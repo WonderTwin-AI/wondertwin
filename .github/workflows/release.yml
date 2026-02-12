@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          BINARY="wt-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
+          go build -ldflags "-s -w -X main.version=${{ github.ref_name }}" \
+            -o "${BINARY}" ./cmd/wt/
+          echo "BINARY=${BINARY}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wt-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.BINARY }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum wt-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## WonderTwin CLI ${{ github.ref_name }}
+
+            ### Installation
+
+            Download the binary for your platform below, rename it to `wt` (or `wt.exe` on Windows), and place it on your `PATH`.
+
+            **macOS (Apple Silicon):**
+            ```bash
+            curl -Lo wt https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/wt-darwin-arm64
+            chmod +x wt && sudo mv wt /usr/local/bin/
+            ```
+
+            **macOS (Intel):**
+            ```bash
+            curl -Lo wt https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/wt-darwin-amd64
+            chmod +x wt && sudo mv wt /usr/local/bin/
+            ```
+
+            **Linux (amd64):**
+            ```bash
+            curl -Lo wt https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/wt-linux-amd64
+            chmod +x wt && sudo mv wt /usr/local/bin/
+            ```
+
+            ### Verify checksums
+            ```bash
+            sha256sum --check checksums.txt
+            ```
+          files: |
+            dist/wt-*
+            dist/checksums.txt
