@@ -1,0 +1,29 @@
+# wondertwin.yaml — WonderTwin project manifest
+#
+# Declares which twins to run locally, their ports, and configuration.
+# The `wt` CLI reads this file to manage twin lifecycle.
+#
+# For v0.1, twin binaries must be pre-compiled and available at the
+# configured `binary` path. No registry download yet.
+#
+# To test with saltwyk-sim twins:
+#   1. cd /path/to/saltwyk-sim && make build
+#   2. Copy this file to wondertwin.yaml and adjust binary paths
+#   3. wt up
+
+twins:
+  stripe:
+    binary: /path/to/saltwyk-sim/bin/twin-stripe
+    port: 9001
+    # admin_port defaults to same as port (twins serve admin on same router)
+    seed: /path/to/saltwyk-sim/config/seed-data/shopper-signup-fixtures.json
+    env:
+      STRIPE_WEBHOOK_SECRET: "whsec_sim_test_secret"
+
+  twilio:
+    binary: /path/to/saltwyk-sim/bin/twin-twilio
+    port: 9005
+
+settings:
+  log_dir: .wt/logs
+  verbose: true
