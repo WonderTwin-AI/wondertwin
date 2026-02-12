@@ -16,18 +16,24 @@
 #   3. wt up
 
 twins:
-  # Version-based twin — downloaded from registry via `wt install`
   stripe:
-    version: "0.3.2"     # or "latest"
-    port: 9001
-    seed: /path/to/seed-data/shopper-signup-fixtures.json
-    env:
-      STRIPE_WEBHOOK_SECRET: "whsec_sim_test_secret"
-
-  # Binary path twin — use a local pre-compiled binary
+    binary: ./bin/twin-stripe
+    port: 4111
   twilio:
-    binary: /path/to/saltwyk-sim/bin/twin-twilio
-    port: 9005
+    binary: ./bin/twin-twilio
+    port: 4112
+  resend:
+    binary: ./bin/twin-resend
+    port: 4113
+  posthog:
+    binary: ./bin/twin-posthog
+    port: 4114
+  clerk:
+    binary: ./bin/twin-clerk
+    port: 4115
+  logodev:
+    binary: ./bin/twin-logodev
+    port: 4116
 
 settings:
   binary_dir: ~/.wondertwin/bin   # where `wt install` saves binaries

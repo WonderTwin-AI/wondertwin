@@ -1,11 +1,20 @@
-.PHONY: build clean test vet release-local
+.PHONY: build build-twins build-all clean test vet release-local
 
 VERSION ?= dev
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
+TWINS := stripe twilio resend posthog clerk logodev
+
 build: ## Build the wt CLI binary
 	go build $(LDFLAGS) -o bin/wt ./cmd/wt/
 	@echo "Built bin/wt (version=$(VERSION))"
+
+build-twins: ## Build all twin binaries
+	@mkdir -p bin
+	$(foreach twin,$(TWINS),go build -o bin/twin-$(twin) ./twin-$(twin)/cmd/twin-$(twin)/;)
+	@echo "Built twins: $(TWINS)"
+
+build-all: build build-twins ## Build wt CLI and all twins
 
 clean: ## Remove build artifacts
 	rm -rf bin/ dist/
