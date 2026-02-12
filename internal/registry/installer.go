@@ -1,0 +1,87 @@
+package registry
+
+import (
+	"crypto/sha256"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+)
+
+// Install downloads a twin binary for the current platform, verifies its
+// checksum, and saves it to binaryDir. It also writes a .version sidecar file.
+func Install(twinName string, resolvedVersion string, ver Version, binaryDir string) error {
+	platform := runtime.GOOS + "-" + runtime.GOARCH
+
+	binaryURL, ok := ver.BinaryURLs[platform]
+	if !ok {
+		return fmt.Errorf("no binary available for platform %s", platform)
+	}
+
+	expectedChecksum, hasChecksum := ver.Checksums[platform]
+
+	// Ensure binary directory exists
+	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
+		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
+	}
+
+	// Download binary
+	fmt.Printf("  Downloading twin-%s v%s (%s)...\n", twinName, resolvedVersion, platform)
+
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(binaryURL)
+	if err != nil {
+		return fmt.Errorf("downloading binary: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
+	}
+
+	// Read entire binary into memory for checksum verification
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading binary data: %w", err)
+	}
+
+	// Verify checksum
+	if hasChecksum {
+		fmt.Printf("  Verifying checksum...\n")
+		actual := fmt.Sprintf("sha256:%x", sha256.Sum256(data))
+		if actual != expectedChecksum {
+			return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actual)
+		}
+	}
+
+	// Write binary to disk
+	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
+	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
+		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
+	}
+
+	// Write version sidecar file
+	versionPath := binaryPath + ".version"
+	if err := os.WriteFile(versionPath, []byte(resolvedVersion), 0o644); err != nil {
+		return fmt.Errorf("writing version file: %w", err)
+	}
+
+	fmt.Printf("  Installed twin-%s v%s -> %s\n", twinName, resolvedVersion, binaryPath)
+	return nil
+}
+
+// ExpandPath expands a leading ~ to the user's home directory.
+func ExpandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
+}

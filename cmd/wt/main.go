@@ -2,14 +2,16 @@
 //
 // Usage:
 //
-//	wt up                     Start all twins from wondertwin.yaml
-//	wt down                   Stop all running twins
-//	wt status                 Health check all running twins
-//	wt reset                  Reset state on all running twins
-//	wt seed <twin> <file>     POST seed data to a twin's /admin/state
-//	wt logs <twin>            Tail stdout/stderr of a running twin
-//	wt inspect <twin> [res]   Query a running twin's internal state
-//	wt test [path]            Run YAML test scenarios against running twins
+//	wt up                         Start all twins from wondertwin.yaml
+//	wt down                       Stop all running twins
+//	wt status                     Health check all running twins
+//	wt reset                      Reset state on all running twins
+//	wt seed <twin> <file>         POST seed data to a twin's /admin/state
+//	wt logs <twin>                Tail stdout/stderr of a running twin
+//	wt inspect <twin> [res]       Query a running twin's internal state
+//	wt test [path]                Run YAML test scenarios against running twins
+//	wt install                    Install all twins from wondertwin.yaml
+//	wt install <twin>@<version>   Install a specific twin at a version
 package main
 
 import (
@@ -18,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +28,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
+	"github.com/wondertwin-ai/wondertwin/internal/registry"
 	"github.com/wondertwin-ai/wondertwin/internal/scenario"
 )
 
@@ -61,6 +65,8 @@ func main() {
 		err = cmdMcp(manifestPath)
 	case "test":
 		err = cmdTest(manifestPath, args)
+	case "install":
+		err = cmdInstall(manifestPath, args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -104,21 +110,24 @@ Usage:
   wt [--config <path>] <command> [arguments]
 
 Commands:
-  up                     Start all twins defined in wondertwin.yaml
-  down                   Stop all running twins
-  status                 Health check all running twins
-  reset                  Reset state on all running twins
-  seed <twin> <file>     POST seed data to a twin
-  logs <twin>            Tail logs of a running twin
-  inspect <twin> [res]   Query twin state (res: state|requests|faults|time)
-  mcp                    Start MCP server over stdio (for AI agents)
-  test [path]            Run YAML test scenarios (default: ./scenarios/)
+  up                         Start all twins defined in wondertwin.yaml
+  down                       Stop all running twins
+  status                     Health check all running twins
+  reset                      Reset state on all running twins
+  seed <twin> <file>         POST seed data to a twin
+  logs <twin>                Tail logs of a running twin
+  inspect <twin> [res]       Query twin state (res: state|requests|faults|time)
+  mcp                        Start MCP server over stdio (for AI agents)
+  test [path]                Run YAML test scenarios (default: ./scenarios/)
+  install                    Install all twins from wondertwin.yaml
+  install <twin>@<version>   Install a specific twin at a version
 
 Options:
   --config <path>   Path to wondertwin.yaml (default: ./wondertwin.yaml)
 
 Environment:
   WT_CONFIG         Override default manifest path
+  WT_REGISTRY_URL   Override registry URL
 `)
 }
 
@@ -550,4 +559,88 @@ func passFailLabel(passed bool) string {
 		return "PASSED"
 	}
 	return "FAILED"
+}
+
+// ---------------------------------------------------------------------------
+// wt install
+// ---------------------------------------------------------------------------
+
+func cmdInstall(manifestPath string, args []string) error {
+	registryURL := registry.DefaultRegistryURL
+	if u := os.Getenv("WT_REGISTRY_URL"); u != "" {
+		registryURL = u
+	}
+
+	fmt.Println("Fetching twin registry...")
+	reg, err := registry.FetchRegistry(registryURL)
+	if err != nil {
+		return err
+	}
+
+	// wt install <twin>@<version> — install a single twin
+	if len(args) > 0 {
+		spec := args[0]
+		twinName, versionSpec := parseInstallSpec(spec)
+
+		if versionSpec == "" {
+			versionSpec = "latest"
+		}
+
+		resolvedVersion, ver, err := reg.ResolveVersion(twinName, versionSpec)
+		if err != nil {
+			return err
+		}
+
+		binaryDir := registry.ExpandPath("~/.wondertwin/bin")
+		return registry.Install(twinName, resolvedVersion, ver, binaryDir)
+	}
+
+	// wt install — install all twins from manifest
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	binaryDir := registry.ExpandPath(m.Settings.BinaryDir)
+
+	fmt.Println()
+	names := m.TwinNames()
+	var failed []string
+	for _, name := range names {
+		twin := m.Twins[name]
+		versionSpec := twin.Version
+		if versionSpec == "" {
+			fmt.Printf("  %-20s skipped (no version specified, using binary path)\n", name)
+			continue
+		}
+
+		resolvedVersion, ver, err := reg.ResolveVersion(name, versionSpec)
+		if err != nil {
+			fmt.Printf("  %-20s FAILED — %v\n", name, err)
+			failed = append(failed, name)
+			continue
+		}
+
+		if err := registry.Install(name, resolvedVersion, ver, binaryDir); err != nil {
+			fmt.Printf("  %-20s FAILED — %v\n", name, err)
+			failed = append(failed, name)
+			continue
+		}
+	}
+
+	fmt.Println()
+	if len(failed) > 0 {
+		return fmt.Errorf("failed to install: %s", strings.Join(failed, ", "))
+	}
+	fmt.Println("All twins installed.")
+	return nil
+}
+
+// parseInstallSpec parses "twin@version" into (twin, version).
+// If no @ is present, returns (spec, "").
+func parseInstallSpec(spec string) (string, string) {
+	if i := strings.LastIndex(spec, "@"); i >= 0 {
+		return spec[:i], spec[i+1:]
+	}
+	return spec, ""
 }

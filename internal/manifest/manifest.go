@@ -4,6 +4,8 @@ package manifest
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,6 +13,7 @@ import (
 // Twin defines the configuration for a single twin in the manifest.
 type Twin struct {
 	Binary    string            `yaml:"binary"`
+	Version   string            `yaml:"version"`
 	Port      int               `yaml:"port"`
 	AdminPort int               `yaml:"admin_port"`
 	Seed      string            `yaml:"seed"`
@@ -50,10 +53,18 @@ func Load(path string) (*Manifest, error) {
 	if m.Settings.LogDir == "" {
 		m.Settings.LogDir = ".wt/logs"
 	}
+	if m.Settings.BinaryDir == "" {
+		m.Settings.BinaryDir = "~/.wondertwin/bin"
+	}
 
 	for name, t := range m.Twins {
-		if t.Binary == "" {
-			return nil, fmt.Errorf("twin %q: binary path is required", name)
+		if t.Binary == "" && t.Version == "" {
+			return nil, fmt.Errorf("twin %q: binary path or version is required", name)
+		}
+		// When version is set but binary is not, resolve binary from BinaryDir
+		if t.Binary == "" && t.Version != "" {
+			binDir := expandPath(m.Settings.BinaryDir)
+			t.Binary = filepath.Join(binDir, "twin-"+name)
 		}
 		if t.Port == 0 {
 			return nil, fmt.Errorf("twin %q: port is required", name)
@@ -93,4 +104,16 @@ func sortStrings(s []string) {
 			s[j], s[j-1] = s[j-1], s[j]
 		}
 	}
+}
+
+// expandPath expands a leading ~ to the user's home directory.
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
