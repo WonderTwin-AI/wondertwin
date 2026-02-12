@@ -32,6 +32,9 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/scenario"
 )
 
+// version is set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
 const defaultManifest = "wondertwin.yaml"
 
 func main() {
@@ -47,6 +50,9 @@ func main() {
 
 	var err error
 	switch cmd {
+	case "version", "--version", "-v":
+		fmt.Printf("wt version %s\n", version)
+		return
 	case "up":
 		err = cmdUp(manifestPath)
 	case "down":
@@ -104,7 +110,7 @@ func parseArgs() (command string, args []string, manifestPath string) {
 }
 
 func printUsage() {
-	fmt.Print(`wt — WonderTwin CLI v0.1
+	fmt.Printf(`wt — WonderTwin CLI %s
 
 Usage:
   wt [--config <path>] <command> [arguments]
@@ -121,6 +127,7 @@ Commands:
   test [path]                Run YAML test scenarios (default: ./scenarios/)
   install                    Install all twins from wondertwin.yaml
   install <twin>@<version>   Install a specific twin at a version
+  version                    Print the wt version
 
 Options:
   --config <path>   Path to wondertwin.yaml (default: ./wondertwin.yaml)
@@ -128,7 +135,7 @@ Options:
 Environment:
   WT_CONFIG         Override default manifest path
   WT_REGISTRY_URL   Override registry URL
-`)
+`, version)
 }
 
 // ---------------------------------------------------------------------------
