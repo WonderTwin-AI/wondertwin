@@ -22,6 +22,7 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/internal/client"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
+	"github.com/wondertwin-ai/wondertwin/internal/mcp"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
 )
 
@@ -54,6 +55,8 @@ func main() {
 		err = cmdLogs(manifestPath, args)
 	case "inspect":
 		err = cmdInspect(manifestPath, args)
+	case "mcp":
+		err = cmdMcp(manifestPath)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -104,6 +107,7 @@ Commands:
   seed <twin> <file>     POST seed data to a twin
   logs <twin>            Tail logs of a running twin
   inspect <twin> [res]   Query twin state (res: state|requests|faults|time)
+  mcp                    Start MCP server over stdio (for AI agents)
 
 Options:
   --config <path>   Path to wondertwin.yaml (default: ./wondertwin.yaml)
@@ -439,4 +443,18 @@ func prettyJSON(raw string) (string, error) {
 		return "", err
 	}
 	return string(indented), nil
+}
+
+// ---------------------------------------------------------------------------
+// wt mcp
+// ---------------------------------------------------------------------------
+
+func cmdMcp(manifestPath string) error {
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	srv := mcp.NewServer(m)
+	return srv.Serve()
 }
