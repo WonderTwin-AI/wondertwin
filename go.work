@@ -1,0 +1,12 @@
+go 1.25.7
+
+use (
+	.
+	./pkg
+	./twin-clerk
+	./twin-logodev
+	./twin-posthog
+	./twin-resend
+	./twin-stripe
+	./twin-twilio
+)
