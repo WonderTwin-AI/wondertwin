@@ -3,27 +3,33 @@
 # Declares which twins to run locally, their ports, and configuration.
 # The `wt` CLI reads this file to manage twin lifecycle.
 #
-# For v0.1, twin binaries must be pre-compiled and available at the
-# configured `binary` path. No registry download yet.
+# Twins can be configured in two ways:
 #
-# To test with saltwyk-sim twins:
-#   1. cd /path/to/saltwyk-sim && make build
-#   2. Copy this file to wondertwin.yaml and adjust binary paths
+# 1. Version-based (recommended): Set `version` and run `wt install` to
+#    download pre-compiled binaries from the WonderTwin registry.
+#
+# 2. Binary path: Set `binary` to a local path for custom or pre-built twins.
+#
+# Quick start with registry twins:
+#   1. Copy this file to wondertwin.yaml
+#   2. wt install
 #   3. wt up
 
 twins:
+  # Version-based twin — downloaded from registry via `wt install`
   stripe:
-    binary: /path/to/saltwyk-sim/bin/twin-stripe
+    version: "0.3.2"     # or "latest"
     port: 9001
-    # admin_port defaults to same as port (twins serve admin on same router)
-    seed: /path/to/saltwyk-sim/config/seed-data/shopper-signup-fixtures.json
+    seed: /path/to/seed-data/shopper-signup-fixtures.json
     env:
       STRIPE_WEBHOOK_SECRET: "whsec_sim_test_secret"
 
+  # Binary path twin — use a local pre-compiled binary
   twilio:
     binary: /path/to/saltwyk-sim/bin/twin-twilio
     port: 9005
 
 settings:
+  binary_dir: ~/.wondertwin/bin   # where `wt install` saves binaries
   log_dir: .wt/logs
   verbose: true
