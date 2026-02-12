@@ -54,6 +54,40 @@ func (c *AdminClient) Reset(adminPort int) (string, error) {
 	return strings.TrimSpace(string(body)), nil
 }
 
+// Inspect fetches GET /admin/state and returns the raw JSON body.
+func (c *AdminClient) Inspect(adminPort int) (string, error) {
+	return c.adminGet(adminPort, "/admin/state")
+}
+
+// InspectRequests fetches GET /admin/requests and returns the raw JSON body.
+func (c *AdminClient) InspectRequests(adminPort int) (string, error) {
+	return c.adminGet(adminPort, "/admin/requests")
+}
+
+// InspectFaults fetches GET /admin/faults and returns the raw JSON body.
+func (c *AdminClient) InspectFaults(adminPort int) (string, error) {
+	return c.adminGet(adminPort, "/admin/faults")
+}
+
+// InspectTime fetches GET /admin/time and returns the raw JSON body.
+func (c *AdminClient) InspectTime(adminPort int) (string, error) {
+	return c.adminGet(adminPort, "/admin/time")
+}
+
+// adminGet is a helper that GETs an admin endpoint and returns the raw body.
+func (c *AdminClient) adminGet(adminPort int, path string) (string, error) {
+	resp, err := c.http.Get(fmt.Sprintf("http://localhost:%d%s", adminPort, path))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GET %s returned status %d: %s", path, resp.StatusCode, body)
+	}
+	return string(body), nil
+}
+
 // Seed POSTs the contents of a JSON file to POST /admin/state on a twin.
 func (c *AdminClient) Seed(adminPort int, filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
