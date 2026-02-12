@@ -9,6 +9,7 @@
 //	wt seed <twin> <file>     POST seed data to a twin's /admin/state
 //	wt logs <twin>            Tail stdout/stderr of a running twin
 //	wt inspect <twin> [res]   Query a running twin's internal state
+//	wt test [path]            Run YAML test scenarios against running twins
 package main
 
 import (
@@ -24,6 +25,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
+	"github.com/wondertwin-ai/wondertwin/internal/scenario"
 )
 
 const defaultManifest = "wondertwin.yaml"
@@ -57,6 +59,8 @@ func main() {
 		err = cmdInspect(manifestPath, args)
 	case "mcp":
 		err = cmdMcp(manifestPath)
+	case "test":
+		err = cmdTest(manifestPath, args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -108,6 +112,7 @@ Commands:
   logs <twin>            Tail logs of a running twin
   inspect <twin> [res]   Query twin state (res: state|requests|faults|time)
   mcp                    Start MCP server over stdio (for AI agents)
+  test [path]            Run YAML test scenarios (default: ./scenarios/)
 
 Options:
   --config <path>   Path to wondertwin.yaml (default: ./wondertwin.yaml)
@@ -457,4 +462,92 @@ func cmdMcp(manifestPath string) error {
 
 	srv := mcp.NewServer(m)
 	return srv.Serve()
+}
+
+// ---------------------------------------------------------------------------
+// wt test [path]
+// ---------------------------------------------------------------------------
+
+func cmdTest(manifestPath string, args []string) error {
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	// Determine what to load: a specific file, a directory, or the default ./scenarios/
+	path := "./scenarios/"
+	if len(args) > 0 {
+		path = args[0]
+	}
+
+	var scenarios []*scenario.Scenario
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("scenario path %s: %w", path, err)
+	}
+
+	if info.IsDir() {
+		scenarios, err = scenario.LoadDir(path)
+		if err != nil {
+			return err
+		}
+	} else {
+		s, err := scenario.LoadScenario(path)
+		if err != nil {
+			return err
+		}
+		scenarios = append(scenarios, s)
+	}
+
+	runner := scenario.NewRunner(m)
+
+	totalPassed := 0
+	totalFailed := 0
+	totalSteps := 0
+
+	for _, s := range scenarios {
+		fmt.Printf("\n--- %s ---\n", s.Name)
+		if s.Description != "" {
+			fmt.Printf("    %s\n", s.Description)
+		}
+		fmt.Println()
+
+		result, err := runner.Run(s)
+		if err != nil {
+			fmt.Printf("  ERROR: %v\n", err)
+			totalFailed++
+			continue
+		}
+
+		for _, sr := range result.Steps {
+			totalSteps++
+			if sr.Passed {
+				fmt.Printf("  PASS  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+				totalPassed++
+			} else {
+				fmt.Printf("  FAIL  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+				fmt.Printf("        %s\n", sr.Error)
+				totalFailed++
+			}
+		}
+
+		fmt.Printf("\n  Scenario: %s (%s)\n", passFailLabel(result.Passed), result.Duration.Round(time.Millisecond))
+	}
+
+	// Summary
+	fmt.Println()
+	fmt.Printf("Results: %d passed, %d failed, %d total\n", totalPassed, totalFailed, totalPassed+totalFailed)
+
+	if totalFailed > 0 {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func passFailLabel(passed bool) string {
+	if passed {
+		return "PASSED"
+	}
+	return "FAILED"
 }
