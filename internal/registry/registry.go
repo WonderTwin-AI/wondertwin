@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -25,6 +26,7 @@ type TwinEntry struct {
 	Description string             `yaml:"description"`
 	Repo        string             `yaml:"repo"`
 	Category    string             `yaml:"category"`
+	Author      string             `yaml:"author"`
 	Latest      string             `yaml:"latest"`
 	Versions    map[string]Version `yaml:"versions"`
 }
@@ -32,6 +34,9 @@ type TwinEntry struct {
 // Version describes a specific release of a twin.
 type Version struct {
 	Released   string            `yaml:"released"`
+	SDKPackage string            `yaml:"sdk_package"`
+	SDKVersion string            `yaml:"sdk_version"`
+	Tier       string            `yaml:"tier"`
 	Checksums  map[string]string `yaml:"checksums"`
 	BinaryURLs map[string]string `yaml:"binary_urls"`
 }
@@ -68,11 +73,20 @@ func FetchRegistry(url string) (*Registry, error) {
 }
 
 // ResolveVersion looks up a twin in the registry and resolves the version spec.
-// The versionSpec may be "latest" or an exact version string like "0.3.2".
+// The versionSpec may be:
+//   - "latest" — resolves to the entry's latest version
+//   - "0.4.0"  — exact match
+//   - "sdk:github.com/stripe/stripe-go/v76" — newest version targeting this SDK package
 func (r *Registry) ResolveVersion(twinName, versionSpec string) (string, Version, error) {
 	entry, ok := r.Twins[twinName]
 	if !ok {
 		return "", Version{}, fmt.Errorf("twin %q not found in registry", twinName)
+	}
+
+	// SDK resolution: find newest version matching an SDK package
+	if strings.HasPrefix(versionSpec, "sdk:") {
+		sdkPackage := strings.TrimPrefix(versionSpec, "sdk:")
+		return resolveBySDK(twinName, entry, sdkPackage)
 	}
 
 	resolvedVersion := versionSpec
@@ -89,4 +103,52 @@ func (r *Registry) ResolveVersion(twinName, versionSpec string) (string, Version
 	}
 
 	return resolvedVersion, ver, nil
+}
+
+// resolveBySDK finds the newest version of a twin targeting the given SDK package.
+func resolveBySDK(twinName string, entry TwinEntry, sdkPackage string) (string, Version, error) {
+	var bestVersion string
+	var bestVer Version
+
+	for v, ver := range entry.Versions {
+		if ver.SDKPackage != sdkPackage {
+			continue
+		}
+		if bestVersion == "" || compareSemver(v, bestVersion) > 0 {
+			bestVersion = v
+			bestVer = ver
+		}
+	}
+
+	if bestVersion == "" {
+		return "", Version{}, fmt.Errorf("twin %q has no version targeting SDK %q", twinName, sdkPackage)
+	}
+
+	return bestVersion, bestVer, nil
+}
+
+// compareSemver does a simple lexicographic comparison of dotted version strings.
+// Returns >0 if a > b, <0 if a < b, 0 if equal.
+func compareSemver(a, b string) int {
+	aParts := strings.Split(strings.TrimPrefix(a, "v"), ".")
+	bParts := strings.Split(strings.TrimPrefix(b, "v"), ".")
+
+	maxLen := len(aParts)
+	if len(bParts) > maxLen {
+		maxLen = len(bParts)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var aNum, bNum int
+		if i < len(aParts) {
+			fmt.Sscanf(aParts[i], "%d", &aNum)
+		}
+		if i < len(bParts) {
+			fmt.Sscanf(bParts[i], "%d", &bNum)
+		}
+		if aNum != bNum {
+			return aNum - bNum
+		}
+	}
+	return 0
 }

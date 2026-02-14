@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/internal/config"
 )
 
 // Install downloads a twin binary for the current platform, verifies its
@@ -72,6 +74,42 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 
 	fmt.Printf("  Installed twin-%s v%s -> %s\n", twinName, resolvedVersion, binaryPath)
 	return nil
+}
+
+// CheckTierAccess verifies that the user has the required license for a version's tier.
+// Returns nil if access is allowed, or an error with instructions if not.
+func CheckTierAccess(twinName, resolvedVersion string, ver Version, cfg *config.Config) error {
+	if ver.Tier == "" || ver.Tier == "free" {
+		return nil
+	}
+
+	if cfg == nil || !cfg.HasValidLicense() {
+		return fmt.Errorf(
+			"twin-%s v%s requires a %s license.\nRun `wt auth login` to activate, or use `wt install %s@latest` (free).",
+			twinName, resolvedVersion, ver.Tier, twinName,
+		)
+	}
+
+	return nil
+}
+
+// IsAlreadyInstalled checks if a twin binary with the matching version is already present.
+func IsAlreadyInstalled(twinName, resolvedVersion, binaryDir string) bool {
+	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
+	versionPath := binaryPath + ".version"
+
+	// Check binary exists
+	if _, err := os.Stat(binaryPath); err != nil {
+		return false
+	}
+
+	// Check version sidecar matches
+	data, err := os.ReadFile(versionPath)
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(data)) == resolvedVersion
 }
 
 // ExpandPath expands a leading ~ to the user's home directory.

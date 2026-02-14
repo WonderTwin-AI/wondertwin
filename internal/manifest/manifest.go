@@ -14,6 +14,7 @@ import (
 type Twin struct {
 	Binary    string            `yaml:"binary"`
 	Version   string            `yaml:"version"`
+	Registry  string            `yaml:"registry"`
 	Port      int               `yaml:"port"`
 	AdminPort int               `yaml:"admin_port"`
 	Seed      string            `yaml:"seed"`
@@ -31,6 +32,9 @@ type Settings struct {
 type Manifest struct {
 	Twins    map[string]Twin `yaml:"twins"`
 	Settings Settings        `yaml:"settings"`
+
+	// dir is the directory containing the manifest file, used for resolving relative paths.
+	dir string
 }
 
 // Load reads and parses a wondertwin.yaml file.
@@ -49,6 +53,13 @@ func Load(path string) (*Manifest, error) {
 		return nil, fmt.Errorf("manifest has no twins defined")
 	}
 
+	// Store the manifest directory for relative path resolution
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving manifest path: %w", err)
+	}
+	m.dir = filepath.Dir(absPath)
+
 	// Apply defaults
 	if m.Settings.LogDir == "" {
 		m.Settings.LogDir = ".wt/logs"
@@ -61,8 +72,15 @@ func Load(path string) (*Manifest, error) {
 		if t.Binary == "" && t.Version == "" {
 			return nil, fmt.Errorf("twin %q: binary path or version is required", name)
 		}
-		// When version is set but binary is not, resolve binary from BinaryDir
-		if t.Binary == "" && t.Version != "" {
+		// Default registry to "public"
+		if t.Registry == "" {
+			t.Registry = "public"
+		}
+		// Resolve binary path
+		if t.Binary != "" {
+			t.Binary = m.resolvePath(t.Binary)
+		} else if t.Version != "" {
+			// When version is set but binary is not, resolve binary from BinaryDir
 			binDir := expandPath(m.Settings.BinaryDir)
 			t.Binary = filepath.Join(binDir, "twin-"+name)
 		}
@@ -77,6 +95,19 @@ func Load(path string) (*Manifest, error) {
 	}
 
 	return &m, nil
+}
+
+// resolvePath resolves a binary path. Absolute paths and ~ paths are returned as-is.
+// Relative paths (starting with ./ or ../) are resolved against the manifest directory.
+func (m *Manifest) resolvePath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	if strings.HasPrefix(path, "~/") {
+		return expandPath(path)
+	}
+	// Relative path: resolve against manifest directory
+	return filepath.Join(m.dir, path)
 }
 
 // Twin returns a named twin's config, or an error if not found.

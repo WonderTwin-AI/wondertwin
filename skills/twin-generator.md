@@ -8,7 +8,7 @@ Generate a complete, production-ready WonderTwin behavioral API twin from a thir
 
 Before using this skill, ensure you have access to:
 
-1. The WonderTwin shared libraries (`pkg/twincore`, `pkg/store`, `pkg/admin`, `pkg/webhook`, `pkg/testutil`)
+1. The WonderTwin shared libraries via `github.com/wondertwin-ai/twinkit` (`twincore`, `store`, `admin`, `webhook`, `testutil`)
 2. The target service's public API documentation or SDK reference
 3. Optionally, the official SDK client library source code for compatibility verification
 
@@ -40,8 +40,16 @@ twin-{name}/
 │   └── store/
 │       ├── types.go                  # Domain structs with JSON tags
 │       └── memory.go                 # MemoryStore implementing admin.StateStore
+├── twin.yaml                         # Twin metadata (name, SDK, port)
 ├── go.mod
-└── go.sum
+├── go.sum
+├── Makefile
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                    # PR checks: build, test, conformance
+│       └── release.yml              # Tag-triggered: cross-compile + release + registry notify
+└── scenarios/                        # wt test scenarios for integration testing
+    └── basic.yaml
 ```
 
 If the service has webhooks, add:
@@ -54,6 +62,59 @@ If the service has webhooks, add:
 ---
 
 ## Process
+
+### Phase 0: Project Setup
+
+Before writing any twin code, set up the project from the template.
+
+**1. Create the repository:**
+
+```bash
+# Public twin (community contribution)
+gh repo create {org}/twin-{name} --template wondertwin-ai/twin-template --public
+
+# Private twin (internal API)
+gh repo create {org}/twin-{name} --template wondertwin-ai/twin-template --private
+```
+
+**2. Fill in `twin.yaml`** at the repo root:
+
+```yaml
+name: {name}
+description: "Behavioral clone of the {Service} API"
+category: {category}    # e.g., payments, messaging, auth, analytics, email
+
+# SDK version this twin targets
+sdk:
+  package: "{sdk_import_path}"      # e.g., "github.com/stripe/stripe-go/v76"
+  version: "{sdk_version}"          # e.g., "v76.0.0"
+
+# Default port when run standalone
+default_port: {port}                # Pick a unique port (e.g., 4111)
+```
+
+**3. Initialize the Go module:**
+
+```bash
+go mod init github.com/{org}/twin-{name}
+go get github.com/wondertwin-ai/twinkit@latest
+go get github.com/go-chi/chi/v5@latest
+```
+
+**4. The `go.mod` should look like:**
+
+```
+module github.com/{org}/twin-{name}
+
+go 1.25.7
+
+require (
+    github.com/go-chi/chi/v5 v5.2.1
+    github.com/wondertwin-ai/twinkit v0.1.0
+)
+```
+
+No `replace` directives — twins depend on published `twinkit` versions.
 
 ### Phase 1: API Analysis
 
@@ -155,7 +216,7 @@ package store
 
 import (
     "encoding/json"
-    pkgstore "github.com/saltwyk/saltwyk-sim/pkg/store"  // Will become wondertwin pkg path
+    pkgstore "github.com/wondertwin-ai/twinkit/store"
 )
 
 type MemoryStore struct {
@@ -226,8 +287,8 @@ package api
 
 import (
     "github.com/go-chi/chi/v5"
-    "github.com/saltwyk/saltwyk-sim/pkg/twincore"
-    "github.com/saltwyk/saltwyk-sim/twin-{name}/internal/store"
+    "github.com/wondertwin-ai/twinkit/twincore"
+    "github.com/{org}/twin-{name}/internal/store"
 )
 
 type Handler struct {
@@ -511,13 +572,13 @@ package main
 import (
     "os"
 
-    // Shared WonderTwin packages
-    "github.com/saltwyk/saltwyk-sim/pkg/admin"
-    "github.com/saltwyk/saltwyk-sim/pkg/twincore"
+    // Shared WonderTwin packages (from twinkit)
+    "github.com/wondertwin-ai/twinkit/admin"
+    "github.com/wondertwin-ai/twinkit/twincore"
 
     // Twin-specific packages
-    "github.com/saltwyk/saltwyk-sim/twin-{name}/internal/api"
-    "github.com/saltwyk/saltwyk-sim/twin-{name}/internal/store"
+    "github.com/{org}/twin-{name}/internal/api"
+    "github.com/{org}/twin-{name}/internal/store"
 )
 
 func main() {
@@ -581,7 +642,7 @@ func main() {
 
 #### `internal/api/handlers_test.go`
 
-Write tests using the shared `pkg/testutil` package:
+Write tests using the shared `twinkit/testutil` package:
 
 ```go
 package api_test
@@ -590,11 +651,11 @@ import (
     "net/http/httptest"
     "testing"
 
-    "github.com/saltwyk/saltwyk-sim/pkg/admin"
-    "github.com/saltwyk/saltwyk-sim/pkg/testutil"
-    "github.com/saltwyk/saltwyk-sim/pkg/twincore"
-    "github.com/saltwyk/saltwyk-sim/twin-{name}/internal/api"
-    "github.com/saltwyk/saltwyk-sim/twin-{name}/internal/store"
+    "github.com/wondertwin-ai/twinkit/admin"
+    "github.com/wondertwin-ai/twinkit/testutil"
+    "github.com/wondertwin-ai/twinkit/twincore"
+    "github.com/{org}/twin-{name}/internal/api"
+    "github.com/{org}/twin-{name}/internal/store"
 )
 
 func setupTestServer(t *testing.T) (*testutil.TwinClient, *testutil.AdminClient) {
@@ -694,17 +755,145 @@ func TestAdminResetClearsState(t *testing.T) {
 #### `go.mod`
 
 ```
-module github.com/saltwyk/saltwyk-sim/twin-{name}
+module github.com/{org}/twin-{name}
 
 go 1.25.7
 
 require (
     github.com/go-chi/chi/v5 v5.2.1
-    github.com/saltwyk/saltwyk-sim/pkg v0.0.0
+    github.com/wondertwin-ai/twinkit v0.1.0
 )
 ```
 
-Note: The module path will change to `github.com/wondertwin-ai/wondertwin/twin-{name}` when twins are migrated from saltwyk-sim to the wondertwin repo. Use whatever module path matches the current repo structure.
+Twin repos depend on `twinkit` as a normal Go module — no `replace` directives.
+
+### Phase 8: Local Testing with `wt`
+
+Before publishing, validate the twin works end-to-end using the `wt` CLI. This is the primary development workflow — fully offline, no registry needed.
+
+**1. Build the twin locally:**
+
+```bash
+go build -o ./bin/twin-{name} ./cmd/twin-{name}/
+# or use the Makefile:
+make build
+```
+
+**2. Add to your project's `wondertwin.yaml`:**
+
+```yaml
+twins:
+  {name}:
+    binary: ./path/to/twin-{name}/bin/twin-{name}
+    port: {port}
+    # seed: ./fixtures/seed.json    # optional seed data
+```
+
+The `binary:` field supports relative paths — they resolve against the `wondertwin.yaml` location.
+
+**3. Run the full offline workflow:**
+
+```bash
+wt up        # Start the twin
+wt status    # Verify it's healthy
+wt test      # Run test scenarios against it
+wt down      # Stop when done
+```
+
+**4. Write integration test scenarios** in `scenarios/`:
+
+```yaml
+name: "Basic CRUD"
+description: "Verify create, get, list, delete cycle"
+twin: {name}
+
+steps:
+  - name: "Reset state"
+    method: POST
+    path: /admin/reset
+    expect_status: 200
+
+  - name: "Create a resource"
+    method: POST
+    path: /v1/contacts
+    headers:
+      Authorization: "Bearer sk_test_123"
+    body:
+      email: "test@example.com"
+    expect_status: 201
+    capture:
+      contact_id: "$.id"
+
+  - name: "Get the resource"
+    method: GET
+    path: "/v1/contacts/{{contact_id}}"
+    headers:
+      Authorization: "Bearer sk_test_123"
+    expect_status: 200
+```
+
+**5. Run conformance to validate admin API contract:**
+
+```bash
+wt conformance ./bin/twin-{name} --port 9999
+```
+
+This validates all 8 standard checks: health, reset, state POST/GET, fault injection, time advance, and clean shutdown.
+
+**6. Iterate:**
+
+```bash
+# Make code changes, then:
+make build && wt down && wt up && wt test
+```
+
+### Phase 9: Publish (Optional)
+
+Once the twin passes local testing and conformance, publish it to make it installable via `wt install`.
+
+**For public twins (community contribution):**
+
+1. Push a version tag to trigger CI:
+   ```bash
+   git tag v0.1.0
+   git push --tags
+   ```
+2. CI builds cross-platform binaries and creates a GitHub Release
+3. Open a PR to `wondertwin-ai/registry` to add the twin entry
+4. Registry CI runs conformance against the released binary
+5. After merge, the twin is installable: `wt install {name}@latest`
+
+**For private twins:**
+
+1. Same tag-push workflow for building releases
+2. Maintain your own `registry.yaml` in a private repo
+3. Configure `wt registry add` to point to your private registry (Phase 2)
+4. Or skip the registry entirely — use `binary:` paths in manifests
+
+**Release workflow (`.github/workflows/release.yml`):**
+
+The template includes a release workflow that:
+1. Reads `twin.yaml` for metadata
+2. Cross-compiles for 5 platforms (darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64)
+3. Generates SHA256 checksums
+4. Creates a GitHub Release with binaries
+5. Sends a `repository_dispatch` to the registry repo with the release payload
+
+---
+
+## Development Workflow Summary
+
+The recommended workflow emphasizes **offline-first local development**:
+
+```
+1. Set up project from template         (Phase 0)
+2. Analyze the target API               (Phase 1)
+3. Implement store, handlers, tests     (Phases 2-7)
+4. Build and test locally with wt       (Phase 8)  ← Primary loop
+5. Publish to registry when ready       (Phase 9)  ← Optional
+```
+
+For private/internal twins, Phase 9 is entirely optional. The `binary:` field in `wondertwin.yaml` supports any local path, so you can develop and use twins without ever publishing them.
 
 ---
 
@@ -713,6 +902,8 @@ Note: The module path will change to `github.com/wondertwin-ai/wondertwin/twin-{
 Before considering a twin complete, verify:
 
 - [ ] Follows exact directory structure: `cmd/`, `internal/api/`, `internal/store/`
+- [ ] `twin.yaml` has correct name, description, category, SDK package/version, and default port
+- [ ] `go.mod` uses `require github.com/wondertwin-ai/twinkit` (no `replace` directives)
 - [ ] `MemoryStore` implements `admin.StateStore` (Snapshot, LoadState, Reset)
 - [ ] All routes match the real API's URL patterns exactly
 - [ ] Request parsing matches what the SDK sends (JSON vs form-encoded)
@@ -725,10 +916,11 @@ Before considering a twin complete, verify:
 - [ ] `main.go` follows the standard bootstrap pattern
 - [ ] Admin routes are registered via `admin.NewHandler().Routes()`
 - [ ] Handler tests cover CRUD operations, pagination, reset, and auth
-- [ ] `go.mod` uses correct module path for the repo
 - [ ] No hardcoded ports (uses `twincore.ParseFlags()`)
 - [ ] If webhooks: Signer implements `webhook.Signer`, dispatcher integrated
 - [ ] If webhooks: `adminHandler.SetFlusher(dispatcher)` called
+- [ ] Passes `wt conformance` (all 8 checks)
+- [ ] Local `wt up` + `wt test` workflow works end-to-end
 
 ## Common Mistakes to Avoid
 
@@ -741,4 +933,6 @@ Before considering a twin complete, verify:
 7. **Using `http.StatusOK` for creates** — check what the real API returns (often 201)
 8. **Skipping `omitempty` on optional JSON fields** — SDK clients may break on unexpected null fields
 9. **Not nil-checking in `LoadState()`** — partial seed data should work
-10. **Importing the wrong module path** — match whatever repo the twin lives in
+10. **Using `replace` directives in `go.mod`** — twins depend on published `twinkit` versions, not local paths
+11. **Skipping `twin.yaml`** — required for release automation and registry metadata
+12. **Not running `wt conformance`** — conformance pass is mandatory for registry listing
