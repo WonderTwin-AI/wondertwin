@@ -12,19 +12,28 @@
 //	wt test [path]                Run YAML test scenarios against running twins
 //	wt install                    Install all twins from wondertwin.yaml
 //	wt install <twin>@<version>   Install a specific twin at a version
+//	wt auth login                 Activate a license key
+//	wt auth status                Show current license tier
+//	wt auth logout                Clear license key
+//	wt conformance <binary>       Run conformance tests against a twin
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/client"
+	"github.com/wondertwin-ai/wondertwin/internal/config"
+	"github.com/wondertwin-ai/wondertwin/internal/conformance"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
@@ -73,6 +82,10 @@ func main() {
 		err = cmdTest(manifestPath, args)
 	case "install":
 		err = cmdInstall(manifestPath, args)
+	case "auth":
+		err = cmdAuth(args)
+	case "conformance":
+		err = cmdConformance(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -127,6 +140,10 @@ Commands:
   test [path]                Run YAML test scenarios (default: ./scenarios/)
   install                    Install all twins from wondertwin.yaml
   install <twin>@<version>   Install a specific twin at a version
+  auth login                 Activate a license key
+  auth status                Show current license tier and org
+  auth logout                Clear license key
+  conformance <binary>       Run conformance tests against a twin binary
   version                    Print the wt version
 
 Options:
@@ -578,6 +595,9 @@ func cmdInstall(manifestPath string, args []string) error {
 		registryURL = u
 	}
 
+	// Load config for tier enforcement
+	cfg, _ := config.Load()
+
 	fmt.Println("Fetching twin registry...")
 	reg, err := registry.FetchRegistry(registryURL)
 	if err != nil {
@@ -598,7 +618,19 @@ func cmdInstall(manifestPath string, args []string) error {
 			return err
 		}
 
+		// Tier enforcement
+		if err := registry.CheckTierAccess(twinName, resolvedVersion, ver, cfg); err != nil {
+			return err
+		}
+
 		binaryDir := registry.ExpandPath("~/.wondertwin/bin")
+
+		// Skip if already installed
+		if registry.IsAlreadyInstalled(twinName, resolvedVersion, binaryDir) {
+			fmt.Printf("  twin-%s v%s already installed, skipping.\n", twinName, resolvedVersion)
+			return nil
+		}
+
 		return registry.Install(twinName, resolvedVersion, ver, binaryDir)
 	}
 
@@ -628,6 +660,19 @@ func cmdInstall(manifestPath string, args []string) error {
 			continue
 		}
 
+		// Tier enforcement
+		if err := registry.CheckTierAccess(name, resolvedVersion, ver, cfg); err != nil {
+			fmt.Printf("  %-20s BLOCKED — %v\n", name, err)
+			failed = append(failed, name)
+			continue
+		}
+
+		// Skip if already installed
+		if registry.IsAlreadyInstalled(name, resolvedVersion, binaryDir) {
+			fmt.Printf("  %-20s v%s already installed, skipping.\n", name, resolvedVersion)
+			continue
+		}
+
 		if err := registry.Install(name, resolvedVersion, ver, binaryDir); err != nil {
 			fmt.Printf("  %-20s FAILED — %v\n", name, err)
 			failed = append(failed, name)
@@ -650,4 +695,163 @@ func parseInstallSpec(spec string) (string, string) {
 		return spec[:i], spec[i+1:]
 	}
 	return spec, ""
+}
+
+// ---------------------------------------------------------------------------
+// wt auth login|status|logout
+// ---------------------------------------------------------------------------
+
+func cmdAuth(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: wt auth <login|status|logout>")
+	}
+
+	switch args[0] {
+	case "login":
+		return cmdAuthLogin()
+	case "status":
+		return cmdAuthStatus()
+	case "logout":
+		return cmdAuthLogout()
+	default:
+		return fmt.Errorf("unknown auth subcommand %q (expected login, status, or logout)", args[0])
+	}
+}
+
+func cmdAuthLogin() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	fmt.Print("Enter license key: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return fmt.Errorf("no input received")
+	}
+
+	key := strings.TrimSpace(scanner.Text())
+	if key == "" {
+		return fmt.Errorf("no license key provided")
+	}
+
+	info := config.ParseLicenseKey(key)
+	if info == nil {
+		return fmt.Errorf("invalid license key format")
+	}
+
+	cfg.LicenseKey = key
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	tierName := config.TierName(info.Tier)
+	if info.Org == "ind" {
+		fmt.Printf("Activated %s license (individual).\n", tierName)
+	} else {
+		fmt.Printf("Activated %s license for org %q.\n", tierName, info.Org)
+	}
+
+	return nil
+}
+
+func cmdAuthStatus() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	if cfg.LicenseKey == "" {
+		fmt.Println("Tier: free (no license key)")
+		return nil
+	}
+
+	info := config.ParseLicenseKey(cfg.LicenseKey)
+	if info == nil {
+		fmt.Println("Tier: free (invalid license key)")
+		return nil
+	}
+
+	tierName := config.TierName(info.Tier)
+	fmt.Printf("Tier: %s\n", tierName)
+	if info.Org != "ind" {
+		fmt.Printf("Org:  %s\n", info.Org)
+	}
+	fmt.Printf("Key:  %s...%s\n", info.Raw[:6], info.Raw[len(info.Raw)-4:])
+
+	return nil
+}
+
+func cmdAuthLogout() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	if cfg.LicenseKey == "" {
+		fmt.Println("No license key configured.")
+		return nil
+	}
+
+	cfg.LicenseKey = ""
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Println("License key removed.")
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// wt conformance <binary> [--port <port>]
+// ---------------------------------------------------------------------------
+
+func cmdConformance(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: wt conformance <binary> [--port <port>]")
+	}
+
+	binaryPath := args[0]
+	port := 19876 // default conformance test port
+
+	// Parse optional --port flag
+	for i := 1; i < len(args); i++ {
+		if args[i] == "--port" && i+1 < len(args) {
+			p, err := strconv.Atoi(args[i+1])
+			if err != nil {
+				return fmt.Errorf("invalid port: %s", args[i+1])
+			}
+			port = p
+			i++
+		}
+	}
+
+	// Resolve binary path
+	absPath, err := filepath.Abs(binaryPath)
+	if err != nil {
+		return fmt.Errorf("resolving binary path: %w", err)
+	}
+
+	fmt.Printf("Running conformance suite against %s on port %d...\n\n", binaryPath, port)
+
+	report, err := conformance.Run(absPath, port)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range report.Results {
+		if r.Passed {
+			fmt.Printf("  PASS  %s\n", r.Name)
+		} else {
+			fmt.Printf("  FAIL  %s\n", r.Name)
+			fmt.Printf("        %s\n", r.Detail)
+		}
+	}
+
+	fmt.Printf("\nResults: %d passed, %d failed, %d total\n", report.Passed, report.Failed, report.Passed+report.Failed)
+
+	if report.Failed > 0 {
+		os.Exit(1)
+	}
+	return nil
 }

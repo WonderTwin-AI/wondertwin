@@ -3,12 +3,17 @@
 # Declares which twins to run locally, their ports, and configuration.
 # The `wt` CLI reads this file to manage twin lifecycle.
 #
-# Twins can be configured in two ways:
+# Twins can be configured in three ways:
 #
 # 1. Version-based (recommended): Set `version` and run `wt install` to
 #    download pre-compiled binaries from the WonderTwin registry.
 #
-# 2. Binary path: Set `binary` to a local path for custom or pre-built twins.
+# 2. SDK-based: Set `version` to "sdk:<package>" to pin to a specific SDK
+#    package version (e.g., "sdk:github.com/stripe/stripe-go/v76").
+#
+# 3. Binary path: Set `binary` to a local path for custom or pre-built twins.
+#    Supports absolute paths, ~ paths, and relative paths (resolved against
+#    this file's directory).
 #
 # Quick start with registry twins:
 #   1. Copy this file to wondertwin.yaml
@@ -34,6 +39,22 @@ twins:
   logodev:
     binary: ./bin/twin-logodev
     port: 4116
+
+  # --- Alternative configurations ---
+
+  # Version-based twin — downloaded from registry via `wt install`
+  # stripe:
+  #   version: "latest"     # or "0.4.0" or "sdk:github.com/stripe/stripe-go/v76"
+  #   port: 4111
+  #   seed: ./fixtures/seed.json
+  #   env:
+  #     STRIPE_WEBHOOK_SECRET: "whsec_sim_test_secret"
+
+  # Registry twin from a specific registry (Phase 2: multi-registry support)
+  # internal-api:
+  #   version: "latest"
+  #   registry: mycompany      # looks up this registry in ~/.wondertwin/config.yaml
+  #   port: 9020
 
 settings:
   binary_dir: ~/.wondertwin/bin   # where `wt install` saves binaries
