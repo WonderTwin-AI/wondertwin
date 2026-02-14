@@ -20,7 +20,7 @@ const DefaultConfigFile = "config.yaml"
 // RegistryEntry describes a named registry endpoint.
 type RegistryEntry struct {
 	URL   string `yaml:"url"`
-	Token string `yaml:"token,omitempty"` // Phase 2: auth token for private registries
+	Token string `yaml:"token,omitempty"` // Bearer token for private registries
 }
 
 // Config represents the contents of ~/.wondertwin/config.yaml.
