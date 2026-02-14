@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Bug report or general feedback
+    url: https://github.com/wondertwin-ai/wondertwin/issues/new
+    about: Report a bug, suggest a feature, or ask a question.
