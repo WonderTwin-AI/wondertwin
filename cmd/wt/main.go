@@ -15,6 +15,9 @@
 //	wt auth login                 Activate a license key
 //	wt auth status                Show current license tier
 //	wt auth logout                Clear license key
+//	wt registry add <n> <url>     Add a named registry
+//	wt registry remove <name>     Remove a named registry
+//	wt registry list              List configured registries
 //	wt conformance <binary>       Run conformance tests against a twin
 package main
 
@@ -84,6 +87,8 @@ func main() {
 		err = cmdInstall(manifestPath, args)
 	case "auth":
 		err = cmdAuth(args)
+	case "registry":
+		err = cmdRegistry(args)
 	case "conformance":
 		err = cmdConformance(args)
 	default:
@@ -143,6 +148,9 @@ Commands:
   auth login                 Activate a license key
   auth status                Show current license tier and org
   auth logout                Clear license key
+  registry add <n> <url>     Add a named registry (--token <t> for auth)
+  registry remove <name>     Remove a named registry
+  registry list              List configured registries
   conformance <binary>       Run conformance tests against a twin binary
   version                    Print the wt version
 
@@ -590,19 +598,8 @@ func passFailLabel(passed bool) string {
 // ---------------------------------------------------------------------------
 
 func cmdInstall(manifestPath string, args []string) error {
-	registryURL := registry.DefaultRegistryURL
-	if u := os.Getenv("WT_REGISTRY_URL"); u != "" {
-		registryURL = u
-	}
-
-	// Load config for tier enforcement
+	// Load config for tier enforcement and registry lookup
 	cfg, _ := config.Load()
-
-	fmt.Println("Fetching twin registry...")
-	reg, err := registry.FetchRegistry(registryURL)
-	if err != nil {
-		return err
-	}
 
 	// wt install <twin>@<version> — install a single twin
 	if len(args) > 0 {
@@ -611,6 +608,18 @@ func cmdInstall(manifestPath string, args []string) error {
 
 		if versionSpec == "" {
 			versionSpec = "latest"
+		}
+
+		// Use public registry for ad-hoc installs (no manifest context)
+		regEntry := cfg.Registries["public"]
+		if u := os.Getenv("WT_REGISTRY_URL"); u != "" {
+			regEntry.URL = u
+		}
+
+		fmt.Println("Fetching twin registry...")
+		reg, err := registry.FetchRegistry(regEntry.URL, regEntry.Token)
+		if err != nil {
+			return err
 		}
 
 		resolvedVersion, ver, err := reg.ResolveVersion(twinName, versionSpec)
@@ -642,6 +651,9 @@ func cmdInstall(manifestPath string, args []string) error {
 
 	binaryDir := registry.ExpandPath(m.Settings.BinaryDir)
 
+	// Group twins by registry so we fetch each registry at most once
+	registryCache := map[string]*registry.Registry{}
+
 	fmt.Println()
 	names := m.TwinNames()
 	var failed []string
@@ -651,6 +663,30 @@ func cmdInstall(manifestPath string, args []string) error {
 		if versionSpec == "" {
 			fmt.Printf("  %-20s skipped (no version specified, using binary path)\n", name)
 			continue
+		}
+
+		// Resolve which registry this twin uses
+		regName := twin.Registry
+		reg, ok := registryCache[regName]
+		if !ok {
+			regEntry, entryOk := cfg.Registries[regName]
+			if !entryOk {
+				fmt.Printf("  %-20s FAILED — registry %q not configured (run `wt registry add %s <url>`)\n", name, regName, regName)
+				failed = append(failed, name)
+				continue
+			}
+			if u := os.Getenv("WT_REGISTRY_URL"); u != "" && regName == "public" {
+				regEntry.URL = u
+			}
+			fmt.Printf("  Fetching registry %q...\n", regName)
+			var fetchErr error
+			reg, fetchErr = registry.FetchRegistry(regEntry.URL, regEntry.Token)
+			if fetchErr != nil {
+				fmt.Printf("  %-20s FAILED — %v\n", name, fetchErr)
+				failed = append(failed, name)
+				continue
+			}
+			registryCache[regName] = reg
 		}
 
 		resolvedVersion, ver, err := reg.ResolveVersion(name, versionSpec)
@@ -695,6 +731,119 @@ func parseInstallSpec(spec string) (string, string) {
 		return spec[:i], spec[i+1:]
 	}
 	return spec, ""
+}
+
+// ---------------------------------------------------------------------------
+// wt registry add|remove|list
+// ---------------------------------------------------------------------------
+
+func cmdRegistry(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: wt registry <add|remove|list>")
+	}
+
+	switch args[0] {
+	case "add":
+		return cmdRegistryAdd(args[1:])
+	case "remove":
+		return cmdRegistryRemove(args[1:])
+	case "list":
+		return cmdRegistryList()
+	default:
+		return fmt.Errorf("unknown registry subcommand %q (expected add, remove, or list)", args[0])
+	}
+}
+
+func cmdRegistryAdd(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("usage: wt registry add <name> <url> [--token <token>]")
+	}
+
+	name := args[0]
+	url := args[1]
+
+	if name == "public" {
+		return fmt.Errorf("cannot override the built-in public registry")
+	}
+
+	var token string
+	for i := 2; i < len(args); i++ {
+		if args[i] == "--token" && i+1 < len(args) {
+			token = args[i+1]
+			i++
+		}
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	cfg.Registries[name] = config.RegistryEntry{
+		URL:   url,
+		Token: token,
+	}
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("Registry %q added (%s)\n", name, url)
+	if token != "" {
+		fmt.Println("  Token: configured")
+	}
+	return nil
+}
+
+func cmdRegistryRemove(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: wt registry remove <name>")
+	}
+
+	name := args[0]
+	if name == "public" {
+		return fmt.Errorf("cannot remove the built-in public registry")
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := cfg.Registries[name]; !ok {
+		return fmt.Errorf("registry %q not found", name)
+	}
+
+	delete(cfg.Registries, name)
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("Registry %q removed.\n", name)
+	return nil
+}
+
+func cmdRegistryList() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Printf("  %-20s %-60s %s\n", "NAME", "URL", "AUTH")
+	fmt.Printf("  %-20s %-60s %s\n", "----", "---", "----")
+
+	for name, entry := range cfg.Registries {
+		auth := "-"
+		if entry.Token != "" {
+			auth = "token"
+		}
+		fmt.Printf("  %-20s %-60s %s\n", name, entry.URL, auth)
+	}
+
+	fmt.Println()
+	return nil
 }
 
 // ---------------------------------------------------------------------------

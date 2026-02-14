@@ -42,10 +42,19 @@ type Version struct {
 }
 
 // FetchRegistry downloads and parses the registry YAML from the given URL.
-func FetchRegistry(url string) (*Registry, error) {
+// If token is non-empty, it is sent as a Bearer authorization header.
+func FetchRegistry(url, token string) (*Registry, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating registry request: %w", err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching registry: %w", err)
 	}
