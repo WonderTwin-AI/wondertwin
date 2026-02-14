@@ -1,15 +1,40 @@
 version: 2
+
+project_name: wondertwin
+
 builds:
-  - main: ./cmd/wt
+  - id: wt
+    main: ./cmd/wt
     binary: wt
-    env: [CGO_ENABLED=0]
-    goos: [darwin, linux, windows]
-    goarch: [amd64, arm64]
-    ldflags: -s -w -X main.version={{.Version}}
-archives:
-  - format: tar.gz
-    format_overrides:
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
       - goos: windows
-        format: zip
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+# TODO: move twin-* artifact builds into a separate goreleaser config/workflow.
+archives:
+  - id: binaries
+    ids:
+      - wt
+    formats:
+      - binary
+    name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+
 checksum:
   name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc

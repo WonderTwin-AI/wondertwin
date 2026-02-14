@@ -109,8 +109,8 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 
-	// Start in its own process group so it survives CLI exit
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Start in its own process group on platforms that support it.
+	setDetachedProcessAttrs(cmd)
 
 	if err := cmd.Start(); err != nil {
 		logFile.Close()
