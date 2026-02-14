@@ -1,0 +1,58 @@
+name: Request a Twin
+description: Request a behavioral twin of a third-party API
+title: "Twin request: "
+labels: ["twin-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for requesting a twin! This helps us prioritize which APIs to clone next.
+
+  - type: input
+    id: service
+    attributes:
+      label: Service name
+      description: The API or service you want a twin for.
+      placeholder: e.g., Shopify, GitHub, Plaid, SendGrid
+    validations:
+      required: true
+
+  - type: input
+    id: sdk
+    attributes:
+      label: SDK or API docs URL
+      description: Link to the official SDK, API reference, or docs.
+      placeholder: e.g., https://docs.stripe.com/api
+
+  - type: textarea
+    id: endpoints
+    attributes:
+      label: Which endpoints do you need?
+      description: |
+        List the specific endpoints or features you'd use. You don't need to be exhaustive — the most important ones help us scope the work.
+      placeholder: |
+        - POST /v1/orders (create)
+        - GET /v1/orders/:id (retrieve)
+        - POST /v1/refunds (refund an order)
+        - Webhooks for order.completed, refund.created
+
+  - type: textarea
+    id: context
+    attributes:
+      label: How are you using this API?
+      description: |
+        Optional. What does your integration look like? This helps us prioritize which behaviors matter most.
+      placeholder: |
+        We process orders through Shopify and need to test the full
+        checkout → fulfillment → refund cycle offline in CI.
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this to you?
+      options:
+        - Nice to have
+        - Would unblock a real project
+        - Blocking production work
+    validations:
+      required: true
