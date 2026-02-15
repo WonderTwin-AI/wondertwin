@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/twin-manifest.schema.json",
+  "title": "Twin Contribution Manifest",
+  "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
+  "type": "object",
+  "required": ["twin", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation"],
+  "properties": {
+    "twin": {
+      "type": "string",
+      "description": "Machine-readable twin identifier.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable display name for the twin."
+    },
+    "category": {
+      "type": "string",
+      "description": "Category of the service the twin emulates."
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what the twin does."
+    },
+    "sdk_target": {
+      "type": "object",
+      "description": "SDK targeting information.",
+      "required": ["primary"],
+      "properties": {
+        "primary": {
+          "type": "object",
+          "description": "Primary SDK target.",
+          "required": ["package", "language", "version", "repo_url"],
+          "properties": {
+            "package": {
+              "type": "string",
+              "description": "SDK package name."
+            },
+            "language": {
+              "type": "string",
+              "description": "Programming language."
+            },
+            "version": {
+              "type": "string",
+              "description": "SDK version."
+            },
+            "repo_url": {
+              "type": "string",
+              "description": "Repository URL for the SDK."
+            },
+            "docs_url": {
+              "type": "string",
+              "description": "Documentation URL for the SDK."
+            }
+          },
+          "additionalProperties": false
+        },
+        "additional": {
+          "type": "array",
+          "description": "Additional SDK targets with compatibility status.",
+          "items": {
+            "type": "object",
+            "required": ["package", "language"],
+            "properties": {
+              "package": {
+                "type": "string",
+                "description": "SDK package name."
+              },
+              "language": {
+                "type": "string",
+                "description": "Programming language."
+              },
+              "version": {
+                "type": "string",
+                "description": "SDK version tested against."
+              },
+              "repo_url": {
+                "type": "string",
+                "description": "Repository URL for the SDK."
+              },
+              "docs_url": {
+                "type": "string",
+                "description": "Documentation URL for the SDK."
+              },
+              "compatibility": {
+                "type": "string",
+                "description": "Compatibility confidence level.",
+                "enum": ["tested", "inferred", "untested"]
+              },
+              "last_validated": {
+                "type": "string",
+                "format": "date",
+                "description": "Date when compatibility was last validated."
+              },
+              "validation_method": {
+                "type": "string",
+                "description": "How compatibility was validated.",
+                "enum": ["scenario_suite", "manual", "none"]
+              },
+              "known_gaps": {
+                "type": "array",
+                "description": "Known behavioral differences from the primary SDK.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "service_surface": {
+      "type": "object",
+      "description": "Description of the service surface the twin emulates.",
+      "properties": {
+        "openapi_spec": {
+          "type": "object",
+          "description": "OpenAPI specification availability.",
+          "properties": {
+            "available": {
+              "type": "boolean",
+              "description": "Whether an OpenAPI spec is available."
+            },
+            "origin": {
+              "type": "string",
+              "description": "Origin of the OpenAPI spec."
+            },
+            "url": {
+              "type": "string",
+              "description": "URL of the OpenAPI spec."
+            }
+          },
+          "additionalProperties": false
+        },
+        "auth_pattern": {
+          "type": "string",
+          "description": "Authentication pattern used by the service.",
+          "enum": ["api_key", "oauth2", "basic", "jwt", "custom", "none"]
+        },
+        "has_webhooks": {
+          "type": "boolean",
+          "description": "Whether the service supports webhooks."
+        },
+        "resource_count": {
+          "type": "integer",
+          "description": "Number of SDK resources covered."
+        }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Coverage information for the twin.",
+      "properties": {
+        "resources_implemented": {
+          "type": "array",
+          "description": "List of implemented SDK resources.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resources_not_implemented": {
+          "type": "array",
+          "description": "List of SDK resources not yet implemented.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "estimated_coverage_pct": {
+          "type": "integer",
+          "description": "Estimated percentage of SDK coverage.",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": ["resources_implemented"],
+      "additionalProperties": false
+    },
+    "generation": {
+      "type": "object",
+      "description": "How the twin was generated.",
+      "required": ["method"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "Generation method used.",
+          "enum": ["wondertwin_skill", "manual", "other"]
+        },
+        "skill_version": {
+          "type": "string",
+          "description": "Version of the WonderTwin skill used."
+        },
+        "sources_used": {
+          "type": "object",
+          "description": "Which sources were used during generation.",
+          "properties": {
+            "deepwiki": {
+              "type": "boolean",
+              "description": "Whether DeepWiki was used."
+            },
+            "openapi": {
+              "type": "boolean",
+              "description": "Whether an OpenAPI spec was used."
+            },
+            "manual_docs": {
+              "type": "boolean",
+              "description": "Whether manual documentation was used."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

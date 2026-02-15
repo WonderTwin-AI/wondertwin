@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/wondertwin.schema.json",
+  "title": "WonderTwin Project Manifest",
+  "description": "Schema for the WonderTwin project manifest file (wondertwin.yaml).",
+  "type": "object",
+  "properties": {
+    "twins": {
+      "type": "object",
+      "description": "Map of twin names to their configuration.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "binary": {
+            "type": "string",
+            "description": "Path or name of the twin binary."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version of the twin."
+          },
+          "sdk": {
+            "type": "string",
+            "description": "SDK package used by the twin."
+          },
+          "build": {
+            "type": "string",
+            "description": "Build identifier.",
+            "default": "latest"
+          },
+          "registry": {
+            "type": "string",
+            "description": "Registry URL for the twin binary."
+          },
+          "port": {
+            "type": "integer",
+            "description": "Port the twin listens on."
+          },
+          "admin_port": {
+            "type": "integer",
+            "description": "Admin/management port for the twin."
+          },
+          "seed": {
+            "type": "string",
+            "description": "Path to the seed data file."
+          },
+          "env": {
+            "type": "object",
+            "description": "Environment variables for the twin.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Global settings for the WonderTwin CLI.",
+      "properties": {
+        "binary_dir": {
+          "type": "string",
+          "description": "Directory to store twin binaries.",
+          "default": "~/.wondertwin/bin"
+        },
+        "log_dir": {
+          "type": "string",
+          "description": "Directory for log files.",
+          "default": ".wt/logs"
+        },
+        "log_level": {
+          "type": "string",
+          "description": "Logging verbosity level.",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info"
+        },
+        "verbose": {
+          "type": "boolean",
+          "description": "Enable verbose output.",
+          "default": false
+        },
+        "health_check_interval": {
+          "type": "string",
+          "description": "Interval between health checks (Go duration format).",
+          "default": "5s"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
