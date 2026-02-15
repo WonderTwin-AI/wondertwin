@@ -45,9 +45,6 @@ func ParseFlags(twinName string) *Config {
 		if p := os.Getenv("PORT"); p != "" {
 			fmt.Sscanf(p, "%d", &cfg.Port)
 		}
-		if cfg.Port == 0 {
-			cfg.Port = 8080
-		}
 	}
 
 	return cfg

@@ -21,7 +21,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-stripe")
 	if cfg.Port == 0 {
-		cfg.Port = 12111
+		cfg.Port = 4111
 	}
 
 	twin := twincore.New(cfg)
