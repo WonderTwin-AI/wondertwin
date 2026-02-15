@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/provenance.schema.json",
+  "title": "Twin Provenance",
+  "description": "Schema for twin provenance tracking, recording how a twin was generated.",
+  "type": "object",
+  "required": ["twin", "sdk_target", "generated_at"],
+  "properties": {
+    "twin": {
+      "type": "string",
+      "description": "Name of the twin."
+    },
+    "sdk_target": {
+      "type": "object",
+      "description": "Target SDK the twin was generated for.",
+      "required": ["package", "language", "version"],
+      "properties": {
+        "package": {
+          "type": "string",
+          "description": "SDK package name."
+        },
+        "language": {
+          "type": "string",
+          "description": "Programming language of the SDK."
+        },
+        "version": {
+          "type": "string",
+          "description": "SDK version."
+        }
+      },
+      "additionalProperties": false
+    },
+    "build": {
+      "type": "integer",
+      "description": "Build number."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the twin was generated."
+    },
+    "skill_version": {
+      "type": "string",
+      "description": "Version of the WonderTwin skill used for generation."
+    },
+    "sources": {
+      "type": "object",
+      "description": "Sources used during twin generation.",
+      "properties": {
+        "openapi": {
+          "type": "object",
+          "description": "OpenAPI specification source.",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "enum": ["official", "community", "generated", "unknown"],
+              "description": "Origin of the OpenAPI spec."
+            },
+            "url": {
+              "type": "string",
+              "description": "URL where the spec was retrieved from."
+            },
+            "retrieved_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the spec was retrieved."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "SHA-256 hash of the spec content."
+            },
+            "api_version": {
+              "type": "string",
+              "description": "Version of the API described by the spec."
+            }
+          },
+          "additionalProperties": false
+        },
+        "sdk_analysis": {
+          "type": "object",
+          "description": "SDK analysis source.",
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["static", "dynamic", "hybrid"],
+              "description": "Analysis method used."
+            },
+            "repo": {
+              "type": "string",
+              "description": "Repository URL of the SDK."
+            },
+            "repo_ref": {
+              "type": "string",
+              "description": "Git ref (tag, branch, commit) analyzed."
+            },
+            "retrieved_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the SDK was retrieved for analysis."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "SHA-256 hash of the analyzed content."
+            },
+            "fallback_used": {
+              "type": "boolean",
+              "description": "Whether a fallback analysis method was used."
+            }
+          },
+          "additionalProperties": false
+        },
+        "arazzo": {
+          "type": "object",
+          "description": "Arazzo workflow source.",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "enum": ["generated", "manual", "hybrid"],
+              "description": "Origin of the Arazzo workflow."
+            },
+            "generated_from": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of sources used to generate the Arazzo workflow."
+            },
+            "sha256": {
+              "type": "string",
+              "description": "SHA-256 hash of the Arazzo workflow."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

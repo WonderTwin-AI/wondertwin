@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/scenario.schema.json",
+  "title": "Test Scenario",
+  "description": "Schema for defining test scenarios that validate twin behavior.",
+  "type": "object",
+  "required": ["name", "steps"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the test scenario."
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what the scenario tests."
+    },
+    "setup": {
+      "type": "object",
+      "description": "Setup configuration for the scenario.",
+      "properties": {
+        "seed_files": {
+          "type": "object",
+          "description": "Map of twin name to seed data file path.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reset": {
+          "type": "array",
+          "description": "List of twin names to reset before running the scenario.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "string",
+      "description": "Path to an Arazzo workflow file."
+    },
+    "variables": {
+      "type": "object",
+      "description": "Map of variable names to their values.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of test steps.",
+      "items": {
+        "type": "object",
+        "required": ["name", "request"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of this test step."
+          },
+          "request": {
+            "type": "object",
+            "description": "HTTP request to send.",
+            "required": ["method", "url"],
+            "properties": {
+              "method": {
+                "type": "string",
+                "description": "HTTP method.",
+                "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+              },
+              "url": {
+                "type": "string",
+                "description": "Request URL."
+              },
+              "headers": {
+                "type": "object",
+                "description": "HTTP headers to include.",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "body": {
+                "description": "Request body (any type)."
+              }
+            },
+            "additionalProperties": false
+          },
+          "capture": {
+            "type": "object",
+            "description": "Map of variable names to JSONPath expressions for capturing response values.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "assert": {
+            "type": "object",
+            "description": "Assertions to validate the response.",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "description": "Expected HTTP status code."
+              },
+              "headers": {
+                "type": "object",
+                "description": "Expected HTTP response headers.",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "body": {
+                "type": "object",
+                "description": "Map of JSONPath expressions to expected values.",
+                "additionalProperties": {}
+              },
+              "body_contains": {
+                "type": "string",
+                "description": "String that must be present in the response body."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

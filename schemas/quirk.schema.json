@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/quirk.schema.json",
+  "title": "API Quirk",
+  "description": "Schema for documenting API quirks and edge cases observed in real services.",
+  "type": "object",
+  "required": ["id", "service", "resource", "type", "severity", "summary"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique quirk identifier.",
+      "pattern": "^[A-Z]+-Q-[0-9]+$"
+    },
+    "service": {
+      "type": "string",
+      "description": "Name of the service exhibiting the quirk."
+    },
+    "resource": {
+      "type": "string",
+      "description": "API resource affected by the quirk."
+    },
+    "type": {
+      "type": "string",
+      "description": "Category of the quirk.",
+      "enum": [
+        "silent_ignore",
+        "state_dependent",
+        "temporal",
+        "side_effect",
+        "undocumented_default",
+        "race_condition",
+        "inconsistency"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity level of the quirk.",
+      "enum": ["critical", "moderate", "minor"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief summary of the quirk."
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the quirk and its implications."
+    },
+    "observed": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the quirk was first observed."
+    },
+    "confirmed_by": {
+      "type": "array",
+      "description": "Sources that confirm this quirk.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Name or type of the confirming source."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL of the confirming source."
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date the confirmation was made."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "sdk_versions_affected": {
+      "type": "array",
+      "description": "SDK versions affected by this quirk.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "api_versions_affected": {
+      "type": "array",
+      "description": "API versions affected by this quirk.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reproducible": {
+      "type": "boolean",
+      "description": "Whether the quirk is reliably reproducible."
+    },
+    "twin_implementation": {
+      "type": "object",
+      "description": "How the twin handles this quirk.",
+      "properties": {
+        "handler": {
+          "type": "string",
+          "description": "Name of the handler function or middleware."
+        },
+        "behavior": {
+          "type": "string",
+          "description": "Description of the twin's behavior for this quirk."
+        },
+        "enabled_by_default": {
+          "type": "boolean",
+          "description": "Whether this quirk behavior is enabled by default.",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
