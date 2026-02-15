@@ -48,16 +48,21 @@ import (
 // version is set at build time via -ldflags "-X main.version=..."
 var version = "dev"
 
-const defaultManifest = "wondertwin.yaml"
+const defaultManifest = "wondertwin.json"
 
 // resolveManifestPath returns the manifest path to use. If the given path
-// is the default YAML and a wondertwin.json exists alongside it, prefer JSON.
+// is the default JSON and it doesn't exist, fall back to YAML variants.
 func resolveManifestPath(path string) string {
-	base := filepath.Base(path)
-	if base == "wondertwin.yaml" || base == "wondertwin.yml" {
-		jsonPath := filepath.Join(filepath.Dir(path), "wondertwin.json")
-		if _, err := os.Stat(jsonPath); err == nil {
-			return jsonPath
+	if path == "wondertwin.json" {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+		// Fall back to YAML if JSON doesn't exist
+		if _, err := os.Stat("wondertwin.yaml"); err == nil {
+			return "wondertwin.yaml"
+		}
+		if _, err := os.Stat("wondertwin.yml"); err == nil {
+			return "wondertwin.yml"
 		}
 	}
 	return path
@@ -170,7 +175,7 @@ Commands:
   version                    Print the wt version
 
 Options:
-  --config <path>   Path to manifest (default: ./wondertwin.json or ./wondertwin.yaml)
+  --config <path>   Path to manifest (default: ./wondertwin.json, falls back to .yaml)
 
 Environment:
   WT_CONFIG         Override default manifest path

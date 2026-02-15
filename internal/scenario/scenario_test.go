@@ -39,51 +39,17 @@ steps:
 	}
 }
 
-func TestLoadScenarioJSON(t *testing.T) {
+func TestLoadScenarioRejectsJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.json")
-	content := `{
-  "name": "Health check",
-  "description": "Check twin health",
-  "variables": {
-    "stripe_port": "4111"
-  },
-  "steps": [
-    {
-      "name": "Check stripe",
-      "request": {
-        "method": "GET",
-        "url": "http://localhost:4111/admin/health"
-      },
-      "capture": {
-        "status_text": "$.status"
-      },
-      "assert": {
-        "status": 200
-      }
-    }
-  ]
-}`
+	content := `{"name": "test", "steps": [{"name": "s", "request": {"method": "GET", "url": "http://localhost/health"}, "assert": {"status": 200}}]}`
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	s, err := LoadScenario(path)
-	if err != nil {
-		t.Fatalf("LoadScenario() error: %v", err)
-	}
-	if s.Name != "Health check" {
-		t.Errorf("expected name 'Health check', got %q", s.Name)
-	}
-	if len(s.Steps) != 1 {
-		t.Fatalf("expected 1 step, got %d", len(s.Steps))
-	}
-	// JSON-only fields
-	if s.Variables["stripe_port"] != "4111" {
-		t.Errorf("expected variable stripe_port=4111, got %q", s.Variables["stripe_port"])
-	}
-	if s.Steps[0].Capture["status_text"] != "$.status" {
-		t.Errorf("expected capture status_text, got %v", s.Steps[0].Capture)
+	_, err := LoadScenario(path)
+	if err == nil {
+		t.Fatal("expected error for JSON file in v1 runner")
 	}
 }
 
@@ -102,16 +68,16 @@ func TestLoadScenarioUnsupportedFormat(t *testing.T) {
 
 func TestLoadScenarioMissingName(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.json")
-	content := `{
-  "steps": [
-    {
-      "name": "step1",
-      "request": {"method": "GET", "url": "http://localhost/health"},
-      "assert": {"status": 200}
-    }
-  ]
-}`
+	path := filepath.Join(dir, "test.yaml")
+	content := `
+steps:
+  - name: "step1"
+    request:
+      method: GET
+      url: "http://localhost/health"
+    assert:
+      status: 200
+`
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +88,7 @@ func TestLoadScenarioMissingName(t *testing.T) {
 	}
 }
 
-func TestLoadDirMixed(t *testing.T) {
+func TestLoadDirYAMLOnly(t *testing.T) {
 	dir := t.TempDir()
 
 	yamlContent := `
@@ -149,10 +115,10 @@ steps:
 	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yamlContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// JSON file should be ignored by v1 LoadDir
 	if err := os.WriteFile(filepath.Join(dir, "b.json"), []byte(jsonContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Write an unrelated file that should be ignored
 	if err := os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("ignore me"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -161,18 +127,22 @@ steps:
 	if err != nil {
 		t.Fatalf("LoadDir() error: %v", err)
 	}
-	if len(scenarios) != 2 {
-		t.Fatalf("expected 2 scenarios, got %d", len(scenarios))
+	if len(scenarios) != 1 {
+		t.Fatalf("expected 1 scenario (YAML only), got %d", len(scenarios))
 	}
+	if scenarios[0].Name != "YAML scenario" {
+		t.Errorf("expected 'YAML scenario', got %q", scenarios[0].Name)
+	}
+}
 
-	names := map[string]bool{}
-	for _, s := range scenarios {
-		names[s.Name] = true
+func TestLoadDirEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	scenarios, err := LoadDir(dir)
+	if err != nil {
+		t.Fatalf("LoadDir() error: %v", err)
 	}
-	if !names["YAML scenario"] {
-		t.Error("missing YAML scenario")
-	}
-	if !names["JSON scenario"] {
-		t.Error("missing JSON scenario")
+	if len(scenarios) != 0 {
+		t.Fatalf("expected 0 scenarios, got %d", len(scenarios))
 	}
 }
