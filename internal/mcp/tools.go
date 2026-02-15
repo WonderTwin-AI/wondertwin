@@ -98,6 +98,22 @@ func allTools() []toolEntry {
 			},
 			Handler: handleInspect,
 		},
+		{
+			Tool: Tool{
+				Name:        "wt_config",
+				Description: "Get or update the runtime configuration of a twin. Without 'updates', returns current config. With 'updates' (a JSON object), applies config changes.",
+				InputSchema: json.RawMessage(`{"type": "object", "properties": {"twin": {"type": "string", "description": "Name of the twin"}, "updates": {"type": "object", "description": "Key-value pairs to update (optional; omit to just read config)"}}, "required": ["twin"]}`),
+			},
+			Handler: handleConfig,
+		},
+		{
+			Tool: Tool{
+				Name:        "wt_quirks",
+				Description: "List all quirks for a twin, or enable/disable a specific quirk. Without 'action', lists all quirks. With action='enable' or 'disable' and a quirk_id, toggles that quirk.",
+				InputSchema: json.RawMessage(`{"type": "object", "properties": {"twin": {"type": "string", "description": "Name of the twin"}, "action": {"type": "string", "enum": ["enable", "disable"], "description": "Action to perform (optional; omit to list quirks)"}, "quirk_id": {"type": "string", "description": "ID of the quirk to toggle (required when action is set)"}}, "required": ["twin"]}`),
+			},
+			Handler: handleQuirks,
+		},
 	}
 }
 
@@ -311,5 +327,126 @@ func handleInspect(m *manifest.Manifest, _ *client.AdminClient, params json.RawM
 		return textResult(fmt.Sprintf("Error inspecting %s: status %d: %s", p.Twin, resp.StatusCode, body))
 	}
 
+	return textResult(string(body))
+}
+
+type configParams struct {
+	Twin    string         `json:"twin"`
+	Updates map[string]any `json:"updates"`
+}
+
+func handleConfig(m *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
+	var p configParams
+	if len(params) > 0 {
+		json.Unmarshal(params, &p)
+	}
+
+	if p.Twin == "" {
+		return textResult("Error: 'twin' argument is required")
+	}
+
+	twin, err := m.Twin(p.Twin)
+	if err != nil {
+		return textResult(fmt.Sprintf("Error: %v", err))
+	}
+
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+
+	if len(p.Updates) > 0 {
+		// PUT /admin/config with updates
+		body, _ := json.Marshal(p.Updates)
+		req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("http://localhost:%d/admin/config", twin.AdminPort), strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return textResult(fmt.Sprintf("Error updating config for %s: %v", p.Twin, err))
+		}
+		defer resp.Body.Close()
+
+		respBody, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return textResult(fmt.Sprintf("Error updating config for %s: status %d: %s", p.Twin, resp.StatusCode, respBody))
+		}
+		return textResult(string(respBody))
+	}
+
+	// GET /admin/config
+	resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%d/admin/config", twin.AdminPort))
+	if err != nil {
+		return textResult(fmt.Sprintf("Error fetching config for %s: %v", p.Twin, err))
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return textResult(fmt.Sprintf("Error fetching config for %s: status %d: %s", p.Twin, resp.StatusCode, body))
+	}
+	return textResult(string(body))
+}
+
+type quirksParams struct {
+	Twin    string `json:"twin"`
+	Action  string `json:"action"`
+	QuirkID string `json:"quirk_id"`
+}
+
+func handleQuirks(m *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
+	var p quirksParams
+	if len(params) > 0 {
+		json.Unmarshal(params, &p)
+	}
+
+	if p.Twin == "" {
+		return textResult("Error: 'twin' argument is required")
+	}
+
+	twin, err := m.Twin(p.Twin)
+	if err != nil {
+		return textResult(fmt.Sprintf("Error: %v", err))
+	}
+
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+
+	if p.Action != "" {
+		if p.QuirkID == "" {
+			return textResult("Error: 'quirk_id' is required when 'action' is specified")
+		}
+
+		var method string
+		switch p.Action {
+		case "enable":
+			method = http.MethodPut
+		case "disable":
+			method = http.MethodDelete
+		default:
+			return textResult(fmt.Sprintf("Error: unknown action %q (use 'enable' or 'disable')", p.Action))
+		}
+
+		req, _ := http.NewRequest(method, fmt.Sprintf("http://localhost:%d/admin/quirks/%s", twin.AdminPort, p.QuirkID), nil)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return textResult(fmt.Sprintf("Error toggling quirk for %s: %v", p.Twin, err))
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return textResult(fmt.Sprintf("Error toggling quirk for %s: status %d: %s", p.Twin, resp.StatusCode, body))
+		}
+		return textResult(string(body))
+	}
+
+	// GET /admin/quirks
+	resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%d/admin/quirks", twin.AdminPort))
+	if err != nil {
+		return textResult(fmt.Sprintf("Error fetching quirks for %s: %v", p.Twin, err))
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return textResult(fmt.Sprintf("Error fetching quirks for %s: status %d: %s", p.Twin, resp.StatusCode, body))
+	}
 	return textResult(string(body))
 }

@@ -1,0 +1,20 @@
+{
+  "twin": "stripe",
+  "sdk_target": {
+    "package": "github.com/stripe/stripe-go",
+    "language": "go",
+    "version": "v81"
+  },
+  "build": 1,
+  "generated_at": "2026-02-12T15:26:50-08:00",
+  "sources": {
+    "openapi": {
+      "origin": "vendor_published",
+      "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json"
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/stripe/stripe-go"
+    }
+  }
+}

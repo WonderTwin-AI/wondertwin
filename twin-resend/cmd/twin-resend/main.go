@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-resend")
 	if cfg.Port == 0 {
-		cfg.Port = 12115
+		cfg.Port = 4113
 	}
 
 	twin := twincore.New(cfg)
@@ -31,6 +31,7 @@ func main() {
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler.SetConfigProvider(twin)
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided

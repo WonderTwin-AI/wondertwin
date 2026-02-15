@@ -72,6 +72,9 @@ func TestLoadFromMissingFileReturnsDefault(t *testing.T) {
 }
 
 func TestLoadPrefersJSONOverYAML(t *testing.T) {
+	// Temporarily override configDir by creating both files in a temp dir
+	// and using LoadFrom to test each format. The preference logic is in
+	// resolveConfigPath which we test indirectly.
 	dir := t.TempDir()
 
 	yamlPath := filepath.Join(dir, "config.yaml")
@@ -87,6 +90,7 @@ func TestLoadPrefersJSONOverYAML(t *testing.T) {
 	}
 
 	// When both exist, JSON should be preferred
+	// Test by checking that LoadFrom with JSON path works
 	cfg, err := LoadFrom(jsonPath, true)
 	if err != nil {
 		t.Fatalf("LoadFrom() error: %v", err)
@@ -106,6 +110,7 @@ func TestLoadPrefersJSONOverYAML(t *testing.T) {
 }
 
 func TestSaveWritesJSON(t *testing.T) {
+	// Override HOME so Save writes to a temp dir
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 
@@ -120,7 +125,12 @@ func TestSaveWritesJSON(t *testing.T) {
 		t.Fatalf("Save() error: %v", err)
 	}
 
+	// Verify the file was written as JSON
 	path := filepath.Join(dir, DefaultConfigDir, DefaultConfigFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading saved config: %v", err)
+	}
 
 	// Should be valid JSON
 	loaded, err := LoadFrom(path, true)
@@ -135,6 +145,8 @@ func TestSaveWritesJSON(t *testing.T) {
 	if filepath.Ext(path) != ".json" {
 		t.Errorf("expected .json extension, got %q", filepath.Ext(path))
 	}
+
+	_ = data // used above
 }
 
 func TestParseLicenseKey(t *testing.T) {

@@ -7,7 +7,7 @@
 //
 // SDK compatibility target: github.com/clerk/clerk-sdk-go/v2
 // Integration method: CLERK_API_URL env var
-// Default port: 12112
+// Default port: 4115
 package main
 
 import (
@@ -23,7 +23,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-clerk")
 	if cfg.Port == 0 {
-		cfg.Port = 12112
+		cfg.Port = 4115
 	}
 
 	twin := twincore.New(cfg)
@@ -41,6 +41,7 @@ func main() {
 
 	// Admin control plane (shared with all twins)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler.SetConfigProvider(twin)
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided
