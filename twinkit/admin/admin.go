@@ -28,12 +28,37 @@ type WebhookFlusher interface {
 	FlushWebhooks() error
 }
 
+// ConfigProvider exposes runtime configuration for reading and updating.
+type ConfigProvider interface {
+	GetConfig() map[string]any
+	UpdateConfig(updates map[string]any) error
+}
+
+// QuirkStore manages behavioral quirks that can be toggled at runtime.
+type QuirkStore interface {
+	ListQuirks() []QuirkStatus
+	EnableQuirk(id string) error
+	DisableQuirk(id string) error
+	IsEnabled(id string) bool
+}
+
+// QuirkStatus describes the state of a single quirk.
+type QuirkStatus struct {
+	ID       string `json:"id"`
+	Summary  string `json:"summary"`
+	Enabled  bool   `json:"enabled"`
+	Type     string `json:"type"`
+	Severity string `json:"severity"`
+}
+
 // Handler provides the shared admin endpoints.
 type Handler struct {
 	state   StateStore
 	flusher WebhookFlusher
 	mw      *twincore.Middleware
 	clock   *store.Clock
+	config  ConfigProvider
+	quirks  QuirkStore
 }
 
 // NewHandler creates a new admin handler.
@@ -50,6 +75,16 @@ func (h *Handler) SetFlusher(f WebhookFlusher) {
 	h.flusher = f
 }
 
+// SetConfigProvider sets the config provider (optional).
+func (h *Handler) SetConfigProvider(cp ConfigProvider) {
+	h.config = cp
+}
+
+// SetQuirkStore sets the quirk store (optional).
+func (h *Handler) SetQuirkStore(qs QuirkStore) {
+	h.quirks = qs
+}
+
 // Routes mounts the admin endpoints on the given router.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
@@ -64,6 +99,11 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/time/advance", h.handleTimeAdvance)
 		r.Get("/time", h.handleGetTime)
 		r.Get("/health", h.handleHealth)
+		r.Get("/config", h.handleGetConfig)
+		r.Put("/config", h.handleUpdateConfig)
+		r.Get("/quirks", h.handleListQuirks)
+		r.Put("/quirks/{quirk_id}", h.handleEnableQuirk)
+		r.Delete("/quirks/{quirk_id}", h.handleDisableQuirk)
 	})
 }
 
@@ -162,10 +202,10 @@ func (h *Handler) handleTimeAdvance(w http.ResponseWriter, r *http.Request) {
 
 	h.clock.Advance(d)
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"status":     "advanced",
-		"duration":   d.String(),
-		"offset":     h.clock.Offset().String(),
-		"simulated":  h.clock.Now().Format(time.RFC3339),
+		"status":    "advanced",
+		"duration":  d.String(),
+		"offset":    h.clock.Offset().String(),
+		"simulated": h.clock.Now().Format(time.RFC3339),
 	})
 }
 
@@ -185,4 +225,69 @@ func (h *Handler) handleGetTime(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	if h.config == nil {
+		twincore.Error(w, http.StatusNotFound, "config provider not configured")
+		return
+	}
+	twincore.JSON(w, http.StatusOK, h.config.GetConfig())
+}
+
+func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if h.config == nil {
+		twincore.Error(w, http.StatusNotFound, "config provider not configured")
+		return
+	}
+
+	var updates map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		twincore.Error(w, http.StatusBadRequest, "invalid config body: "+err.Error())
+		return
+	}
+
+	if err := h.config.UpdateConfig(updates); err != nil {
+		twincore.Error(w, http.StatusBadRequest, "failed to update config: "+err.Error())
+		return
+	}
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"status": "updated",
+		"config": h.config.GetConfig(),
+	})
+}
+
+func (h *Handler) handleListQuirks(w http.ResponseWriter, r *http.Request) {
+	if h.quirks == nil {
+		twincore.JSON(w, http.StatusOK, []QuirkStatus{})
+		return
+	}
+	twincore.JSON(w, http.StatusOK, h.quirks.ListQuirks())
+}
+
+func (h *Handler) handleEnableQuirk(w http.ResponseWriter, r *http.Request) {
+	if h.quirks == nil {
+		twincore.Error(w, http.StatusNotFound, "quirk store not configured")
+		return
+	}
+	id := chi.URLParam(r, "quirk_id")
+	if err := h.quirks.EnableQuirk(id); err != nil {
+		twincore.Error(w, http.StatusNotFound, "quirk not found: "+err.Error())
+		return
+	}
+	twincore.JSON(w, http.StatusOK, map[string]any{"status": "enabled", "quirk_id": id})
+}
+
+func (h *Handler) handleDisableQuirk(w http.ResponseWriter, r *http.Request) {
+	if h.quirks == nil {
+		twincore.Error(w, http.StatusNotFound, "quirk store not configured")
+		return
+	}
+	id := chi.URLParam(r, "quirk_id")
+	if err := h.quirks.DisableQuirk(id); err != nil {
+		twincore.Error(w, http.StatusNotFound, "quirk not found: "+err.Error())
+		return
+	}
+	twincore.JSON(w, http.StatusOK, map[string]any{"status": "disabled", "quirk_id": id})
 }

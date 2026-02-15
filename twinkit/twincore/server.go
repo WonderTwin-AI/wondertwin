@@ -98,6 +98,65 @@ func (t *Twin) Middleware() *Middleware {
 	return t.mw
 }
 
+// GetConfig returns the current runtime configuration as a map.
+// This implements the admin.ConfigProvider interface.
+func (t *Twin) GetConfig() map[string]any {
+	return map[string]any{
+		"name":        t.Config.Name,
+		"port":        t.Config.Port,
+		"latency":     t.Config.Latency.String(),
+		"fail_rate":   t.Config.FailRate,
+		"webhook_url": t.Config.WebhookURL,
+		"verbose":     t.Config.Verbose,
+	}
+}
+
+// UpdateConfig updates runtime configuration fields from a map.
+// This implements the admin.ConfigProvider interface.
+// Only latency, fail_rate, verbose, and webhook_url can be updated at runtime.
+func (t *Twin) UpdateConfig(updates map[string]any) error {
+	for k, v := range updates {
+		switch k {
+		case "latency":
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("latency must be a duration string")
+			}
+			d, err := time.ParseDuration(s)
+			if err != nil {
+				return fmt.Errorf("invalid latency duration: %w", err)
+			}
+			t.Config.Latency = d
+		case "fail_rate":
+			f, ok := v.(float64)
+			if !ok {
+				return fmt.Errorf("fail_rate must be a number")
+			}
+			if f < 0 || f > 1 {
+				return fmt.Errorf("fail_rate must be between 0.0 and 1.0")
+			}
+			t.Config.FailRate = f
+		case "verbose":
+			b, ok := v.(bool)
+			if !ok {
+				return fmt.Errorf("verbose must be a boolean")
+			}
+			t.Config.Verbose = b
+		case "webhook_url":
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("webhook_url must be a string")
+			}
+			t.Config.WebhookURL = s
+		case "name", "port":
+			return fmt.Errorf("%s cannot be changed at runtime", k)
+		default:
+			return fmt.Errorf("unknown config key: %s", k)
+		}
+	}
+	return nil
+}
+
 // Serve starts the HTTP server and blocks until shutdown signal.
 func (t *Twin) Serve() error {
 	addr := fmt.Sprintf(":%d", t.Config.Port)

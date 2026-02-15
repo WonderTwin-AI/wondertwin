@@ -88,9 +88,15 @@ func Run(binaryPath string, port int) (*Report, error) {
 
 		// Check 7: POST /admin/time/advance advances simulated clock
 		report.addResult(checkTimeAdvance(baseURL))
+
+		// Check 8: GET /admin/config returns valid JSON
+		report.addResult(checkConfig(baseURL))
+
+		// Check 9: GET /admin/quirks returns valid JSON (or 404 if not implemented)
+		report.addResult(checkQuirks(baseURL))
 	}
 
-	// Check 8: Twin shuts down cleanly on SIGTERM within 5 seconds
+	// Check 10: Twin shuts down cleanly on SIGTERM within 5 seconds
 	report.addResult(checkCleanShutdown(cmd))
 
 	for _, r := range report.Results {
@@ -247,6 +253,66 @@ func checkTimeAdvance(baseURL string) Result {
 	}
 
 	return Result{Name: name, Passed: true, Detail: "POST /admin/time/advance returned 200"}
+}
+
+func checkConfig(baseURL string) Result {
+	name := "GET /admin/config returns valid JSON"
+
+	resp, err := http.Get(baseURL + "/admin/config")
+	if err != nil {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	// 200 with valid JSON or 404 (not configured) are both acceptable
+	if resp.StatusCode == http.StatusNotFound {
+		return Result{Name: name, Passed: true, Detail: "GET /admin/config returned 404 (config provider not configured)"}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("expected 200 or 404, got %d", resp.StatusCode)}
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("failed to read body: %v", err)}
+	}
+
+	if !json.Valid(data) {
+		return Result{Name: name, Passed: false, Detail: "response body is not valid JSON"}
+	}
+
+	return Result{Name: name, Passed: true, Detail: "GET /admin/config returned valid JSON"}
+}
+
+func checkQuirks(baseURL string) Result {
+	name := "GET /admin/quirks returns valid JSON"
+
+	resp, err := http.Get(baseURL + "/admin/quirks")
+	if err != nil {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("request failed: %v", err)}
+	}
+	defer resp.Body.Close()
+
+	// 200 with valid JSON or 404 are both acceptable
+	if resp.StatusCode == http.StatusNotFound {
+		return Result{Name: name, Passed: true, Detail: "GET /admin/quirks returned 404 (quirk store not configured)"}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("expected 200 or 404, got %d", resp.StatusCode)}
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("failed to read body: %v", err)}
+	}
+
+	if !json.Valid(data) {
+		return Result{Name: name, Passed: false, Detail: "response body is not valid JSON"}
+	}
+
+	return Result{Name: name, Passed: true, Detail: "GET /admin/quirks returned valid JSON"}
 }
 
 func checkCleanShutdown(cmd *exec.Cmd) Result {
