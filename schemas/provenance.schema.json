@@ -53,7 +53,7 @@
           "properties": {
             "origin": {
               "type": "string",
-              "enum": ["official", "community", "generated", "unknown"],
+              "enum": ["vendor_published", "community_maintained", "derived", "manual", "unknown"],
               "description": "Origin of the OpenAPI spec."
             },
             "url": {
@@ -82,7 +82,7 @@
           "properties": {
             "method": {
               "type": "string",
-              "enum": ["static", "dynamic", "hybrid"],
+              "enum": ["deepwiki", "direct_repo", "manual", "none"],
               "description": "Analysis method used."
             },
             "repo": {
@@ -115,7 +115,7 @@
           "properties": {
             "origin": {
               "type": "string",
-              "enum": ["generated", "manual", "hybrid"],
+              "enum": ["vendor_published", "community_contributed", "generated", "manual"],
               "description": "Origin of the Arazzo workflow."
             },
             "generated_from": {
