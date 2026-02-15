@@ -347,7 +347,7 @@ func TestValuesEqual(t *testing.T) {
 		{"same numbers", float64(42), float64(42), true},
 		{"int and float equal", float64(42), float64(42), true},
 		{"different numbers", float64(42), float64(43), false},
-		{"string vs number same repr", "42", float64(42), true},
+		{"string vs number same repr", "42", float64(42), false},
 		{"string vs number different repr", "hello", float64(42), false},
 	}
 

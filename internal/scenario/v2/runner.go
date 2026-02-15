@@ -68,11 +68,21 @@ func (r *Runner) Run(s *Scenario) (*Result, error) {
 	}
 
 	// --- Steps phase ---
+	var stopEarly bool
 	for _, step := range s.Steps {
+		if stopEarly {
+			sr := StepResult{Name: step.Name, Error: "skipped: previous step failed"}
+			result.Steps = append(result.Steps, sr)
+			continue
+		}
 		sr := r.runStep(&step)
 		result.Steps = append(result.Steps, sr)
 		if !sr.Passed {
 			result.Passed = false
+			// Stop executing if this step had captures (downstream steps likely depend on them)
+			if len(step.Capture) > 0 {
+				stopEarly = true
+			}
 		}
 	}
 
@@ -240,13 +250,21 @@ func (r *Runner) buildBody(body any) (string, error) {
 func (r *Runner) runAssertions(assert *Assert, resp *http.Response, body []byte) error {
 	// Assert status
 	if assert.Status != 0 && resp.StatusCode != assert.Status {
-		return fmt.Errorf("expected status %d, got %d", assert.Status, resp.StatusCode)
+		bodySnippet := string(body)
+		if len(bodySnippet) > 200 {
+			bodySnippet = bodySnippet[:200] + "..."
+		}
+		return fmt.Errorf("expected status %d, got %d; body: %s", assert.Status, resp.StatusCode, bodySnippet)
 	}
 
-	// Assert body_contains
+	// Assert body_contains (with template expansion)
 	if assert.BodyContains != "" {
-		if !strings.Contains(string(body), assert.BodyContains) {
-			return fmt.Errorf("body does not contain %q", assert.BodyContains)
+		expanded, err := ExpandTemplates(assert.BodyContains, r.manifest, r.vars)
+		if err != nil {
+			return fmt.Errorf("template expansion in body_contains: %v", err)
+		}
+		if !strings.Contains(string(body), expanded) {
+			return fmt.Errorf("body does not contain %q", expanded)
 		}
 	}
 

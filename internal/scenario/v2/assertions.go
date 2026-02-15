@@ -138,15 +138,22 @@ func evaluateOperators(path string, results []any, ops map[string]any) error {
 }
 
 // valuesEqual compares two values for equality, handling numeric type coercion.
+// Values must be the same kind (both numeric or both string) to be equal.
 func valuesEqual(actual, expected any) bool {
-	// Try numeric comparison first
 	actualNum, aErr := toFloat64(actual)
 	expectedNum, eErr := toFloat64(expected)
+
+	// Both numeric: compare as numbers
 	if aErr == nil && eErr == nil {
 		return actualNum == expectedNum
 	}
 
-	// Fall back to string comparison
+	// One numeric, one not: different types are not equal
+	if (aErr == nil) != (eErr == nil) {
+		return false
+	}
+
+	// Both non-numeric: compare as strings
 	return fmt.Sprintf("%v", actual) == fmt.Sprintf("%v", expected)
 }
 
