@@ -2,7 +2,14 @@
 
 ## Purpose
 
-Generate a complete, production-ready WonderTwin behavioral API twin from a third-party service's public API documentation and/or SDK reference. The output is a self-contained Go module that behaviorally clones the target API — maintaining state, implementing business logic, and targeting compatibility with the service's official SDK client libraries.
+Generate a complete, production-ready WonderTwin behavioral service twin from a third-party service's public SDK reference and/or API documentation. The output is a self-contained Go module that behaviorally clones the target service — maintaining state, implementing business logic, and targeting compatibility with the service's official SDK client libraries.
+
+In addition to the twin source code, generation produces a set of pipeline artifacts:
+
+1. **`twin-manifest.json`** — describes the twin's capabilities, SDK target, service surface, and coverage (see `schemas/twin-manifest.schema.json`)
+2. **`provenance.json`** — records what sources were used during generation and when (see `schemas/provenance.schema.json`)
+3. **Arazzo workflow file** — captures discovered multi-step sequences as Arazzo 1.0.1 JSON (e.g., `workflows/{name}.arazzo.json`)
+4. **Starter scenario file** — a JSON scenario covering health check and basic CRUD, ready for `wt test` (see `schemas/scenario.schema.json`)
 
 ## Prerequisites
 
@@ -17,10 +24,11 @@ Before using this skill, ensure you have access to:
 The user will provide:
 
 - **Service name**: The SaaS service to twin (e.g., "Stripe", "SendGrid", "Auth0")
-- **API documentation**: URL or document containing API reference
+- **SDK reference**: URL or document containing the SDK or API reference
+- **OpenAPI spec URL** (optional): Direct URL to the service's OpenAPI/Swagger spec, if available
 - **SDK target** (optional): Official SDK client library for compatibility (e.g., `github.com/stripe/stripe-go`)
-- **Scope** (optional): Specific API resources to prioritize, or "full coverage"
-- **Known quirks** (optional): Undocumented behaviors or edge cases to encode
+- **Scope** (optional): Specific SDK resources to prioritize, or "full coverage"
+- **Known quirks** (optional): Undocumented behaviors or edge cases to encode (see `schemas/quirk.schema.json`)
 
 ## Output Structure
 
@@ -34,12 +42,14 @@ twin-{name}/
 ├── internal/
 │   ├── api/
 │   │   ├── router.go                 # Handler struct, Routes(), auth middleware
-│   │   ├── handlers_{resource}.go    # One file per API resource group
+│   │   ├── handlers_{resource}.go    # One file per SDK resource group
 │   │   ├── helpers.go                # Request parsing, response formatting helpers
 │   │   └── handlers_test.go          # Handler tests
 │   └── store/
 │       ├── types.go                  # Domain structs with JSON tags
 │       └── memory.go                 # MemoryStore implementing admin.StateStore
+├── twin-manifest.json                # Twin capabilities and coverage (schemas/twin-manifest.schema.json)
+├── provenance.json                   # Generation provenance record (schemas/provenance.schema.json)
 ├── twin.yaml                         # Twin metadata (name, SDK, port)
 ├── go.mod
 ├── go.sum
@@ -48,8 +58,10 @@ twin-{name}/
 │   └── workflows/
 │       ├── ci.yml                    # PR checks: build, test, conformance
 │       └── release.yml              # Tag-triggered: cross-compile + release + registry notify
-└── scenarios/                        # wt test scenarios for integration testing
-    └── basic.yaml
+├── workflows/
+│   └── {name}.arazzo.json            # Arazzo 1.0.1 multi-step workflow descriptions
+└── scenarios/
+    └── basic.json                    # Starter scenario: health + CRUD (schemas/scenario.schema.json)
 ```
 
 If the service has webhooks, add:
@@ -63,7 +75,110 @@ If the service has webhooks, add:
 
 ## Process
 
-### Phase 0: Project Setup
+### Phase 0: Analyze
+
+Before any code generation, gather and record all available sources. This phase produces the initial `provenance.json` and informs every subsequent phase.
+
+**1. Discover the OpenAPI spec:**
+
+- If the user provides an OpenAPI spec URL, fetch it and save to `specs/{name}-openapi.json` (or `.yaml`).
+- If no URL is provided, check common locations: `https://api.{service}.com/openapi.json`, the service's developer docs, or GitHub repos.
+- Record the result in provenance format (see below).
+
+**2. Check DeepWiki for SDK analysis:**
+
+- If the SDK repo has been indexed by DeepWiki, note the URL (e.g., `https://deepwiki.com/{org}/{sdk-repo}`) for retrieval during later phases.
+- If DeepWiki has not indexed the repo, fall back to reading the SDK's README, examples, and test files directly. See [Fallback Guidance](#fallback-guidance) below.
+
+**3. Identify the primary SDK:**
+
+- Determine the SDK package name, programming language, and version.
+- Locate the SDK repository URL and documentation URL.
+- This information populates `sdk_target.primary` in `twin-manifest.json`.
+
+**4. Record sources in provenance format:**
+
+Create the initial `provenance.json` (validated against `schemas/provenance.schema.json`):
+
+```json
+{
+  "twin": "{name}",
+  "sdk_target": {
+    "package": "{sdk_import_path}",
+    "language": "go",
+    "version": "{sdk_version}"
+  },
+  "generated_at": "{ISO 8601 timestamp}",
+  "skill_version": "2.0",
+  "sources": {
+    "openapi": {
+      "origin": "vendor_published",
+      "url": "https://api.example.com/openapi.json",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{hash of spec content}",
+      "api_version": "2024-01-01"
+    },
+    "sdk_analysis": {
+      "method": "deepwiki",
+      "repo": "https://github.com/{org}/{sdk-repo}",
+      "repo_ref": "{tag or commit}",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "fallback_used": false
+    }
+  }
+}
+```
+
+If no OpenAPI spec is available, omit the `openapi` field or set `origin` to `"derived"`. If DeepWiki was not available, set `method` to `"direct_repo"` and `fallback_used` to `true`.
+
+**5. Create the initial `twin-manifest.json`:**
+
+Populate the manifest shell (validated against `schemas/twin-manifest.schema.json`). Coverage fields will be completed as handlers are implemented:
+
+```json
+{
+  "twin": "{name}",
+  "display_name": "{Service}",
+  "category": "{category}",
+  "description": "Behavioral clone of the {Service} service for SDK-compatible local testing.",
+  "sdk_target": {
+    "primary": {
+      "package": "{sdk_import_path}",
+      "language": "go",
+      "version": "{sdk_version}",
+      "repo_url": "https://github.com/{org}/{sdk-repo}"
+    }
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://api.example.com/openapi.json"
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 0
+  },
+  "coverage": {
+    "resources_implemented": [],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 0
+  },
+  "generation": {
+    "method": "wondertwin_skill",
+    "skill_version": "2.0",
+    "sources_used": {
+      "deepwiki": true,
+      "openapi": true,
+      "manual_docs": false
+    }
+  }
+}
+```
+
+---
+
+### Phase 1: Project Setup
 
 Before writing any twin code, set up the project from the template.
 
@@ -116,9 +231,9 @@ require (
 
 No `replace` directives — twins depend on published `twinkit` versions.
 
-### Phase 1: API Analysis
+### Phase 2: SDK and Service Analysis
 
-Before writing any code, analyze the target API and produce a plan. Document answers to ALL of the following:
+Before writing any code, analyze the target SDK and service and produce a plan. Use the sources gathered in Phase 0 (OpenAPI spec, DeepWiki, SDK source). Document answers to ALL of the following:
 
 **Authentication:**
 - What scheme? (API key in header, Bearer token, Basic auth, OAuth)
@@ -142,7 +257,7 @@ Before writing any code, analyze the target API and produce a plan. Document ans
 - What query parameters control pagination?
 
 **Resources and relationships:**
-- List all API resources (e.g., Users, Messages, Contacts)
+- List all SDK resources (e.g., Users, Messages, Contacts)
 - Map relationships (e.g., User has many Messages)
 - Identify computed/derived state (e.g., balance = sum of transactions)
 - Note any state machines (e.g., order status: pending → paid → shipped)
@@ -164,7 +279,7 @@ Before writing any code, analyze the target API and produce a plan. Document ans
 - What event types exist?
 - What is the webhook payload format?
 
-### Phase 2: Store Implementation
+### Phase 3: Store Implementation
 
 #### `internal/store/types.go`
 
@@ -276,7 +391,7 @@ func (s *MemoryStore) Reset() {
 - Always reset the Clock in `Reset()`
 - Add domain-specific helper methods as needed (e.g., `GetBalance()`, `FindByEmail()`)
 
-### Phase 3: Router and Handlers
+### Phase 4: Router and Handlers
 
 #### `internal/api/router.go`
 
@@ -344,7 +459,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 
 **Rules:**
 - Use `chi.Router` for routing (the shared library depends on chi)
-- Match the real API's URL patterns EXACTLY as the SDK constructs them
+- Match the real service's URL patterns EXACTLY as the SDK constructs them
 - Include version prefixes if the real API uses them
 - Apply `h.authMiddleware` and `h.mw.FaultInjection` inside the route group
 - Group routes by resource, matching the order they appear in the API docs
@@ -474,11 +589,11 @@ func (h *Handler) DeleteContact(w http.ResponseWriter, r *http.Request) {
 **Rules for handlers:**
 - Parse requests in the EXACT format the SDK sends (JSON, form-encoded, etc.)
 - For form-encoded APIs (like Stripe), use a `parseFormOrJSON()` helper
-- Validate required fields and return errors in the real API's error format
+- Validate required fields and return errors in the real service's error format
 - Use `h.store.{Resource}.NextID()` for ID generation
 - Use `h.store.Clock.Now()` for timestamps (supports simulated time)
-- Match the real API's HTTP status codes exactly (201 for create, 200 for update, etc.)
-- Match the real API's response body format exactly
+- Match the real service's HTTP status codes exactly (201 for create, 200 for update, etc.)
+- Match the real service's response body format exactly
 - Implement real business logic — not just CRUD:
   - Enforce constraints (e.g., can't send message without verified sender)
   - Update related entities (e.g., creating a transfer updates balance)
@@ -507,7 +622,7 @@ func (h *Handler) emitEvent(eventType string, obj any) {
 }
 ```
 
-### Phase 4: Webhook Support (if applicable)
+### Phase 5: Webhook Support (if applicable)
 
 Only implement if the target service sends webhooks.
 
@@ -560,7 +675,7 @@ type Handler struct {
 }
 ```
 
-### Phase 5: Entry Point
+### Phase 6: Entry Point
 
 #### `cmd/twin-{name}/main.go`
 
@@ -599,7 +714,13 @@ func main() {
     apiHandler.Routes(twin.Router)
 
     // 5. Create admin handler and register /admin/* routes
+    //    This provides: /admin/health, /admin/reset, /admin/state,
+    //    /admin/fault/*, /admin/time/*, /admin/webhooks/flush,
+    //    /admin/config (GET/PUT), /admin/quirks (GET/PUT/DELETE)
     adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+    // Optionally wire in config and quirk providers:
+    // adminHandler.SetConfigProvider(myConfigProvider)
+    // adminHandler.SetQuirkStore(myQuirkStore)
     adminHandler.Routes(twin.Router)
 
     // 6. Load seed data if provided via --seed-file flag
@@ -638,7 +759,7 @@ func main() {
     adminHandler.Routes(twin.Router)
 ```
 
-### Phase 6: Tests
+### Phase 7: Tests
 
 #### `internal/api/handlers_test.go`
 
@@ -750,7 +871,7 @@ func TestAdminResetClearsState(t *testing.T) {
 - 401 for missing auth header
 - Required field validation returns appropriate errors
 
-### Phase 7: Go Module
+### Phase 8: Go Module
 
 #### `go.mod`
 
@@ -767,7 +888,247 @@ require (
 
 Twin repos depend on `twinkit` as a normal Go module — no `replace` directives.
 
-### Phase 8: Local Testing with `wt`
+### Phase 9: Arazzo Workflow Generation
+
+After implementing handlers, review all endpoints and identify multi-step workflows that span multiple resources or require sequenced operations. Produce an Arazzo 1.0.1 JSON file at `workflows/{name}.arazzo.json`.
+
+**When to produce workflows:**
+
+- A resource must be created before it can be used (e.g., create a sender before sending a message)
+- Operations have dependencies (e.g., verify a domain, then send from that domain)
+- A common integration pattern involves 3+ sequential SDK calls
+
+**Arazzo 1.0.1 structure:**
+
+```json
+{
+  "arazzo": "1.0.1",
+  "info": {
+    "title": "{Service} Twin Workflows",
+    "version": "1.0.0",
+    "description": "Multi-step workflows discovered during twin generation."
+  },
+  "sourceDescriptions": [
+    {
+      "name": "{name}-twin",
+      "type": "openapi",
+      "url": "./specs/{name}-openapi.json"
+    }
+  ],
+  "workflows": [
+    {
+      "workflowId": "create-and-send-message",
+      "description": "Create a contact, then send a message to that contact.",
+      "steps": [
+        {
+          "stepId": "create-contact",
+          "operationId": "createContact",
+          "requestBody": {
+            "payload": {
+              "email": "$inputs.recipient_email"
+            }
+          },
+          "successCriteria": [
+            { "condition": "$statusCode == 201" }
+          ],
+          "outputs": {
+            "contact_id": "$response.body.id"
+          }
+        },
+        {
+          "stepId": "send-message",
+          "operationId": "sendMessage",
+          "requestBody": {
+            "payload": {
+              "to": "$steps.create-contact.outputs.contact_id",
+              "body": "$inputs.message_body"
+            }
+          },
+          "successCriteria": [
+            { "condition": "$statusCode == 201" }
+          ],
+          "outputs": {
+            "message_id": "$response.body.id"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Rules for Arazzo generation:**
+
+- Each workflow MUST have a descriptive `workflowId` (kebab-case)
+- Steps MUST reference `operationId` values that match the twin's handlers
+- Use runtime expressions (`$response.body.*`, `$statusCode`, `$inputs.*`) to wire steps together
+- Include `successCriteria` for every step (at minimum, the expected status code)
+- If no OpenAPI spec exists, use `operationPath` with method and path instead of `operationId`
+
+**Update provenance after generating:**
+
+Add the `arazzo` source to `provenance.json`:
+
+```json
+{
+  "sources": {
+    "arazzo": {
+      "origin": "generated",
+      "generated_from": ["sdk_analysis", "handler_implementation"],
+      "sha256": "{hash of arazzo file}"
+    }
+  }
+}
+```
+
+### Phase 10: Scenario Scaffolding
+
+After Arazzo generation, produce a starter scenario JSON file at `scenarios/basic.json`. This file validates against `schemas/scenario.schema.json` and provides baseline test coverage for `wt test`.
+
+**The starter scenario MUST include:**
+
+1. A health check step (verifying `/admin/health`)
+2. A state reset step (calling `/admin/reset`)
+3. One complete CRUD cycle per primary resource (create, get, update, list, delete)
+4. Variable capture between steps (e.g., capturing the created resource ID for subsequent get/update/delete)
+
+**Starter scenario example:**
+
+```json
+{
+  "name": "Basic CRUD - {Service}",
+  "description": "Health check and CRUD cycle for primary {Service} resources.",
+  "setup": {
+    "reset": ["{name}"]
+  },
+  "variables": {
+    "auth_token": "Bearer sk_test_123"
+  },
+  "steps": [
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/admin/health"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.status": "ok"
+        }
+      }
+    },
+    {
+      "name": "Reset state",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/admin/reset"
+      },
+      "assert": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Create contact",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/v1/contacts",
+        "headers": {
+          "Authorization": "{{auth_token}}"
+        },
+        "body": {
+          "email": "test@example.com",
+          "first_name": "Test"
+        }
+      },
+      "capture": {
+        "contact_id": "$.id"
+      },
+      "assert": {
+        "status": 201,
+        "body": {
+          "$.email": "test@example.com"
+        }
+      }
+    },
+    {
+      "name": "Get contact",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/v1/contacts/{{contact_id}}",
+        "headers": {
+          "Authorization": "{{auth_token}}"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.id": "{{contact_id}}",
+          "$.email": "test@example.com"
+        }
+      }
+    },
+    {
+      "name": "Update contact",
+      "request": {
+        "method": "PATCH",
+        "url": "{{base_url}}/v1/contacts/{{contact_id}}",
+        "headers": {
+          "Authorization": "{{auth_token}}"
+        },
+        "body": {
+          "first_name": "Updated"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.first_name": "Updated"
+        }
+      }
+    },
+    {
+      "name": "List contacts",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/v1/contacts?limit=10",
+        "headers": {
+          "Authorization": "{{auth_token}}"
+        }
+      },
+      "assert": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Delete contact",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/v1/contacts/{{contact_id}}",
+        "headers": {
+          "Authorization": "{{auth_token}}"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.deleted": true
+        }
+      }
+    }
+  ]
+}
+```
+
+**Rules for scenario scaffolding:**
+
+- Use the v2 JSON format matching `schemas/scenario.schema.json`
+- Always start with health check and reset steps
+- Capture IDs from create responses and reuse them in subsequent steps via `{{variable}}` syntax
+- Include at least one assertion per step (status code at minimum, body assertions preferred)
+- If Arazzo workflows were generated, reference the workflow file in the `workflow` field for complex multi-step scenarios
+
+### Phase 11: Local Testing with `wt`
 
 Before publishing, validate the twin works end-to-end using the `wt` CLI. This is the primary development workflow — fully offline, no registry needed.
 
@@ -800,37 +1161,13 @@ wt test      # Run test scenarios against it
 wt down      # Stop when done
 ```
 
-**4. Write integration test scenarios** in `scenarios/`:
+**4. Run the starter scenario** generated in Phase 10:
 
-```yaml
-name: "Basic CRUD"
-description: "Verify create, get, list, delete cycle"
-twin: {name}
-
-steps:
-  - name: "Reset state"
-    method: POST
-    path: /admin/reset
-    expect_status: 200
-
-  - name: "Create a resource"
-    method: POST
-    path: /v1/contacts
-    headers:
-      Authorization: "Bearer sk_test_123"
-    body:
-      email: "test@example.com"
-    expect_status: 201
-    capture:
-      contact_id: "$.id"
-
-  - name: "Get the resource"
-    method: GET
-    path: "/v1/contacts/{{contact_id}}"
-    headers:
-      Authorization: "Bearer sk_test_123"
-    expect_status: 200
+```bash
+wt test scenarios/basic.json
 ```
+
+Or write additional scenario files in `scenarios/` using the JSON format described in Phase 10, validated against `schemas/scenario.schema.json`.
 
 **5. Run conformance to validate admin API contract:**
 
@@ -847,7 +1184,7 @@ This validates all 8 standard checks: health, reset, state POST/GET, fault injec
 make build && wt down && wt up && wt test
 ```
 
-### Phase 9: Publish (Optional)
+### Phase 12: Publish (Optional)
 
 Once the twin passes local testing and conformance, publish it to make it installable via `wt install`.
 
@@ -886,14 +1223,17 @@ The template includes a release workflow that:
 The recommended workflow emphasizes **offline-first local development**:
 
 ```
-1. Set up project from template         (Phase 0)
-2. Analyze the target API               (Phase 1)
-3. Implement store, handlers, tests     (Phases 2-7)
-4. Build and test locally with wt       (Phase 8)  ← Primary loop
-5. Publish to registry when ready       (Phase 9)  ← Optional
+ 1. Analyze sources and record provenance   (Phase 0)
+ 2. Set up project from template            (Phase 1)
+ 3. Analyze the target SDK and service      (Phase 2)
+ 4. Implement store, handlers, tests        (Phases 3-8)
+ 5. Generate Arazzo workflows               (Phase 9)
+ 6. Scaffold starter scenarios              (Phase 10)
+ 7. Build and test locally with wt          (Phase 11) ← Primary loop
+ 8. Publish to registry when ready          (Phase 12) ← Optional
 ```
 
-For private/internal twins, Phase 9 is entirely optional. The `binary:` field in `wondertwin.yaml` supports any local path, so you can develop and use twins without ever publishing them.
+For private/internal twins, Phase 12 is entirely optional. The `binary:` field in `wondertwin.yaml` supports any local path, so you can develop and use twins without ever publishing them.
 
 ---
 
@@ -901,26 +1241,75 @@ For private/internal twins, Phase 9 is entirely optional. The `binary:` field in
 
 Before considering a twin complete, verify:
 
+**Source code and structure:**
 - [ ] Follows exact directory structure: `cmd/`, `internal/api/`, `internal/store/`
 - [ ] `twin.yaml` has correct name, description, category, SDK package/version, and default port
 - [ ] `go.mod` uses `require github.com/wondertwin-ai/twinkit` (no `replace` directives)
 - [ ] `MemoryStore` implements `admin.StateStore` (Snapshot, LoadState, Reset)
-- [ ] All routes match the real API's URL patterns exactly
+- [ ] All routes match the real service's URL patterns exactly
 - [ ] Request parsing matches what the SDK sends (JSON vs form-encoded)
-- [ ] Response format matches the real API's envelope and field names
-- [ ] Error responses match the real API's error format
-- [ ] ID generation matches the real API's ID format and prefix
+- [ ] Response format matches the real service's envelope and field names
+- [ ] Error responses match the real service's error format
+- [ ] ID generation matches the real service's ID format and prefix
 - [ ] Timestamps use `store.Clock.Now()` (not `time.Now()`)
-- [ ] Pagination matches the real API's pagination pattern
+- [ ] Pagination matches the real service's pagination pattern
 - [ ] Auth middleware validates header presence (accepts any value)
 - [ ] `main.go` follows the standard bootstrap pattern
 - [ ] Admin routes are registered via `admin.NewHandler().Routes()`
 - [ ] Handler tests cover CRUD operations, pagination, reset, and auth
 - [ ] No hardcoded ports (uses `twincore.ParseFlags()`)
-- [ ] If webhooks: Signer implements `webhook.Signer`, dispatcher integrated
-- [ ] If webhooks: `adminHandler.SetFlusher(dispatcher)` called
+
+**Pipeline artifacts:**
+- [ ] `twin-manifest.json` is present and validates against `schemas/twin-manifest.schema.json`
+- [ ] `provenance.json` is present and validates against `schemas/provenance.schema.json`
+- [ ] `workflows/{name}.arazzo.json` is present with at least one workflow (if multi-step sequences exist)
+- [ ] `scenarios/basic.json` is present and validates against `schemas/scenario.schema.json`
+- [ ] Manifest `service_surface` fields are populated (auth pattern, webhook support, resource count)
+- [ ] Manifest `coverage` fields reflect actual implementation status
+- [ ] Provenance `sources` accurately records what was used during generation
+
+**Webhooks (if applicable):**
+- [ ] Signer implements `webhook.Signer`, dispatcher integrated
+- [ ] `adminHandler.SetFlusher(dispatcher)` called
+
+**Validation:**
 - [ ] Passes `wt conformance` (all 8 checks)
 - [ ] Local `wt up` + `wt test` workflow works end-to-end
+- [ ] Starter scenario passes: `wt test scenarios/basic.json`
+
+## Fallback Guidance
+
+Not every service provides the same quality of documentation or tooling. Here is how to proceed when the ideal sources are unavailable.
+
+### No OpenAPI spec available
+
+When the service does not publish an OpenAPI spec:
+
+1. **Derive the service surface from SDK analysis.** Read the SDK client source code to extract endpoints, request/response shapes, and authentication patterns. This is often more accurate than docs anyway, since the SDK is what users actually call.
+2. **Set `service_surface.openapi_spec.available` to `false`** in the manifest.
+3. **Set `sources.openapi.origin` to `"derived"`** in provenance, or omit the `openapi` source entirely.
+4. **Use `operationPath` instead of `operationId`** in Arazzo workflows, since there is no spec to reference operation IDs from. Example: `"operationPath": "POST /v1/contacts"`.
+5. **Note the limitation** in the manifest description so consumers know the twin was built from SDK analysis alone.
+
+### DeepWiki has not indexed the SDK repo
+
+When DeepWiki is unavailable for the target SDK:
+
+1. **Clone the SDK repo directly** and read the source code, README, examples, and test files.
+2. **Set `sources.sdk_analysis.method` to `"direct_repo"`** in provenance.
+3. **Set `sources.sdk_analysis.fallback_used` to `true`** in provenance.
+4. **Focus on test files** -- SDK integration tests are the best source of truth for expected request/response shapes and multi-step workflows.
+5. **Check the SDK's changelog or release notes** for recent behavioral changes.
+
+### Poorly documented SDK
+
+When the SDK lacks documentation, has sparse examples, or has inconsistent behavior:
+
+1. **Note coverage limitations honestly** in the manifest. Set `coverage.estimated_coverage_pct` to reflect what was actually verified, not what was guessed.
+2. **Add entries to `coverage.resources_not_implemented`** for resources that could not be confidently implemented.
+3. **Set `generation.sources_used.manual_docs` to `true`** if you relied on non-SDK documentation (blog posts, community guides, etc.).
+4. **Document discovered quirks** using `schemas/quirk.schema.json` format and register them via `/admin/quirks` if the twin implements the `QuirkStore` interface. Quirks can be toggled at runtime via `PUT /admin/quirks/{quirk_id}` and `DELETE /admin/quirks/{quirk_id}`.
+5. **Use runtime configuration** via `/admin/config` (`GET` to read, `PUT` to update) to allow consumers to adjust twin behavior for edge cases that may vary between SDK versions.
 
 ## Common Mistakes to Avoid
 
@@ -930,9 +1319,14 @@ Before considering a twin complete, verify:
 4. **Returning wrong error format** — each service has its own error envelope, match it exactly
 5. **Hardcoding the port** — always use `twincore.ParseFlags()` and allow `--port` override
 6. **Forgetting to register admin routes** — every twin MUST mount `admin.Handler.Routes()`
-7. **Using `http.StatusOK` for creates** — check what the real API returns (often 201)
+7. **Using `http.StatusOK` for creates** — check what the real service returns (often 201)
 8. **Skipping `omitempty` on optional JSON fields** — SDK clients may break on unexpected null fields
 9. **Not nil-checking in `LoadState()`** — partial seed data should work
 10. **Using `replace` directives in `go.mod`** — twins depend on published `twinkit` versions, not local paths
 11. **Skipping `twin.yaml`** — required for release automation and registry metadata
 12. **Not running `wt conformance`** — conformance pass is mandatory for registry listing
+13. **Skipping `twin-manifest.json` or `provenance.json`** — both are required pipeline artifacts; validate against their schemas in `schemas/`
+14. **Using `api_surface` instead of `service_surface`** — the manifest schema uses `service_surface`
+15. **Forgetting to update provenance after Arazzo generation** — add the `arazzo` source entry with `origin` and `sha256`
+16. **Writing scenarios in YAML instead of JSON** — the v2 scenario format uses JSON, validated against `schemas/scenario.schema.json`
+17. **Omitting health check and reset steps from starter scenarios** — every scenario should begin with these steps
