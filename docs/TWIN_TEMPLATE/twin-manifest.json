@@ -1,0 +1,39 @@
+{
+  "twin": "your-service",
+  "display_name": "Your Service",
+  "category": "your-category",
+  "description": "Simulates the Your Service API, covering the core resource operations.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/your-org/your-sdk-go",
+      "language": "go",
+      "version": "v1",
+      "repo_url": "https://github.com/your-org/your-sdk-go",
+      "docs_url": "https://docs.your-service.com/api-reference"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 1
+  },
+  "coverage": {
+    "resources_implemented": [
+      "resources"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 0
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

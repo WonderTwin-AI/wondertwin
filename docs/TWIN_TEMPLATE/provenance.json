@@ -1,0 +1,19 @@
+{
+  "twin": "your-service",
+  "sdk_target": {
+    "package": "github.com/your-org/your-sdk-go",
+    "language": "go",
+    "version": "v1"
+  },
+  "build": 1,
+  "generated_at": "2026-01-01T00:00:00Z",
+  "sources": {
+    "openapi": {
+      "origin": "unknown"
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/your-org/your-sdk-go"
+    }
+  }
+}
