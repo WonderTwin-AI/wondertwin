@@ -131,6 +131,38 @@ func TestExpandTemplates_EnvVariables(t *testing.T) {
 	}
 }
 
+func TestExpandTemplates_EnvRestricted(t *testing.T) {
+	m := testManifest()
+
+	os.Setenv("HOME", "/some/path")
+
+	_, err := ExpandTemplates("{{env.HOME}}", m, nil)
+	if err == nil {
+		t.Error("expected error for non-WT_ env var access")
+	}
+}
+
+func TestExpandTemplates_NoReexpansion(t *testing.T) {
+	m := testManifest()
+
+	os.Setenv("WT_SECRET", "sensitive")
+	defer os.Unsetenv("WT_SECRET")
+
+	// A captured variable that contains template-like syntax should NOT be re-expanded
+	vars := map[string]string{
+		"payload": "{{env.WT_SECRET}}",
+	}
+
+	got, err := ExpandTemplates("value={{payload}}", m, vars)
+	if err != nil {
+		t.Fatalf("ExpandTemplates() error = %v", err)
+	}
+	// The literal string "{{env.WT_SECRET}}" should appear, NOT "sensitive"
+	if got != "value={{env.WT_SECRET}}" {
+		t.Errorf("ExpandTemplates() = %q, want %q (should not re-expand captured values)", got, "value={{env.WT_SECRET}}")
+	}
+}
+
 func TestExpandTemplates_NoTemplates(t *testing.T) {
 	m := testManifest()
 

@@ -619,7 +619,8 @@ func runV1Dir(m *manifest.Manifest, dir string) (passed, failed, steps int) {
 func runV2Dir(m *manifest.Manifest, dir string) (passed, failed, steps int) {
 	scenarios, err := scenariov2.LoadDir(dir)
 	if err != nil {
-		return 0, 0, 0
+		fmt.Printf("\n  ERROR loading scenarios: %v\n", err)
+		return 0, 1, 0
 	}
 
 	runner := scenariov2.NewRunner(m)

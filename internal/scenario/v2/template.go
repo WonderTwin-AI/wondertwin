@@ -15,11 +15,13 @@ import (
 //   - {{variable_name}} from captured variables
 func ExpandTemplates(s string, m *manifest.Manifest, vars map[string]string) (string, error) {
 	result := s
+	pos := 0
 	for {
-		start := strings.Index(result, "{{")
+		start := strings.Index(result[pos:], "{{")
 		if start == -1 {
 			break
 		}
+		start += pos
 		end := strings.Index(result[start:], "}}")
 		if end == -1 {
 			return "", fmt.Errorf("unterminated template expression at position %d", start)
@@ -34,6 +36,7 @@ func ExpandTemplates(s string, m *manifest.Manifest, vars map[string]string) (st
 		}
 
 		result = result[:start] + value + result[end:]
+		pos = start + len(value) // skip past inserted value, don't re-expand
 	}
 	return result, nil
 }
@@ -45,9 +48,12 @@ func resolveExpr(expr string, m *manifest.Manifest, vars map[string]string) (str
 		return resolveTwinExpr(expr, m)
 	}
 
-	// env.VARIABLE
+	// env.VARIABLE (restricted to WT_ and WONDERTWIN_ prefixed vars for safety)
 	if strings.HasPrefix(expr, "env.") {
 		envKey := expr[4:]
+		if !strings.HasPrefix(envKey, "WT_") && !strings.HasPrefix(envKey, "WONDERTWIN_") {
+			return "", fmt.Errorf("env var access restricted to WT_* and WONDERTWIN_* prefixes, got %q", envKey)
+		}
 		val := os.Getenv(envKey)
 		return val, nil
 	}
