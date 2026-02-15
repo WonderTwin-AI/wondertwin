@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-twilio")
 	if cfg.Port == 0 {
-		cfg.Port = 12113
+		cfg.Port = 4112
 	}
 
 	twin := twincore.New(cfg)

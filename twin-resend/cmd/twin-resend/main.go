@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-resend")
 	if cfg.Port == 0 {
-		cfg.Port = 12115
+		cfg.Port = 4113
 	}
 
 	twin := twincore.New(cfg)
