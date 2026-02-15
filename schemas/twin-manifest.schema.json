@@ -58,24 +58,52 @@
         },
         "additional": {
           "type": "array",
-          "description": "Additional SDK targets.",
+          "description": "Additional SDK targets with compatibility status.",
           "items": {
             "type": "object",
+            "required": ["package", "language"],
             "properties": {
               "package": {
-                "type": "string"
+                "type": "string",
+                "description": "SDK package name."
               },
               "language": {
-                "type": "string"
+                "type": "string",
+                "description": "Programming language."
               },
               "version": {
-                "type": "string"
+                "type": "string",
+                "description": "SDK version tested against."
               },
               "repo_url": {
-                "type": "string"
+                "type": "string",
+                "description": "Repository URL for the SDK."
               },
               "docs_url": {
-                "type": "string"
+                "type": "string",
+                "description": "Documentation URL for the SDK."
+              },
+              "compatibility": {
+                "type": "string",
+                "description": "Compatibility confidence level.",
+                "enum": ["tested", "inferred", "untested"]
+              },
+              "last_validated": {
+                "type": "string",
+                "format": "date",
+                "description": "Date when compatibility was last validated."
+              },
+              "validation_method": {
+                "type": "string",
+                "description": "How compatibility was validated.",
+                "enum": ["scenario_suite", "manual", "none"]
+              },
+              "known_gaps": {
+                "type": "array",
+                "description": "Known behavioral differences from the primary SDK.",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
