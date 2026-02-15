@@ -53,8 +53,9 @@ const defaultManifest = "wondertwin.yaml"
 // resolveManifestPath returns the manifest path to use. If the given path
 // is the default YAML and a wondertwin.json exists alongside it, prefer JSON.
 func resolveManifestPath(path string) string {
-	if path == "wondertwin.yaml" || path == "wondertwin.yml" {
-		jsonPath := "wondertwin.json"
+	base := filepath.Base(path)
+	if base == "wondertwin.yaml" || base == "wondertwin.yml" {
+		jsonPath := filepath.Join(filepath.Dir(path), "wondertwin.json")
 		if _, err := os.Stat(jsonPath); err == nil {
 			return jsonPath
 		}

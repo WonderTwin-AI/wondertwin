@@ -260,7 +260,7 @@ func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleListQuirks(w http.ResponseWriter, r *http.Request) {
 	if h.quirks == nil {
-		twincore.JSON(w, http.StatusOK, []QuirkStatus{})
+		twincore.Error(w, http.StatusNotFound, "quirk store not configured")
 		return
 	}
 	twincore.JSON(w, http.StatusOK, h.quirks.ListQuirks())

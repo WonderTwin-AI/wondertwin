@@ -234,7 +234,9 @@ type resetParams struct {
 func handleReset(m *manifest.Manifest, ac *client.AdminClient, params json.RawMessage) ToolResult {
 	var p resetParams
 	if len(params) > 0 {
-		json.Unmarshal(params, &p)
+		if err := json.Unmarshal(params, &p); err != nil {
+			return textResult(fmt.Sprintf("Error: invalid parameters: %v", err))
+		}
 	}
 
 	pids, _ := procmgr.LoadPids()
@@ -275,7 +277,9 @@ type seedParams struct {
 func handleSeed(m *manifest.Manifest, ac *client.AdminClient, params json.RawMessage) ToolResult {
 	var p seedParams
 	if len(params) > 0 {
-		json.Unmarshal(params, &p)
+		if err := json.Unmarshal(params, &p); err != nil {
+			return textResult(fmt.Sprintf("Error: invalid parameters: %v", err))
+		}
 	}
 
 	if p.Twin == "" || p.File == "" {
@@ -302,7 +306,9 @@ type inspectParams struct {
 func handleInspect(m *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
 	var p inspectParams
 	if len(params) > 0 {
-		json.Unmarshal(params, &p)
+		if err := json.Unmarshal(params, &p); err != nil {
+			return textResult(fmt.Sprintf("Error: invalid parameters: %v", err))
+		}
 	}
 
 	if p.Twin == "" {
@@ -338,7 +344,9 @@ type configParams struct {
 func handleConfig(m *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
 	var p configParams
 	if len(params) > 0 {
-		json.Unmarshal(params, &p)
+		if err := json.Unmarshal(params, &p); err != nil {
+			return textResult(fmt.Sprintf("Error: invalid parameters: %v", err))
+		}
 	}
 
 	if p.Twin == "" {
@@ -394,7 +402,9 @@ type quirksParams struct {
 func handleQuirks(m *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
 	var p quirksParams
 	if len(params) > 0 {
-		json.Unmarshal(params, &p)
+		if err := json.Unmarshal(params, &p); err != nil {
+			return textResult(fmt.Sprintf("Error: invalid parameters: %v", err))
+		}
 	}
 
 	if p.Twin == "" {

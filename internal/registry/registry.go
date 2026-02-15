@@ -55,10 +55,30 @@ func FetchRegistry(url, token string) (*Registry, error) {
 		if err == nil {
 			return reg, nil
 		}
-		// Fall back to original YAML URL
+		// Only fall back to YAML on HTTP errors (e.g. 404).
+		// If JSON was fetched successfully but failed to parse,
+		// that's a real error — don't silently swallow it.
+		if !isHTTPError(err) {
+			return nil, err
+		}
 	}
 
 	return fetchAndParse(url, token)
+}
+
+// httpError is returned when the registry server responds with a non-200 status.
+type httpError struct {
+	statusCode int
+}
+
+func (e *httpError) Error() string {
+	return fmt.Sprintf("registry returned HTTP %d", e.statusCode)
+}
+
+// isHTTPError returns true if the error is an HTTP-level error (non-200 status).
+func isHTTPError(err error) bool {
+	_, ok := err.(*httpError)
+	return ok
 }
 
 // toJSONURL converts a .yaml/.yml URL to its .json equivalent.
@@ -93,7 +113,7 @@ func fetchAndParse(url, token string) (*Registry, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("registry returned HTTP %d", resp.StatusCode)
+		return nil, &httpError{statusCode: resp.StatusCode}
 	}
 
 	body, err := io.ReadAll(resp.Body)

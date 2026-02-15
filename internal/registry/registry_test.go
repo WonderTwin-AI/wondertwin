@@ -32,6 +32,11 @@ func TestFetchRegistryYAML(t *testing.T) {
 	data, _ := yaml.Marshal(reg)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only serve YAML at the YAML path; return 404 for JSON variant
+		if r.URL.Path == "/registry.json" {
+			http.NotFound(w, r)
+			return
+		}
 		w.Write(data)
 	}))
 	defer srv.Close()
