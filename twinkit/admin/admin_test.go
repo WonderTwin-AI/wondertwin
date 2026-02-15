@@ -18,7 +18,7 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockState struct {
-	data      map[string]string
+	data        map[string]string
 	resetCalled bool
 }
 
@@ -59,16 +59,112 @@ func (m *mockFlusher) FlushWebhooks() error {
 }
 
 // ---------------------------------------------------------------------------
+// Mock config provider
+// ---------------------------------------------------------------------------
+
+type mockConfigProvider struct {
+	cfg map[string]any
+}
+
+func newMockConfigProvider() *mockConfigProvider {
+	return &mockConfigProvider{cfg: map[string]any{
+		"port":    8080,
+		"latency": "100ms",
+		"verbose": false,
+	}}
+}
+
+func (m *mockConfigProvider) GetConfig() map[string]any {
+	return m.cfg
+}
+
+func (m *mockConfigProvider) UpdateConfig(updates map[string]any) error {
+	for k, v := range updates {
+		m.cfg[k] = v
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Mock quirk store
+// ---------------------------------------------------------------------------
+
+type mockQuirkStore struct {
+	quirks []QuirkStatus
+}
+
+func newMockQuirkStore() *mockQuirkStore {
+	return &mockQuirkStore{quirks: []QuirkStatus{
+		{ID: "q1", Summary: "Test quirk", Enabled: false, Type: "behavior", Severity: "low"},
+		{ID: "q2", Summary: "Another quirk", Enabled: true, Type: "timing", Severity: "medium"},
+	}}
+}
+
+func (m *mockQuirkStore) ListQuirks() []QuirkStatus {
+	return m.quirks
+}
+
+func (m *mockQuirkStore) EnableQuirk(id string) error {
+	for i, q := range m.quirks {
+		if q.ID == id {
+			m.quirks[i].Enabled = true
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown quirk: %s", id)
+}
+
+func (m *mockQuirkStore) DisableQuirk(id string) error {
+	for i, q := range m.quirks {
+		if q.ID == id {
+			m.quirks[i].Enabled = false
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown quirk: %s", id)
+}
+
+func (m *mockQuirkStore) IsEnabled(id string) bool {
+	for _, q := range m.quirks {
+		if q.ID == id {
+			return q.Enabled
+		}
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
 // Helper to create a test server
 // ---------------------------------------------------------------------------
 
+type testServerOpts struct {
+	state   StateStore
+	clock   *store.Clock
+	flusher WebhookFlusher
+	config  ConfigProvider
+	quirks  QuirkStore
+}
+
 func setupTestServer(state StateStore, clock *store.Clock, flusher WebhookFlusher) *httptest.Server {
+	return setupTestServerFull(testServerOpts{state: state, clock: clock, flusher: flusher})
+}
+
+func setupTestServerFull(opts testServerOpts) *httptest.Server {
+	if opts.state == nil {
+		opts.state = newMockState()
+	}
 	cfg := &twincore.Config{Name: "test-admin"}
 	mw := twincore.NewMiddleware(cfg, nil)
 
-	h := NewHandler(state, mw, clock)
-	if flusher != nil {
-		h.SetFlusher(flusher)
+	h := NewHandler(opts.state, mw, opts.clock)
+	if opts.flusher != nil {
+		h.SetFlusher(opts.flusher)
+	}
+	if opts.config != nil {
+		h.SetConfigProvider(opts.config)
+	}
+	if opts.quirks != nil {
+		h.SetQuirkStore(opts.quirks)
 	}
 
 	r := chi.NewRouter()
@@ -531,5 +627,256 @@ func TestHandleResetWithNilClock(t *testing.T) {
 	}
 	if !state.resetCalled {
 		t.Error("expected state Reset to be called")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Config endpoint tests
+// ---------------------------------------------------------------------------
+
+func TestHandleGetConfig(t *testing.T) {
+	srv := setupTestServerFull(testServerOpts{config: newMockConfigProvider()})
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/admin/config")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body map[string]any
+	json.NewDecoder(resp.Body).Decode(&body)
+	if body["port"] != float64(8080) {
+		t.Errorf("expected port=8080, got %v", body["port"])
+	}
+}
+
+func TestHandleGetConfigNilProvider(t *testing.T) {
+	srv := setupTestServer(newMockState(), nil, nil)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/admin/config")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 when no config provider, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleUpdateConfig(t *testing.T) {
+	cp := newMockConfigProvider()
+	srv := setupTestServerFull(testServerOpts{config: cp})
+	defer srv.Close()
+
+	body := `{"verbose": true, "latency": "200ms"}`
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	if cp.cfg["verbose"] != true {
+		t.Errorf("expected verbose=true, got %v", cp.cfg["verbose"])
+	}
+	if cp.cfg["latency"] != "200ms" {
+		t.Errorf("expected latency=200ms, got %v", cp.cfg["latency"])
+	}
+}
+
+func TestHandleUpdateConfigNilProvider(t *testing.T) {
+	srv := setupTestServer(newMockState(), nil, nil)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/config", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 when no config provider, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleUpdateConfigInvalidJSON(t *testing.T) {
+	srv := setupTestServerFull(testServerOpts{config: newMockConfigProvider()})
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/config", strings.NewReader("{bad"))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Quirk endpoint tests
+// ---------------------------------------------------------------------------
+
+func TestHandleListQuirks(t *testing.T) {
+	srv := setupTestServerFull(testServerOpts{quirks: newMockQuirkStore()})
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/admin/quirks")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body []QuirkStatus
+	json.NewDecoder(resp.Body).Decode(&body)
+	if len(body) != 2 {
+		t.Fatalf("expected 2 quirks, got %d", len(body))
+	}
+}
+
+func TestHandleListQuirksNilStore(t *testing.T) {
+	srv := setupTestServer(newMockState(), nil, nil)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/admin/quirks")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var body []QuirkStatus
+	json.NewDecoder(resp.Body).Decode(&body)
+	if len(body) != 0 {
+		t.Errorf("expected empty list, got %d items", len(body))
+	}
+}
+
+func TestHandleEnableQuirk(t *testing.T) {
+	qs := newMockQuirkStore()
+	srv := setupTestServerFull(testServerOpts{quirks: qs})
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/quirks/q1", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	if !qs.IsEnabled("q1") {
+		t.Error("expected q1 to be enabled")
+	}
+}
+
+func TestHandleEnableQuirkNotFound(t *testing.T) {
+	srv := setupTestServerFull(testServerOpts{quirks: newMockQuirkStore()})
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/quirks/nonexistent", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleEnableQuirkNilStore(t *testing.T) {
+	srv := setupTestServer(newMockState(), nil, nil)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/admin/quirks/q1", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 when no quirk store, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleDisableQuirk(t *testing.T) {
+	qs := newMockQuirkStore()
+	srv := setupTestServerFull(testServerOpts{quirks: qs})
+	defer srv.Close()
+
+	// q2 is initially enabled
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/admin/quirks/q2", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+	if qs.IsEnabled("q2") {
+		t.Error("expected q2 to be disabled")
+	}
+}
+
+func TestHandleDisableQuirkNotFound(t *testing.T) {
+	srv := setupTestServerFull(testServerOpts{quirks: newMockQuirkStore()})
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/admin/quirks/nonexistent", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestHandleDisableQuirkNilStore(t *testing.T) {
+	srv := setupTestServer(newMockState(), nil, nil)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/admin/quirks/q1", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 when no quirk store, got %d", resp.StatusCode)
 	}
 }
