@@ -48,6 +48,11 @@ WonderTwin fixes this. Run the full dependency stack on your laptop, on a plane,
 # Install the CLI
 brew install wondertwin-ai/tap/wt
 
+# Or download a prebuilt binary from GitHub Releases
+# https://github.com/WonderTwin-AI/wondertwin/releases
+curl -Lo wt https://github.com/WonderTwin-AI/wondertwin/releases/latest/download/wt-darwin-arm64
+chmod +x wt && sudo mv wt /usr/local/bin/
+
 # Or build from source
 git clone https://github.com/wondertwin-ai/wondertwin.git
 cd wondertwin
@@ -179,7 +184,7 @@ wondertwin/
 ## Why Go Binaries?
 
 - **Single file, zero dependencies.** No Docker, no runtime, no package manager conflicts.
-- **Cross-platform.** macOS, Linux, Windows. ARM and x86.
+- **Cross-platform.** macOS and Linux (ARM and x86). Windows binaries are provided but currently untested.
 - **Fast startup.** Twins launch in milliseconds.
 - **Deployable anywhere.** Laptop, CI runner, Kubernetes pod, bare metal.
 - **Easy to generate.** Go's standard library handles HTTP, JSON, and concurrency out of the box — making twins ideal targets for AI coding agents.
