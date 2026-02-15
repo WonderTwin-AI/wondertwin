@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 )
 

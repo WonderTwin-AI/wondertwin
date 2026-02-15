@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // GetBalance handles GET /v1/balance.

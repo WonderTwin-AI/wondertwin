@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/pkg/store"
+	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
 )
 
 // MemoryStore holds all PostHog twin state in memory.

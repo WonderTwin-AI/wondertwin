@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/pkg/store"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // StateStore is the interface a twin must implement to support admin state management.

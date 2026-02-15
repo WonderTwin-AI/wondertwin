@@ -1,4 +1,4 @@
-module github.com/wondertwin-ai/wondertwin/pkg
+module github.com/wondertwin-ai/wondertwin/twinkit
 
 go 1.25.7
 
