@@ -1,0 +1,20 @@
+{
+  "twin": "posthog",
+  "sdk_target": {
+    "package": "github.com/posthog/posthog-go",
+    "language": "go",
+    "version": "v0"
+  },
+  "build": 1,
+  "generated_at": "2026-02-12T15:26:50-08:00",
+  "sources": {
+    "openapi": {
+      "origin": "vendor_published",
+      "url": "https://posthog.com/docs/api"
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/posthog/posthog-go"
+    }
+  }
+}
