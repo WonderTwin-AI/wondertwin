@@ -1,0 +1,62 @@
+{
+  "name": "Stripe twin health and basic operations",
+  "setup": {
+    "reset": ["stripe"]
+  },
+  "steps": [
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.stripe.port}}/admin/health"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.status": "ok"
+        }
+      }
+    },
+    {
+      "name": "Create customer",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:{{twins.stripe.port}}/v1/customers",
+        "headers": {
+          "Authorization": "Bearer sk_test_123"
+        },
+        "body": {
+          "email": "test@example.com",
+          "name": "Test Customer"
+        }
+      },
+      "capture": {
+        "customer_id": "$.id"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.email": "test@example.com",
+          "$.object": "customer"
+        }
+      }
+    },
+    {
+      "name": "Retrieve customer",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.stripe.port}}/v1/customers/{{customer_id}}",
+        "headers": {
+          "Authorization": "Bearer sk_test_123"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.id": "{{customer_id}}",
+          "$.email": "test@example.com"
+        }
+      }
+    }
+  ]
+}
