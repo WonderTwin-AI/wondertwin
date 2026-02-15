@@ -1,7 +1,8 @@
-// Package manifest parses wondertwin.yaml project manifests.
+// Package manifest parses wondertwin.yaml and wondertwin.json project manifests.
 package manifest
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,32 +13,36 @@ import (
 
 // Twin defines the configuration for a single twin in the manifest.
 type Twin struct {
-	Binary    string            `yaml:"binary"`
-	Version   string            `yaml:"version"`
-	Registry  string            `yaml:"registry"`
-	Port      int               `yaml:"port"`
-	AdminPort int               `yaml:"admin_port"`
-	Seed      string            `yaml:"seed"`
-	Env       map[string]string `yaml:"env"`
+	Binary    string            `yaml:"binary" json:"binary"`
+	Version   string            `yaml:"version" json:"version"`
+	SDK       string            `yaml:"sdk" json:"sdk"`
+	Build     string            `yaml:"build" json:"build"`
+	Registry  string            `yaml:"registry" json:"registry"`
+	Port      int               `yaml:"port" json:"port"`
+	AdminPort int               `yaml:"admin_port" json:"admin_port"`
+	Seed      string            `yaml:"seed" json:"seed"`
+	Env       map[string]string `yaml:"env" json:"env"`
 }
 
 // Settings holds global CLI settings from the manifest.
 type Settings struct {
-	BinaryDir string `yaml:"binary_dir"`
-	LogDir    string `yaml:"log_dir"`
-	Verbose   bool   `yaml:"verbose"`
+	BinaryDir string `yaml:"binary_dir" json:"binary_dir"`
+	LogDir    string `yaml:"log_dir" json:"log_dir"`
+	Verbose   bool   `yaml:"verbose" json:"verbose"`
 }
 
-// Manifest represents a parsed wondertwin.yaml file.
+// Manifest represents a parsed wondertwin.yaml or wondertwin.json file.
 type Manifest struct {
-	Twins    map[string]Twin `yaml:"twins"`
-	Settings Settings        `yaml:"settings"`
+	Twins    map[string]Twin `yaml:"twins" json:"twins"`
+	Settings Settings        `yaml:"settings" json:"settings"`
 
 	// dir is the directory containing the manifest file, used for resolving relative paths.
 	dir string
 }
 
-// Load reads and parses a wondertwin.yaml file.
+// Load reads and parses a wondertwin.yaml or wondertwin.json file.
+// The format is detected by file extension: .json uses encoding/json,
+// .yaml/.yml uses gopkg.in/yaml.v3.
 func Load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -45,8 +50,18 @@ func Load(path string) (*Manifest, error) {
 	}
 
 	var m Manifest
-	if err := yaml.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("parsing manifest: %w", err)
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(data, &m); err != nil {
+			return nil, fmt.Errorf("parsing manifest JSON: %w", err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &m); err != nil {
+			return nil, fmt.Errorf("parsing manifest YAML: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported manifest format %q (expected .json, .yaml, or .yml)", ext)
 	}
 
 	if m.Twins == nil {

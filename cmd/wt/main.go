@@ -49,8 +49,21 @@ var version = "dev"
 
 const defaultManifest = "wondertwin.yaml"
 
+// resolveManifestPath returns the manifest path to use. If the given path
+// is the default YAML and a wondertwin.json exists alongside it, prefer JSON.
+func resolveManifestPath(path string) string {
+	if path == "wondertwin.yaml" || path == "wondertwin.yml" {
+		jsonPath := "wondertwin.json"
+		if _, err := os.Stat(jsonPath); err == nil {
+			return jsonPath
+		}
+	}
+	return path
+}
+
 func main() {
 	cmd, args, manifestPath := parseArgs()
+	manifestPath = resolveManifestPath(manifestPath)
 
 	if cmd == "" || cmd == "help" || cmd == "--help" || cmd == "-h" {
 		printUsage()
@@ -134,7 +147,7 @@ Usage:
   wt [--config <path>] <command> [arguments]
 
 Commands:
-  up                         Start all twins defined in wondertwin.yaml
+  up                         Start all twins defined in wondertwin.json (or .yaml)
   down                       Stop all running twins
   status                     Health check all running twins
   reset                      Reset state on all running twins
@@ -143,7 +156,7 @@ Commands:
   inspect <twin> [res]       Query twin state (res: state|requests|faults|time)
   mcp                        Start MCP server over stdio (for AI agents)
   test [path]                Run YAML test scenarios (default: ./scenarios/)
-  install                    Install all twins from wondertwin.yaml
+  install                    Install all twins from manifest
   install <twin>@<version>   Install a specific twin at a version
   auth login                 Activate a license key
   auth status                Show current license tier and org
@@ -155,7 +168,7 @@ Commands:
   version                    Print the wt version
 
 Options:
-  --config <path>   Path to wondertwin.yaml (default: ./wondertwin.yaml)
+  --config <path>   Path to manifest (default: ./wondertwin.json or ./wondertwin.yaml)
 
 Environment:
   WT_CONFIG         Override default manifest path
