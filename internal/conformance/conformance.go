@@ -45,7 +45,7 @@ func Run(binaryPath string, port int) (*Report, error) {
 
 	// Start the twin
 	cmd := exec.Command(binaryPath, "--port", fmt.Sprintf("%d", port))
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setConformanceProcessAttrs(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting twin: %w", err)

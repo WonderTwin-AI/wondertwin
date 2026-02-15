@@ -16,4 +16,11 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test ./... -count=1
-      - run: go build -o bin/wt ./cmd/wt/
+      - run: make build
+
+      - name: Validate GoReleaser config
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
