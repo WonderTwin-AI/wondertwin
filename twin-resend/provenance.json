@@ -1,0 +1,19 @@
+{
+  "twin": "resend",
+  "sdk_target": {
+    "package": "github.com/resend/resend-go",
+    "language": "go",
+    "version": "v2"
+  },
+  "build": 1,
+  "generated_at": "2026-02-12T15:26:50-08:00",
+  "sources": {
+    "openapi": {
+      "origin": "manual"
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/resend/resend-go"
+    }
+  }
+}

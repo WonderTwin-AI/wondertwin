@@ -1,0 +1,54 @@
+{
+  "twin": "clerk",
+  "display_name": "Clerk",
+  "category": "auth",
+  "description": "Simulates the Clerk Backend API for user management, sessions, organizations, and JWT/JWKS endpoints for token verification.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/clerk/clerk-sdk-go",
+      "language": "go",
+      "version": "v2",
+      "repo_url": "https://github.com/clerk/clerk-sdk-go",
+      "docs_url": "https://clerk.com/docs/references/go/overview"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://clerk.com/docs/reference/backend-api"
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 4
+  },
+  "coverage": {
+    "resources_implemented": [
+      "users",
+      "sessions",
+      "organizations",
+      "jwks"
+    ],
+    "resources_not_implemented": [
+      "invitations",
+      "allowlist",
+      "blocklist",
+      "email_addresses",
+      "phone_numbers",
+      "oauth_applications",
+      "saml_connections",
+      "organization_memberships",
+      "webhooks"
+    ],
+    "estimated_coverage_pct": 10
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

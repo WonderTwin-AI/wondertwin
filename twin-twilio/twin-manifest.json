@@ -1,0 +1,49 @@
+{
+  "twin": "twilio",
+  "display_name": "Twilio",
+  "category": "communications",
+  "description": "Simulates the Twilio Messaging and Verify API surfaces, including SMS message send/retrieve and phone number verification workflows.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/twilio/twilio-go",
+      "language": "go",
+      "version": "v1",
+      "repo_url": "https://github.com/twilio/twilio-go",
+      "docs_url": "https://www.twilio.com/docs/libraries/reference/twilio-go"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://github.com/twilio/twilio-oai/tree/main/spec/json"
+    },
+    "auth_pattern": "basic",
+    "has_webhooks": false,
+    "resource_count": 2
+  },
+  "coverage": {
+    "resources_implemented": [
+      "messages",
+      "verify"
+    ],
+    "resources_not_implemented": [
+      "calls",
+      "phone_numbers",
+      "accounts",
+      "conferences",
+      "recordings",
+      "queues"
+    ],
+    "estimated_coverage_pct": 5
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "twin": "stripe",
+  "display_name": "Stripe",
+  "category": "payments",
+  "description": "Simulates the Stripe Connect and Payouts API surface, including accounts, external accounts, transfers, balance, payouts, and events with webhook delivery.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/stripe/stripe-go",
+      "language": "go",
+      "version": "v81",
+      "repo_url": "https://github.com/stripe/stripe-go",
+      "docs_url": "https://docs.stripe.com/api"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json"
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": true,
+    "resource_count": 6
+  },
+  "coverage": {
+    "resources_implemented": [
+      "accounts",
+      "external_accounts",
+      "transfers",
+      "balance",
+      "payouts",
+      "events"
+    ],
+    "resources_not_implemented": [
+      "charges",
+      "customers",
+      "payment_intents",
+      "subscriptions",
+      "invoices",
+      "products",
+      "prices",
+      "refunds",
+      "disputes"
+    ],
+    "estimated_coverage_pct": 5
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

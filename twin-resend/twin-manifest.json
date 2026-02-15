@@ -1,0 +1,45 @@
+{
+  "twin": "resend",
+  "display_name": "Resend",
+  "category": "email",
+  "description": "Simulates the Resend email sending API, including single and batch email dispatch with delivery tracking.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/resend/resend-go",
+      "language": "go",
+      "version": "v2",
+      "repo_url": "https://github.com/resend/resend-go",
+      "docs_url": "https://resend.com/docs/api-reference"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 1
+  },
+  "coverage": {
+    "resources_implemented": [
+      "emails"
+    ],
+    "resources_not_implemented": [
+      "domains",
+      "api_keys",
+      "audiences",
+      "contacts",
+      "broadcasts"
+    ],
+    "estimated_coverage_pct": 15
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

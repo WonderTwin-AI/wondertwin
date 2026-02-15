@@ -1,0 +1,39 @@
+{
+  "twin": "logodev",
+  "display_name": "Logo.dev",
+  "category": "media",
+  "description": "Simulates the Logo.dev logo retrieval API, returning deterministic SVG placeholder logos for any domain.",
+  "sdk_target": {
+    "primary": {
+      "package": "logo.dev",
+      "language": "http",
+      "version": "v1",
+      "repo_url": "https://docs.logo.dev",
+      "docs_url": "https://docs.logo.dev"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 1
+  },
+  "coverage": {
+    "resources_implemented": [
+      "logos"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 80
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

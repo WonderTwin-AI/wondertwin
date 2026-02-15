@@ -1,7 +1,8 @@
-// Package scenario loads and runs YAML-based test scenarios against running twins.
+// Package scenario loads and runs YAML and JSON test scenarios against running twins.
 package scenario
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,43 +11,56 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Scenario is a complete test scenario loaded from a YAML file.
+// Scenario is a complete test scenario loaded from a YAML or JSON file.
+// JSON scenarios use the new schema (with variables, workflow, capture, etc.);
+// YAML scenarios use the legacy format.
 type Scenario struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Setup       Setup  `yaml:"setup"`
-	Steps       []Step `yaml:"steps"`
+	Name        string `yaml:"name" json:"name"`
+	Description string `yaml:"description" json:"description"`
+	Setup       Setup  `yaml:"setup" json:"setup"`
+	Steps       []Step `yaml:"steps" json:"steps"`
+
+	// JSON-schema fields (only populated from JSON scenarios)
+	Workflow  string            `yaml:"-" json:"workflow,omitempty"`
+	Variables map[string]string `yaml:"-" json:"variables,omitempty"`
 }
 
 // Setup defines pre-test actions: resetting twins and seeding data.
 type Setup struct {
-	Reset []string          `yaml:"reset"`
-	Seed  map[string]string `yaml:"seed"`
+	Reset     []string          `yaml:"reset" json:"reset"`
+	Seed      map[string]string `yaml:"seed" json:"seed,omitempty"`
+	SeedFiles map[string]string `yaml:"-" json:"seed_files,omitempty"`
 }
 
 // Step is a single request/assert pair within a scenario.
 type Step struct {
-	Name    string  `yaml:"name"`
-	Request Request `yaml:"request"`
-	Assert  Assert  `yaml:"assert"`
+	Name    string  `yaml:"name" json:"name"`
+	Request Request `yaml:"request" json:"request"`
+	Assert  Assert  `yaml:"assert" json:"assert"`
+
+	// Capture is only populated from JSON scenarios.
+	Capture map[string]string `yaml:"-" json:"capture,omitempty"`
 }
 
 // Request defines the HTTP request to make during a step.
 type Request struct {
-	Method  string            `yaml:"method"`
-	URL     string            `yaml:"url"`
-	Headers map[string]string `yaml:"headers"`
-	Body    string            `yaml:"body"`
+	Method  string            `yaml:"method" json:"method"`
+	URL     string            `yaml:"url" json:"url"`
+	Headers map[string]string `yaml:"headers" json:"headers"`
+	Body    string            `yaml:"body" json:"body"`
 }
 
 // Assert defines the expected results of a step.
 type Assert struct {
-	Status       int               `yaml:"status"`
-	BodyContains string            `yaml:"body_contains"`
-	BodyJSON     map[string]string `yaml:"body_json"`
+	Status       int               `yaml:"status" json:"status"`
+	BodyContains string            `yaml:"body_contains" json:"body_contains"`
+	BodyJSON     map[string]string `yaml:"body_json" json:"body_json,omitempty"`
+	Headers      map[string]string `yaml:"-" json:"headers,omitempty"`
+	Body2        map[string]string `yaml:"-" json:"body,omitempty"`
 }
 
-// LoadScenario parses a single YAML scenario file.
+// LoadScenario parses a single YAML or JSON scenario file.
+// The format is detected by file extension.
 func LoadScenario(path string) (*Scenario, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -54,8 +68,18 @@ func LoadScenario(path string) (*Scenario, error) {
 	}
 
 	var s Scenario
-	if err := yaml.Unmarshal(data, &s); err != nil {
-		return nil, fmt.Errorf("parsing scenario %s: %w", path, err)
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".json":
+		if err := json.Unmarshal(data, &s); err != nil {
+			return nil, fmt.Errorf("parsing scenario %s: %w", path, err)
+		}
+	case ".yaml", ".yml":
+		if err := yaml.Unmarshal(data, &s); err != nil {
+			return nil, fmt.Errorf("parsing scenario %s: %w", path, err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported scenario format %q (expected .json, .yaml, or .yml)", ext)
 	}
 
 	if s.Name == "" {
@@ -68,7 +92,7 @@ func LoadScenario(path string) (*Scenario, error) {
 	return &s, nil
 }
 
-// LoadDir loads all .yaml and .yml scenario files from a directory.
+// LoadDir loads all .yaml, .yml, and .json scenario files from a directory.
 func LoadDir(dir string) ([]*Scenario, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -82,7 +106,7 @@ func LoadDir(dir string) ([]*Scenario, error) {
 		}
 		name := entry.Name()
 		ext := strings.ToLower(filepath.Ext(name))
-		if ext != ".yaml" && ext != ".yml" {
+		if ext != ".yaml" && ext != ".yml" && ext != ".json" {
 			continue
 		}
 		s, err := LoadScenario(filepath.Join(dir, name))

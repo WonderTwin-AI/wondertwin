@@ -1,8 +1,9 @@
 // Package config loads and manages the WonderTwin CLI configuration file
-// stored at ~/.wondertwin/config.yaml.
+// stored at ~/.wondertwin/config.json (preferred) or ~/.wondertwin/config.yaml.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,19 +15,22 @@ import (
 // DefaultConfigDir is the directory under the user's home for CLI state.
 const DefaultConfigDir = ".wondertwin"
 
-// DefaultConfigFile is the config file name within the config directory.
-const DefaultConfigFile = "config.yaml"
+// DefaultConfigFile is the preferred config file name (JSON).
+const DefaultConfigFile = "config.json"
+
+// legacyConfigFile is the legacy config file name (YAML).
+const legacyConfigFile = "config.yaml"
 
 // RegistryEntry describes a named registry endpoint.
 type RegistryEntry struct {
-	URL   string `yaml:"url"`
-	Token string `yaml:"token,omitempty"` // Bearer token for private registries
+	URL   string `yaml:"url" json:"url"`
+	Token string `yaml:"token,omitempty" json:"token,omitempty"` // Bearer token for private registries
 }
 
-// Config represents the contents of ~/.wondertwin/config.yaml.
+// Config represents the contents of ~/.wondertwin/config.json or config.yaml.
 type Config struct {
-	LicenseKey string                   `yaml:"license_key"`
-	Registries map[string]RegistryEntry `yaml:"registries"`
+	LicenseKey string                   `yaml:"license_key" json:"license_key"`
+	Registries map[string]RegistryEntry `yaml:"registries" json:"registries"`
 }
 
 // LicenseInfo holds parsed fields from a license key.
@@ -45,23 +49,39 @@ func configDir() (string, error) {
 	return filepath.Join(home, DefaultConfigDir), nil
 }
 
-// configPath returns the full path to the config file.
-func configPath() (string, error) {
+// resolveConfigPath returns the path to the config file to load.
+// It prefers config.json; if that does not exist, it falls back to config.yaml.
+// The returned boolean indicates whether the file is JSON (true) or YAML (false).
+func resolveConfigPath() (string, bool, error) {
 	dir, err := configDir()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return filepath.Join(dir, DefaultConfigFile), nil
+
+	jsonPath := filepath.Join(dir, DefaultConfigFile)
+	if _, err := os.Stat(jsonPath); err == nil {
+		return jsonPath, true, nil
+	}
+
+	yamlPath := filepath.Join(dir, legacyConfigFile)
+	return yamlPath, false, nil
 }
 
-// Load reads the config from ~/.wondertwin/config.yaml.
-// Returns a default config if the file doesn't exist.
+// Load reads the config from ~/.wondertwin/config.json (preferred) or
+// ~/.wondertwin/config.yaml (legacy fallback).
+// Returns a default config if neither file exists.
 func Load() (*Config, error) {
-	path, err := configPath()
+	path, isJSON, err := resolveConfigPath()
 	if err != nil {
 		return nil, err
 	}
 
+	return LoadFrom(path, isJSON)
+}
+
+// LoadFrom reads and parses a config from the given path.
+// If isJSON is true, the file is parsed as JSON; otherwise as YAML.
+func LoadFrom(path string, isJSON bool) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -71,8 +91,14 @@ func Load() (*Config, error) {
 	}
 
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
+	if isJSON {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("parsing config JSON: %w", err)
+		}
+	} else {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("parsing config YAML: %w", err)
+		}
 	}
 
 	// Ensure registries always has the public entry
@@ -88,22 +114,24 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
-// Save writes the config to ~/.wondertwin/config.yaml.
+// Save writes the config to ~/.wondertwin/config.json.
 func Save(cfg *Config) error {
-	path, err := configPath()
+	dir, err := configDir()
 	if err != nil {
 		return err
 	}
 
-	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
 
-	data, err := yaml.Marshal(cfg)
+	path := filepath.Join(dir, DefaultConfigFile)
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
+	data = append(data, '\n')
 
 	return os.WriteFile(path, data, 0o644)
 }

@@ -1,0 +1,16 @@
+{
+  "name": "Twin health check",
+  "description": "Verify twins are running and healthy",
+  "steps": [
+    {
+      "name": "Check stripe health",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.stripe.port}}/admin/health"
+      },
+      "assert": {
+        "status": 200
+      }
+    }
+  ]
+}

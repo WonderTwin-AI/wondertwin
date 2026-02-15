@@ -3,6 +3,7 @@
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,37 +14,68 @@ import (
 )
 
 // DefaultRegistryURL is the canonical location of the WonderTwin registry.
+// FetchRegistry will try the JSON variant first and fall back to YAML.
 const DefaultRegistryURL = "https://raw.githubusercontent.com/wondertwin-ai/registry/main/registry.yaml"
 
 // Registry represents the top-level registry manifest.
 type Registry struct {
-	SchemaVersion int                  `yaml:"schema_version"`
-	Twins         map[string]TwinEntry `yaml:"twins"`
+	SchemaVersion int                  `yaml:"schema_version" json:"schema_version"`
+	Twins         map[string]TwinEntry `yaml:"twins" json:"twins"`
 }
 
 // TwinEntry describes a twin available in the registry.
 type TwinEntry struct {
-	Description string             `yaml:"description"`
-	Repo        string             `yaml:"repo"`
-	Category    string             `yaml:"category"`
-	Author      string             `yaml:"author"`
-	Latest      string             `yaml:"latest"`
-	Versions    map[string]Version `yaml:"versions"`
+	Description string             `yaml:"description" json:"description"`
+	Repo        string             `yaml:"repo" json:"repo"`
+	Category    string             `yaml:"category" json:"category"`
+	Author      string             `yaml:"author" json:"author"`
+	Latest      string             `yaml:"latest" json:"latest"`
+	Versions    map[string]Version `yaml:"versions" json:"versions"`
 }
 
 // Version describes a specific release of a twin.
 type Version struct {
-	Released   string            `yaml:"released"`
-	SDKPackage string            `yaml:"sdk_package"`
-	SDKVersion string            `yaml:"sdk_version"`
-	Tier       string            `yaml:"tier"`
-	Checksums  map[string]string `yaml:"checksums"`
-	BinaryURLs map[string]string `yaml:"binary_urls"`
+	Released   string            `yaml:"released" json:"released"`
+	SDKPackage string            `yaml:"sdk_package" json:"sdk_package"`
+	SDKVersion string            `yaml:"sdk_version" json:"sdk_version"`
+	Tier       string            `yaml:"tier" json:"tier"`
+	Checksums  map[string]string `yaml:"checksums" json:"checksums"`
+	BinaryURLs map[string]string `yaml:"binary_urls" json:"binary_urls"`
 }
 
-// FetchRegistry downloads and parses the registry YAML from the given URL.
-// If token is non-empty, it is sent as a Bearer authorization header.
+// FetchRegistry downloads and parses the registry from the given URL.
+// If the URL ends in .yaml or .yml, it tries a .json variant first and
+// falls back to the original URL. If token is non-empty, it is sent as
+// a Bearer authorization header.
 func FetchRegistry(url, token string) (*Registry, error) {
+	// Try JSON variant first if URL points to a YAML file
+	jsonURL := toJSONURL(url)
+	if jsonURL != "" {
+		reg, err := fetchAndParse(jsonURL, token)
+		if err == nil {
+			return reg, nil
+		}
+		// Fall back to original YAML URL
+	}
+
+	return fetchAndParse(url, token)
+}
+
+// toJSONURL converts a .yaml/.yml URL to its .json equivalent.
+// Returns empty string if the URL does not end in .yaml or .yml.
+func toJSONURL(url string) string {
+	if strings.HasSuffix(url, ".yaml") {
+		return strings.TrimSuffix(url, ".yaml") + ".json"
+	}
+	if strings.HasSuffix(url, ".yml") {
+		return strings.TrimSuffix(url, ".yml") + ".json"
+	}
+	return ""
+}
+
+// fetchAndParse downloads a registry file and parses it based on the URL extension.
+// JSON is used for .json URLs, YAML for everything else.
+func fetchAndParse(url, token string) (*Registry, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -70,8 +102,14 @@ func FetchRegistry(url, token string) (*Registry, error) {
 	}
 
 	var reg Registry
-	if err := yaml.Unmarshal(body, &reg); err != nil {
-		return nil, fmt.Errorf("parsing registry YAML: %w", err)
+	if strings.HasSuffix(url, ".json") {
+		if err := json.Unmarshal(body, &reg); err != nil {
+			return nil, fmt.Errorf("parsing registry JSON: %w", err)
+		}
+	} else {
+		if err := yaml.Unmarshal(body, &reg); err != nil {
+			return nil, fmt.Errorf("parsing registry YAML: %w", err)
+		}
 	}
 
 	if reg.Twins == nil {
