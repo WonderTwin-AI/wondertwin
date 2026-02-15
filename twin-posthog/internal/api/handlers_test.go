@@ -4,9 +4,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/wondertwin-ai/wondertwin/pkg/admin"
-	"github.com/wondertwin-ai/wondertwin/pkg/testutil"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )

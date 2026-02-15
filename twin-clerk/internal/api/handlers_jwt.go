@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // JWTManager manages RSA key pairs and JWT generation for the Clerk twin.

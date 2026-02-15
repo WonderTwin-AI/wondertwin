@@ -14,8 +14,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/wondertwin-ai/wondertwin/pkg/admin"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-clerk/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-clerk/internal/store"
 )

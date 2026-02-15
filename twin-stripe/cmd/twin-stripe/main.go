@@ -10,9 +10,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/wondertwin-ai/wondertwin/pkg/admin"
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
-	pkgwebhook "github.com/wondertwin-ai/wondertwin/pkg/webhook"
+	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"

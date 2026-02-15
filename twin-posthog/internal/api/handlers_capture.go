@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/pkg/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )
 
