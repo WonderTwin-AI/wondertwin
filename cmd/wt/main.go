@@ -42,6 +42,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
 	"github.com/wondertwin-ai/wondertwin/internal/registry"
 	"github.com/wondertwin-ai/wondertwin/internal/scenario"
+	scenariov2 "github.com/wondertwin-ai/wondertwin/internal/scenario/v2"
 )
 
 // version is set at build time via -ldflags "-X main.version=..."
@@ -534,59 +535,42 @@ func cmdTest(manifestPath string, args []string) error {
 		path = args[0]
 	}
 
-	var scenarios []*scenario.Scenario
-
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("scenario path %s: %w", path, err)
 	}
 
-	if info.IsDir() {
-		scenarios, err = scenario.LoadDir(path)
-		if err != nil {
-			return err
-		}
-	} else {
-		s, err := scenario.LoadScenario(path)
-		if err != nil {
-			return err
-		}
-		scenarios = append(scenarios, s)
-	}
-
-	runner := scenario.NewRunner(m)
-
 	totalPassed := 0
 	totalFailed := 0
 	totalSteps := 0
 
-	for _, s := range scenarios {
-		fmt.Printf("\n--- %s ---\n", s.Name)
-		if s.Description != "" {
-			fmt.Printf("    %s\n", s.Description)
-		}
-		fmt.Println()
+	if info.IsDir() {
+		// Run both YAML and JSON scenarios from the directory
+		p, f, s := runV1Dir(m, path)
+		totalPassed += p
+		totalFailed += f
+		totalSteps += s
 
-		result, err := runner.Run(s)
-		if err != nil {
-			fmt.Printf("  ERROR: %v\n", err)
-			totalFailed++
-			continue
+		p, f, s = runV2Dir(m, path)
+		totalPassed += p
+		totalFailed += f
+		totalSteps += s
+	} else {
+		ext := strings.ToLower(filepath.Ext(path))
+		switch ext {
+		case ".json":
+			p, f, s := runV2File(m, path)
+			totalPassed += p
+			totalFailed += f
+			totalSteps += s
+		case ".yaml", ".yml":
+			p, f, s := runV1File(m, path)
+			totalPassed += p
+			totalFailed += f
+			totalSteps += s
+		default:
+			return fmt.Errorf("unsupported scenario format %q", ext)
 		}
-
-		for _, sr := range result.Steps {
-			totalSteps++
-			if sr.Passed {
-				fmt.Printf("  PASS  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
-				totalPassed++
-			} else {
-				fmt.Printf("  FAIL  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
-				fmt.Printf("        %s\n", sr.Error)
-				totalFailed++
-			}
-		}
-
-		fmt.Printf("\n  Scenario: %s (%s)\n", passFailLabel(result.Passed), result.Duration.Round(time.Millisecond))
 	}
 
 	// Summary
@@ -597,6 +581,139 @@ func cmdTest(manifestPath string, args []string) error {
 		os.Exit(1)
 	}
 	return nil
+}
+
+// runV1Dir runs all YAML scenarios from a directory using the v1 runner.
+// JSON files are skipped here because they are handled by the v2 runner.
+func runV1Dir(m *manifest.Manifest, dir string) (passed, failed, steps int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, 0, 0
+	}
+
+	runner := scenario.NewRunner(m)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		s, err := scenario.LoadScenario(filepath.Join(dir, entry.Name()))
+		if err != nil {
+			fmt.Printf("\n  ERROR loading %s: %v\n", entry.Name(), err)
+			failed++
+			continue
+		}
+		result, runErr := runner.Run(s)
+		p, f, st := printScenarioResult(s.Name, s.Description, result, runErr)
+		passed += p
+		failed += f
+		steps += st
+	}
+	return
+}
+
+// runV2Dir runs all JSON scenarios from a directory using the v2 runner.
+func runV2Dir(m *manifest.Manifest, dir string) (passed, failed, steps int) {
+	scenarios, err := scenariov2.LoadDir(dir)
+	if err != nil {
+		fmt.Printf("\n  ERROR loading scenarios: %v\n", err)
+		return 0, 1, 0
+	}
+
+	runner := scenariov2.NewRunner(m)
+	for _, s := range scenarios {
+		result, runErr := runner.Run(s)
+		p, f, st := printV2ScenarioResult(s.Name, s.Description, result, runErr)
+		passed += p
+		failed += f
+		steps += st
+	}
+	return
+}
+
+// runV1File runs a single YAML scenario file.
+func runV1File(m *manifest.Manifest, path string) (passed, failed, steps int) {
+	s, err := scenario.LoadScenario(path)
+	if err != nil {
+		fmt.Printf("\n  ERROR: %v\n", err)
+		return 0, 1, 0
+	}
+	runner := scenario.NewRunner(m)
+	result, runErr := runner.Run(s)
+	return printScenarioResult(s.Name, s.Description, result, runErr)
+}
+
+// runV2File runs a single JSON scenario file using the v2 runner.
+func runV2File(m *manifest.Manifest, path string) (passed, failed, steps int) {
+	s, err := scenariov2.LoadScenario(path)
+	if err != nil {
+		fmt.Printf("\n  ERROR: %v\n", err)
+		return 0, 1, 0
+	}
+	runner := scenariov2.NewRunner(m)
+	result, runErr := runner.Run(s)
+	return printV2ScenarioResult(s.Name, s.Description, result, runErr)
+}
+
+// printScenarioResult prints v1 scenario results and returns counts.
+func printScenarioResult(name, description string, result *scenario.Result, err error) (passed, failed, steps int) {
+	fmt.Printf("\n--- %s ---\n", name)
+	if description != "" {
+		fmt.Printf("    %s\n", description)
+	}
+	fmt.Println()
+
+	if err != nil {
+		fmt.Printf("  ERROR: %v\n", err)
+		return 0, 1, 0
+	}
+
+	for _, sr := range result.Steps {
+		steps++
+		if sr.Passed {
+			fmt.Printf("  PASS  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+			passed++
+		} else {
+			fmt.Printf("  FAIL  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+			fmt.Printf("        %s\n", sr.Error)
+			failed++
+		}
+	}
+
+	fmt.Printf("\n  Scenario: %s (%s)\n", passFailLabel(result.Passed), result.Duration.Round(time.Millisecond))
+	return
+}
+
+// printV2ScenarioResult prints v2 scenario results and returns counts.
+func printV2ScenarioResult(name, description string, result *scenariov2.Result, err error) (passed, failed, steps int) {
+	fmt.Printf("\n--- %s ---\n", name)
+	if description != "" {
+		fmt.Printf("    %s\n", description)
+	}
+	fmt.Println()
+
+	if err != nil {
+		fmt.Printf("  ERROR: %v\n", err)
+		return 0, 1, 0
+	}
+
+	for _, sr := range result.Steps {
+		steps++
+		if sr.Passed {
+			fmt.Printf("  PASS  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+			passed++
+		} else {
+			fmt.Printf("  FAIL  %-50s (%s)\n", sr.Name, sr.Duration.Round(time.Millisecond))
+			fmt.Printf("        %s\n", sr.Error)
+			failed++
+		}
+	}
+
+	fmt.Printf("\n  Scenario: %s (%s)\n", passFailLabel(result.Passed), result.Duration.Round(time.Millisecond))
+	return
 }
 
 func passFailLabel(passed bool) string {
