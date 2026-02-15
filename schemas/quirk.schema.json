@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://wondertwin.dev/schemas/quirk.schema.json",
-  "title": "API Quirk",
-  "description": "Schema for documenting API quirks and edge cases observed in real services.",
+  "title": "SDK Quirk",
+  "description": "Schema for documenting SDK quirks and edge cases observed in real services.",
   "type": "object",
   "required": ["id", "service", "resource", "type", "severity", "summary"],
   "properties": {
@@ -17,7 +17,7 @@
     },
     "resource": {
       "type": "string",
-      "description": "API resource affected by the quirk."
+      "description": "SDK resource affected by the quirk."
     },
     "type": {
       "type": "string",
@@ -80,9 +80,9 @@
         "type": "string"
       }
     },
-    "api_versions_affected": {
+    "service_versions_affected": {
       "type": "array",
-      "description": "API versions affected by this quirk.",
+      "description": "Service versions affected by this quirk.",
       "items": {
         "type": "string"
       }

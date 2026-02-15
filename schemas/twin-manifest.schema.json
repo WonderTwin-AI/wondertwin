@@ -4,7 +4,7 @@
   "title": "Twin Contribution Manifest",
   "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
   "type": "object",
-  "required": ["twin", "display_name", "category", "sdk_target", "api_surface", "coverage", "generation"],
+  "required": ["twin", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation"],
   "properties": {
     "twin": {
       "type": "string",
@@ -84,9 +84,9 @@
       },
       "additionalProperties": false
     },
-    "api_surface": {
+    "service_surface": {
       "type": "object",
-      "description": "Description of the API surface being emulated.",
+      "description": "Description of the service surface the twin emulates.",
       "properties": {
         "openapi_spec": {
           "type": "object",
@@ -109,16 +109,16 @@
         },
         "auth_pattern": {
           "type": "string",
-          "description": "Authentication pattern used by the API.",
+          "description": "Authentication pattern used by the service.",
           "enum": ["api_key", "oauth2", "basic", "jwt", "custom", "none"]
         },
         "has_webhooks": {
           "type": "boolean",
-          "description": "Whether the API supports webhooks."
+          "description": "Whether the service supports webhooks."
         },
         "resource_count": {
           "type": "integer",
-          "description": "Number of API resources/endpoints."
+          "description": "Number of SDK resources covered."
         }
       },
       "additionalProperties": false
@@ -129,21 +129,21 @@
       "properties": {
         "resources_implemented": {
           "type": "array",
-          "description": "List of implemented API resources.",
+          "description": "List of implemented SDK resources.",
           "items": {
             "type": "string"
           }
         },
         "resources_not_implemented": {
           "type": "array",
-          "description": "List of API resources not yet implemented.",
+          "description": "List of SDK resources not yet implemented.",
           "items": {
             "type": "string"
           }
         },
         "estimated_coverage_pct": {
           "type": "integer",
-          "description": "Estimated percentage of API coverage.",
+          "description": "Estimated percentage of SDK coverage.",
           "minimum": 0,
           "maximum": 100
         }
