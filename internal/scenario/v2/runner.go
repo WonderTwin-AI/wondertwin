@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 )
+
+// maxResponseBody is the maximum response body size the runner will read (10 MB).
+const maxResponseBody = 10 * 1024 * 1024
 
 // StepResult records the outcome of a single step.
 type StepResult struct {
@@ -32,7 +36,6 @@ type Result struct {
 type Runner struct {
 	manifest *manifest.Manifest
 	http     *http.Client
-	vars     map[string]string // captured variables
 }
 
 // NewRunner creates a Runner with the given manifest and a default HTTP client.
@@ -40,7 +43,6 @@ func NewRunner(m *manifest.Manifest) *Runner {
 	return &Runner{
 		manifest: m,
 		http:     &http.Client{Timeout: 10 * time.Second},
-		vars:     make(map[string]string),
 	}
 }
 
@@ -52,12 +54,10 @@ func (r *Runner) Run(s *Scenario) (*Result, error) {
 		Passed:       true,
 	}
 
-	// Reset captured variables for each scenario run
-	r.vars = make(map[string]string)
-
-	// Copy initial variables from the scenario
+	// Scoped variables for this run
+	vars := make(map[string]string)
 	for k, v := range s.Variables {
-		r.vars[k] = v
+		vars[k] = v
 	}
 
 	// --- Setup phase ---
@@ -75,11 +75,10 @@ func (r *Runner) Run(s *Scenario) (*Result, error) {
 			result.Steps = append(result.Steps, sr)
 			continue
 		}
-		sr := r.runStep(&step)
+		sr := r.runStep(&step, vars)
 		result.Steps = append(result.Steps, sr)
 		if !sr.Passed {
 			result.Passed = false
-			// Stop executing if this step had captures (downstream steps likely depend on them)
 			if len(step.Capture) > 0 {
 				stopEarly = true
 			}
@@ -124,7 +123,7 @@ func (r *Runner) runSetup(setup *Setup) error {
 		resp, err := r.http.Post(
 			fmt.Sprintf("http://localhost:%d/admin/state", twin.AdminPort),
 			"application/json",
-			strings.NewReader(string(data)),
+			bytes.NewReader(data),
 		)
 		if err != nil {
 			return fmt.Errorf("seed %s: %w", name, err)
@@ -139,25 +138,24 @@ func (r *Runner) runSetup(setup *Setup) error {
 }
 
 // runStep executes a single scenario step and returns its result.
-func (r *Runner) runStep(step *Step) StepResult {
+func (r *Runner) runStep(step *Step, vars map[string]string) StepResult {
 	start := time.Now()
 	sr := StepResult{Name: step.Name}
+	defer func() { sr.Duration = time.Since(start) }()
 
 	// Expand templates in the URL
-	url, err := ExpandTemplates(step.Request.URL, r.manifest, r.vars)
+	url, err := ExpandTemplates(step.Request.URL, r.manifest, vars)
 	if err != nil {
 		sr.Error = fmt.Sprintf("template expansion in url: %v", err)
-		sr.Duration = time.Since(start)
 		return sr
 	}
 
 	// Build request body
 	var reqBody io.Reader
 	if step.Request.Body != nil {
-		bodyStr, err := r.buildBody(step.Request.Body)
+		bodyStr, err := buildBody(step.Request.Body, r.manifest, vars)
 		if err != nil {
 			sr.Error = fmt.Sprintf("building request body: %v", err)
-			sr.Duration = time.Since(start)
 			return sr
 		}
 		reqBody = strings.NewReader(bodyStr)
@@ -167,16 +165,14 @@ func (r *Runner) runStep(step *Step) StepResult {
 	req, err := http.NewRequest(step.Request.Method, url, reqBody)
 	if err != nil {
 		sr.Error = fmt.Sprintf("building request: %v", err)
-		sr.Duration = time.Since(start)
 		return sr
 	}
 
 	// Set headers with template expansion
 	for k, v := range step.Request.Headers {
-		expanded, err := ExpandTemplates(v, r.manifest, r.vars)
+		expanded, err := ExpandTemplates(v, r.manifest, vars)
 		if err != nil {
 			sr.Error = fmt.Sprintf("template expansion in header %q: %v", k, err)
-			sr.Duration = time.Since(start)
 			return sr
 		}
 		req.Header.Set(k, expanded)
@@ -191,15 +187,13 @@ func (r *Runner) runStep(step *Step) StepResult {
 	resp, err := r.http.Do(req)
 	if err != nil {
 		sr.Error = fmt.Sprintf("request failed: %v", err)
-		sr.Duration = time.Since(start)
 		return sr
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		sr.Error = fmt.Sprintf("reading response body: %v", err)
-		sr.Duration = time.Since(start)
 		return sr
 	}
 
@@ -209,32 +203,29 @@ func (r *Runner) runStep(step *Step) StepResult {
 			val, err := ExtractJSONPath(respBody, jsonPath)
 			if err != nil {
 				sr.Error = fmt.Sprintf("capture %q: %v", varName, err)
-				sr.Duration = time.Since(start)
 				return sr
 			}
-			r.vars[varName] = fmt.Sprintf("%v", val)
+			vars[varName] = fmt.Sprintf("%v", val)
 		}
 	}
 
 	// Run assertions
 	if step.Assert != nil {
-		if err := r.runAssertions(step.Assert, resp, respBody); err != nil {
+		if err := runAssertions(step.Assert, resp, respBody, r.manifest, vars); err != nil {
 			sr.Error = err.Error()
-			sr.Duration = time.Since(start)
 			return sr
 		}
 	}
 
 	sr.Passed = true
-	sr.Duration = time.Since(start)
 	return sr
 }
 
 // buildBody converts the request body to a JSON string with template expansion.
-func (r *Runner) buildBody(body any) (string, error) {
+func buildBody(body any, m *manifest.Manifest, vars map[string]string) (string, error) {
 	// If it's a string, expand templates directly
 	if s, ok := body.(string); ok {
-		return ExpandTemplates(s, r.manifest, r.vars)
+		return ExpandTemplates(s, m, vars)
 	}
 
 	// Otherwise marshal to JSON then expand templates
@@ -243,11 +234,11 @@ func (r *Runner) buildBody(body any) (string, error) {
 		return "", fmt.Errorf("marshaling body: %w", err)
 	}
 
-	return ExpandTemplates(string(data), r.manifest, r.vars)
+	return ExpandTemplates(string(data), m, vars)
 }
 
 // runAssertions evaluates all assertions against the HTTP response.
-func (r *Runner) runAssertions(assert *Assert, resp *http.Response, body []byte) error {
+func runAssertions(assert *Assert, resp *http.Response, body []byte, m *manifest.Manifest, vars map[string]string) error {
 	// Assert status
 	if assert.Status != 0 && resp.StatusCode != assert.Status {
 		bodySnippet := string(body)
@@ -259,7 +250,7 @@ func (r *Runner) runAssertions(assert *Assert, resp *http.Response, body []byte)
 
 	// Assert body_contains (with template expansion)
 	if assert.BodyContains != "" {
-		expanded, err := ExpandTemplates(assert.BodyContains, r.manifest, r.vars)
+		expanded, err := ExpandTemplates(assert.BodyContains, m, vars)
 		if err != nil {
 			return fmt.Errorf("template expansion in body_contains: %v", err)
 		}
@@ -282,7 +273,7 @@ func (r *Runner) runAssertions(assert *Assert, resp *http.Response, body []byte)
 		expandedAssertions := make(map[string]any, len(assert.Body))
 		for path, expected := range assert.Body {
 			if s, ok := expected.(string); ok {
-				expanded, err := ExpandTemplates(s, r.manifest, r.vars)
+				expanded, err := ExpandTemplates(s, m, vars)
 				if err != nil {
 					return fmt.Errorf("template expansion in assertion %q: %v", path, err)
 				}

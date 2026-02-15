@@ -6,9 +6,8 @@ package v2
 type Scenario struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
-	Setup       *Setup            `json:"setup,omitempty"`
-	Workflow    string            `json:"workflow,omitempty"`
-	Variables   map[string]string `json:"variables,omitempty"`
+	Setup     *Setup            `json:"setup,omitempty"`
+	Variables map[string]string `json:"variables,omitempty"`
 	Steps       []Step            `json:"steps"`
 }
 
