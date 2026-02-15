@@ -59,19 +59,25 @@ cd wondertwin
 make build-all
 ```
 
-Create a `wondertwin.yaml` in your project:
+Create a `wondertwin.json` (or `wondertwin.yaml`) in your project:
 
-```yaml
-twins:
-  stripe:
-    binary: ./bin/twin-stripe
-    port: 4111
-  twilio:
-    binary: ./bin/twin-twilio
-    port: 4112
-  clerk:
-    binary: ./bin/twin-clerk
-    port: 4113
+```json
+{
+  "twins": {
+    "stripe": {
+      "binary": "./bin/twin-stripe",
+      "port": 4111
+    },
+    "twilio": {
+      "binary": "./bin/twin-twilio",
+      "port": 4112
+    },
+    "clerk": {
+      "binary": "./bin/twin-clerk",
+      "port": 4113
+    }
+  }
+}
 ```
 
 Start everything:
@@ -142,7 +148,7 @@ More twins coming. [Request a twin →](https://github.com/wondertwin-ai/wondert
 
 | Command | Description |
 |---------|-------------|
-| `wt up` | Start all twins defined in `wondertwin.yaml` |
+| `wt up` | Start all twins defined in `wondertwin.json` (or `.yaml`) |
 | `wt down` | Stop all running twins |
 | `wt status` | Show running twins with PID, port, and health |
 | `wt reset` | Reset all twin state |
@@ -177,7 +183,8 @@ wondertwin/
 ├── twin-resend/               # Resend behavioral twin
 ├── twin-posthog/              # PostHog behavioral twin
 ├── twin-logodev/              # Logo.dev behavioral twin
-├── wondertwin.example.yaml    # Example manifest
+├── wondertwin.example.json    # Example manifest (JSON, preferred)
+├── wondertwin.example.yaml    # Example manifest (YAML, legacy)
 └── Makefile
 ```
 

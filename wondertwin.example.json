@@ -1,0 +1,33 @@
+{
+  "twins": {
+    "stripe": {
+      "binary": "./bin/twin-stripe",
+      "port": 4111
+    },
+    "twilio": {
+      "binary": "./bin/twin-twilio",
+      "port": 4112
+    },
+    "resend": {
+      "binary": "./bin/twin-resend",
+      "port": 4113
+    },
+    "posthog": {
+      "binary": "./bin/twin-posthog",
+      "port": 4114
+    },
+    "clerk": {
+      "binary": "./bin/twin-clerk",
+      "port": 4115
+    },
+    "logodev": {
+      "binary": "./bin/twin-logodev",
+      "port": 4116
+    }
+  },
+  "settings": {
+    "binary_dir": "~/.wondertwin/bin",
+    "log_dir": ".wt/logs",
+    "verbose": true
+  }
+}
