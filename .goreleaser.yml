@@ -21,7 +21,6 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
 
-# TODO: move twin-* artifact builds into a separate goreleaser config/workflow.
 archives:
   - id: binaries
     ids:
@@ -29,6 +28,36 @@ archives:
     formats:
       - binary
     name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+  - id: tarballs
+    ids:
+      - wt
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - name: wt
+    ids:
+      - tarballs
+    repository:
+      owner: wondertwin-ai
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: wondertwin-bot
+      email: bot@wondertwin.ai
+    directory: Formula
+    homepage: https://wondertwin.dev
+    description: "CLI for WonderTwin — behavioral twins for third-party APIs"
+    license: MIT
+    test: |
+      system "#{bin}/wt", "version"
+    install: |
+      bin.install "wt"
 
 checksum:
   name_template: checksums.txt
