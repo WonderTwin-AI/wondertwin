@@ -210,4 +210,4 @@ It worked so well that we open-sourced it.
 
 ## License
 
-Apache 2.0
+MIT
