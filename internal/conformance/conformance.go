@@ -221,7 +221,7 @@ func checkResetClearsState(baseURL string) Result {
 func checkFaultInjection(baseURL string) Result {
 	name := "POST /admin/fault/{endpoint} injects faults"
 
-	body := strings.NewReader(`{"status": 500, "message": "test fault"}`)
+	body := strings.NewReader(`{"status_code": 500, "rate": 1.0}`)
 	req, _ := http.NewRequest("POST", baseURL+"/admin/fault/test-endpoint", body)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -241,7 +241,7 @@ func checkFaultInjection(baseURL string) Result {
 func checkTimeAdvance(baseURL string) Result {
 	name := "POST /admin/time/advance advances simulated clock"
 
-	body := strings.NewReader(`{"seconds": 3600}`)
+	body := strings.NewReader(`{"duration": "1h"}`)
 	resp, err := http.Post(baseURL+"/admin/time/advance", "application/json", body)
 	if err != nil {
 		return Result{Name: name, Passed: false, Detail: fmt.Sprintf("request failed: %v", err)}

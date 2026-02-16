@@ -40,10 +40,13 @@ type Manifest struct {
 	dir string
 }
 
-// Load reads and parses a wondertwin.yaml or wondertwin.json file.
-// The format is detected by file extension: .json uses encoding/json,
-// .yaml/.yml uses gopkg.in/yaml.v3.
+// Load reads and parses a wondertwin.json or wondertwin.yaml file.
+// If the given path is a YAML file and a wondertwin.json exists in the same
+// directory, the JSON file is preferred. The format is detected by file
+// extension: .json uses encoding/json, .yaml/.yml uses gopkg.in/yaml.v3.
 func Load(path string) (*Manifest, error) {
+	path = resolveManifestFormat(path)
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest %s: %w", path, err)
@@ -110,6 +113,20 @@ func Load(path string) (*Manifest, error) {
 	}
 
 	return &m, nil
+}
+
+// resolveManifestFormat checks if a YAML manifest path has a JSON sibling and
+// returns the JSON path if it exists. This ensures JSON-preferred loading
+// regardless of entry point.
+func resolveManifestFormat(path string) string {
+	base := filepath.Base(path)
+	if base == "wondertwin.yaml" || base == "wondertwin.yml" {
+		jsonPath := filepath.Join(filepath.Dir(path), "wondertwin.json")
+		if _, err := os.Stat(jsonPath); err == nil {
+			return jsonPath
+		}
+	}
+	return path
 }
 
 // resolvePath resolves a binary path. Absolute paths and ~ paths are returned as-is.

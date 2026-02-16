@@ -133,7 +133,7 @@ func Save(cfg *Config) error {
 	}
 	data = append(data, '\n')
 
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 // ParseLicenseKey parses a license key of the format wt_{tier}_{org}_{random}_{check}.
