@@ -112,6 +112,52 @@ func IsAlreadyInstalled(twinName, resolvedVersion, binaryDir string) bool {
 	return strings.TrimSpace(string(data)) == resolvedVersion
 }
 
+// InstallFromURL downloads a twin binary from a specific URL, verifies its
+// checksum, and saves it to binaryDir. Used by lock file installs where the
+// exact URL and checksum are known.
+func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir string) error {
+	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
+		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
+	}
+
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(binaryURL)
+	if err != nil {
+		return fmt.Errorf("downloading binary: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading binary data: %w", err)
+	}
+
+	// Verify checksum if provided
+	if expectedChecksum != "" {
+		actual := fmt.Sprintf("sha256:%x", sha256.Sum256(data))
+		if actual != expectedChecksum {
+			return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actual)
+		}
+	}
+
+	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
+	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
+		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
+	}
+
+	versionPath := binaryPath + ".version"
+	if err := os.WriteFile(versionPath, []byte(version), 0o644); err != nil {
+		return fmt.Errorf("writing version file: %w", err)
+	}
+
+	fmt.Printf("  Installed twin-%s v%s -> %s\n", twinName, version, binaryPath)
+	return nil
+}
+
 // ExpandPath expands a leading ~ to the user's home directory.
 func ExpandPath(path string) string {
 	if strings.HasPrefix(path, "~/") {

@@ -12,6 +12,7 @@
 //	wt test [path]                Run YAML test scenarios against running twins
 //	wt install                    Install all twins from wondertwin.yaml
 //	wt install <twin>@<version>   Install a specific twin at a version
+//	wt ci                         Install twins from lock file (frozen)
 //	wt auth login                 Activate a license key
 //	wt auth status                Show current license tier
 //	wt auth logout                Clear license key
@@ -29,6 +30,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -37,6 +39,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/client"
 	"github.com/wondertwin-ai/wondertwin/internal/config"
 	"github.com/wondertwin-ai/wondertwin/internal/conformance"
+	"github.com/wondertwin-ai/wondertwin/internal/lockfile"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
@@ -104,6 +107,8 @@ func main() {
 		err = cmdTest(manifestPath, args)
 	case "install":
 		err = cmdInstall(manifestPath, args)
+	case "ci":
+		err = cmdCI(manifestPath)
 	case "auth":
 		err = cmdAuth(args)
 	case "registry":
@@ -164,6 +169,7 @@ Commands:
   test [path]                Run JSON test scenarios (default: ./scenarios/)
   install                    Install all twins from manifest
   install <twin>@<version>   Install a specific twin at a version
+  ci                         Install twins from lock file (frozen, reproducible)
   auth login                 Activate a license key
   auth status                Show current license tier and org
   auth logout                Clear license key
@@ -190,6 +196,24 @@ func cmdUp(manifestPath string) error {
 	m, err := manifest.Load(manifestPath)
 	if err != nil {
 		return err
+	}
+
+	// Ensure twins are installed before starting
+	manifestDir := filepath.Dir(manifestPath)
+	if manifestDir == "" || manifestDir == "." {
+		manifestDir, _ = os.Getwd()
+	}
+
+	if lockfile.Exists(manifestDir) {
+		fmt.Println("Using locked versions from wondertwin-lock.json")
+		if err := installFromLockFile(manifestDir, m); err != nil {
+			return fmt.Errorf("installing from lock file: %w", err)
+		}
+	} else {
+		fmt.Println("No lock file found, resolving from registry...")
+		if err := cmdInstall(manifestPath, nil); err != nil {
+			return err
+		}
 	}
 
 	pids, _ := procmgr.LoadPids()
@@ -676,9 +700,14 @@ func cmdInstall(manifestPath string, args []string) error {
 	}
 
 	binaryDir := registry.ExpandPath(m.Settings.BinaryDir)
+	platform := runtime.GOOS + "-" + runtime.GOARCH
 
 	// Group twins by registry so we fetch each registry at most once
 	registryCache := map[string]*registry.Registry{}
+	registryFetchedAt := time.Time{}
+
+	// Collect lock file entries as we resolve
+	lockedTwins := map[string]lockfile.LockedTwin{}
 
 	fmt.Println()
 	names := m.TwinNames()
@@ -713,6 +742,7 @@ func cmdInstall(manifestPath string, args []string) error {
 				continue
 			}
 			registryCache[regName] = reg
+			registryFetchedAt = time.Now().UTC()
 		}
 
 		resolvedVersion, ver, err := reg.ResolveVersion(name, versionSpec)
@@ -720,6 +750,16 @@ func cmdInstall(manifestPath string, args []string) error {
 			fmt.Printf("  %-20s FAILED — %v\n", name, err)
 			failed = append(failed, name)
 			continue
+		}
+
+		// Record lock entry
+		lockedTwins[name] = lockfile.LockedTwin{
+			Version:      resolvedVersion,
+			ResolvedFrom: versionSpec,
+			SDKPackage:   ver.SDKPackage,
+			SDKVersion:   ver.SDKVersion,
+			Checksum:     ver.Checksums[platform],
+			BinaryURL:    ver.BinaryURLs[platform],
 		}
 
 		// Tier enforcement
@@ -746,6 +786,28 @@ func cmdInstall(manifestPath string, args []string) error {
 	if len(failed) > 0 {
 		return fmt.Errorf("failed to install: %s", strings.Join(failed, ", "))
 	}
+
+	// Write lock file
+	if len(lockedTwins) > 0 {
+		now := time.Now().UTC()
+		if registryFetchedAt.IsZero() {
+			registryFetchedAt = now
+		}
+		lf := &lockfile.LockFile{
+			GeneratedAt:       now,
+			RegistryFetchedAt: registryFetchedAt,
+			Twins:             lockedTwins,
+		}
+		manifestDir := filepath.Dir(manifestPath)
+		if manifestDir == "" || manifestDir == "." {
+			manifestDir, _ = os.Getwd()
+		}
+		if err := lockfile.Save(manifestDir, lf); err != nil {
+			return fmt.Errorf("writing lock file: %w", err)
+		}
+		fmt.Printf("Wrote %s\n", lockfile.Filename)
+	}
+
 	fmt.Println("All twins installed.")
 	return nil
 }
@@ -1028,5 +1090,91 @@ func cmdConformance(args []string) error {
 	if report.Failed > 0 {
 		os.Exit(1)
 	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// wt ci
+// ---------------------------------------------------------------------------
+
+func cmdCI(manifestPath string) error {
+	manifestDir := filepath.Dir(manifestPath)
+	if manifestDir == "" || manifestDir == "." {
+		manifestDir, _ = os.Getwd()
+	}
+
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	if !lockfile.Exists(manifestDir) {
+		return fmt.Errorf("No %s found. Run 'wt install' first.", lockfile.Filename)
+	}
+
+	lf, err := lockfile.Load(manifestDir)
+	if err != nil {
+		return fmt.Errorf("reading lock file: %w", err)
+	}
+
+	binaryDir := registry.ExpandPath(m.Settings.BinaryDir)
+
+	fmt.Println("Installing from lock file (frozen)...")
+	fmt.Println()
+
+	var failed []string
+	for name, locked := range lf.Twins {
+		if registry.IsAlreadyInstalled(name, locked.Version, binaryDir) {
+			fmt.Printf("  %-20s v%s already installed, skipping.\n", name, locked.Version)
+			continue
+		}
+
+		if locked.BinaryURL == "" {
+			fmt.Printf("  %-20s FAILED — no binary_url in lock file\n", name)
+			failed = append(failed, name)
+			continue
+		}
+
+		fmt.Printf("  Downloading twin-%s v%s...\n", name, locked.Version)
+		if err := registry.InstallFromURL(name, locked.Version, locked.BinaryURL, locked.Checksum, binaryDir); err != nil {
+			fmt.Printf("  %-20s FAILED — %v\n", name, err)
+			failed = append(failed, name)
+			continue
+		}
+	}
+
+	fmt.Println()
+	if len(failed) > 0 {
+		return fmt.Errorf("failed to install: %s", strings.Join(failed, ", "))
+	}
+	fmt.Println("All twins installed from lock file.")
+	return nil
+}
+
+// installFromLockFile installs twins using versions from the lock file.
+func installFromLockFile(manifestDir string, m *manifest.Manifest) error {
+	lf, err := lockfile.Load(manifestDir)
+	if err != nil {
+		return err
+	}
+
+	binaryDir := registry.ExpandPath(m.Settings.BinaryDir)
+
+	for name, locked := range lf.Twins {
+		if registry.IsAlreadyInstalled(name, locked.Version, binaryDir) {
+			fmt.Printf("  %-20s v%s (locked), already installed.\n", name, locked.Version)
+			continue
+		}
+
+		if locked.BinaryURL == "" {
+			return fmt.Errorf("twin %s: no binary_url in lock file", name)
+		}
+
+		fmt.Printf("  Downloading twin-%s v%s (locked)...\n", name, locked.Version)
+		if err := registry.InstallFromURL(name, locked.Version, locked.BinaryURL, locked.Checksum, binaryDir); err != nil {
+			return fmt.Errorf("twin %s: %w", name, err)
+		}
+	}
+
 	return nil
 }
