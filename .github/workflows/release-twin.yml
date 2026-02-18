@@ -40,18 +40,34 @@ jobs:
           git tag -f "$TAG"
           git push origin -f "$TAG"
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --config .goreleaser-twin.yml --clean
-          workdir: wondertwin
+      - name: Build binaries
+        working-directory: wondertwin
+        run: |
+          TWIN="${{ inputs.twin }}"
+          mkdir -p dist
+          for platform in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
+            os="${platform%-*}"
+            arch="${platform#*-}"
+            echo "Building twin-${TWIN}-${os}-${arch}..."
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+              go build -ldflags "-s -w" \
+              -o "dist/twin-${TWIN}-${os}-${arch}" \
+              "./twin-${TWIN}/cmd/twin-${TWIN}/"
+          done
+          cd dist && shasum -a 256 twin-${TWIN}-* > checksums.txt
+
+      - name: Create release
+        working-directory: wondertwin
         env:
-          GITHUB_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
-          GORELEASER_CURRENT_TAG: v${{ inputs.version }}
-          TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
+        run: |
+          TWIN="${{ inputs.twin }}"
+          VERSION="${{ inputs.version }}"
+          gh release create "twin-${TWIN}-v${VERSION}" \
+            dist/twin-${TWIN}-* dist/checksums.txt \
+            --repo wondertwin-ai/registry \
+            --title "twin-${TWIN} v${VERSION}" \
+            --notes "Twin release for ${TWIN} v${VERSION}"
 
       - name: Checkout registry
         uses: actions/checkout@v4
