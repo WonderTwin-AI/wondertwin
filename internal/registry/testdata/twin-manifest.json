@@ -1,0 +1,14 @@
+{
+  "twin": "stripe",
+  "display_name": "Stripe",
+  "category": "payments",
+  "description": "Stripe twin for contract testing",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/stripe/stripe-go",
+      "language": "go",
+      "version": "v81",
+      "api_version": "2024-12-18"
+    }
+  }
+}

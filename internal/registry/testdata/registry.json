@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "twins": {
+    "stripe": {
+      "description": "Stripe Payments API twin",
+      "repo": "https://github.com/wondertwin-ai/wondertwin",
+      "category": "payments",
+      "author": "WonderTwin",
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": {
+          "released": "2026-02-17",
+          "sdk_package": "github.com/stripe/stripe-go",
+          "sdk_version": "v81",
+          "api_version": "2024-12-18",
+          "tier": "free",
+          "checksums": {
+            "darwin-amd64": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+            "darwin-arm64": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "linux-amd64": "sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+            "linux-arm64": "sha256:0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba"
+          },
+          "binary_urls": {
+            "darwin-amd64": "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-darwin-amd64",
+            "darwin-arm64": "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-darwin-arm64",
+            "linux-amd64": "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-linux-amd64",
+            "linux-arm64": "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-linux-arm64"
+          }
+        }
+      }
+    },
+    "twilio": {
+      "description": "Twilio Communications API twin",
+      "repo": "https://github.com/wondertwin-ai/wondertwin",
+      "category": "communications",
+      "author": "WonderTwin",
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": {
+          "released": "2026-02-17",
+          "sdk_package": "github.com/twilio/twilio-go",
+          "sdk_version": "v1",
+          "api_version": "2010-04-01",
+          "tier": "free",
+          "checksums": {
+            "darwin-amd64": "sha256:aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222",
+            "darwin-arm64": "sha256:bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222cccc3333",
+            "linux-amd64": "sha256:cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222cccc3333dddd4444",
+            "linux-arm64": "sha256:dddd4444eeee5555ffff6666aaaa1111bbbb2222cccc3333dddd4444eeee5555"
+          },
+          "binary_urls": {
+            "darwin-amd64": "https://github.com/wondertwin-ai/registry/releases/download/twin-twilio-v0.1.0/twin-twilio-darwin-amd64",
+            "darwin-arm64": "https://github.com/wondertwin-ai/registry/releases/download/twin-twilio-v0.1.0/twin-twilio-darwin-arm64",
+            "linux-amd64": "https://github.com/wondertwin-ai/registry/releases/download/twin-twilio-v0.1.0/twin-twilio-linux-amd64",
+            "linux-arm64": "https://github.com/wondertwin-ai/registry/releases/download/twin-twilio-v0.1.0/twin-twilio-linux-arm64"
+          }
+        }
+      }
+    }
+  }
+}
