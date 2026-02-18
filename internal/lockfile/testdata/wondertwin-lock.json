@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-02-17T10:30:00Z",
+  "registry_fetched_at": "2026-02-17T10:30:00Z",
+  "twins": {
+    "stripe": {
+      "version": "0.1.0",
+      "resolved_from": "latest",
+      "sdk_package": "github.com/stripe/stripe-go",
+      "sdk_version": "v81",
+      "checksum": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      "binary_url": "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-darwin-arm64"
+    },
+    "twilio": {
+      "version": "0.1.0",
+      "resolved_from": "latest",
+      "sdk_package": "github.com/twilio/twilio-go",
+      "sdk_version": "v1",
+      "checksum": "sha256:bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222cccc3333",
+      "binary_url": "https://github.com/wondertwin-ai/registry/releases/download/twin-twilio-v0.1.0/twin-twilio-darwin-arm64"
+    }
+  }
+}
