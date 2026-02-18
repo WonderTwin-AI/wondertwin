@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"time"
 
 	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
 )
@@ -16,7 +17,8 @@ type MemoryStore struct {
 	ExternalAccts    *pkgstore.Store[ExternalAccount]
 	Transfers        *pkgstore.Store[Transfer]
 	Payouts          *pkgstore.Store[Payout]
-	Events           *pkgstore.Store[Event]
+	Events               *pkgstore.Store[Event]
+	BalanceTransactions  *pkgstore.Store[BalanceTransaction]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -34,7 +36,8 @@ func New() *MemoryStore {
 		ExternalAccts:   pkgstore.New[ExternalAccount]("ba"),
 		Transfers:       pkgstore.New[Transfer]("tr"),
 		Payouts:         pkgstore.New[Payout]("po"),
-		Events:          pkgstore.New[Event]("evt"),
+		Events:              pkgstore.New[Event]("evt"),
+		BalanceTransactions: pkgstore.New[BalanceTransaction]("txn"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -82,18 +85,40 @@ func (s *MemoryStore) GetBalance(accountID string) *Balance {
 }
 
 // CreditBalance adds to an account's available balance.
+// Pass empty accountID for the platform balance.
 func (s *MemoryStore) CreditBalance(accountID string, currency string, amount int64) {
-	b := s.GetOrCreateBalance(accountID)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var b *AccountBalance
+	if accountID == "" {
+		b = s.PlatformBalance
+	} else {
+		if existing, ok := s.Balances[accountID]; ok {
+			b = existing
+		} else {
+			b = NewAccountBalance()
+			s.Balances[accountID] = b
+		}
+	}
 	b.Available[currency] += amount
 }
 
 // DebitBalance subtracts from an account's available balance.
+// Pass empty accountID for the platform balance.
 func (s *MemoryStore) DebitBalance(accountID string, currency string, amount int64) error {
-	b := s.GetOrCreateBalance(accountID)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var b *AccountBalance
+	if accountID == "" {
+		b = s.PlatformBalance
+	} else {
+		if existing, ok := s.Balances[accountID]; ok {
+			b = existing
+		} else {
+			b = NewAccountBalance()
+			s.Balances[accountID] = b
+		}
+	}
 	if b.Available[currency] < amount {
 		return fmt.Errorf("insufficient funds: available %d, requested %d", b.Available[currency], amount)
 	}
@@ -101,27 +126,48 @@ func (s *MemoryStore) DebitBalance(accountID string, currency string, amount int
 	return nil
 }
 
+// RecordBalanceTransaction creates and stores a balance transaction ledger entry.
+func (s *MemoryStore) RecordBalanceTransaction(txType, source, currency string, amount, fee int64) string {
+	id := s.BalanceTransactions.NextID()
+	bt := BalanceTransaction{
+		ID:       id,
+		Object:   "balance_transaction",
+		Amount:   amount,
+		Currency: currency,
+		Net:      amount - fee,
+		Fee:      fee,
+		Status:   "available",
+		Type:     txType,
+		Source:   source,
+		Created:  time.Now().Unix(),
+	}
+	s.BalanceTransactions.Set(id, bt)
+	return id
+}
+
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
-	Accounts        map[string]Account          `json:"accounts"`
-	ExternalAccts   map[string]ExternalAccount  `json:"external_accounts"`
-	Transfers       map[string]Transfer         `json:"transfers"`
-	Payouts         map[string]Payout           `json:"payouts"`
-	Events          map[string]Event            `json:"events"`
-	Balances        map[string]*AccountBalance  `json:"balances"`
-	PlatformBalance *AccountBalance             `json:"platform_balance"`
+	Accounts            map[string]Account             `json:"accounts"`
+	ExternalAccts       map[string]ExternalAccount     `json:"external_accounts"`
+	Transfers           map[string]Transfer            `json:"transfers"`
+	Payouts             map[string]Payout              `json:"payouts"`
+	Events              map[string]Event               `json:"events"`
+	BalanceTransactions map[string]BalanceTransaction   `json:"balance_transactions"`
+	Balances            map[string]*AccountBalance     `json:"balances"`
+	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
-		Accounts:        s.Accounts.Snapshot(),
-		ExternalAccts:   s.ExternalAccts.Snapshot(),
-		Transfers:       s.Transfers.Snapshot(),
-		Payouts:         s.Payouts.Snapshot(),
-		Events:          s.Events.Snapshot(),
-		Balances:        s.snapshotBalances(),
-		PlatformBalance: s.PlatformBalance,
+		Accounts:            s.Accounts.Snapshot(),
+		ExternalAccts:       s.ExternalAccts.Snapshot(),
+		Transfers:           s.Transfers.Snapshot(),
+		Payouts:             s.Payouts.Snapshot(),
+		Events:              s.Events.Snapshot(),
+		BalanceTransactions: s.BalanceTransactions.Snapshot(),
+		Balances:            s.snapshotBalances(),
+		PlatformBalance:     s.PlatformBalance,
 	}
 }
 
@@ -147,6 +193,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Transfers.LoadSnapshot(snap.Transfers)
 	s.Payouts.LoadSnapshot(snap.Payouts)
 	s.Events.LoadSnapshot(snap.Events)
+	s.BalanceTransactions.LoadSnapshot(snap.BalanceTransactions)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -166,6 +213,7 @@ func (s *MemoryStore) Reset() {
 	s.Transfers.Reset()
 	s.Payouts.Reset()
 	s.Events.Reset()
+	s.BalanceTransactions.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

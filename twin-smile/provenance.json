@@ -1,0 +1,20 @@
+{
+  "twin": "smile",
+  "sdk_target": {
+    "package": "smile.io",
+    "language": "rest",
+    "version": "v1"
+  },
+  "build": 1,
+  "generated_at": "2026-02-18T00:00:00-08:00",
+  "sources": {
+    "openapi": {
+      "origin": "none",
+      "url": ""
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://docs.smile.io"
+    }
+  }
+}
