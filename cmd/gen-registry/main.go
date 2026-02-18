@@ -34,6 +34,7 @@ type Version struct {
 	Released   string            `json:"released"`
 	SDKPackage string            `json:"sdk_package"`
 	SDKVersion string            `json:"sdk_version"`
+	APIVersion string            `json:"api_version,omitempty"`
 	Tier       string            `json:"tier"`
 	Checksums  map[string]string `json:"checksums"`
 	BinaryURLs map[string]string `json:"binary_urls"`
@@ -46,8 +47,9 @@ type TwinManifest struct {
 	Category    string `json:"category"`
 	SDKTarget   struct {
 		Primary struct {
-			Package string `json:"package"`
-			Version string `json:"version"`
+			Package    string `json:"package"`
+			Version    string `json:"version"`
+			APIVersion string `json:"api_version"`
 		} `json:"primary"`
 	} `json:"sdk_target"`
 }
@@ -69,6 +71,7 @@ func run(args []string) error {
 	checksumsFile := fs.String("checksums-file", "", "path to checksums file")
 	registryFile := fs.String("registry-file", "", "path to registry.json")
 	repo := fs.String("repo", "wondertwin-ai/registry", "GitHub repo for download URLs")
+	prerelease := fs.Bool("prerelease", false, "add version without updating latest")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -100,7 +103,7 @@ func run(args []string) error {
 	ver := buildVersion(*twin, *version, *repo, manifest, checksums)
 
 	// 5. Upsert into registry
-	upsert(reg, *twin, *version, manifest, ver)
+	upsert(reg, *twin, *version, manifest, ver, *prerelease)
 
 	// 6. Write back
 	if err := writeRegistry(*registryFile, reg); err != nil {
@@ -198,13 +201,14 @@ func buildVersion(twin, version, repo string, manifest *TwinManifest, checksums 
 		Released:   nowFunc().UTC().Format("2006-01-02"),
 		SDKPackage: manifest.SDKTarget.Primary.Package,
 		SDKVersion: manifest.SDKTarget.Primary.Version,
+		APIVersion: manifest.SDKTarget.Primary.APIVersion,
 		Tier:       "free",
 		Checksums:  checksums,
 		BinaryURLs: binaryURLs,
 	}
 }
 
-func upsert(reg *Registry, twin, version string, manifest *TwinManifest, ver Version) {
+func upsert(reg *Registry, twin, version string, manifest *TwinManifest, ver Version, prerelease bool) {
 	entry, exists := reg.Twins[twin]
 	if !exists {
 		entry = TwinEntry{
@@ -215,7 +219,11 @@ func upsert(reg *Registry, twin, version string, manifest *TwinManifest, ver Ver
 			Versions:    make(map[string]Version),
 		}
 	}
-	entry.Latest = version
+	// Update latest unless --prerelease is set.
+	// Exception: if there's no previous latest (first release), set it even for prereleases.
+	if !prerelease || entry.Latest == "" {
+		entry.Latest = version
+	}
 	entry.Versions[version] = ver
 	reg.Twins[twin] = entry
 }

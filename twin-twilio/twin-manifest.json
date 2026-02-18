@@ -8,6 +8,7 @@
       "package": "github.com/twilio/twilio-go",
       "language": "go",
       "version": "v1",
+      "api_version": "2010-04-01",
       "repo_url": "https://github.com/twilio/twilio-go",
       "docs_url": "https://www.twilio.com/docs/libraries/reference/twilio-go"
     },
