@@ -41,6 +41,3 @@ snapshot:
 
 changelog:
   disable: true
-
-gomod:
-  proxy: true

@@ -36,8 +36,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "twin-${{ inputs.twin }}-v${{ inputs.version }}"
-          git push origin "twin-${{ inputs.twin }}-v${{ inputs.version }}"
+          TAG="twin-${{ inputs.twin }}-v${{ inputs.version }}"
+          git tag -f "$TAG"
+          git push origin -f "$TAG"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -48,6 +49,7 @@ jobs:
           workdir: wondertwin
         env:
           GITHUB_TOKEN: ${{ secrets.REGISTRY_PUSH_TOKEN }}
+          GORELEASER_CURRENT_TAG: v${{ inputs.version }}
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
 
