@@ -7,16 +7,28 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
       - run: go vet ./...
-      - run: go test ./... -count=1
-      - run: make build
+      - run: go test ./... -count=1 -timeout 120s
+
+      - name: Build wt CLI
+        run: go build ./cmd/wt/
+
+      - name: Build all twins
+        run: |
+          for twin in stripe twilio clerk resend posthog logodev; do
+            echo "Building twin-$twin..."
+            go build -o bin/twin-$twin ./twin-$twin/cmd/twin-$twin/
+          done
 
       - name: Validate GoReleaser config
         uses: goreleaser/goreleaser-action@v6
@@ -24,3 +36,23 @@ jobs:
           distribution: goreleaser
           version: "~> v2"
           args: check
+
+  conformance:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
+      - name: Build wt CLI
+        run: go build -o ./wt-test ./cmd/wt/
+
+      - name: Build twin-stripe
+        run: go build -o ./twin-stripe-test ./twin-stripe/cmd/twin-stripe/
+
+      - name: Run conformance
+        run: ./wt-test conformance ./twin-stripe-test
