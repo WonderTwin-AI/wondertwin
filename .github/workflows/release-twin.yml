@@ -48,7 +48,7 @@ jobs:
           args: release --config .goreleaser-twin.yml --clean
           workdir: wondertwin
         env:
-          GITHUB_TOKEN: ${{ secrets.REGISTRY_PUSH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
           GORELEASER_CURRENT_TAG: v${{ inputs.version }}
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: wondertwin-ai/registry
-          token: ${{ secrets.REGISTRY_PUSH_TOKEN }}
+          token: ${{ secrets.WONDERTWIN_REGISTRY }}
           path: registry
 
       - name: Update registry.json
