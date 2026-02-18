@@ -97,3 +97,19 @@ jobs:
             git commit -m "Update registry: twin-${{ inputs.twin }} v${{ inputs.version }}"
             git push
           fi
+
+      # ── Post-release validation ──────────────────────────────────
+      - name: Build wt CLI from source
+        working-directory: wondertwin
+        run: go build -o ./wt-test ./cmd/wt/
+
+      - name: Clear local twin cache
+        run: rm -rf ~/.wondertwin/bin/
+
+      - name: Install the just-released twin
+        working-directory: wondertwin
+        run: ./wt-test install ${{ inputs.twin }}@${{ inputs.version }}
+
+      - name: Run conformance on installed twin
+        working-directory: wondertwin
+        run: ./wt-test conformance ~/.wondertwin/bin/twin-${{ inputs.twin }}
