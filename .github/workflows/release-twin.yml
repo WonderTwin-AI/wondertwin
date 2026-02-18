@@ -29,6 +29,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: wondertwin/go.mod
+          cache-dependency-path: "**/go.sum"
 
       - name: Create and push twin tag
         working-directory: wondertwin
