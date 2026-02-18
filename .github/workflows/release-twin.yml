@@ -1,0 +1,76 @@
+name: Release Twin
+
+on:
+  workflow_dispatch:
+    inputs:
+      twin:
+        description: "Twin name (e.g., stripe)"
+        required: true
+        type: string
+      version:
+        description: "Version string without v prefix (e.g., 0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout wondertwin
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: wondertwin
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: wondertwin/go.mod
+
+      - name: Create and push twin tag
+        working-directory: wondertwin
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "twin-${{ inputs.twin }}-v${{ inputs.version }}"
+          git push origin "twin-${{ inputs.twin }}-v${{ inputs.version }}"
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --config .goreleaser-twin.yml --clean
+          workdir: wondertwin
+        env:
+          GITHUB_TOKEN: ${{ secrets.REGISTRY_PUSH_TOKEN }}
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+
+      - name: Checkout registry
+        uses: actions/checkout@v4
+        with:
+          repository: wondertwin-ai/registry
+          token: ${{ secrets.REGISTRY_PUSH_TOKEN }}
+          path: registry
+
+      - name: Update registry.json
+        working-directory: wondertwin
+        run: |
+          go run ./cmd/gen-registry \
+            --twin "${{ inputs.twin }}" \
+            --version "${{ inputs.version }}" \
+            --checksums-file dist/checksums.txt \
+            --registry-file "${{ github.workspace }}/registry/registry.json"
+
+      - name: Push registry update
+        working-directory: registry
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add registry.json
+          git commit -m "Update registry: twin-${{ inputs.twin }} v${{ inputs.version }}"
+          git push
