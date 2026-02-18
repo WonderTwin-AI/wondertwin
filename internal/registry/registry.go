@@ -38,6 +38,7 @@ type Version struct {
 	Released   string            `yaml:"released" json:"released"`
 	SDKPackage string            `yaml:"sdk_package" json:"sdk_package"`
 	SDKVersion string            `yaml:"sdk_version" json:"sdk_version"`
+	APIVersion string            `yaml:"api_version,omitempty" json:"api_version,omitempty"`
 	Tier       string            `yaml:"tier" json:"tier"`
 	Checksums  map[string]string `yaml:"checksums" json:"checksums"`
 	BinaryURLs map[string]string `yaml:"binary_urls" json:"binary_urls"`

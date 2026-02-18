@@ -329,3 +329,251 @@ func TestOutputMatchesSchema(t *testing.T) {
 		}
 	}
 }
+
+func TestPrereleaseDoesNotUpdateLatest(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	// First stable release
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Prerelease
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.2.0-beta.1",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--prerelease",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	entry := reg.Twins["stripe"]
+	if entry.Latest != "0.1.0" {
+		t.Errorf("latest = %q, want %q (should not update for prerelease)", entry.Latest, "0.1.0")
+	}
+	if _, ok := entry.Versions["0.2.0-beta.1"]; !ok {
+		t.Error("prerelease version 0.2.0-beta.1 not added")
+	}
+	if len(entry.Versions) != 2 {
+		t.Errorf("versions count = %d, want 2", len(entry.Versions))
+	}
+}
+
+func TestPrereleaseWithoutFlag(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	// First version
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second version without --prerelease
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.2.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	if reg.Twins["stripe"].Latest != "0.2.0" {
+		t.Errorf("latest = %q, want %q", reg.Twins["stripe"].Latest, "0.2.0")
+	}
+}
+
+func TestPrereleaseFirstReleaseSetsLatest(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	// First release is a prerelease on an empty twin
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0-alpha.1",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--prerelease",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	// Should still set latest since there's no previous latest
+	if reg.Twins["stripe"].Latest != "0.1.0-alpha.1" {
+		t.Errorf("latest = %q, want %q (first release should set latest even with --prerelease)",
+			reg.Twins["stripe"].Latest, "0.1.0-alpha.1")
+	}
+}
+
+func setupManifestWithAPIVersion(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	twinDir := filepath.Join(dir, "twin-stripe")
+	if err := os.MkdirAll(twinDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{
+  "twin": "stripe",
+  "display_name": "Stripe",
+  "category": "payments",
+  "description": "Stripe twin for testing",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/stripe/stripe-go",
+      "language": "go",
+      "version": "v81",
+      "api_version": "2024-12-18"
+    }
+  }
+}`
+	if err := os.WriteFile(filepath.Join(twinDir, "twin-manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestAPIVersionIncludedInRegistry(t *testing.T) {
+	dir := setupManifestWithAPIVersion(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	ver := reg.Twins["stripe"].Versions["0.1.0"]
+	if ver.APIVersion != "2024-12-18" {
+		t.Errorf("api_version = %q, want %q", ver.APIVersion, "2024-12-18")
+	}
+}
+
+func TestAPIVersionOmittedWhenAbsent(t *testing.T) {
+	// setupManifest (no api_version)
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+
+	// api_version should not appear in JSON when empty
+	var raw map[string]interface{}
+	json.Unmarshal(data, &raw)
+	twins := raw["twins"].(map[string]interface{})
+	stripe := twins["stripe"].(map[string]interface{})
+	versions := stripe["versions"].(map[string]interface{})
+	v010 := versions["0.1.0"].(map[string]interface{})
+
+	if _, ok := v010["api_version"]; ok {
+		t.Error("api_version should be omitted when not present in manifest")
+	}
+}
+
+func TestBackwardCompatibilityWithoutAPIVersion(t *testing.T) {
+	// Simulate a registry.json that was created before api_version existed
+	dir := t.TempDir()
+	registryJSON := `{
+  "schema_version": 1,
+  "twins": {
+    "stripe": {
+      "description": "Stripe twin",
+      "repo": "https://github.com/wondertwin-ai/wondertwin",
+      "category": "payments",
+      "author": "WonderTwin",
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": {
+          "released": "2026-02-17",
+          "sdk_package": "github.com/stripe/stripe-go",
+          "sdk_version": "v81",
+          "tier": "free",
+          "checksums": {},
+          "binary_urls": {}
+        }
+      }
+    }
+  }
+}`
+	registryPath := filepath.Join(dir, "registry.json")
+	os.WriteFile(registryPath, []byte(registryJSON), 0o644)
+
+	var reg Registry
+	data, _ := os.ReadFile(registryPath)
+	if err := json.Unmarshal(data, &reg); err != nil {
+		t.Fatalf("failed to parse registry without api_version: %v", err)
+	}
+
+	ver := reg.Twins["stripe"].Versions["0.1.0"]
+	if ver.APIVersion != "" {
+		t.Errorf("api_version should be empty for old registry, got %q", ver.APIVersion)
+	}
+	if ver.SDKPackage != "github.com/stripe/stripe-go" {
+		t.Errorf("sdk_package = %q", ver.SDKPackage)
+	}
+}

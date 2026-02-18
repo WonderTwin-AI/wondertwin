@@ -8,6 +8,7 @@
       "package": "github.com/stripe/stripe-go",
       "language": "go",
       "version": "v81",
+      "api_version": "2024-12-18",
       "repo_url": "https://github.com/stripe/stripe-go",
       "docs_url": "https://docs.stripe.com/api"
     },
