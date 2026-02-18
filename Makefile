@@ -1,4 +1,4 @@
-.PHONY: build build-twins build-all clean test vet goreleaser-check release-local
+.PHONY: build build-twins build-all clean test vet goreleaser-check release-local verify-registry
 
 VERSION ?= dev
 GORELEASER ?= goreleaser
@@ -31,3 +31,6 @@ goreleaser-check: ## Validate Goreleaser config
 
 release-local: ## Build cross-platform release artifacts into dist/ using Goreleaser
 	$(GORELEASER) release --snapshot --clean
+
+verify-registry: ## Validate the live twin registry
+	go run ./cmd/verify-registry
