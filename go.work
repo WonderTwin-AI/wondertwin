@@ -6,6 +6,7 @@ use (
 	./twin-logodev
 	./twin-posthog
 	./twin-resend
+	./twin-smile
 	./twin-stripe
 	./twin-twilio
 	./twinkit

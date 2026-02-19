@@ -1,0 +1,48 @@
+{
+  "twin": "smile",
+  "display_name": "Smile.io",
+  "category": "loyalty",
+  "description": "Simulates the Smile.io rewards platform API, including customer points balance, tier info, points redemption, and points refund.",
+  "sdk_target": {
+    "primary": {
+      "package": "smile.io",
+      "language": "rest",
+      "version": "v1",
+      "api_version": "v1",
+      "repo_url": "https://docs.smile.io",
+      "docs_url": "https://docs.smile.io/api"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false,
+      "origin": "none",
+      "url": ""
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 2
+  },
+  "coverage": {
+    "resources_implemented": [
+      "customers",
+      "redemptions"
+    ],
+    "resources_not_implemented": [
+      "rewards",
+      "activities",
+      "referrals",
+      "webhooks"
+    ],
+    "estimated_coverage_pct": 10
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

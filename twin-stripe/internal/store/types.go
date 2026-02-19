@@ -111,6 +111,21 @@ type Payout struct {
 	Created            int64             `json:"created"`
 }
 
+// BalanceTransaction represents a Stripe balance transaction ledger entry.
+type BalanceTransaction struct {
+	ID          string `json:"id"`
+	Object      string `json:"object"`
+	Amount      int64  `json:"amount"`
+	Currency    string `json:"currency"`
+	Description string `json:"description,omitempty"`
+	Net         int64  `json:"net"`
+	Fee         int64  `json:"fee"`
+	Status      string `json:"status"` // "available" or "pending"
+	Type        string `json:"type"`   // "transfer", "payout", "adjustment"
+	Source      string `json:"source,omitempty"` // transfer/payout ID
+	Created     int64  `json:"created"`
+}
+
 // Event represents a Stripe webhook event.
 type Event struct {
 	ID             string    `json:"id"`

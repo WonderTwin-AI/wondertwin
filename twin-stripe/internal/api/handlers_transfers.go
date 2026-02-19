@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -70,6 +71,15 @@ func (h *Handler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 
 	// Credit the destination account balance
 	h.store.CreditBalance(destination, currency, amount)
+
+	// Debit the platform balance (transfers move funds platform -> connected account)
+	if err := h.store.DebitBalance("", currency, amount); err != nil {
+		slog.Warn("platform balance insufficient for transfer", "amount", amount, "error", err)
+	}
+
+	// Record balance transactions
+	h.store.RecordBalanceTransaction("transfer", transfer.ID, currency, -amount, 0) // platform debit
+	h.store.RecordBalanceTransaction("transfer", transfer.ID, currency, amount, 0)  // destination credit
 
 	// Emit transfer.created event
 	h.emitEvent("transfer.created", transferToMap(transfer))

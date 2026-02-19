@@ -4,7 +4,7 @@ VERSION ?= dev
 GORELEASER ?= goreleaser
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
-TWINS := stripe twilio resend posthog clerk logodev
+TWINS := stripe twilio resend posthog clerk logodev smile
 
 build: ## Build the wt CLI binary
 	go build $(LDFLAGS) -o bin/wt ./cmd/wt/

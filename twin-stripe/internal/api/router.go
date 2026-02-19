@@ -28,6 +28,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v1", func(r chi.Router) {
 		// Auth middleware for all v1 routes
 		r.Use(h.authMiddleware)
+		// Idempotency key caching for POST requests
+		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
 		r.Use(h.mw.FaultInjection)
 
@@ -57,6 +59,10 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/payouts/{id}", h.GetPayout)
 		r.Get("/payouts", h.ListPayouts)
 
+		// Balance Transactions
+		r.Get("/balance_transactions", h.ListBalanceTransactions)
+		r.Get("/balance_transactions/{id}", h.GetBalanceTransaction)
+
 		// Events
 		r.Get("/events", h.ListEvents)
 		r.Get("/events/{id}", h.GetEvent)
@@ -64,6 +70,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)
 	r.Post("/admin/payouts/{id}/fail", h.AdminFailPayout)
+	r.Post("/admin/accounts/{id}/fund", h.AdminFundAccount)
 }
 
 // authMiddleware validates Stripe-style Bearer token authentication.

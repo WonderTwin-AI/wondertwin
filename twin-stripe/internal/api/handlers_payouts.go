@@ -77,6 +77,9 @@ func (h *Handler) CreatePayout(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Payouts.Set(id, payout)
 
+	// Record balance transaction for payout
+	h.store.RecordBalanceTransaction("payout", payout.ID, payout.Currency, -payout.Amount, 0)
+
 	// Emit payout.created webhook
 	h.emitEvent("payout.created", payoutToMap(payout))
 
