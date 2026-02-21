@@ -4,6 +4,7 @@ use (
 	.
 	./twin-clerk
 	./twin-logodev
+	./twin-loyaltylion
 	./twin-posthog
 	./twin-resend
 	./twin-smile

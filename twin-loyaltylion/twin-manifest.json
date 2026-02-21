@@ -1,0 +1,52 @@
+{
+  "twin": "loyaltylion",
+  "display_name": "LoyaltyLion",
+  "category": "loyalty",
+  "description": "Simulates the LoyaltyLion REST API v2 for customer management, points operations, reward redemption, and activity recording with multi-merchant isolation.",
+  "sdk_target": {
+    "primary": {
+      "package": "loyaltylion",
+      "language": "rest",
+      "version": "v2",
+      "api_version": "v2",
+      "repo_url": "https://developers.loyaltylion.com",
+      "docs_url": "https://developers.loyaltylion.com/api"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false,
+      "origin": "none",
+      "url": ""
+    },
+    "auth_pattern": "basic_auth",
+    "has_webhooks": false,
+    "resource_count": 6
+  },
+  "coverage": {
+    "resources_implemented": [
+      "customers",
+      "points",
+      "rewards",
+      "claimed_rewards",
+      "activities",
+      "merchants"
+    ],
+    "resources_not_implemented": [
+      "tiers",
+      "rules",
+      "webhooks",
+      "segments"
+    ],
+    "estimated_coverage_pct": 40
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

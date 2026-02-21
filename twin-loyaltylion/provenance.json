@@ -1,0 +1,20 @@
+{
+  "twin": "loyaltylion",
+  "sdk_target": {
+    "package": "loyaltylion",
+    "language": "rest",
+    "version": "v2"
+  },
+  "build": 1,
+  "generated_at": "2026-02-19T00:00:00-08:00",
+  "sources": {
+    "openapi": {
+      "origin": "none",
+      "url": ""
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://developers.loyaltylion.com"
+    }
+  }
+}
