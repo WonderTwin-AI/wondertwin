@@ -27,6 +27,29 @@ func (h *Handler) Routes(r chi.Router) {
 	// Public endpoints (no auth required)
 	r.Get("/.well-known/jwks.json", h.GetJWKS)
 
+	// Clerk Frontend API (FAPI) — used by clerk-js browser SDK.
+	// These endpoints use cookie-based auth, not Bearer tokens.
+	r.Get("/v1/environment", h.GetEnvironment)
+	r.Get("/v1/client", h.GetClient)
+	r.Post("/v1/client", h.CreateClient)
+	r.Delete("/v1/client", h.DestroyClient)
+	r.Post("/v1/client/sign_ins", h.CreateSignIn)
+	r.Post("/v1/client/sign_ins/{id}/attempt_first_factor", h.AttemptFirstFactor)
+	r.Post("/v1/client/sessions/{id}/tokens", h.GetSessionToken)
+	r.Post("/v1/client/sessions/{id}/tokens/{template}", h.GetSessionToken) // template variant
+	r.Post("/v1/client/sessions/{id}/touch", h.TouchSession)
+	r.Delete("/v1/client/sessions/{id}", h.EndSession)
+	r.Get("/v1/client/handshake", h.Handshake)
+
+	// Serve clerk-js bundle — redirect to CDN.
+	// When proxyUrl is set, clerk-js tries to load from {proxyUrl}/npm/@clerk/clerk-js@{ver}/dist/clerk.browser.js.
+	// We redirect to the real CDN so the twin doesn't need to host the bundle.
+	r.Get("/npm/*", func(w http.ResponseWriter, r *http.Request) {
+		// Rewrite to jsDelivr CDN
+		cdnPath := "https://cdn.jsdelivr.net" + r.URL.Path
+		http.Redirect(w, r, cdnPath, http.StatusTemporaryRedirect)
+	})
+
 	// Clerk Backend API (requires Bearer auth with sk_test_* key)
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(h.authMiddleware)

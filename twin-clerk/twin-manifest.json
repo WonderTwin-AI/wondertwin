@@ -2,7 +2,7 @@
   "twin": "clerk",
   "display_name": "Clerk",
   "category": "auth",
-  "description": "Simulates the Clerk Backend API for user management, sessions, organizations, and JWT/JWKS endpoints for token verification.",
+  "description": "Simulates the Clerk Backend API and Frontend API (FAPI) for user management, sessions, organizations, JWT/JWKS, sign-in flows, and client state management.",
   "sdk_target": {
     "primary": {
       "package": "github.com/clerk/clerk-sdk-go",
@@ -21,14 +21,18 @@
     },
     "auth_pattern": "api_key",
     "has_webhooks": false,
-    "resource_count": 4
+    "resource_count": 8
   },
   "coverage": {
     "resources_implemented": [
       "users",
       "sessions",
       "organizations",
-      "jwks"
+      "jwks",
+      "fapi_environment",
+      "fapi_client",
+      "fapi_sign_ins",
+      "fapi_session_tokens"
     ],
     "resources_not_implemented": [
       "invitations",
@@ -41,7 +45,7 @@
       "organization_memberships",
       "webhooks"
     ],
-    "estimated_coverage_pct": 10
+    "estimated_coverage_pct": 20
   },
   "generation": {
     "method": "manual",
