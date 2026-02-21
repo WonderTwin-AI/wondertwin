@@ -15,6 +15,8 @@ type MemoryStore struct {
 	Sessions      *pkgstore.Store[Session]
 	Organizations *pkgstore.Store[Organization]
 	OrgMembers    *pkgstore.Store[OrgMembership]
+	Clients       *pkgstore.Store[Client]
+	SignIns       *pkgstore.Store[SignIn]
 
 	Clock *pkgstore.Clock
 }
@@ -26,16 +28,20 @@ func New() *MemoryStore {
 		Sessions:      pkgstore.New[Session]("sess"),
 		Organizations: pkgstore.New[Organization]("org"),
 		OrgMembers:    pkgstore.New[OrgMembership]("orgmem"),
+		Clients:       pkgstore.New[Client]("client"),
+		SignIns:       pkgstore.New[SignIn]("sini"),
 		Clock:         pkgstore.NewClock(),
 	}
 }
 
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
-	Users         map[string]User         `json:"users"`
-	Sessions      map[string]Session      `json:"sessions"`
-	Organizations map[string]Organization `json:"organizations"`
+	Users         map[string]User          `json:"users"`
+	Sessions      map[string]Session       `json:"sessions"`
+	Organizations map[string]Organization  `json:"organizations"`
 	OrgMembers    map[string]OrgMembership `json:"org_members"`
+	Clients       map[string]Client        `json:"clients,omitempty"`
+	SignIns       map[string]SignIn         `json:"sign_ins,omitempty"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
@@ -45,6 +51,8 @@ func (s *MemoryStore) Snapshot() any {
 		Sessions:      s.Sessions.Snapshot(),
 		Organizations: s.Organizations.Snapshot(),
 		OrgMembers:    s.OrgMembers.Snapshot(),
+		Clients:       s.Clients.Snapshot(),
+		SignIns:       s.SignIns.Snapshot(),
 	}
 }
 
@@ -59,6 +67,12 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Sessions.LoadSnapshot(snap.Sessions)
 	s.Organizations.LoadSnapshot(snap.Organizations)
 	s.OrgMembers.LoadSnapshot(snap.OrgMembers)
+	if snap.Clients != nil {
+		s.Clients.LoadSnapshot(snap.Clients)
+	}
+	if snap.SignIns != nil {
+		s.SignIns.LoadSnapshot(snap.SignIns)
+	}
 	return nil
 }
 
@@ -68,5 +82,7 @@ func (s *MemoryStore) Reset() {
 	s.Sessions.Reset()
 	s.Organizations.Reset()
 	s.OrgMembers.Reset()
+	s.Clients.Reset()
+	s.SignIns.Reset()
 	s.Clock.Reset()
 }

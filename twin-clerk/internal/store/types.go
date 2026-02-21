@@ -28,6 +28,9 @@ type User struct {
 	LastActiveAt        *int64            `json:"last_active_at"`
 	CreatedAt           int64             `json:"created_at"`
 	UpdatedAt           int64             `json:"updated_at"`
+	// PasswordHash stores the password for FAPI sign-in verification.
+	// Not exposed in JSON responses (json:"-").
+	PasswordHash        string            `json:"-"`
 }
 
 // EmailAddress represents a Clerk email address.
@@ -127,4 +130,80 @@ type ClerkList[T any] struct {
 // Now returns the current timestamp in milliseconds (Clerk uses ms).
 func Now() int64 {
 	return time.Now().UnixMilli()
+}
+
+// --- FAPI (Frontend API) types ---
+
+// Client represents a Clerk client (browser session container).
+// A client holds multiple sessions and tracks sign-in/sign-up state.
+type Client struct {
+	ID                         string       `json:"id"`
+	Object                     string       `json:"object"`
+	Sessions                   []FAPISession `json:"sessions"`
+	SignIn                     *SignIn      `json:"sign_in"`
+	SignUp                     any          `json:"sign_up"`
+	LastActiveSessionID        *string      `json:"last_active_session_id"`
+	LastAuthenticationStrategy *string      `json:"last_authentication_strategy"`
+	CookieExpiresAt            *int64       `json:"cookie_expires_at"`
+	CreatedAt                  int64        `json:"created_at"`
+	UpdatedAt                  int64        `json:"updated_at"`
+}
+
+// FAPISession is the FAPI representation of a session, which embeds the full User.
+type FAPISession struct {
+	ID                       string            `json:"id"`
+	Object                   string            `json:"object"`
+	Status                   string            `json:"status"`
+	ExpireAt                 int64             `json:"expire_at"`
+	AbandonAt                int64             `json:"abandon_at"`
+	LastActiveAt             int64             `json:"last_active_at"`
+	LastActiveToken          *TokenResponse    `json:"last_active_token"`
+	LastActiveOrganizationID *string           `json:"last_active_organization_id"`
+	Actor                    any               `json:"actor"`
+	User                     User              `json:"user"`
+	PublicUserData           PublicUserData     `json:"public_user_data"`
+	FactorVerificationAge    any               `json:"factor_verification_age"`
+	CreatedAt                int64             `json:"created_at"`
+	UpdatedAt                int64             `json:"updated_at"`
+}
+
+// PublicUserData is the public subset of user data in a session.
+type PublicUserData struct {
+	FirstName  string `json:"first_name,omitempty"`
+	LastName   string `json:"last_name,omitempty"`
+	ImageURL   string `json:"image_url,omitempty"`
+	Identifier string `json:"identifier,omitempty"`
+}
+
+// SignIn represents an in-progress or completed sign-in attempt.
+type SignIn struct {
+	ID                    string         `json:"id"`
+	Object                string         `json:"object"`
+	Status                string         `json:"status"`
+	SupportedIdentifiers  []string       `json:"supported_identifiers"`
+	Identifier            string         `json:"identifier,omitempty"`
+	SupportedFirstFactors []SignInFactor `json:"supported_first_factors"`
+	FirstFactorVerification *FactorVerification `json:"first_factor_verification"`
+	SecondFactorVerification any         `json:"second_factor_verification"`
+	CreatedSessionID      *string        `json:"created_session_id"`
+	UserID                *string        `json:"user_id,omitempty"`
+	CreatedAt             int64          `json:"created_at"`
+	UpdatedAt             int64          `json:"updated_at"`
+	AbandonAt             int64          `json:"abandon_at"`
+}
+
+// SignInFactor describes a supported authentication factor.
+type SignInFactor struct {
+	Strategy string `json:"strategy"`
+	SafeIdentifier string `json:"safe_identifier,omitempty"`
+	EmailAddressID string `json:"email_address_id,omitempty"`
+	PhoneNumberID  string `json:"phone_number_id,omitempty"`
+}
+
+// FactorVerification tracks the state of a factor verification attempt.
+type FactorVerification struct {
+	Status   string `json:"status"`
+	Strategy string `json:"strategy"`
+	Attempts *int   `json:"attempts"`
+	ExpireAt *int64 `json:"expire_at"`
 }

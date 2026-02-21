@@ -110,6 +110,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		PrivateMetadata:     req.PrivateMetadata,
 		UnsafeMetadata:      req.UnsafeMetadata,
 		PasswordEnabled:     req.Password != "",
+		PasswordHash:        req.Password, // stored in plaintext — twin only, never production
 		TwoFactorEnabled:    false,
 		Banned:              false,
 		Locked:              false,
@@ -169,6 +170,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Password != nil {
 		user.PasswordEnabled = *req.Password != ""
+		user.PasswordHash = *req.Password
 	}
 	if req.PublicMetadata != nil {
 		user.PublicMetadata = req.PublicMetadata
