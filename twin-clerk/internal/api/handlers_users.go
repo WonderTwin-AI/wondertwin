@@ -13,6 +13,10 @@ import (
 
 // createUserRequest is the JSON body for POST /v1/users.
 type createUserRequest struct {
+	// ID allows callers to set a specific user ID (twin-only extension).
+	// Real Clerk auto-generates IDs; this field enables test systems to
+	// align Clerk user IDs with their own identifiers (e.g. merchant UUIDs).
+	ID              string         `json:"id,omitempty"`
 	ExternalID      string         `json:"external_id,omitempty"`
 	EmailAddress    []string       `json:"email_address,omitempty"`
 	PhoneNumber     []string       `json:"phone_number,omitempty"`
@@ -46,7 +50,10 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Users.NextID()
+	id := req.ID
+	if id == "" {
+		id = h.store.Users.NextID()
+	}
 	now := store.Now()
 
 	// Build email addresses
