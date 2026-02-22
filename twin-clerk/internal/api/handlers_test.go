@@ -110,6 +110,31 @@ func TestCreateAndGetUser(t *testing.T) {
 	}
 }
 
+func TestCreateUserWithCustomID(t *testing.T) {
+	_, tc := setupClerk(t)
+
+	customID := "merchant-uuid-12345"
+	resp := clerkPost(tc, "/v1/users", map[string]any{
+		"id":            customID,
+		"email_address": []string{"custom@example.com"},
+		"first_name":    "Custom",
+		"password":      "demo",
+	})
+	resp.AssertStatus(200)
+
+	m := resp.JSONMap()
+	if m["id"] != customID {
+		t.Errorf("expected custom id=%s, got %v", customID, m["id"])
+	}
+
+	// Verify we can fetch by the custom ID
+	resp = clerkGet(tc, "/v1/users/"+customID)
+	resp.AssertStatus(200)
+	if resp.JSONMap()["first_name"] != "Custom" {
+		t.Error("expected first_name=Custom")
+	}
+}
+
 func TestUpdateUser(t *testing.T) {
 	_, tc := setupClerk(t)
 
@@ -435,6 +460,24 @@ func TestJWKSEndpoint(t *testing.T) {
 	}
 	if key["alg"] != "RS256" {
 		t.Errorf("expected alg=RS256, got %v", key["alg"])
+	}
+}
+
+func TestJWKSV1Alias(t *testing.T) {
+	_, tc := setupClerk(t)
+
+	// /v1/jwks should return the same JWKS as /.well-known/jwks.json
+	resp := tc.Get("/v1/jwks")
+	resp.AssertStatus(200)
+
+	m := resp.JSONMap()
+	keys, ok := m["keys"].([]any)
+	if !ok || len(keys) == 0 {
+		t.Fatal("expected at least 1 key in JWKS from /v1/jwks")
+	}
+	key := keys[0].(map[string]any)
+	if key["kty"] != "RSA" {
+		t.Errorf("expected kty=RSA, got %v", key["kty"])
 	}
 }
 

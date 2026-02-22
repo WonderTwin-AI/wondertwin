@@ -26,6 +26,9 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, jwtMgr *JWTManage
 func (h *Handler) Routes(r chi.Router) {
 	// Public endpoints (no auth required)
 	r.Get("/.well-known/jwks.json", h.GetJWKS)
+	// Alias: Clerk SDKs fetch JWKS from {apiUrl}/v1/jwks (Go SDK, @clerk/backend).
+	// Must be outside the auth-protected /v1 route group.
+	r.Get("/v1/jwks", h.GetJWKS)
 
 	// Clerk Frontend API (FAPI) — used by clerk-js browser SDK.
 	// These endpoints use cookie-based auth, not Bearer tokens.
