@@ -24,11 +24,10 @@ WonderTwin gives you behavioral replicas of third-party APIs that run on your ma
 Point your SDK at localhost. Your existing tests just work.
 
 ```bash
-wt install stripe@latest twilio@latest clerk@latest
+wt install stripe@latest twilio@latest
 wt up
 # ✓ stripe running on :4111
 # ✓ twilio running on :4112
-# ✓ clerk  running on :4113
 ```
 
 ## Why
@@ -71,10 +70,6 @@ Create a `wondertwin.json` (or `wondertwin.yaml`) in your project:
     "twilio": {
       "binary": "./bin/twin-twilio",
       "port": 4112
-    },
-    "clerk": {
-      "binary": "./bin/twin-clerk",
-      "port": 4113
     }
   }
 }
@@ -137,9 +132,8 @@ Works with any test framework. Go, Python, Node, Rust, Java — if it speaks HTT
 |------|----------|-------------|
 | **Stripe** | Accounts, Balance, Transfers, Payouts, External Accounts, Events, Webhooks | 4111 |
 | **Twilio** | Messages, Verify (OTP send/check) | 4112 |
-| **Clerk** | Users, Sessions, Organizations, JWT validation | 4113 |
-| **Resend** | Email send, delivery status | 4114 |
-| **PostHog** | Event capture, batch ingestion | 4115 |
+| **Resend** | Email send, delivery status | 4113 |
+| **PostHog** | Event capture, batch ingestion | 4114 |
 | **Logo.dev** | Logo image retrieval | 4116 |
 
 More twins coming. [Request a twin →](https://github.com/wondertwin-ai/wondertwin/issues/new?template=twin-request.yml)
@@ -179,7 +173,6 @@ wondertwin/
 │   └── testutil/              # Test client helpers
 ├── twin-stripe/               # Stripe behavioral twin
 ├── twin-twilio/               # Twilio behavioral twin
-├── twin-clerk/                # Clerk behavioral twin
 ├── twin-resend/               # Resend behavioral twin
 ├── twin-posthog/              # PostHog behavioral twin
 ├── twin-logodev/              # Logo.dev behavioral twin
