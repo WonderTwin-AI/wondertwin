@@ -16,10 +16,6 @@
       "binary": "./bin/twin-posthog",
       "port": 4114
     },
-    "clerk": {
-      "binary": "./bin/twin-clerk",
-      "port": 4115
-    },
     "logodev": {
       "binary": "./bin/twin-logodev",
       "port": 4116
