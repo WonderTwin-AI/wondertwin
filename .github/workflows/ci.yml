@@ -20,6 +20,9 @@ jobs:
       - run: go vet ./...
       - run: go test ./... -count=1 -timeout 120s
 
+      - name: Validate twin schemas
+        run: go run ./cmd/validate-schemas/
+
       - name: Build wt CLI
         run: go build ./cmd/wt/
 
