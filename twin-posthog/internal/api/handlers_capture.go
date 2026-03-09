@@ -119,17 +119,23 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 		} else {
 			featureFlags[key] = false
 		}
-		featureFlagPayloads[key] = nil
+		if flag.Payload != "" {
+			featureFlagPayloads[key] = flag.Payload
+		} else {
+			featureFlagPayloads[key] = nil
+		}
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"featureFlags":        featureFlags,
-		"featureFlagPayloads": featureFlagPayloads,
-		"errorsWhileComputingFlags": false,
+		"featureFlags":                featureFlags,
+		"featureFlagPayloads":         featureFlagPayloads,
+		"errorsWhileComputingFlags":   false,
+		"requestId":                   h.store.Events.NextID(),
+		"quotaLimited":               []string{},
 	})
 }
 
-// storeEvent saves a captured event to the store.
+// storeEvent saves a captured event to the store and processes special event types.
 func (h *Handler) storeEvent(req captureRequest) {
 	now := h.store.Clock.Now()
 
@@ -149,6 +155,132 @@ func (h *Handler) storeEvent(req captureRequest) {
 	}
 
 	h.store.Events.Set(id, evt)
+
+	// Process special event types
+	switch req.Event {
+	case "$identify":
+		h.processIdentify(req, ts)
+	case "$create_alias":
+		h.processAlias(req, ts)
+	case "$groupidentify":
+		h.processGroupIdentify(req, ts)
+	}
+}
+
+// processIdentify upserts a Person from an $identify event.
+func (h *Handler) processIdentify(req captureRequest, ts string) {
+	props := make(map[string]any)
+
+	// Merge $set properties
+	if req.Properties != nil {
+		if setProps, ok := req.Properties["$set"].(map[string]any); ok {
+			for k, v := range setProps {
+				props[k] = v
+			}
+		}
+	}
+
+	// Check if person already exists and merge
+	existing := h.store.Persons.Filter(func(_ string, p store.Person) bool {
+		return p.DistinctID == req.DistinctID
+	})
+
+	if len(existing) > 0 {
+		// Merge with existing properties
+		for k, v := range existing[0].Properties {
+			if _, exists := props[k]; !exists {
+				props[k] = v
+			}
+		}
+		// Find and update the existing record
+		ids, _ := h.store.Persons.FilterWithIDs(func(_ string, p store.Person) bool {
+			return p.DistinctID == req.DistinctID
+		})
+		if len(ids) > 0 {
+			h.store.Persons.Set(ids[0], store.Person{
+				DistinctID: req.DistinctID,
+				Properties: props,
+				CreatedAt:  existing[0].CreatedAt,
+			})
+			return
+		}
+	}
+
+	id := h.store.Persons.NextID()
+	h.store.Persons.Set(id, store.Person{
+		DistinctID: req.DistinctID,
+		Properties: props,
+		CreatedAt:  ts,
+	})
+}
+
+// processAlias stores an AliasMapping from a $create_alias event.
+func (h *Handler) processAlias(req captureRequest, ts string) {
+	alias := ""
+	if req.Properties != nil {
+		if a, ok := req.Properties["alias"].(string); ok {
+			alias = a
+		}
+	}
+	if alias == "" {
+		return
+	}
+
+	id := h.store.Aliases.NextID()
+	h.store.Aliases.Set(id, store.AliasMapping{
+		Alias:      alias,
+		DistinctID: req.DistinctID,
+		CreatedAt:  ts,
+	})
+}
+
+// processGroupIdentify upserts a Group from a $groupidentify event.
+func (h *Handler) processGroupIdentify(req captureRequest, ts string) {
+	if req.Properties == nil {
+		return
+	}
+
+	groupType, _ := req.Properties["$group_type"].(string)
+	groupKey, _ := req.Properties["$group_key"].(string)
+	if groupType == "" || groupKey == "" {
+		return
+	}
+
+	props := make(map[string]any)
+	if setProps, ok := req.Properties["$group_set"].(map[string]any); ok {
+		for k, v := range setProps {
+			props[k] = v
+		}
+	}
+
+	// Check if group already exists
+	ids, existing := h.store.Groups.FilterWithIDs(func(_ string, g store.Group) bool {
+		return g.Type == groupType && g.Key == groupKey
+	})
+
+	if len(existing) > 0 {
+		// Merge properties
+		for k, v := range existing[0].Properties {
+			if _, exists := props[k]; !exists {
+				props[k] = v
+			}
+		}
+		h.store.Groups.Set(ids[0], store.Group{
+			Type:       groupType,
+			Key:        groupKey,
+			Properties: props,
+			CreatedAt:  existing[0].CreatedAt,
+		})
+		return
+	}
+
+	id := h.store.Groups.NextID()
+	h.store.Groups.Set(id, store.Group{
+		Type:       groupType,
+		Key:        groupKey,
+		Properties: props,
+		CreatedAt:  ts,
+	})
 }
 
 // AdminListEvents handles GET /admin/events
@@ -198,4 +330,60 @@ func (h *Handler) AdminSetFeatureFlags(w http.ResponseWriter, r *http.Request) {
 // AdminGetFeatureFlags handles GET /admin/feature-flags
 func (h *Handler) AdminGetFeatureFlags(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, h.store.GetFeatureFlags())
+}
+
+// AdminListPersons handles GET /admin/persons
+// Supports ?distinct_id={id} query parameter.
+func (h *Handler) AdminListPersons(w http.ResponseWriter, r *http.Request) {
+	distinctIDFilter := r.URL.Query().Get("distinct_id")
+
+	persons := h.store.Persons.List()
+
+	if distinctIDFilter != "" {
+		var filtered []store.Person
+		for _, p := range persons {
+			if p.DistinctID == distinctIDFilter {
+				filtered = append(filtered, p)
+			}
+		}
+		persons = filtered
+	}
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"persons": persons,
+		"total":   len(persons),
+	})
+}
+
+// AdminListAliases handles GET /admin/aliases
+func (h *Handler) AdminListAliases(w http.ResponseWriter, r *http.Request) {
+	aliases := h.store.Aliases.List()
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"aliases": aliases,
+		"total":   len(aliases),
+	})
+}
+
+// AdminListGroups handles GET /admin/groups
+// Supports ?type={groupType} query parameter.
+func (h *Handler) AdminListGroups(w http.ResponseWriter, r *http.Request) {
+	typeFilter := r.URL.Query().Get("type")
+
+	groups := h.store.Groups.List()
+
+	if typeFilter != "" {
+		var filtered []store.Group
+		for _, g := range groups {
+			if g.Type == typeFilter {
+				filtered = append(filtered, g)
+			}
+		}
+		groups = filtered
+	}
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"groups": groups,
+		"total":  len(groups),
+	})
 }
