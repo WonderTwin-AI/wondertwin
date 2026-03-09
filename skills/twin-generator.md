@@ -1311,6 +1311,95 @@ When the SDK lacks documentation, has sparse examples, or has inconsistent behav
 4. **Document discovered quirks** using `schemas/quirk.schema.json` format and register them via `/admin/quirks` if the twin implements the `QuirkStore` interface. Quirks can be toggled at runtime via `PUT /admin/quirks/{quirk_id}` and `DELETE /admin/quirks/{quirk_id}`.
 5. **Use runtime configuration** via `/admin/config` (`GET` to read, `PUT` to update) to allow consumers to adjust twin behavior for edge cases that may vary between SDK versions.
 
+## Advanced Patterns
+
+### Pattern: Single-Endpoint Message Routing
+
+Some services route multiple logical operations through a single endpoint, discriminated by a field in the request body. This is common in analytics and event-based services (PostHog, Segment, Amplitude).
+
+**Example: PostHog**
+
+The PostHog Go SDK sends identify, alias, group identify, and exception operations through the same `/capture` and `/batch` endpoints. The `event` field determines the logical operation:
+
+| SDK Method | Event Field | Logical Operation |
+|---|---|---|
+| `Enqueue(Capture{})` | `"page_view"` (user-defined) | Store event |
+| `Enqueue(Identify{})` | `"$identify"` | Upsert person with `$set` properties |
+| `Enqueue(Alias{})` | `"$create_alias"` | Create alias mapping |
+| `Enqueue(GroupIdentify{})` | `"$groupidentify"` | Upsert group with `$group_set` properties |
+| `Enqueue(Exception{})` | `"$exception"` | Store exception event |
+
+**Implementation pattern:**
+
+The handler for the shared endpoint should:
+
+1. Always store the raw event/message for observability
+2. Switch on the discriminator field to trigger side effects
+3. Create separate store types and admin endpoints for each logical entity
+
+```go
+func (h *Handler) storeEvent(req captureRequest) {
+    // Always store the raw event
+    h.store.Events.Set(id, evt)
+
+    // Process special event types
+    switch req.Event {
+    case "$identify":
+        h.processIdentify(req, ts)
+    case "$create_alias":
+        h.processAlias(req, ts)
+    case "$groupidentify":
+        h.processGroupIdentify(req, ts)
+    }
+}
+```
+
+**When to use this pattern:**
+
+- The SDK sends all operations through 1-2 endpoints (e.g., `/capture`, `/batch`, `/track`, `/import`)
+- A field in the request body determines the logical operation (e.g., `event`, `type`, `action`)
+- The service creates different domain objects from the same endpoint
+
+**Store implications:**
+
+Each logical operation needs its own store type and admin endpoint, even though they arrive through the same API endpoint. The admin API should expose the derived entities separately (e.g., `/admin/persons`, `/admin/aliases`, `/admin/groups`) so test code can verify side effects.
+
+### Pattern: Feature Flag / Remote Config Endpoints
+
+Services that provide feature flags or remote configuration (PostHog, LaunchDarkly, Unleash) typically expose multiple evaluation paths:
+
+| Endpoint | Purpose | Auth |
+|---|---|---|
+| `POST /decide` or `/flags` | Server-side flag evaluation | Project API key |
+| `GET /api/feature_flag/local_evaluation` | Flag definitions for client-side evaluation | Personal API key (Bearer token) |
+
+**Implementation notes:**
+
+- Flag evaluation endpoints should return both flag values and payloads
+- Local evaluation endpoints return flag *definitions* (filters, rollout percentages, variants) so the SDK can evaluate locally without network calls
+- Different auth schemes may apply (project key vs. personal key)
+- Response shapes often include metadata fields (`requestId`, `quotaLimited`, `errorsWhileComputingFlags`)
+
+**Admin setup:**
+
+Feature flags are typically configured via admin endpoints (`POST /admin/feature-flags`) rather than through the service API. The admin endpoint accepts flag definitions including key, enabled state, variant, and payload.
+
+### Pattern: CI Twin List Maintenance
+
+When generating a new twin for the monorepo, the CI workflow at `.github/workflows/ci.yml` has a hardcoded list of twins to build. **This list must be updated when twins are added or removed.** Failure to update it will break CI for all PRs.
+
+```yaml
+# .github/workflows/ci.yml — "Build all twins" step
+for twin in stripe twilio resend posthog logodev loyaltylion smile; do
+  echo "Building twin-$twin..."
+  go build -o bin/twin-$twin ./twin-$twin/cmd/twin-$twin/
+done
+```
+
+After generating a new twin, add it to this list in the same PR. After removing a twin, remove it from this list.
+
+---
+
 ## Common Mistakes to Avoid
 
 1. **Using `time.Now()` instead of `store.Clock.Now()`** — breaks simulated time
@@ -1330,3 +1419,6 @@ When the SDK lacks documentation, has sparse examples, or has inconsistent behav
 15. **Forgetting to update provenance after Arazzo generation** — add the `arazzo` source entry with `origin` and `sha256`
 16. **Writing scenarios in YAML instead of JSON** — the v2 scenario format uses JSON, validated against `schemas/scenario.schema.json`
 17. **Omitting health check and reset steps from starter scenarios** — every scenario should begin with these steps
+18. **Forgetting to update the CI twin list** — `.github/workflows/ci.yml` has a hardcoded list of twins to build. Adding or removing a twin without updating this list breaks CI for all PRs
+19. **Assuming 1 endpoint = 1 operation** — analytics services (PostHog, Segment, Amplitude) route multiple logical operations through a single endpoint via event type discrimination. Analyze the SDK to identify all message types sent through shared endpoints
+20. **Not creating admin endpoints for derived entities** — when a single endpoint creates multiple entity types (e.g., `/capture` creates events, persons, aliases, and groups), each entity type needs its own admin endpoint for test observability
