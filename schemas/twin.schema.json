@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wondertwin.dev/schemas/twin.schema.json",
+  "title": "Twin Configuration",
+  "description": "Schema for twin.json files that define a twin's identity, SDK target, and default port.",
+  "type": "object",
+  "required": ["name", "description", "category", "sdk", "default_port"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Machine-readable twin name, matching the directory suffix (twin-{name}).",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what the twin simulates."
+    },
+    "category": {
+      "type": "string",
+      "description": "Service category (e.g., payments, email, analytics, loyalty, auth)."
+    },
+    "sdk": {
+      "type": "object",
+      "description": "Primary SDK or API this twin targets.",
+      "required": ["package", "version"],
+      "properties": {
+        "package": {
+          "type": "string",
+          "description": "SDK package name or API identifier."
+        },
+        "version": {
+          "type": "string",
+          "description": "SDK or API version targeted."
+        }
+      },
+      "additionalProperties": false
+    },
+    "default_port": {
+      "type": "integer",
+      "description": "Default port the twin listens on.",
+      "minimum": 1024,
+      "maximum": 65535
+    }
+  },
+  "additionalProperties": false
+}

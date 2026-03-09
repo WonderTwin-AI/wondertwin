@@ -21,7 +21,7 @@
       "origin": "none",
       "url": ""
     },
-    "auth_pattern": "basic_auth",
+    "auth_pattern": "basic",
     "has_webhooks": false,
     "resource_count": 6
   },

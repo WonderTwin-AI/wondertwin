@@ -6,6 +6,12 @@
   "type": "object",
   "required": ["twin", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation"],
   "properties": {
+    "tier": {
+      "type": "string",
+      "description": "Distribution tier for the twin.",
+      "enum": ["free", "paid"],
+      "default": "free"
+    },
     "twin": {
       "type": "string",
       "description": "Machine-readable twin identifier.",
@@ -52,6 +58,10 @@
             "docs_url": {
               "type": "string",
               "description": "Documentation URL for the SDK."
+            },
+            "api_version": {
+              "type": "string",
+              "description": "Version of the upstream API targeted."
             }
           },
           "additionalProperties": false
