@@ -25,7 +25,7 @@ jobs:
 
       - name: Build all twins
         run: |
-          for twin in stripe twilio resend posthog logodev loyaltylion smile; do
+          for twin in stripe twilio resend posthog logodev; do
             echo "Building twin-$twin..."
             go build -o bin/twin-$twin ./twin-$twin/cmd/twin-$twin/
           done

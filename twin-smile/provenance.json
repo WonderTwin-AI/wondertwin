@@ -5,8 +5,8 @@
     "language": "rest",
     "version": "v1"
   },
-  "build": 1,
-  "generated_at": "2026-02-18T00:00:00-08:00",
+  "build": 2,
+  "generated_at": "2026-03-09T00:00:00-08:00",
   "sources": {
     "openapi": {
       "origin": "none",
