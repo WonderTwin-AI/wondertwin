@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -102,6 +103,75 @@ func TestGetLogoDifferentDomains(t *testing.T) {
 	// Different domains should produce different SVGs (different colors/initials)
 	if string(resp1.Body) == string(resp2.Body) {
 		t.Error("expected different SVGs for different domains")
+	}
+}
+
+// --- Custom Logo Tests ---
+
+func TestGetCustomLogoSVG(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	// Load a custom SVG logo via seed data
+	seed := json.RawMessage(`{"custom_logos":{"acme.com":{"content_type":"image/svg+xml","data":"PHN2Zz5hY21lPC9zdmc+"}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	resp := tc.Get("/acme.com?token=test")
+	resp.AssertStatus(200)
+
+	ct := resp.Headers.Get("Content-Type")
+	if ct != "image/svg+xml" {
+		t.Errorf("expected Content-Type=image/svg+xml, got %s", ct)
+	}
+	if string(resp.Body) != "<svg>acme</svg>" {
+		t.Errorf("expected custom SVG, got %s", string(resp.Body))
+	}
+}
+
+func TestGetCustomLogoPNG(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	// Load a custom PNG logo (fake PNG data for test)
+	seed := json.RawMessage(`{"custom_logos":{"img.com":{"content_type":"image/png","data":"iVBORw0KGgo="}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	resp := tc.Get("/img.com?token=test")
+	resp.AssertStatus(200)
+
+	ct := resp.Headers.Get("Content-Type")
+	if ct != "image/png" {
+		t.Errorf("expected Content-Type=image/png, got %s", ct)
+	}
+}
+
+func TestCustomLogoFallbackToPlaceholder(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	// Load custom logo for one domain
+	seed := json.RawMessage(`{"custom_logos":{"known.com":{"content_type":"image/svg+xml","data":"PHN2Zz48L3N2Zz4="}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	// Unknown domain should still get a placeholder
+	resp := tc.Get("/unknown.com?token=test")
+	resp.AssertStatus(200)
+	if !strings.Contains(string(resp.Body), "<svg") {
+		t.Error("expected placeholder SVG for unknown domain")
+	}
+}
+
+func TestCustomLogosResetOnReset(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	seed := json.RawMessage(`{"custom_logos":{"reset-test.com":{"content_type":"image/svg+xml","data":"PHN2Zz48L3N2Zz4="}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	tc.Post("/admin/reset", nil).AssertStatus(200)
+
+	// After reset, should get placeholder, not custom logo
+	resp := tc.Get("/reset-test.com?token=test")
+	resp.AssertStatus(200)
+	// Placeholder SVGs contain initials — custom one was just "<svg></svg>"
+	if !strings.Contains(string(resp.Body), "RE") {
+		t.Error("expected placeholder SVG with initials after reset")
 	}
 }
 

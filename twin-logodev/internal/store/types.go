@@ -10,3 +10,9 @@ type LogoRequest struct {
 	Greyscale bool      `json:"greyscale,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+// CustomLogo holds logo content with its media type.
+type CustomLogo struct {
+	ContentType string `json:"content_type"`
+	Data        []byte `json:"data"`
+}
