@@ -1,0 +1,10 @@
+{
+  "name": "twilio",
+  "description": "Simulates the Twilio Messaging and Verify API surfaces, including SMS message send/retrieve and phone number verification workflows.",
+  "category": "messaging",
+  "sdk": {
+    "package": "github.com/twilio/twilio-go",
+    "version": "v1"
+  },
+  "default_port": 4112
+}

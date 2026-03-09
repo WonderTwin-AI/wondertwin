@@ -1,0 +1,10 @@
+{
+  "name": "smile",
+  "description": "Simulates the Smile.io rewards platform API, including customer points balance, tier info, points redemption, and points refund.",
+  "category": "loyalty",
+  "sdk": {
+    "package": "Smile.io REST API",
+    "version": "v1"
+  },
+  "default_port": 8087
+}

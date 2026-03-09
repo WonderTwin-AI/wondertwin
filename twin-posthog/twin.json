@@ -1,0 +1,10 @@
+{
+  "name": "posthog",
+  "description": "Simulates the PostHog event capture, feature flag evaluation, identify, alias, group identify, exception tracking, and local evaluation API surfaces for the PostHog Go SDK.",
+  "category": "analytics",
+  "sdk": {
+    "package": "github.com/posthog/posthog-go",
+    "version": "v0"
+  },
+  "default_port": 4114
+}

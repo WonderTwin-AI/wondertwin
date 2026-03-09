@@ -120,12 +120,16 @@ twin-{name}/
 
 6. **Fill in the manifest and provenance files.** See [The Manifest and Provenance Files](#the-manifest-and-provenance-files) below.
 
-7. **Test locally.** Build the binary and wire it into a `wondertwin.yaml`:
-   ```yaml
-   twins:
-     my-service:
-       binary: ./path/to/twin-my-service
-       port: 9020
+7. **Test locally.** Build the binary and wire it into a `wondertwin.json`:
+   ```json
+   {
+     "twins": {
+       "my-service": {
+         "binary": "./path/to/twin-my-service",
+         "port": 9020
+       }
+     }
+   }
    ```
    ```bash
    wt up

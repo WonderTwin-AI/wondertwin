@@ -50,14 +50,9 @@ twin-{name}/
 │       └── memory.go                 # MemoryStore implementing admin.StateStore
 ├── twin-manifest.json                # Twin capabilities and coverage (schemas/twin-manifest.schema.json)
 ├── provenance.json                   # Generation provenance record (schemas/provenance.schema.json)
-├── twin.yaml                         # Twin metadata (name, SDK, port)
+├── twin.json                         # Twin metadata (name, SDK, port)
 ├── go.mod
 ├── go.sum
-├── Makefile
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                    # PR checks: build, test, conformance
-│       └── release.yml              # Tag-triggered: cross-compile + release + registry notify
 ├── workflows/
 │   └── {name}.arazzo.json            # Arazzo 1.0.1 multi-step workflow descriptions
 └── scenarios/
@@ -180,56 +175,89 @@ Populate the manifest shell (validated against `schemas/twin-manifest.schema.jso
 
 ### Phase 1: Project Setup
 
-Before writing any twin code, set up the project from the template.
+Before writing any twin code, set up the project structure.
 
-**1. Create the repository:**
+#### Monorepo Setup (default — all official twins)
+
+Official twins live in the `wondertwin` monorepo alongside `twinkit` and the `wt` CLI.
+
+**1. Create the twin directory:**
 
 ```bash
-# Public twin (community contribution)
-gh repo create {org}/twin-{name} --template wondertwin-ai/twin-template --public
-
-# Private twin (internal API)
-gh repo create {org}/twin-{name} --template wondertwin-ai/twin-template --private
+mkdir -p twin-{name}/cmd/twin-{name}
+mkdir -p twin-{name}/internal/api
+mkdir -p twin-{name}/internal/store
 ```
 
-**2. Fill in `twin.yaml`** at the repo root:
+**2. Add to `go.work`:**
 
-```yaml
-name: {name}
-description: "Behavioral clone of the {Service} API"
-category: {category}    # e.g., payments, messaging, auth, analytics, email
-
-# SDK version this twin targets
-sdk:
-  package: "{sdk_import_path}"      # e.g., "github.com/stripe/stripe-go/v76"
-  version: "{sdk_version}"          # e.g., "v76.0.0"
-
-# Default port when run standalone
-default_port: {port}                # Pick a unique port (e.g., 4111)
+```bash
+# Add the new module to the workspace
+go work edit -use ./twin-{name}
 ```
 
 **3. Initialize the Go module:**
 
 ```bash
+cd twin-{name}
+go mod init github.com/wondertwin-ai/wondertwin/twin-{name}
+```
+
+The `go.mod` uses workspace-relative imports — `twinkit` is resolved via `go.work`, not via `require`:
+
+```
+module github.com/wondertwin-ai/wondertwin/twin-{name}
+
+go 1.25.7
+
+require (
+    github.com/go-chi/chi/v5 v5.2.5
+    github.com/wondertwin-ai/wondertwin/twinkit v0.0.0-00010101000000-000000000000
+)
+```
+
+The twinkit version hash is auto-resolved by `go.work`. Run `go mod tidy` after adding imports.
+
+**4. Update CI twin list:**
+
+Add the twin name to `.github/workflows/ci.yml` in the "Build all twins" step:
+
+```yaml
+for twin in stripe twilio resend posthog logodev {name}; do
+```
+
+And to the Makefile `TWINS` variable if it's a free-tier twin.
+
+**5. Fill in `twin.json`** at the twin root:
+
+```json
+{
+  "name": "{name}",
+  "description": "Behavioral clone of the {Service} API",
+  "category": "{category}",
+  "sdk": {
+    "package": "{sdk_import_path}",
+    "version": "{sdk_version}"
+  },
+  "default_port": {port}
+}
+```
+
+Port assignment: use the next available port in the 411x range (check existing twins).
+
+#### Separate Repo Setup (community contributions)
+
+For twins contributed outside the monorepo:
+
+```bash
+gh repo create {org}/twin-{name} --template wondertwin-ai/twin-template --public
+cd twin-{name}
 go mod init github.com/{org}/twin-{name}
 go get github.com/wondertwin-ai/twinkit@latest
 go get github.com/go-chi/chi/v5@latest
 ```
 
-**4. The `go.mod` should look like:**
-
-```
-module github.com/{org}/twin-{name}
-
-go 1.25.7
-
-require (
-    github.com/go-chi/chi/v5 v5.2.1
-    github.com/wondertwin-ai/twinkit v0.1.0
-)
-```
-
-No `replace` directives — twins depend on published `twinkit` versions.
+The `go.mod` uses published `twinkit` versions — no `replace` directives.
 
 ### Phase 2: SDK and Service Analysis
 
@@ -1140,17 +1168,20 @@ go build -o ./bin/twin-{name} ./cmd/twin-{name}/
 make build
 ```
 
-**2. Add to your project's `wondertwin.yaml`:**
+**2. Add to your project's `wondertwin.json`:**
 
-```yaml
-twins:
-  {name}:
-    binary: ./path/to/twin-{name}/bin/twin-{name}
-    port: {port}
-    # seed: ./fixtures/seed.json    # optional seed data
+```json
+{
+  "twins": {
+    "{name}": {
+      "binary": "./path/to/twin-{name}/bin/twin-{name}",
+      "port": {port}
+    }
+  }
+}
 ```
 
-The `binary:` field supports relative paths — they resolve against the `wondertwin.yaml` location.
+The `binary` field supports relative paths — they resolve against the `wondertwin.json` location.
 
 **3. Run the full offline workflow:**
 
@@ -1210,7 +1241,7 @@ Once the twin passes local testing and conformance, publish it to make it instal
 **Release workflow (`.github/workflows/release.yml`):**
 
 The template includes a release workflow that:
-1. Reads `twin.yaml` for metadata
+1. Reads `twin.json` for metadata
 2. Cross-compiles for 5 platforms (darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64)
 3. Generates SHA256 checksums
 4. Creates a GitHub Release with binaries
@@ -1233,7 +1264,7 @@ The recommended workflow emphasizes **offline-first local development**:
  8. Publish to registry when ready          (Phase 12) ← Optional
 ```
 
-For private/internal twins, Phase 12 is entirely optional. The `binary:` field in `wondertwin.yaml` supports any local path, so you can develop and use twins without ever publishing them.
+For private/internal twins, Phase 12 is entirely optional. The `binary:` field in `wondertwin.json` supports any local path, so you can develop and use twins without ever publishing them.
 
 ---
 
@@ -1243,7 +1274,7 @@ Before considering a twin complete, verify:
 
 **Source code and structure:**
 - [ ] Follows exact directory structure: `cmd/`, `internal/api/`, `internal/store/`
-- [ ] `twin.yaml` has correct name, description, category, SDK package/version, and default port
+- [ ] `twin.json` has correct name, description, category, SDK package/version, and default port
 - [ ] `go.mod` uses `require github.com/wondertwin-ai/twinkit` (no `replace` directives)
 - [ ] `MemoryStore` implements `admin.StateStore` (Snapshot, LoadState, Reset)
 - [ ] All routes match the real service's URL patterns exactly
@@ -1412,7 +1443,7 @@ After generating a new twin, add it to this list in the same PR. After removing 
 8. **Skipping `omitempty` on optional JSON fields** — SDK clients may break on unexpected null fields
 9. **Not nil-checking in `LoadState()`** — partial seed data should work
 10. **Using `replace` directives in `go.mod`** — twins depend on published `twinkit` versions, not local paths
-11. **Skipping `twin.yaml`** — required for release automation and registry metadata
+11. **Skipping `twin.json`** — required for release automation and registry metadata
 12. **Not running `wt conformance`** — conformance pass is mandatory for registry listing
 13. **Skipping `twin-manifest.json` or `provenance.json`** — both are required pipeline artifacts; validate against their schemas in `schemas/`
 14. **Using `api_surface` instead of `service_surface`** — the manifest schema uses `service_surface`
