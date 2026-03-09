@@ -1,0 +1,10 @@
+{
+  "name": "stripe",
+  "description": "Simulates the Stripe Connect and Payouts API surface, including accounts, external accounts, transfers, balance, payouts, and events with webhook delivery.",
+  "category": "payments",
+  "sdk": {
+    "package": "github.com/stripe/stripe-go",
+    "version": "v81"
+  },
+  "default_port": 4111
+}

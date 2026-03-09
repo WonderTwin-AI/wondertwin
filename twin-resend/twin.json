@@ -1,0 +1,10 @@
+{
+  "name": "resend",
+  "description": "Simulates the Resend email sending API, including single and batch email dispatch with delivery tracking.",
+  "category": "email",
+  "sdk": {
+    "package": "github.com/resend/resend-go/v2",
+    "version": "v2"
+  },
+  "default_port": 4113
+}

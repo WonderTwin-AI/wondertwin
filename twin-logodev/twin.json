@@ -1,0 +1,10 @@
+{
+  "name": "logodev",
+  "description": "Simulates the Logo.dev logo retrieval API, returning deterministic SVG placeholder logos for any domain.",
+  "category": "design",
+  "sdk": {
+    "package": "logo.dev HTTP API",
+    "version": "v1"
+  },
+  "default_port": 4116
+}
