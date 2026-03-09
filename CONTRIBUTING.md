@@ -154,6 +154,13 @@ The fastest way to build a twin is with the twin generator skill and an AI codin
 
 The skill is designed to produce twins that conform to the standard structure and quality bar from the start.
 
+### Using the Twin Extender and Maintainer Skills
+
+Two additional skills support the twin lifecycle after initial creation:
+
+- **[`skills/twin-extender.md`](skills/twin-extender.md)** — Guides expanding an existing twin's SDK coverage: gap analysis, adding new store types, handlers, admin endpoints, and tests.
+- **[`skills/twin-maintainer.md`](skills/twin-maintainer.md)** — Covers ongoing maintenance tasks: CI twin list updates, dependency upgrades, SDK drift detection, conformance updates, coverage audits, and twin addition/removal.
+
 ### The Manifest and Provenance Files
 
 #### `twin-manifest.json`
