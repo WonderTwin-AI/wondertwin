@@ -2,6 +2,7 @@
   "twin": "loyaltylion",
   "display_name": "LoyaltyLion",
   "category": "loyalty",
+  "tier": "paid",
   "description": "Simulates the LoyaltyLion REST API v2 for customer management, points operations, reward redemption, and activity recording with multi-merchant isolation.",
   "sdk_target": {
     "primary": {

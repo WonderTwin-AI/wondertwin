@@ -2,6 +2,7 @@
   "twin": "smile",
   "display_name": "Smile.io",
   "category": "loyalty",
+  "tier": "paid",
   "description": "Simulates the Smile.io rewards platform API, including customer points balance, tier info, points redemption, and points refund.",
   "sdk_target": {
     "primary": {
