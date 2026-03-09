@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"time"
 
@@ -9,9 +10,8 @@ import (
 
 // MemoryStore holds all logo twin state.
 type MemoryStore struct {
-	Requests *pkgstore.Store[LogoRequest]
-	// CustomLogos maps domain -> SVG content for specific test domains
-	CustomLogos map[string][]byte
+	Requests    *pkgstore.Store[LogoRequest]
+	CustomLogos map[string]CustomLogo
 	Clock       *pkgstore.Clock
 }
 
@@ -19,7 +19,7 @@ type MemoryStore struct {
 func New() *MemoryStore {
 	return &MemoryStore{
 		Requests:    pkgstore.New[LogoRequest]("logo"),
-		CustomLogos: make(map[string][]byte),
+		CustomLogos: make(map[string]CustomLogo),
 		Clock:       pkgstore.NewClock(),
 	}
 }
@@ -36,14 +36,27 @@ func (s *MemoryStore) RecordRequest(domain string, size int, format string, grey
 	})
 }
 
+type logoSnapshot struct {
+	ContentType string `json:"content_type"`
+	Data        string `json:"data"` // base64-encoded
+}
+
 type stateSnapshot struct {
-	Requests    map[string]LogoRequest `json:"requests"`
-	CustomLogos map[string]string      `json:"custom_logos,omitempty"` // domain -> base64 SVG
+	Requests    map[string]LogoRequest    `json:"requests"`
+	CustomLogos map[string]logoSnapshot   `json:"custom_logos,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
+	logos := make(map[string]logoSnapshot, len(s.CustomLogos))
+	for domain, logo := range s.CustomLogos {
+		logos[domain] = logoSnapshot{
+			ContentType: logo.ContentType,
+			Data:        base64.StdEncoding.EncodeToString(logo.Data),
+		}
+	}
 	return stateSnapshot{
-		Requests: s.Requests.Snapshot(),
+		Requests:    s.Requests.Snapshot(),
+		CustomLogos: logos,
 	}
 }
 
@@ -53,11 +66,22 @@ func (s *MemoryStore) LoadState(data []byte) error {
 		return err
 	}
 	s.Requests.LoadSnapshot(snap.Requests)
+	for domain, logo := range snap.CustomLogos {
+		decoded, err := base64.StdEncoding.DecodeString(logo.Data)
+		if err != nil {
+			return err
+		}
+		ct := logo.ContentType
+		if ct == "" {
+			ct = "image/svg+xml"
+		}
+		s.CustomLogos[domain] = CustomLogo{ContentType: ct, Data: decoded}
+	}
 	return nil
 }
 
 func (s *MemoryStore) Reset() {
 	s.Requests.Reset()
-	s.CustomLogos = make(map[string][]byte)
+	s.CustomLogos = make(map[string]CustomLogo)
 	s.Clock.Reset()
 }

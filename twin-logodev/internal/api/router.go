@@ -57,9 +57,10 @@ func (h *Handler) GetLogo(w http.ResponseWriter, r *http.Request) {
 
 	// Check for custom logo
 	if custom, ok := h.store.CustomLogos[domain]; ok {
-		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Content-Type", custom.ContentType)
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 		w.WriteHeader(http.StatusOK)
-		w.Write(custom)
+		w.Write(custom.Data)
 		return
 	}
 
