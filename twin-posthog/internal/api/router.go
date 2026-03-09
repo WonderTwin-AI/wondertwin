@@ -34,12 +34,19 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/e/", h.CaptureEvent)
 		r.Post("/decide/", h.Decide)    // Feature flag evaluation
 		r.Post("/decide", h.Decide)
+		r.Post("/flags", h.Flags)       // Feature flags v2
+		r.Post("/flags/", h.Flags)
+		r.Get("/api/feature_flag/local_evaluation", h.LocalEvaluation)
+		r.Get("/api/feature_flag/local_evaluation/", h.LocalEvaluation)
 	})
 
 	// Admin extras (no auth required)
 	r.Get("/admin/events", h.AdminListEvents)
 	r.Post("/admin/feature-flags", h.AdminSetFeatureFlags)
 	r.Get("/admin/feature-flags", h.AdminGetFeatureFlags)
+	r.Get("/admin/persons", h.AdminListPersons)
+	r.Get("/admin/aliases", h.AdminListAliases)
+	r.Get("/admin/groups", h.AdminListGroups)
 }
 
 // apiKeyFromRequest extracts the PostHog api_key from the request.

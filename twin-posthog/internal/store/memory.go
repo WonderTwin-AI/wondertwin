@@ -9,8 +9,11 @@ import (
 
 // MemoryStore holds all PostHog twin state in memory.
 type MemoryStore struct {
-	Events *pkgstore.Store[CapturedEvent]
-	Clock  *pkgstore.Clock
+	Events  *pkgstore.Store[CapturedEvent]
+	Persons *pkgstore.Store[Person]
+	Aliases *pkgstore.Store[AliasMapping]
+	Groups  *pkgstore.Store[Group]
+	Clock   *pkgstore.Clock
 
 	mu           sync.RWMutex
 	FeatureFlags map[string]FeatureFlag
@@ -20,6 +23,9 @@ type MemoryStore struct {
 func New() *MemoryStore {
 	return &MemoryStore{
 		Events:       pkgstore.New[CapturedEvent]("evt"),
+		Persons:      pkgstore.New[Person]("per"),
+		Aliases:      pkgstore.New[AliasMapping]("als"),
+		Groups:       pkgstore.New[Group]("grp"),
 		Clock:        pkgstore.NewClock(),
 		FeatureFlags: make(map[string]FeatureFlag),
 	}
@@ -56,6 +62,9 @@ func (s *MemoryStore) SetFeatureFlags(flags []FeatureFlag) {
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
 	Events       map[string]CapturedEvent `json:"events"`
+	Persons      map[string]Person        `json:"persons"`
+	Aliases      map[string]AliasMapping  `json:"aliases"`
+	Groups       map[string]Group         `json:"groups"`
 	FeatureFlags map[string]FeatureFlag   `json:"feature_flags"`
 }
 
@@ -63,6 +72,9 @@ type stateSnapshot struct {
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
 		Events:       s.Events.Snapshot(),
+		Persons:      s.Persons.Snapshot(),
+		Aliases:      s.Aliases.Snapshot(),
+		Groups:       s.Groups.Snapshot(),
 		FeatureFlags: s.GetFeatureFlags(),
 	}
 }
@@ -74,6 +86,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 		return err
 	}
 	s.Events.LoadSnapshot(snap.Events)
+	s.Persons.LoadSnapshot(snap.Persons)
+	s.Aliases.LoadSnapshot(snap.Aliases)
+	s.Groups.LoadSnapshot(snap.Groups)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if snap.FeatureFlags != nil {
@@ -85,6 +100,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 // Reset clears all state.
 func (s *MemoryStore) Reset() {
 	s.Events.Reset()
+	s.Persons.Reset()
+	s.Aliases.Reset()
+	s.Groups.Reset()
 	s.Clock.Reset()
 	s.mu.Lock()
 	defer s.mu.Unlock()

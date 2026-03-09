@@ -101,6 +101,186 @@ func TestBatchCapture(t *testing.T) {
 	}
 }
 
+// --- Identify Tests ---
+
+func TestIdentifyViaCapture(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	resp := tc.Post("/capture", map[string]any{
+		"api_key":     "phc_test_key",
+		"event":       "$identify",
+		"distinct_id": "user_123",
+		"properties": map[string]any{
+			"$set": map[string]any{
+				"email": "test@example.com",
+				"name":  "Test User",
+			},
+		},
+	})
+	resp.AssertStatus(200)
+
+	// Verify person was created
+	resp = tc.Get("/admin/persons?distinct_id=user_123")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	persons := m["persons"].([]any)
+	if len(persons) != 1 {
+		t.Fatalf("expected 1 person, got %d", len(persons))
+	}
+	person := persons[0].(map[string]any)
+	if person["distinct_id"] != "user_123" {
+		t.Errorf("expected distinct_id=user_123, got %v", person["distinct_id"])
+	}
+	props := person["properties"].(map[string]any)
+	if props["email"] != "test@example.com" {
+		t.Errorf("expected email=test@example.com, got %v", props["email"])
+	}
+
+	// Verify event was also stored
+	resp = tc.Get("/admin/events?event=$identify")
+	resp.AssertStatus(200)
+	evtM := resp.JSONMap()
+	events := evtM["events"].([]any)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 $identify event, got %d", len(events))
+	}
+}
+
+func TestIdentifyMergesProperties(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	// First identify
+	tc.Post("/capture", map[string]any{
+		"api_key": "phc_test_key", "event": "$identify", "distinct_id": "user_456",
+		"properties": map[string]any{"$set": map[string]any{"email": "a@b.com", "plan": "free"}},
+	}).AssertStatus(200)
+
+	// Second identify with updated property
+	tc.Post("/capture", map[string]any{
+		"api_key": "phc_test_key", "event": "$identify", "distinct_id": "user_456",
+		"properties": map[string]any{"$set": map[string]any{"plan": "pro"}},
+	}).AssertStatus(200)
+
+	resp := tc.Get("/admin/persons?distinct_id=user_456")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	persons := m["persons"].([]any)
+	if len(persons) != 1 {
+		t.Fatalf("expected 1 person, got %d", len(persons))
+	}
+	props := persons[0].(map[string]any)["properties"].(map[string]any)
+	if props["plan"] != "pro" {
+		t.Errorf("expected plan=pro, got %v", props["plan"])
+	}
+	if props["email"] != "a@b.com" {
+		t.Errorf("expected email preserved, got %v", props["email"])
+	}
+}
+
+// --- Alias Tests ---
+
+func TestAliasViaCapture(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	resp := tc.Post("/capture", map[string]any{
+		"api_key":     "phc_test_key",
+		"event":       "$create_alias",
+		"distinct_id": "user_123",
+		"properties": map[string]any{
+			"alias": "anon_456",
+		},
+	})
+	resp.AssertStatus(200)
+
+	// Verify alias was created
+	resp = tc.Get("/admin/aliases")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	aliases := m["aliases"].([]any)
+	if len(aliases) != 1 {
+		t.Fatalf("expected 1 alias, got %d", len(aliases))
+	}
+	alias := aliases[0].(map[string]any)
+	if alias["alias"] != "anon_456" {
+		t.Errorf("expected alias=anon_456, got %v", alias["alias"])
+	}
+	if alias["distinct_id"] != "user_123" {
+		t.Errorf("expected distinct_id=user_123, got %v", alias["distinct_id"])
+	}
+}
+
+// --- Group Identify Tests ---
+
+func TestGroupIdentifyViaCapture(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	resp := tc.Post("/capture", map[string]any{
+		"api_key":     "phc_test_key",
+		"event":       "$groupidentify",
+		"distinct_id": "user_123",
+		"properties": map[string]any{
+			"$group_type": "company",
+			"$group_key":  "acme_inc",
+			"$group_set": map[string]any{
+				"name":     "Acme Inc",
+				"industry": "Technology",
+			},
+		},
+	})
+	resp.AssertStatus(200)
+
+	// Verify group was created
+	resp = tc.Get("/admin/groups?type=company")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	groups := m["groups"].([]any)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(groups))
+	}
+	group := groups[0].(map[string]any)
+	if group["type"] != "company" {
+		t.Errorf("expected type=company, got %v", group["type"])
+	}
+	if group["key"] != "acme_inc" {
+		t.Errorf("expected key=acme_inc, got %v", group["key"])
+	}
+	props := group["properties"].(map[string]any)
+	if props["name"] != "Acme Inc" {
+		t.Errorf("expected name=Acme Inc, got %v", props["name"])
+	}
+}
+
+// --- Exception Tests ---
+
+func TestExceptionViaCapture(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	resp := tc.Post("/capture", map[string]any{
+		"api_key":     "phc_test_key",
+		"event":       "$exception",
+		"distinct_id": "user_123",
+		"properties": map[string]any{
+			"$exception_message": "null pointer dereference",
+			"$exception_type":    "NilPointerError",
+		},
+	})
+	resp.AssertStatus(200)
+
+	// Verify exception event was stored
+	resp = tc.Get("/admin/events?event=$exception")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	events := m["events"].([]any)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 exception event, got %d", len(events))
+	}
+	evt := events[0].(map[string]any)
+	props := evt["properties"].(map[string]any)
+	if props["$exception_message"] != "null pointer dereference" {
+		t.Errorf("expected exception message, got %v", props["$exception_message"])
+	}
+}
+
 // --- Decide Tests ---
 
 func TestDecideNoFlags(t *testing.T) {
@@ -148,6 +328,109 @@ func TestDecideWithFlags(t *testing.T) {
 	if flags["variant-test"] != "control" {
 		t.Errorf("expected variant-test=control, got %v", flags["variant-test"])
 	}
+}
+
+func TestDecideWithPayloads(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	tc.Post("/admin/feature-flags", []map[string]any{
+		{"key": "banner", "enabled": true, "payload": `{"text":"Welcome!"}`},
+		{"key": "no-payload", "enabled": true},
+	}).AssertStatus(200)
+
+	resp := tc.Post("/decide", map[string]any{
+		"api_key":     "phc_test_key",
+		"distinct_id": "user_123",
+	})
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+
+	payloads := m["featureFlagPayloads"].(map[string]any)
+	if payloads["banner"] != `{"text":"Welcome!"}` {
+		t.Errorf("expected banner payload, got %v", payloads["banner"])
+	}
+	if payloads["no-payload"] != nil {
+		t.Errorf("expected nil payload for no-payload flag, got %v", payloads["no-payload"])
+	}
+
+	// Verify additional response fields
+	if m["requestId"] == nil {
+		t.Error("expected requestId in response")
+	}
+	if m["errorsWhileComputingFlags"] != false {
+		t.Errorf("expected errorsWhileComputingFlags=false, got %v", m["errorsWhileComputingFlags"])
+	}
+}
+
+// --- Flags v2 Tests ---
+
+func TestFlagsEndpoint(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	tc.Post("/admin/feature-flags", []map[string]any{
+		{"key": "beta-feature", "enabled": true, "payload": `{"color":"blue"}`},
+		{"key": "disabled-flag", "enabled": false},
+	}).AssertStatus(200)
+
+	resp := tc.Post("/flags", map[string]any{
+		"token":       "phc_test_key",
+		"distinct_id": "user_123",
+	})
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+
+	flags := m["featureFlags"].(map[string]any)
+	if flags["beta-feature"] != true {
+		t.Errorf("expected beta-feature=true, got %v", flags["beta-feature"])
+	}
+	if flags["disabled-flag"] != false {
+		t.Errorf("expected disabled-flag=false, got %v", flags["disabled-flag"])
+	}
+
+	payloads := m["featureFlagPayloads"].(map[string]any)
+	if payloads["beta-feature"] != `{"color":"blue"}` {
+		t.Errorf("expected payload for beta-feature, got %v", payloads["beta-feature"])
+	}
+}
+
+// --- Local Evaluation Tests ---
+
+func TestLocalEvaluation(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	tc.Post("/admin/feature-flags", []map[string]any{
+		{"key": "local-flag", "enabled": true},
+		{"key": "variant-flag", "enabled": true, "variant": "test"},
+	}).AssertStatus(200)
+
+	resp := tc.DoWithHeaders("GET", "/api/feature_flag/local_evaluation", nil, map[string]string{
+		"Authorization": "Bearer phx_personal_api_key",
+	})
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+
+	flagDefs := m["flags"].([]any)
+	if len(flagDefs) != 2 {
+		t.Fatalf("expected 2 flag definitions, got %d", len(flagDefs))
+	}
+
+	// Check that flags have expected structure
+	for _, f := range flagDefs {
+		def := f.(map[string]any)
+		if def["key"] == nil {
+			t.Error("expected key field in flag definition")
+		}
+		if def["filters"] == nil {
+			t.Error("expected filters field in flag definition")
+		}
+	}
+}
+
+func TestLocalEvaluationNoAuth(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	resp := tc.Get("/api/feature_flag/local_evaluation")
+	resp.AssertStatus(401)
 }
 
 // --- Admin Tests ---
@@ -213,4 +496,40 @@ func TestAdminReset(t *testing.T) {
 func TestAdminHealth(t *testing.T) {
 	_, tc := setupPostHog(t)
 	tc.Get("/admin/health").AssertStatus(200)
+}
+
+func TestAdminListPersons(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	// Create a person via identify
+	tc.Post("/capture", map[string]any{
+		"api_key": "phc_test_key", "event": "$identify", "distinct_id": "person_1",
+		"properties": map[string]any{"$set": map[string]any{"name": "Alice"}},
+	}).AssertStatus(200)
+
+	resp := tc.Get("/admin/persons")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	if m["total"] != float64(1) {
+		t.Errorf("expected total=1, got %v", m["total"])
+	}
+}
+
+func TestAdminListGroups(t *testing.T) {
+	_, tc := setupPostHog(t)
+
+	tc.Post("/capture", map[string]any{
+		"api_key": "phc_test_key", "event": "$groupidentify", "distinct_id": "u1",
+		"properties": map[string]any{
+			"$group_type": "org", "$group_key": "org_1",
+			"$group_set": map[string]any{"name": "Org One"},
+		},
+	}).AssertStatus(200)
+
+	resp := tc.Get("/admin/groups?type=org")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	if m["total"] != float64(1) {
+		t.Errorf("expected total=1, got %v", m["total"])
+	}
 }

@@ -2,7 +2,7 @@
   "twin": "posthog",
   "display_name": "PostHog",
   "category": "analytics",
-  "description": "Simulates the PostHog event capture and feature flag evaluation API surfaces, including single capture, batch capture, and the /decide endpoint.",
+  "description": "Simulates the PostHog event capture, feature flag evaluation, identify, alias, group identify, exception tracking, and local evaluation API surfaces for the PostHog Go SDK.",
   "sdk_target": {
     "primary": {
       "package": "github.com/posthog/posthog-go",
@@ -21,24 +21,28 @@
     },
     "auth_pattern": "api_key",
     "has_webhooks": false,
-    "resource_count": 2
+    "resource_count": 8
   },
   "coverage": {
     "resources_implemented": [
       "capture",
-      "decide"
+      "decide",
+      "identify",
+      "alias",
+      "group_identify",
+      "flags",
+      "local_evaluation",
+      "exceptions"
     ],
     "resources_not_implemented": [
-      "persons",
-      "groups",
-      "cohorts",
       "insights",
       "dashboards",
       "annotations",
       "experiments",
-      "surveys"
+      "surveys",
+      "cohorts"
     ],
-    "estimated_coverage_pct": 5
+    "estimated_coverage_pct": 85
   },
   "generation": {
     "method": "manual",
