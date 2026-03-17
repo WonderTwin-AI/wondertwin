@@ -154,6 +154,12 @@ The fastest way to build a twin is with the twin generator skill and an AI codin
 
 The skill is designed to produce twins that conform to the standard structure and quality bar from the start.
 
+### Using the Twin Researcher Skill
+
+Before building a twin, use the researcher skill to investigate the target platform and produce archived, provenanced research artifacts:
+
+- **[`skills/twin-researcher.md`](skills/twin-researcher.md)** — Investigates a target platform's API surfaces, data model, auth, events, SDK landscape, and release lifecycle. Produces a source archive, system model, feasibility assessment, and architecture spec that feed into the generator. Pins the twin to specific API and SDK versions with full provenance.
+
 ### Using the Twin Extender and Maintainer Skills
 
 Two additional skills support the twin lifecycle after initial creation:
