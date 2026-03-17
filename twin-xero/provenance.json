@@ -1,0 +1,47 @@
+{
+  "twin": "twin-xero",
+  "version": "0.1.0",
+  "api_version": "2.0",
+  "platform": "Xero",
+  "platform_url": "https://developer.xero.com/documentation/api/accounting/overview",
+  "category": "accounting",
+  "sources": [
+    {
+      "type": "api_documentation",
+      "url": "https://developer.xero.com/documentation/api/accounting/overview",
+      "accessed": "2026-03-17"
+    }
+  ],
+  "fintech_primitives": ["ledger_accounting"],
+  "twinkit_packages": [
+    "twinkit/store/journal",
+    "twinkit/ledger/accounting"
+  ],
+  "scope": {
+    "implemented": [
+      "Contacts (create, list, get)",
+      "Accounts (create, list, get)",
+      "Invoices (create, update, state transitions, list, get)",
+      "Credit Notes (create, update, state transitions, list, get)",
+      "Payments (create, list, get)",
+      "Bank Transactions (create, list, get)",
+      "Manual Journals (create, list, get)",
+      "Items (create, list, get)",
+      "Reports: Trial Balance, Profit & Loss, Balance Sheet",
+      "Double-entry journal with balanced entries",
+      "Document state machine (DRAFT→SUBMITTED→AUTHORISED→PAID/VOIDED/DELETED)",
+      "Period locking",
+      "Webhook events (HMAC-SHA256 signed)"
+    ],
+    "not_implemented": [
+      "Multi-tenant isolation",
+      "If-Modified-Since filtering",
+      "Batch operations",
+      "Tracking Categories, Tax Rates, Currencies",
+      "Repeating Invoices, Prepayments, Overpayments",
+      "Purchase Orders",
+      "OAuth 2.0 token exchange",
+      "Attachments API"
+    ]
+  }
+}

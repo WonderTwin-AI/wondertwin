@@ -9,5 +9,6 @@ use (
 	./twin-smile
 	./twin-stripe
 	./twin-twilio
+	./twin-xero
 	./twinkit
 )
