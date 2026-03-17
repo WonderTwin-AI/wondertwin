@@ -160,6 +160,12 @@ Before building a twin, use the researcher skill to investigate the target platf
 
 - **[`skills/twin-researcher.md`](skills/twin-researcher.md)** — Investigates a target platform's API surfaces, data model, auth, events, SDK landscape, and release lifecycle. Produces a source archive, system model, feasibility assessment, and architecture spec that feed into the generator. Pins the twin to specific API and SDK versions with full provenance.
 
+### Using the Fintech Twin Planner Skill
+
+For fintech twins specifically, use the planner skill after research is complete to produce a full twin specification:
+
+- **[`skills/fintech-twin-planner.md`](skills/fintech-twin-planner.md)** — Takes research artifacts as input and produces a `twin-{platform}-spec.md` that fully defines what the coding agent will build: primitive classification, `twinkit/` import plan, hook specifications, state model, API surface, webhook event catalog, seed data schema, conformance test plan, and build sequencing.
+
 ### Using the Twin Extender and Maintainer Skills
 
 Two additional skills support the twin lifecycle after initial creation:
