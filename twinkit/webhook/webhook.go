@@ -20,6 +20,19 @@ type Signer interface {
 	Sign(payload []byte, secret string) map[string]string
 }
 
+// Endpoint describes a registered webhook endpoint.
+type Endpoint struct {
+	URL           string
+	Secret        string
+	EnabledEvents []string // event types to deliver; ["*"] means all
+	Enabled       bool
+}
+
+// EndpointProvider supplies the active webhook endpoints for multi-endpoint delivery.
+type EndpointProvider interface {
+	ActiveEndpoints() []Endpoint
+}
+
 // Event represents a webhook event to be dispatched.
 type Event struct {
 	ID        string         `json:"id"`
@@ -40,19 +53,20 @@ type Delivery struct {
 
 // Dispatcher manages outbound webhook delivery.
 type Dispatcher struct {
-	mu          sync.RWMutex
-	url         string
-	secret      string
-	signer      Signer
-	logger      *slog.Logger
-	queue       []Event
-	deliveries  []Delivery
-	maxRetries  int
-	retryDelay  time.Duration
-	client      *http.Client
-	eventPrefix string
-	counter     int
-	autoDeliver bool
+	mu               sync.RWMutex
+	url              string
+	secret           string
+	signer           Signer
+	logger           *slog.Logger
+	queue            []Event
+	deliveries       []Delivery
+	maxRetries       int
+	retryDelay       time.Duration
+	client           *http.Client
+	eventPrefix      string
+	counter          int
+	autoDeliver      bool
+	endpointProvider EndpointProvider
 }
 
 // Config configures the webhook dispatcher.
@@ -111,6 +125,15 @@ func (d *Dispatcher) SetSecret(secret string) {
 	d.secret = secret
 }
 
+// SetEndpointProvider sets a provider for multi-endpoint delivery.
+// When set, events are delivered to each active endpoint whose enabled_events
+// matches the event type. Falls back to the single URL if no provider is set.
+func (d *Dispatcher) SetEndpointProvider(ep EndpointProvider) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.endpointProvider = ep
+}
+
 // Enqueue adds an event to the dispatch queue. If AutoDeliver is true,
 // it will be delivered asynchronously.
 func (d *Dispatcher) Enqueue(eventType string, payload map[string]any) Event {
@@ -161,16 +184,52 @@ func (d *Dispatcher) FlushWebhooks() error {
 
 func (d *Dispatcher) deliverEvent(evt Event) error {
 	d.mu.RLock()
-	url := d.url
-	secret := d.secret
+	provider := d.endpointProvider
+	fallbackURL := d.url
+	fallbackSecret := d.secret
 	signer := d.signer
 	d.mu.RUnlock()
 
-	if url == "" {
+	// If an endpoint provider is set, deliver to all matching endpoints.
+	if provider != nil {
+		endpoints := provider.ActiveEndpoints()
+		if len(endpoints) > 0 {
+			var lastErr error
+			for _, ep := range endpoints {
+				if !endpointMatchesEvent(ep.EnabledEvents, evt.Type) {
+					continue
+				}
+				if err := d.deliverToURL(evt, ep.URL, ep.Secret, signer); err != nil {
+					lastErr = err
+				}
+			}
+			return lastErr
+		}
+	}
+
+	// Fallback to single configured URL.
+	if fallbackURL == "" {
 		d.logger.Debug("no webhook URL configured, skipping delivery", "event_id", evt.ID)
 		return nil
 	}
+	return d.deliverToURL(evt, fallbackURL, fallbackSecret, signer)
+}
 
+// endpointMatchesEvent checks whether an endpoint's enabled_events filter
+// includes the given event type. ["*"] matches all events.
+func endpointMatchesEvent(enabledEvents []string, eventType string) bool {
+	if len(enabledEvents) == 0 {
+		return true // no filter = all events
+	}
+	for _, e := range enabledEvents {
+		if e == "*" || e == eventType {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *Dispatcher) deliverToURL(evt Event, url, secret string, signer Signer) error {
 	payload, err := json.Marshal(evt)
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
