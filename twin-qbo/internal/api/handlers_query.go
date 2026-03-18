@@ -23,71 +23,71 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 
 	switch entity {
 	case "customer":
-		items := h.store.Customers.List()
-		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		items := FilterItems(h.store.Customers.List(), pq)
 		if pq.IsCount {
 			qboJSON(w, http.StatusOK, queryResponse("Customer", nil, 0, 0, len(items)))
 		} else {
+			page := Paginate(items, pq.StartPosition, pq.MaxResults)
 			qboJSON(w, http.StatusOK, queryResponse("Customer", page, pq.StartPosition, len(page), len(items)))
 		}
 	case "vendor":
-		items := h.store.Vendors.List()
+		items := FilterItems(h.store.Vendors.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Vendor", page, pq.StartPosition, len(page), len(items)))
 	case "account":
-		items := h.store.Accounts.List()
+		items := FilterItems(h.store.Accounts.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Account", page, pq.StartPosition, len(page), len(items)))
 	case "item":
-		items := h.store.Items.List()
+		items := FilterItems(h.store.Items.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Item", page, pq.StartPosition, len(page), len(items)))
 	case "invoice":
-		items := h.store.Invoices.List()
+		items := FilterItems(h.store.Invoices.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Invoice", page, pq.StartPosition, len(page), len(items)))
 	case "bill":
-		items := h.store.Bills.List()
+		items := FilterItems(h.store.Bills.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Bill", page, pq.StartPosition, len(page), len(items)))
 	case "payment":
-		items := h.store.Payments.List()
+		items := FilterItems(h.store.Payments.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Payment", page, pq.StartPosition, len(page), len(items)))
 	case "billpayment":
-		items := h.store.BillPayments.List()
+		items := FilterItems(h.store.BillPayments.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("BillPayment", page, pq.StartPosition, len(page), len(items)))
 	case "creditmemo":
-		items := h.store.CreditMemos.List()
+		items := FilterItems(h.store.CreditMemos.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("CreditMemo", page, pq.StartPosition, len(page), len(items)))
 	case "vendorcredit":
-		items := h.store.VendorCredits.List()
+		items := FilterItems(h.store.VendorCredits.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("VendorCredit", page, pq.StartPosition, len(page), len(items)))
 	case "salesreceipt":
-		items := h.store.SalesReceipts.List()
+		items := FilterItems(h.store.SalesReceipts.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("SalesReceipt", page, pq.StartPosition, len(page), len(items)))
 	case "deposit":
-		items := h.store.Deposits.List()
+		items := FilterItems(h.store.Deposits.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Deposit", page, pq.StartPosition, len(page), len(items)))
 	case "transfer":
-		items := h.store.Transfers.List()
+		items := FilterItems(h.store.Transfers.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Transfer", page, pq.StartPosition, len(page), len(items)))
 	case "journalentry":
-		items := h.store.JournalEntries.List()
+		items := FilterItems(h.store.JournalEntries.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("JournalEntry", page, pq.StartPosition, len(page), len(items)))
 	case "estimate":
-		items := h.store.Estimates.List()
+		items := FilterItems(h.store.Estimates.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Estimate", page, pq.StartPosition, len(page), len(items)))
 	case "purchase":
-		items := h.store.Purchases.List()
+		items := FilterItems(h.store.Purchases.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Purchase", page, pq.StartPosition, len(page), len(items)))
 	default:
