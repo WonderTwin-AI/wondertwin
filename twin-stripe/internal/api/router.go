@@ -76,6 +76,26 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/refunds/{id}", h.GetRefund)
 		r.Get("/refunds", h.ListRefunds)
 
+		// Subscriptions
+		r.Post("/subscriptions", h.CreateSubscription)
+		r.Get("/subscriptions/{id}", h.GetSubscription)
+		r.Post("/subscriptions/{id}", h.UpdateSubscription)
+		r.Delete("/subscriptions/{id}", h.CancelSubscription)
+		r.Get("/subscriptions", h.ListSubscriptions)
+
+		// Invoices
+		r.Post("/invoices", h.CreateInvoice)
+		r.Get("/invoices/{id}", h.GetInvoice)
+		r.Post("/invoices/{id}/finalize", h.FinalizeInvoice)
+		r.Post("/invoices/{id}/pay", h.PayInvoice)
+		r.Post("/invoices/{id}/void", h.VoidInvoice)
+		r.Get("/invoices", h.ListInvoices)
+
+		// Invoice Items
+		r.Post("/invoiceitems", h.CreateInvoiceItem)
+		r.Get("/invoiceitems/{id}", h.GetInvoiceItem)
+		r.Delete("/invoiceitems/{id}", h.DeleteInvoiceItem)
+
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)
 		r.Get("/accounts/{id}", h.GetAccount)

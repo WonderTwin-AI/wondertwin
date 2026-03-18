@@ -5,11 +5,14 @@
   "description": "Simulates the Xero Accounting API — chart of accounts, invoices, bills, credit notes, payments, manual journals, and financial reports.",
   "sdk_target": {
     "primary": {
-      "package": "github.com/xero-api/xero-go",
+      "package": "github.com/XeroAPI/xerogolang",
       "language": "go",
-      "version": "v2.0.0",
-      "repo_url": "https://github.com/XeroAPI/xero-go"
-    }
+      "version": "v2.0",
+      "api_version": "2.0",
+      "repo_url": "https://github.com/XeroAPI/xerogolang",
+      "docs_url": "https://developer.xero.com/documentation/api/accounting/overview"
+    },
+    "additional": []
   },
   "service_surface": {
     "openapi_spec": {
@@ -19,27 +22,36 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 12
+    "resource_count": 8
   },
   "coverage": {
     "resources_implemented": [
-      "Contacts", "Accounts", "Invoices", "CreditNotes",
-      "Payments", "BankTransactions", "ManualJournals", "Items",
-      "TrialBalance", "ProfitAndLoss", "BalanceSheet"
+      "contacts",
+      "accounts",
+      "invoices",
+      "creditnotes",
+      "payments",
+      "banktransactions",
+      "manualjournals",
+      "items"
     ],
     "resources_not_implemented": [
-      "TrackingCategories", "TaxRates", "Currencies",
-      "RepeatingInvoices", "Prepayments", "Overpayments",
-      "PurchaseOrders", "Attachments"
+      "trackingcategories",
+      "taxrates",
+      "currencies",
+      "repeatinginvoices",
+      "prepayments",
+      "overpayments",
+      "purchaseorders",
+      "attachments"
     ],
-    "estimated_coverage_pct": 60
+    "estimated_coverage_pct": 40
   },
   "generation": {
     "method": "wondertwin_skill",
-    "skill_version": "2.1",
     "sources_used": {
       "deepwiki": false,
-      "openapi": true,
+      "openapi": false,
       "manual_docs": true
     }
   }

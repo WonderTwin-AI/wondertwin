@@ -1,72 +1,19 @@
 {
-  "twin": "twin-qbo",
-  "version": "0.1.0",
-  "api_version": "v3, minorversion=75",
-  "platform": "QuickBooks Online",
-  "platform_url": "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities",
-  "category": "accounting",
-  "research_archive": "wondertwin-docs/research/quickbooks-online",
-  "research_completed": "2026-03-17T00:00:00Z",
-  "generated_at": "2026-03-17T00:00:00Z",
+  "twin": "qbo",
   "sdk_target": {
     "package": "github.com/rwestlund/quickbooks-go",
     "language": "go",
-    "version": "v0.0.0"
+    "version": "v0.5"
   },
-  "sources": [
-    {
-      "type": "api_documentation",
-      "url": "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities",
-      "accessed": "2026-03-17"
+  "build": 1,
+  "generated_at": "2026-03-17T00:00:00Z",
+  "sources": {
+    "openapi": {
+      "origin": "none"
     },
-    {
-      "type": "secondary_guide",
-      "url": "https://www.apideck.com/blog/exploring-the-quickbooks-online-accounting-api",
-      "accessed": "2026-03-17"
-    },
-    {
-      "type": "community_sdk",
-      "url": "https://github.com/rwestlund/quickbooks-go",
-      "accessed": "2026-03-17"
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/rwestlund/quickbooks-go"
     }
-  ],
-  "fintech_primitives": ["ledger_accounting"],
-  "twinkit_packages": [
-    "twinkit/store/journal",
-    "twinkit/ledger/accounting"
-  ],
-  "scope": {
-    "implemented": [
-      "Customers (create, update, get, query)",
-      "Vendors (create, update, get, query)",
-      "Accounts (create, update, get, query) with Classification derivation",
-      "Items (create, update, get, query)",
-      "Invoices (create, update, get, query, void, delete) with Balance-derived status",
-      "Bills (create, update, get, query, delete) with Balance-derived status",
-      "Payments (create, update, get, query, void) with LinkedTxn invoice application",
-      "BillPayments (create, update, get, query) with LinkedTxn bill application",
-      "CreditMemos, VendorCredits, SalesReceipts, Deposits, Transfers",
-      "JournalEntries, Estimates, Purchases",
-      "CompanyInfo (get)",
-      "SQL-like query endpoint (SELECT * FROM, WHERE, ORDERBY, STARTPOSITION, MAXRESULTS)",
-      "Reports: Trial Balance, Profit & Loss, Balance Sheet",
-      "SyncToken optimistic locking on all entities",
-      "POST for create+update (Id field distinguishes)",
-      "QBO Fault error envelope",
-      "HMAC-SHA256 webhook signing (intuit-signature header)"
-    ],
-    "not_implemented": [
-      "WHERE clause filtering in queries (parsed but not applied to results)",
-      "Batch endpoint (/v3/company/{realmId}/batch)",
-      "ChangeDataCapture (CDC) endpoint",
-      "OAuth 2.0 token exchange endpoints",
-      "Minor version behavioral differences",
-      "Tax codes and tax calculation",
-      "Multi-currency support",
-      "Attachments API",
-      "TimeActivity, Budget entities",
-      "PDF generation, Email sending",
-      "CloudEvents webhook format"
-    ]
   }
 }

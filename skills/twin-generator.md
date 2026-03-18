@@ -128,6 +128,7 @@ Create the initial `provenance.json` (validated against `schemas/provenance.sche
       "repo": "https://github.com/{org}/{sdk-repo}",
       "repo_ref": "{tag or commit}",
       "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{hash of analyzed content}",
       "fallback_used": false
     }
   }
@@ -152,7 +153,9 @@ Populate the manifest shell (validated against `schemas/twin-manifest.schema.jso
       "package": "{sdk_import_path}",
       "language": "go",
       "version": "{sdk_version}",
-      "repo_url": "https://github.com/{org}/{sdk-repo}"
+      "repo_url": "https://github.com/{org}/{sdk-repo}",
+      "docs_url": "https://pkg.go.dev/{sdk_import_path}",
+      "api_version": "{pinned API version or null}"
     }
   },
   "service_surface": {

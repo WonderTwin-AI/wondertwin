@@ -7,35 +7,55 @@
     "primary": {
       "package": "github.com/rwestlund/quickbooks-go",
       "language": "go",
-      "version": "v0.0.0",
-      "repo_url": "https://github.com/rwestlund/quickbooks-go"
-    }
+      "version": "v0.5",
+      "api_version": "v3, minorversion=75",
+      "repo_url": "https://github.com/rwestlund/quickbooks-go",
+      "docs_url": "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities"
+    },
+    "additional": []
   },
   "service_surface": {
     "openapi_spec": {
-      "available": false
+      "available": false,
+      "origin": "none"
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 18
+    "resource_count": 17
   },
   "coverage": {
     "resources_implemented": [
-      "Customer", "Vendor", "Account", "Item",
-      "Invoice", "Bill", "Payment", "BillPayment",
-      "CreditMemo", "VendorCredit", "SalesReceipt", "Deposit",
-      "Transfer", "JournalEntry", "Estimate", "Purchase",
-      "CompanyInfo", "Query"
+      "customer",
+      "vendor",
+      "account",
+      "item",
+      "invoice",
+      "bill",
+      "payment",
+      "billpayment",
+      "creditmemo",
+      "vendorcredit",
+      "salesreceipt",
+      "deposit",
+      "transfer",
+      "journalentry",
+      "estimate",
+      "purchase",
+      "companyinfo"
     ],
     "resources_not_implemented": [
-      "Batch", "ChangeDataCapture", "Attachments",
-      "TaxCode", "TimeActivity", "Budget"
+      "batch",
+      "changedatacapture",
+      "taxcode",
+      "currency",
+      "attachments",
+      "timeactivity",
+      "budget"
     ],
-    "estimated_coverage_pct": 75
+    "estimated_coverage_pct": 60
   },
   "generation": {
     "method": "wondertwin_skill",
-    "skill_version": "2.1",
     "sources_used": {
       "deepwiki": false,
       "openapi": false,

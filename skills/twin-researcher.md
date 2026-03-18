@@ -1,10 +1,3 @@
----
-skill: twin-researcher
-skill_version: "1.0"
-schemas:
-  provenance.schema.json: "1.1"
----
-
 # SKILL: WonderTwin Twin Researcher
 
 ## Purpose
@@ -29,6 +22,19 @@ This skill produces two categories of output:
 1. A target platform name and general category (accounting, payments, CRM, etc.)
 2. Access to public internet for documentation, SDK repos, and community sources
 3. The `wondertwin-docs/` repo for storing research archives
+
+## Agent Permissions
+
+When this skill runs as a subagent, it needs write access to `wondertwin-docs/research/` which is **outside** the main `wondertwin/` working directory. To avoid permission denials:
+
+- The **parent conversation** should pre-create the research directory structure before launching the agent:
+  ```bash
+  platform="{platform}"
+  base="/Users/tela/dev/wondertwin-docs/research/${platform}"
+  mkdir -p "${base}/archive/"{official-docs,schemas,sdks,release-notes,community,observations}
+  ```
+- Alternatively, the parent should write all artifact files itself after the agent completes research, since the parent conversation has broader file permissions than subagents.
+- Subagents spawned from the `wondertwin/` directory cannot write to `wondertwin-docs/` due to sandbox scoping. This is a known limitation.
 
 ## Inputs
 
@@ -450,41 +456,42 @@ Append the completion entry:
 
 **2. Generate the twin's `provenance.json` template:**
 
-This is the file that ships with the twin (in `twin-{name}/provenance.json`). It extends the existing provenance format with research lineage:
+This is the file that ships with the twin (in `twin-{name}/provenance.json`). It **must** conform to `schemas/provenance.schema.json`. The twin-generator skill will fill in build-time details, but the researcher seeds the initial values:
 
-<!-- schema: provenance.schema.json -->
 ```json
 {
-  "twin": "twin-{name}",
-  "version": "0.1.0",
-  "api_version": "{pinned API version}",
-  "platform": "{Platform}",
-  "platform_url": "{developer docs URL}",
-  "category": "{category}",
-  "research_archive": "wondertwin-docs/research/{platform}",
-  "research_completed": "{ISO 8601}",
-  "generated_at": "{ISO 8601 timestamp}",
-  "sources": [
-    {
-      "type": "{source_type}",
-      "url": "{url}",
-      "accessed": "{date}",
-      "archived_at": "{archive_path}"
-    }
-  ],
-  "fintech_primitives": [],
-  "twinkit_packages": [],
+  "twin": "{name}",
   "sdk_target": {
     "package": "{sdk_import_path}",
-    "version": "{pinned version}",
-    "language": "go"
+    "language": "go",
+    "version": "{pinned SDK version}"
   },
-  "scope": {
-    "implemented": [],
-    "not_implemented": []
+  "build": 1,
+  "generated_at": "{ISO 8601 timestamp}",
+  "skill_version": "2.0",
+  "sources": {
+    "openapi": {
+      "origin": "vendor_published",
+      "url": "{OpenAPI spec URL, if available}",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{SHA-256 hash of spec content}",
+      "api_version": "{pinned API version}"
+    },
+    "sdk_analysis": {
+      "method": "deepwiki",
+      "repo": "https://github.com/{org}/{sdk-repo}",
+      "repo_ref": "{tag or commit}",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{SHA-256 hash of analyzed content}",
+      "fallback_used": false
+    }
   }
 }
 ```
+
+If no OpenAPI spec is available, omit the `openapi` field or set `origin` to `"none"`. If no SDK exists, set `sdk_analysis.method` to `"none"`.
+
+**Note:** Research-specific metadata (platform URL, research archive path, category, fintech primitives, scope lists) belongs in the research artifacts (`system-model.md`, `feasibility.md`, `source-catalog.json`) — NOT in `provenance.json`. The provenance file tracks only how the twin was *generated*, not how it was *researched*.
 
 ---
 
