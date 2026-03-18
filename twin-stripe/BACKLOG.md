@@ -24,10 +24,10 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 - [x] Credit for unused time on old price, charge for remaining time on new price
 - [x] `proration_behavior=none` skips proration invoice
 
-### 5. Invoice lifecycle deepening
-- [ ] `POST /v1/invoices/{id}/send` for send_invoice mode
-- [ ] Paying an invoice creates a PaymentIntent + Charge (currently just flips status)
-- [ ] Finalizing an invoice sets `hosted_invoice_url`
+### 5. ~~Invoice lifecycle deepening~~ (done)
+- [x] `POST /v1/invoices/{id}/send` for send_invoice mode (auto-finalizes draft)
+- [x] Paying an invoice creates a PaymentIntent + Charge, credits balance
+- [x] Finalizing an invoice sets `hosted_invoice_url`
 
 ### 6. Payout cancellation
 - [ ] `POST /v1/payouts/{id}/cancel` for payouts in pending status

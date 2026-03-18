@@ -93,6 +93,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/invoices/{id}", h.UpdateInvoice)
 		r.Post("/invoices/{id}/finalize", h.FinalizeInvoice)
 		r.Post("/invoices/{id}/pay", h.PayInvoice)
+		r.Post("/invoices/{id}/send", h.SendInvoice)
 		r.Post("/invoices/{id}/void", h.VoidInvoice)
 		r.Get("/invoices", h.ListInvoices)
 

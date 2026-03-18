@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -187,8 +188,33 @@ func (h *Handler) FinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inv.Status = "open"
+	inv.HostedInvoiceURL = fmt.Sprintf("https://invoice.stripe.com/i/%s", id)
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.finalized", mapFromJSON(inv))
+	twincore.JSON(w, http.StatusOK, inv)
+}
+
+// SendInvoice handles POST /v1/invoices/{id}/send.
+// Finalizes the invoice if still draft, then marks it as sent.
+func (h *Handler) SendInvoice(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	inv, ok := h.store.Invoices.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		return
+	}
+	if inv.Status != "open" && inv.Status != "draft" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_sendable",
+			"Invoice status is "+inv.Status+", which is not sendable.")
+		return
+	}
+	if inv.Status == "draft" {
+		inv.Status = "open"
+		inv.HostedInvoiceURL = fmt.Sprintf("https://invoice.stripe.com/i/%s", id)
+		h.emitEvent("invoice.finalized", mapFromJSON(inv))
+	}
+	h.store.Invoices.Set(id, inv)
+	h.emitEvent("invoice.sent", mapFromJSON(inv))
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -202,6 +228,33 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	if inv.Status != "open" {
 		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_open", "Invoice is not open.")
 		return
+	}
+
+	// Create a PaymentIntent + Charge for the invoice amount.
+	if inv.Total > 0 {
+		piID := h.store.PaymentIntents.NextID()
+		pi := store.PaymentIntent{
+			ID:             piID,
+			Object:         "payment_intent",
+			Amount:         inv.Total,
+			AmountReceived: inv.Total,
+			Currency:       inv.Currency,
+			Customer:       inv.Customer,
+			Description:    "Invoice " + inv.Number,
+			Status:         "succeeded",
+			CaptureMethod:  "automatic",
+			ClientSecret:   piID + "_secret_" + randomHex(12),
+			Livemode:       false,
+			Created:        store.Now(),
+		}
+		chargeID := h.createChargeForPI(&pi)
+		pi.LatestCharge = chargeID
+		h.store.PaymentIntents.Set(piID, pi)
+		h.store.CreditBalance("", inv.Currency, inv.Total)
+		h.store.RecordBalanceTransaction("charge", chargeID, inv.Currency, inv.Total, 0)
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
+
+		inv.PaymentIntent = piID
 	}
 
 	inv.Status = "paid"
