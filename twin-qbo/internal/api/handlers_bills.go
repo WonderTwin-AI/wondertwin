@@ -92,9 +92,13 @@ func (h *Handler) GetBill(w http.ResponseWriter, r *http.Request) {
 }
 
 func computeBillTotals(bill *store.Bill) {
-	var total float64
+	var subTotal float64
 	for _, line := range bill.Line {
-		total += line.Amount
+		subTotal += line.Amount
 	}
-	bill.TotalAmt = total
+	tax := 0.0
+	if bill.TxnTaxDetail != nil {
+		tax = bill.TxnTaxDetail.TotalTax
+	}
+	bill.TotalAmt = subTotal + tax
 }
