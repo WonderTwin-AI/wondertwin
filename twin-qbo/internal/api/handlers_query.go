@@ -118,6 +118,18 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 		items := FilterItems(h.store.TaxRates.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("TaxRate", page, pq.StartPosition, len(page), len(items)))
+	case "refundreceipt":
+		items := FilterItems(h.store.RefundReceipts.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("RefundReceipt", page, pq.StartPosition, len(page), len(items)))
+	case "purchaseorder":
+		items := FilterItems(h.store.PurchaseOrders.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("PurchaseOrder", page, pq.StartPosition, len(page), len(items)))
+	case "timeactivity":
+		items := FilterItems(h.store.TimeActivities.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("TimeActivity", page, pq.StartPosition, len(page), len(items)))
 	default:
 		validationFault(w, "500", "Invalid entity", "Entity '"+pq.Entity+"' is not supported.")
 	}
