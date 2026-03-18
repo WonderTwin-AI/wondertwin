@@ -1,3 +1,9 @@
+---
+skill: twin-extender
+skill_version: "1.0"
+schemas: {}
+---
+
 # SKILL: WonderTwin Twin Extender
 
 ## Purpose

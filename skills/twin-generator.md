@@ -1,3 +1,12 @@
+---
+skill: twin-generator
+skill_version: "2.1"
+schemas:
+  provenance.schema.json: "1.1"
+  twin-manifest.schema.json: "1.0"
+  twin.schema.json: "1.0"
+---
+
 # SKILL: WonderTwin Twin Generator
 
 ## Purpose
@@ -95,6 +104,7 @@ Before any code generation, gather and record all available sources. This phase 
 
 Create the initial `provenance.json` (validated against `schemas/provenance.schema.json`):
 
+<!-- schema: provenance.schema.json -->
 ```json
 {
   "twin": "{name}",
@@ -104,7 +114,7 @@ Create the initial `provenance.json` (validated against `schemas/provenance.sche
     "version": "{sdk_version}"
   },
   "generated_at": "{ISO 8601 timestamp}",
-  "skill_version": "2.0",
+  "skill_version": "2.1",
   "sources": {
     "openapi": {
       "origin": "vendor_published",
@@ -130,6 +140,7 @@ If no OpenAPI spec is available, omit the `openapi` field or set `origin` to `"d
 
 Populate the manifest shell (validated against `schemas/twin-manifest.schema.json`). Coverage fields will be completed as handlers are implemented:
 
+<!-- schema: twin-manifest.schema.json -->
 ```json
 {
   "twin": "{name}",
@@ -161,7 +172,7 @@ Populate the manifest shell (validated against `schemas/twin-manifest.schema.jso
   },
   "generation": {
     "method": "wondertwin_skill",
-    "skill_version": "2.0",
+    "skill_version": "2.1",
     "sources_used": {
       "deepwiki": true,
       "openapi": true,
@@ -230,6 +241,7 @@ And to the Makefile `TWINS` variable if it's a free-tier twin.
 
 **5. Fill in `twin.json`** at the twin root:
 
+<!-- schema: twin.schema.json -->
 ```json
 {
   "name": "{name}",

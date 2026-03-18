@@ -1,57 +1,45 @@
 {
-  "name": "twin-qbo",
+  "twin": "qbo",
   "display_name": "QuickBooks Online",
-  "version": "0.1.0",
   "category": "accounting",
   "description": "Simulates the QuickBooks Online Accounting API v3 — chart of accounts, customers, vendors, invoices, bills, payments, journal entries, and financial reports with SQL-like query language.",
-  "default_port": 4116,
-  "api_prefix": "/v3/company/{realmId}",
-  "auth_type": "bearer_oauth2",
-  "fintech_primitives": ["ledger_accounting"],
-  "sdk_targets": [],
-  "admin_endpoints": [
-    "GET /admin/health",
-    "POST /admin/reset",
-    "GET /admin/state",
-    "POST /admin/state"
-  ],
-  "api_endpoints": [
-    "POST /v3/company/{realmId}/customer",
-    "GET /v3/company/{realmId}/customer/{id}",
-    "POST /v3/company/{realmId}/vendor",
-    "GET /v3/company/{realmId}/vendor/{id}",
-    "POST /v3/company/{realmId}/account",
-    "GET /v3/company/{realmId}/account/{id}",
-    "POST /v3/company/{realmId}/item",
-    "GET /v3/company/{realmId}/item/{id}",
-    "POST /v3/company/{realmId}/invoice",
-    "GET /v3/company/{realmId}/invoice/{id}",
-    "POST /v3/company/{realmId}/bill",
-    "GET /v3/company/{realmId}/bill/{id}",
-    "POST /v3/company/{realmId}/payment",
-    "GET /v3/company/{realmId}/payment/{id}",
-    "POST /v3/company/{realmId}/billpayment",
-    "GET /v3/company/{realmId}/billpayment/{id}",
-    "POST /v3/company/{realmId}/creditmemo",
-    "GET /v3/company/{realmId}/creditmemo/{id}",
-    "POST /v3/company/{realmId}/vendorcredit",
-    "GET /v3/company/{realmId}/vendorcredit/{id}",
-    "POST /v3/company/{realmId}/salesreceipt",
-    "GET /v3/company/{realmId}/salesreceipt/{id}",
-    "POST /v3/company/{realmId}/deposit",
-    "GET /v3/company/{realmId}/deposit/{id}",
-    "POST /v3/company/{realmId}/transfer",
-    "GET /v3/company/{realmId}/transfer/{id}",
-    "POST /v3/company/{realmId}/journalentry",
-    "GET /v3/company/{realmId}/journalentry/{id}",
-    "POST /v3/company/{realmId}/estimate",
-    "GET /v3/company/{realmId}/estimate/{id}",
-    "POST /v3/company/{realmId}/purchase",
-    "GET /v3/company/{realmId}/purchase/{id}",
-    "GET /v3/company/{realmId}/companyinfo/{id}",
-    "GET /v3/company/{realmId}/query",
-    "GET /v3/company/{realmId}/reports/ProfitAndLoss",
-    "GET /v3/company/{realmId}/reports/BalanceSheet",
-    "GET /v3/company/{realmId}/reports/TrialBalance"
-  ]
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/rwestlund/quickbooks-go",
+      "language": "go",
+      "version": "v0.0.0",
+      "repo_url": "https://github.com/rwestlund/quickbooks-go"
+    }
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 18
+  },
+  "coverage": {
+    "resources_implemented": [
+      "Customer", "Vendor", "Account", "Item",
+      "Invoice", "Bill", "Payment", "BillPayment",
+      "CreditMemo", "VendorCredit", "SalesReceipt", "Deposit",
+      "Transfer", "JournalEntry", "Estimate", "Purchase",
+      "CompanyInfo", "Query"
+    ],
+    "resources_not_implemented": [
+      "Batch", "ChangeDataCapture", "Attachments",
+      "TaxCode", "TimeActivity", "Budget"
+    ],
+    "estimated_coverage_pct": 75
+  },
+  "generation": {
+    "method": "wondertwin_skill",
+    "skill_version": "2.1",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
 }

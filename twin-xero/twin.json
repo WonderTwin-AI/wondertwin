@@ -1,0 +1,10 @@
+{
+  "name": "xero",
+  "description": "Behavioral clone of the Xero Accounting API",
+  "category": "accounting",
+  "sdk": {
+    "package": "github.com/xero-api/xero-go",
+    "version": "v2.0.0"
+  },
+  "default_port": 4115
+}

@@ -5,6 +5,12 @@
   "platform": "Xero",
   "platform_url": "https://developer.xero.com/documentation/api/accounting/overview",
   "category": "accounting",
+  "generated_at": "2026-03-17T00:00:00Z",
+  "sdk_target": {
+    "package": "github.com/xero-api/xero-go",
+    "language": "go",
+    "version": "v2.0.0"
+  },
   "sources": [
     {
       "type": "api_documentation",

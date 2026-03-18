@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://wondertwin.dev/schemas/quirk.schema.json",
+  "$version": "1.0",
   "title": "SDK Quirk",
   "description": "Schema for documenting SDK quirks and edge cases observed in real services.",
   "type": "object",

@@ -6,7 +6,13 @@
   "platform_url": "https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities",
   "category": "accounting",
   "research_archive": "wondertwin-docs/research/quickbooks-online",
-  "research_completed": "2026-03-17",
+  "research_completed": "2026-03-17T00:00:00Z",
+  "generated_at": "2026-03-17T00:00:00Z",
+  "sdk_target": {
+    "package": "github.com/rwestlund/quickbooks-go",
+    "language": "go",
+    "version": "v0.0.0"
+  },
   "sources": [
     {
       "type": "api_documentation",

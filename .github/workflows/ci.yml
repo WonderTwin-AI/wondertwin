@@ -23,6 +23,12 @@ jobs:
       - name: Validate twin schemas
         run: go run ./cmd/validate-schemas/
 
+      - name: Validate skill-schema pins
+        run: go run ./cmd/validate-skill-pins/
+
+      - name: Validate skill JSON templates
+        run: go run ./cmd/validate-skill-templates/
+
       - name: Build wt CLI
         run: go build ./cmd/wt/
 
