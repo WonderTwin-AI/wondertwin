@@ -110,4 +110,9 @@ func computeInvoiceTotals(inv *store.Invoice) {
 		tax = inv.TxnTaxDetail.TotalTax
 	}
 	inv.TotalAmt = subTotal + tax
+	if inv.ExchangeRate > 0 {
+		inv.HomeTotalAmt = inv.TotalAmt * inv.ExchangeRate
+	} else {
+		inv.HomeTotalAmt = inv.TotalAmt
+	}
 }
