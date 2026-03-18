@@ -43,6 +43,9 @@ func main() {
 		AutoDeliver: cfg.WebhookURL != "",
 	})
 
+	// Wire MemoryStore as endpoint provider for multi-endpoint webhook delivery
+	dispatcher.SetEndpointProvider(memStore)
+
 	// API handlers
 	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	apiHandler.Routes(twin.Router)

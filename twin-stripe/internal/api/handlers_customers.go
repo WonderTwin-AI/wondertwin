@@ -30,7 +30,7 @@ func (h *Handler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	cus.Metadata = parseMetadata(r)
 
 	h.store.Customers.Set(id, cus)
-	h.dispatcher.Enqueue("customer.created", mapFromJSON(cus))
+	h.emitEvent("customer.created", mapFromJSON(cus))
 	twincore.JSON(w, http.StatusOK, cus)
 }
 
@@ -73,7 +73,7 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Customers.Set(id, cus)
-	h.dispatcher.Enqueue("customer.updated", mapFromJSON(cus))
+	h.emitEvent("customer.updated", mapFromJSON(cus))
 	twincore.JSON(w, http.StatusOK, cus)
 }
 
@@ -83,7 +83,7 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
-	h.dispatcher.Enqueue("customer.deleted", map[string]any{"id": id})
+	h.emitEvent("customer.deleted", map[string]any{"id": id})
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "customer", "deleted": true})
 }
 

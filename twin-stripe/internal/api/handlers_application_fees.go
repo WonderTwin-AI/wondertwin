@@ -100,7 +100,7 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 	}
 	h.store.ApplicationFees.Set(feeID, fee)
 
-	h.dispatcher.Enqueue("application_fee.refunded", mapFromJSON(refund))
+	h.emitEvent("application_fee.refunded", mapFromJSON(refund))
 
 	twincore.JSON(w, http.StatusOK, refund)
 }

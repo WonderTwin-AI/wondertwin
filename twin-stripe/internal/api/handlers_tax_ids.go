@@ -44,7 +44,7 @@ func (h *Handler) CreateTaxID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.TaxIDs.Set(id, taxID)
-	h.dispatcher.Enqueue("customer.tax_id.created", mapFromJSON(taxID))
+	h.emitEvent("customer.tax_id.created", mapFromJSON(taxID))
 	twincore.JSON(w, http.StatusOK, taxID)
 }
 
@@ -76,7 +76,7 @@ func (h *Handler) DeleteTaxID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.store.TaxIDs.Delete(id)
-	h.dispatcher.Enqueue("customer.tax_id.deleted", map[string]any{"id": id, "customer": customerID})
+	h.emitEvent("customer.tax_id.deleted", map[string]any{"id": id, "customer": customerID})
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "tax_id", "deleted": true})
 }
 

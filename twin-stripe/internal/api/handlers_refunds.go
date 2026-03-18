@@ -80,7 +80,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 	h.store.RecordBalanceTransaction("refund", id, ch.Currency, -amount, 0)
 
 	h.store.Refunds.Set(id, ref)
-	h.dispatcher.Enqueue("charge.refunded", mapFromJSON(ch))
+	h.emitEvent("charge.refunded", mapFromJSON(ch))
 	twincore.JSON(w, http.StatusOK, ref)
 }
 

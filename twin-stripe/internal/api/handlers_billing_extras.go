@@ -53,7 +53,7 @@ func (h *Handler) CreateCoupon(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Coupons.Set(id, coup)
-	h.dispatcher.Enqueue("coupon.created", mapFromJSON(coup))
+	h.emitEvent("coupon.created", mapFromJSON(coup))
 	twincore.JSON(w, http.StatusOK, coup)
 }
 
@@ -73,7 +73,7 @@ func (h *Handler) DeleteCoupon(w http.ResponseWriter, r *http.Request) {
 		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such coupon: "+id)
 		return
 	}
-	h.dispatcher.Enqueue("coupon.deleted", map[string]any{"id": id})
+	h.emitEvent("coupon.deleted", map[string]any{"id": id})
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "coupon", "deleted": true})
 }
 
@@ -118,9 +118,9 @@ func (h *Handler) CreateSetupIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.SetupIntents.Set(id, si)
-	h.dispatcher.Enqueue("setup_intent.created", mapFromJSON(si))
+	h.emitEvent("setup_intent.created", mapFromJSON(si))
 	if si.Status == "succeeded" {
-		h.dispatcher.Enqueue("setup_intent.succeeded", mapFromJSON(si))
+		h.emitEvent("setup_intent.succeeded", mapFromJSON(si))
 	}
 	twincore.JSON(w, http.StatusOK, si)
 }
@@ -149,7 +149,7 @@ func (h *Handler) ConfirmSetupIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	si.Status = "succeeded"
 	h.store.SetupIntents.Set(id, si)
-	h.dispatcher.Enqueue("setup_intent.succeeded", mapFromJSON(si))
+	h.emitEvent("setup_intent.succeeded", mapFromJSON(si))
 	twincore.JSON(w, http.StatusOK, si)
 }
 
@@ -162,7 +162,7 @@ func (h *Handler) CancelSetupIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	si.Status = "canceled"
 	h.store.SetupIntents.Set(id, si)
-	h.dispatcher.Enqueue("setup_intent.canceled", mapFromJSON(si))
+	h.emitEvent("setup_intent.canceled", mapFromJSON(si))
 	twincore.JSON(w, http.StatusOK, si)
 }
 
@@ -251,7 +251,7 @@ func (h *Handler) CloseDispute(w http.ResponseWriter, r *http.Request) {
 	}
 	dp.Status = "lost"
 	h.store.Disputes.Set(id, dp)
-	h.dispatcher.Enqueue("charge.dispute.closed", mapFromJSON(dp))
+	h.emitEvent("charge.dispute.closed", mapFromJSON(dp))
 	twincore.JSON(w, http.StatusOK, dp)
 }
 

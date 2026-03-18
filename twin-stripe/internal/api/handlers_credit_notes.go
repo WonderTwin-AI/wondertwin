@@ -53,7 +53,7 @@ func (h *Handler) CreateCreditNote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.CreditNotes.Set(id, cn)
-	h.dispatcher.Enqueue("credit_note.created", mapFromJSON(cn))
+	h.emitEvent("credit_note.created", mapFromJSON(cn))
 	twincore.JSON(w, http.StatusOK, cn)
 }
 
@@ -89,7 +89,7 @@ func (h *Handler) VoidCreditNote(w http.ResponseWriter, r *http.Request) {
 	}
 	cn.Status = "void"
 	h.store.CreditNotes.Set(id, cn)
-	h.dispatcher.Enqueue("credit_note.voided", mapFromJSON(cn))
+	h.emitEvent("credit_note.voided", mapFromJSON(cn))
 	twincore.JSON(w, http.StatusOK, cn)
 }
 

@@ -64,7 +64,7 @@ func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 	sub.Items.Data = append(sub.Items.Data, si)
 	h.store.Subscriptions.Set(subID, sub)
 
-	h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+	h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 	twincore.JSON(w, http.StatusOK, si)
 }
 

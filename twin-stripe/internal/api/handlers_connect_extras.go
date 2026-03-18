@@ -84,7 +84,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 	}
 	h.store.Transfers.Set(transferID, transfer)
 
-	h.dispatcher.Enqueue("transfer.reversed", mapFromJSON(reversal))
+	h.emitEvent("transfer.reversed", mapFromJSON(reversal))
 
 	twincore.JSON(w, http.StatusOK, reversal)
 }
@@ -220,7 +220,7 @@ func (h *Handler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 	person.Relationship = parsePersonRelationship(r)
 
 	h.store.Persons.Set(id, person)
-	h.dispatcher.Enqueue("person.created", mapFromJSON(person))
+	h.emitEvent("person.created", mapFromJSON(person))
 	twincore.JSON(w, http.StatusOK, person)
 }
 
@@ -286,7 +286,7 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Persons.Set(id, person)
-	h.dispatcher.Enqueue("person.updated", mapFromJSON(person))
+	h.emitEvent("person.updated", mapFromJSON(person))
 	twincore.JSON(w, http.StatusOK, person)
 }
 
@@ -310,7 +310,7 @@ func (h *Handler) DeletePerson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Persons.Delete(id)
-	h.dispatcher.Enqueue("person.deleted", map[string]any{"id": id, "account": accountID})
+	h.emitEvent("person.deleted", map[string]any{"id": id, "account": accountID})
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"id":      id,
@@ -436,7 +436,7 @@ func (h *Handler) CreateTopUp(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.TopUps.Set(id, topup)
 
-	h.dispatcher.Enqueue("topup.succeeded", mapFromJSON(topup))
+	h.emitEvent("topup.succeeded", mapFromJSON(topup))
 
 	twincore.JSON(w, http.StatusOK, topup)
 }

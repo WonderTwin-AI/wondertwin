@@ -47,7 +47,7 @@ func (h *Handler) CreateQuote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Quotes.Set(id, qt)
-	h.dispatcher.Enqueue("quote.created", mapFromJSON(qt))
+	h.emitEvent("quote.created", mapFromJSON(qt))
 	twincore.JSON(w, http.StatusOK, qt)
 }
 
@@ -112,7 +112,7 @@ func (h *Handler) FinalizeQuote(w http.ResponseWriter, r *http.Request) {
 	qt.Status = "open"
 	qt.ExpiresAt = time.Now().AddDate(0, 0, 30).Unix()
 	h.store.Quotes.Set(id, qt)
-	h.dispatcher.Enqueue("quote.finalized", mapFromJSON(qt))
+	h.emitEvent("quote.finalized", mapFromJSON(qt))
 	twincore.JSON(w, http.StatusOK, qt)
 }
 
@@ -130,7 +130,7 @@ func (h *Handler) AcceptQuote(w http.ResponseWriter, r *http.Request) {
 
 	qt.Status = "accepted"
 	h.store.Quotes.Set(id, qt)
-	h.dispatcher.Enqueue("quote.accepted", mapFromJSON(qt))
+	h.emitEvent("quote.accepted", mapFromJSON(qt))
 	twincore.JSON(w, http.StatusOK, qt)
 }
 
@@ -148,7 +148,7 @@ func (h *Handler) CancelQuote(w http.ResponseWriter, r *http.Request) {
 
 	qt.Status = "canceled"
 	h.store.Quotes.Set(id, qt)
-	h.dispatcher.Enqueue("quote.canceled", mapFromJSON(qt))
+	h.emitEvent("quote.canceled", mapFromJSON(qt))
 	twincore.JSON(w, http.StatusOK, qt)
 }
 
