@@ -30,6 +30,19 @@ This skill produces two categories of output:
 2. Access to public internet for documentation, SDK repos, and community sources
 3. The `wondertwin-docs/` repo for storing research archives
 
+## Agent Permissions
+
+When this skill runs as a subagent, it needs write access to `wondertwin-docs/research/` which is **outside** the main `wondertwin/` working directory. To avoid permission denials:
+
+- The **parent conversation** should pre-create the research directory structure before launching the agent:
+  ```bash
+  platform="{platform}"
+  base="/Users/tela/dev/wondertwin-docs/research/${platform}"
+  mkdir -p "${base}/archive/"{official-docs,schemas,sdks,release-notes,community,observations}
+  ```
+- Alternatively, the parent should write all artifact files itself after the agent completes research, since the parent conversation has broader file permissions than subagents.
+- Subagents spawned from the `wondertwin/` directory cannot write to `wondertwin-docs/` due to sandbox scoping. This is a known limitation.
+
 ## Inputs
 
 The user will provide:
