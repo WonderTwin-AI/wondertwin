@@ -47,7 +47,7 @@ func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PromotionCodes.Set(id, pc)
-	h.dispatcher.Enqueue("promotion_code.created", mapFromJSON(pc))
+	h.emitEvent("promotion_code.created", mapFromJSON(pc))
 	twincore.JSON(w, http.StatusOK, pc)
 }
 
@@ -83,7 +83,7 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PromotionCodes.Set(id, pc)
-	h.dispatcher.Enqueue("promotion_code.updated", mapFromJSON(pc))
+	h.emitEvent("promotion_code.updated", mapFromJSON(pc))
 	twincore.JSON(w, http.StatusOK, pc)
 }
 

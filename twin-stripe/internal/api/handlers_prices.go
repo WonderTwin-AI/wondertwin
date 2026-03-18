@@ -65,7 +65,7 @@ func (h *Handler) CreatePrice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Prices.Set(id, price)
-	h.dispatcher.Enqueue("price.created", mapFromJSON(price))
+	h.emitEvent("price.created", mapFromJSON(price))
 	twincore.JSON(w, http.StatusOK, price)
 }
 
@@ -104,7 +104,7 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Prices.Set(id, price)
-	h.dispatcher.Enqueue("price.updated", mapFromJSON(price))
+	h.emitEvent("price.updated", mapFromJSON(price))
 	twincore.JSON(w, http.StatusOK, price)
 }
 

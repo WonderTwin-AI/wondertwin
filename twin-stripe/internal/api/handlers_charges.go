@@ -44,7 +44,7 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	h.store.Charges.Set(id, ch)
 	h.store.CreditBalance("", currency, amount)
 	h.store.RecordBalanceTransaction("charge", id, currency, amount, 0)
-	h.dispatcher.Enqueue("charge.succeeded", mapFromJSON(ch))
+	h.emitEvent("charge.succeeded", mapFromJSON(ch))
 	twincore.JSON(w, http.StatusOK, ch)
 }
 

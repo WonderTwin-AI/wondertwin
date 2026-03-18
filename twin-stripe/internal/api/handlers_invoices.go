@@ -70,7 +70,7 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	inv.AmountRemaining = total
 
 	h.store.Invoices.Set(id, inv)
-	h.dispatcher.Enqueue("invoice.created", mapFromJSON(inv))
+	h.emitEvent("invoice.created", mapFromJSON(inv))
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -97,7 +97,7 @@ func (h *Handler) FinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	inv.Status = "open"
 	h.store.Invoices.Set(id, inv)
-	h.dispatcher.Enqueue("invoice.finalized", mapFromJSON(inv))
+	h.emitEvent("invoice.finalized", mapFromJSON(inv))
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -120,7 +120,7 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	inv.AmountDue = 0
 
 	h.store.Invoices.Set(id, inv)
-	h.dispatcher.Enqueue("invoice.paid", mapFromJSON(inv))
+	h.emitEvent("invoice.paid", mapFromJSON(inv))
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -137,7 +137,7 @@ func (h *Handler) VoidInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 	inv.Status = "void"
 	h.store.Invoices.Set(id, inv)
-	h.dispatcher.Enqueue("invoice.voided", mapFromJSON(inv))
+	h.emitEvent("invoice.voided", mapFromJSON(inv))
 	twincore.JSON(w, http.StatusOK, inv)
 }
 

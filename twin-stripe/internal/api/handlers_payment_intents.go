@@ -74,11 +74,11 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PaymentIntents.Set(id, pi)
-	h.dispatcher.Enqueue("payment_intent.created", mapFromJSON(pi))
+	h.emitEvent("payment_intent.created", mapFromJSON(pi))
 	if pi.Status == "succeeded" {
-		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
 	} else if pi.Status == "requires_capture" {
-		h.dispatcher.Enqueue("payment_intent.amount_capturable_updated", mapFromJSON(pi))
+		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
 	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
@@ -126,9 +126,9 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 
 	h.store.PaymentIntents.Set(id, pi)
 	if pi.Status == "succeeded" {
-		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
 	} else {
-		h.dispatcher.Enqueue("payment_intent.amount_capturable_updated", mapFromJSON(pi))
+		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
 	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
@@ -177,7 +177,7 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	h.store.CreditBalance("", pi.Currency, captureAmount)
 	h.store.RecordBalanceTransaction("charge", pi.LatestCharge, pi.Currency, captureAmount, 0)
 	h.store.PaymentIntents.Set(id, pi)
-	h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+	h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
@@ -203,7 +203,7 @@ func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PaymentIntents.Set(id, pi)
-	h.dispatcher.Enqueue("payment_intent.canceled", mapFromJSON(pi))
+	h.emitEvent("payment_intent.canceled", mapFromJSON(pi))
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
@@ -238,7 +238,7 @@ func (h *Handler) createChargeForPI(pi *store.PaymentIntent) string {
 		Created:       store.Now(),
 	}
 	h.store.Charges.Set(id, ch)
-	h.dispatcher.Enqueue("charge.succeeded", mapFromJSON(ch))
+	h.emitEvent("charge.succeeded", mapFromJSON(ch))
 	return id
 }
 

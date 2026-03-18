@@ -107,7 +107,7 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	sub.LatestInvoice = invoiceID
 
 	h.store.Subscriptions.Set(id, sub)
-	h.dispatcher.Enqueue("customer.subscription.created", mapFromJSON(sub))
+	h.emitEvent("customer.subscription.created", mapFromJSON(sub))
 	twincore.JSON(w, http.StatusOK, sub)
 }
 
@@ -149,7 +149,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Subscriptions.Set(id, sub)
-	h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+	h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 	twincore.JSON(w, http.StatusOK, sub)
 }
 
@@ -164,7 +164,7 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	sub.Status = "canceled"
 	sub.CanceledAt = store.Now()
 	h.store.Subscriptions.Set(id, sub)
-	h.dispatcher.Enqueue("customer.subscription.deleted", mapFromJSON(sub))
+	h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
 	twincore.JSON(w, http.StatusOK, sub)
 }
 
@@ -249,9 +249,9 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 	}
 
 	h.store.Invoices.Set(id, inv)
-	h.dispatcher.Enqueue("invoice.created", mapFromJSON(inv))
+	h.emitEvent("invoice.created", mapFromJSON(inv))
 	if inv.Paid {
-		h.dispatcher.Enqueue("invoice.paid", mapFromJSON(inv))
+		h.emitEvent("invoice.paid", mapFromJSON(inv))
 	}
 	return id
 }

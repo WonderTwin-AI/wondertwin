@@ -38,6 +38,6 @@ func (h *Handler) ApproveReview(w http.ResponseWriter, r *http.Request) {
 	rev.Status = "closed"
 	rev.ClosedReason = "approved"
 	h.store.Reviews.Set(id, rev)
-	h.dispatcher.Enqueue("review.closed", mapFromJSON(rev))
+	h.emitEvent("review.closed", mapFromJSON(rev))
 	twincore.JSON(w, http.StatusOK, rev)
 }

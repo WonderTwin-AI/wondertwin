@@ -34,7 +34,7 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Products.Set(id, prod)
-	h.dispatcher.Enqueue("product.created", mapFromJSON(prod))
+	h.emitEvent("product.created", mapFromJSON(prod))
 	twincore.JSON(w, http.StatusOK, prod)
 }
 
@@ -77,7 +77,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	prod.Updated = store.Now()
 
 	h.store.Products.Set(id, prod)
-	h.dispatcher.Enqueue("product.updated", mapFromJSON(prod))
+	h.emitEvent("product.updated", mapFromJSON(prod))
 	twincore.JSON(w, http.StatusOK, prod)
 }
 

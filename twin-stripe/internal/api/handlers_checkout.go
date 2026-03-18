@@ -53,7 +53,7 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	}
 
 	h.store.CheckoutSessions.Set(id, cs)
-	h.dispatcher.Enqueue("checkout.session.created", mapFromJSON(cs))
+	h.emitEvent("checkout.session.created", mapFromJSON(cs))
 	twincore.JSON(w, http.StatusOK, cs)
 }
 
@@ -95,7 +95,7 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	cs.Status = "expired"
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
-	h.dispatcher.Enqueue("checkout.session.expired", mapFromJSON(cs))
+	h.emitEvent("checkout.session.expired", mapFromJSON(cs))
 	twincore.JSON(w, http.StatusOK, cs)
 }
 
@@ -122,7 +122,7 @@ func (h *Handler) CreatePaymentLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PaymentLinks.Set(id, pl)
-	h.dispatcher.Enqueue("payment_link.created", mapFromJSON(pl))
+	h.emitEvent("payment_link.created", mapFromJSON(pl))
 	twincore.JSON(w, http.StatusOK, pl)
 }
 
@@ -156,7 +156,7 @@ func (h *Handler) UpdatePaymentLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.PaymentLinks.Set(id, pl)
-	h.dispatcher.Enqueue("payment_link.updated", mapFromJSON(pl))
+	h.emitEvent("payment_link.updated", mapFromJSON(pl))
 	twincore.JSON(w, http.StatusOK, pl)
 }
 
