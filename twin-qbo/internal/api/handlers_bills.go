@@ -55,6 +55,7 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		computeBillTotals(&bill)
 		bill.Balance = bill.TotalAmt
 		h.store.Bills.Set(bill.Id, bill)
+		h.journalBillCreated(&bill)
 		h.fireEvent("Bill", bill.Id, "Create")
 	}
 

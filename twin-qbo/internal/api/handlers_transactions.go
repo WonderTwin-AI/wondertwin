@@ -118,6 +118,7 @@ func (h *Handler) CreateOrUpdateSalesReceipt(w http.ResponseWriter, r *http.Requ
 		for _, line := range sr.Line { total += line.Amount }
 		sr.TotalAmt = total
 		h.store.SalesReceipts.Set(sr.Id, sr)
+		h.journalSalesReceiptCreated(&sr)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("SalesReceipt", sr))
 }
@@ -155,6 +156,7 @@ func (h *Handler) CreateOrUpdateDeposit(w http.ResponseWriter, r *http.Request) 
 		for _, line := range dep.Line { total += line.Amount }
 		dep.TotalAmt = total
 		h.store.Deposits.Set(dep.Id, dep)
+		h.journalDepositCreated(&dep)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Deposit", dep))
 }
@@ -189,6 +191,7 @@ func (h *Handler) CreateOrUpdateTransfer(w http.ResponseWriter, r *http.Request)
 		xfer.Domain = "QBO"
 		xfer.MetaData = h.store.NewMetaData()
 		h.store.Transfers.Set(xfer.Id, xfer)
+		h.journalTransferCreated(&xfer)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Transfer", xfer))
 }
@@ -230,6 +233,7 @@ func (h *Handler) CreateOrUpdateJournalEntry(w http.ResponseWriter, r *http.Requ
 		}
 		je.TotalAmt = total
 		h.store.JournalEntries.Set(je.Id, je)
+		h.journalJournalEntryCreated(&je)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("JournalEntry", je))
 }
@@ -305,6 +309,7 @@ func (h *Handler) CreateOrUpdatePurchase(w http.ResponseWriter, r *http.Request)
 		for _, line := range pur.Line { total += line.Amount }
 		pur.TotalAmt = total
 		h.store.Purchases.Set(pur.Id, pur)
+		h.journalPurchaseCreated(&pur)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Purchase", pur))
 }
