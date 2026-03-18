@@ -103,5 +103,6 @@ func (h *Handler) Routes(r chi.Router) {
 
 		// Company Info
 		r.Get("/companyinfo/{id}", h.GetCompanyInfo)
+		r.Post("/companyinfo", h.UpdateCompanyInfo)
 	})
 }

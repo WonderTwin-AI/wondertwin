@@ -383,11 +383,38 @@ func (h *Handler) GetCompanyInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ci, ok := h.store.CompanyInfos.Get(id)
 	if !ok {
-		// Return default company info.
+		// Seed a default and store it so it's updateable.
 		ci = store.CompanyInfo{
 			Id: "1", SyncToken: "0", CompanyName: "Sandbox Company",
+			Country: "US", FiscalYearStartMonth: "January",
 			Domain: "QBO", MetaData: h.store.NewMetaData(),
 		}
+		h.store.CompanyInfos.Set("1", ci)
 	}
+	qboJSON(w, http.StatusOK, entityResponse("CompanyInfo", ci))
+}
+
+func (h *Handler) UpdateCompanyInfo(w http.ResponseWriter, r *http.Request) {
+	var ci store.CompanyInfo
+	if err := json.NewDecoder(r.Body).Decode(&ci); err != nil {
+		validationFault(w, "500", "Invalid JSON", err.Error())
+		return
+	}
+	if ci.Id == "" {
+		ci.Id = "1"
+	}
+	existing, ok := h.store.CompanyInfos.Get(ci.Id)
+	if !ok {
+		existing = store.CompanyInfo{Id: "1", SyncToken: "0", Domain: "QBO", MetaData: h.store.NewMetaData()}
+	}
+	if err := ValidateSyncToken(existing.SyncToken, ci.SyncToken); err != nil {
+		staleSyncTokenFault(w)
+		return
+	}
+	ci.SyncToken = IncrementSyncToken(existing.SyncToken)
+	ci.MetaData.CreateTime = existing.MetaData.CreateTime
+	ci.MetaData.LastUpdatedTime = h.store.Now()
+	ci.Domain = "QBO"
+	h.store.CompanyInfos.Set(ci.Id, ci)
 	qboJSON(w, http.StatusOK, entityResponse("CompanyInfo", ci))
 }
