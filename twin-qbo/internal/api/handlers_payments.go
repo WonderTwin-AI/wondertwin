@@ -110,10 +110,35 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateOrUpdateBillPayment(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var bp store.BillPayment
 	if err := json.NewDecoder(r.Body).Decode(&bp); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+
+	if op == "void" {
+		existing, ok := h.store.BillPayments.Get(bp.Id)
+		if !ok { notFoundFault(w, "BillPayment", bp.Id); return }
+		if err := ValidateSyncToken(existing.SyncToken, bp.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		// Un-apply from linked bills.
+		for _, line := range existing.Line {
+			for _, link := range line.LinkedTxn {
+				if link.TxnType == "Bill" {
+					if bill, ok := h.store.Bills.Get(link.TxnId); ok {
+						bill.Balance += line.Amount; bill.MetaData.LastUpdatedTime = h.store.Now()
+						h.store.Bills.Set(bill.Id, bill)
+					}
+				}
+			}
+		}
+		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
+		h.store.BillPayments.Set(existing.Id, existing); h.fireEvent("BillPayment", existing.Id, "Void")
+		qboJSON(w, http.StatusOK, entityResponse("BillPayment", existing)); return
+	}
+	if op == "delete" {
+		h.store.BillPayments.Delete(bp.Id); h.fireEvent("BillPayment", bp.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("BillPayment", bp)); return
 	}
 
 	if bp.Id != "" {
