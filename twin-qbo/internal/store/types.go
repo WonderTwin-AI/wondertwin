@@ -115,6 +115,28 @@ type JournalEntryLineDetail struct {
 	AccountRef  *Ref   `json:"AccountRef"`
 }
 
+// TxnTaxDetail holds tax information on a transaction.
+type TxnTaxDetail struct {
+	TxnTaxCodeRef *Ref      `json:"TxnTaxCodeRef,omitempty"`
+	TotalTax      float64   `json:"TotalTax"`
+	TaxLine       []TaxLine `json:"TaxLine,omitempty"`
+}
+
+// TaxLine is a single tax line on a transaction.
+type TaxLine struct {
+	Amount         float64        `json:"Amount"`
+	DetailType     string         `json:"DetailType"` // TaxLineDetail
+	TaxLineDetail  *TaxLineDetail `json:"TaxLineDetail,omitempty"`
+}
+
+// TaxLineDetail holds tax computation details.
+type TaxLineDetail struct {
+	TaxRateRef       *Ref    `json:"TaxRateRef,omitempty"`
+	PercentBased     bool    `json:"PercentBased"`
+	TaxPercent       float64 `json:"TaxPercent"`
+	NetAmountTaxable float64 `json:"NetAmountTaxable"`
+}
+
 // LinkedTxn links a payment to an invoice or bill.
 type LinkedTxn struct {
 	TxnId   string `json:"TxnId"`
@@ -123,38 +145,44 @@ type LinkedTxn struct {
 
 // Invoice represents a QBO invoice (ACCREC).
 type Invoice struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	DueDate     string   `json:"DueDate,omitempty"`
-	CustomerRef *Ref     `json:"CustomerRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	Balance     float64  `json:"Balance"`
-	EmailStatus string   `json:"EmailStatus,omitempty"`
-	CurrencyRef *Ref     `json:"CurrencyRef,omitempty"`
-	SalesTermRef *Ref    `json:"SalesTermRef,omitempty"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
-	Sparse      bool     `json:"sparse,omitempty"`
+	Id            string         `json:"Id"`
+	SyncToken     string         `json:"SyncToken"`
+	DocNumber     string         `json:"DocNumber,omitempty"`
+	TxnDate       string         `json:"TxnDate,omitempty"`
+	DueDate       string         `json:"DueDate,omitempty"`
+	CustomerRef   *Ref           `json:"CustomerRef"`
+	Line          []Line         `json:"Line"`
+	TxnTaxDetail  *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
+	TotalAmt      float64        `json:"TotalAmt"`
+	Balance       float64        `json:"Balance"`
+	HomeTotalAmt  float64        `json:"HomeTotalAmt,omitempty"`
+	ExchangeRate  float64        `json:"ExchangeRate,omitempty"`
+	EmailStatus   string         `json:"EmailStatus,omitempty"`
+	CurrencyRef   *Ref           `json:"CurrencyRef,omitempty"`
+	SalesTermRef  *Ref           `json:"SalesTermRef,omitempty"`
+	MetaData      MetaData       `json:"MetaData"`
+	Domain        string         `json:"domain"`
+	Sparse        bool           `json:"sparse,omitempty"`
 }
 
 // Bill represents a QBO bill (ACCPAY).
 type Bill struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	DueDate     string   `json:"DueDate,omitempty"`
-	VendorRef   *Ref     `json:"VendorRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	Balance     float64  `json:"Balance"`
-	CurrencyRef *Ref     `json:"CurrencyRef,omitempty"`
-	APAccountRef *Ref    `json:"APAccountRef,omitempty"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
+	Id           string         `json:"Id"`
+	SyncToken    string         `json:"SyncToken"`
+	DocNumber    string         `json:"DocNumber,omitempty"`
+	TxnDate      string         `json:"TxnDate,omitempty"`
+	DueDate      string         `json:"DueDate,omitempty"`
+	VendorRef    *Ref           `json:"VendorRef"`
+	Line         []Line         `json:"Line"`
+	TxnTaxDetail *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
+	TotalAmt     float64        `json:"TotalAmt"`
+	Balance      float64        `json:"Balance"`
+	HomeTotalAmt float64        `json:"HomeTotalAmt,omitempty"`
+	ExchangeRate float64        `json:"ExchangeRate,omitempty"`
+	CurrencyRef  *Ref           `json:"CurrencyRef,omitempty"`
+	APAccountRef *Ref           `json:"APAccountRef,omitempty"`
+	MetaData     MetaData       `json:"MetaData"`
+	Domain       string         `json:"domain"`
 }
 
 // Payment represents a QBO customer payment.
@@ -294,6 +322,138 @@ type Purchase struct {
 	EntityRef   *Ref     `json:"EntityRef,omitempty"`
 	Line        []Line   `json:"Line"`
 	TotalAmt    float64  `json:"TotalAmt"`
+	MetaData    MetaData `json:"MetaData"`
+	Domain      string   `json:"domain"`
+}
+
+// Employee represents a QBO employee.
+type Employee struct {
+	Id          string   `json:"Id"`
+	SyncToken   string   `json:"SyncToken"`
+	DisplayName string   `json:"DisplayName"`
+	GivenName   string   `json:"GivenName,omitempty"`
+	FamilyName  string   `json:"FamilyName,omitempty"`
+	Active      bool     `json:"Active"`
+	MetaData    MetaData `json:"MetaData"`
+	Domain      string   `json:"domain"`
+}
+
+// Class represents a QBO classification for tracking.
+type Class struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Active    bool     `json:"Active"`
+	ParentRef *Ref     `json:"ParentRef,omitempty"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// Department represents a QBO department/location.
+type Department struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Active    bool     `json:"Active"`
+	ParentRef *Ref     `json:"ParentRef,omitempty"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// Term represents a QBO payment term (e.g., Net 30).
+type Term struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	DueDays   int      `json:"DueDays,omitempty"`
+	Active    bool     `json:"Active"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// PaymentMethod represents a QBO payment method (Cash, Check, etc.).
+type PaymentMethod struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Type      string   `json:"Type,omitempty"` // CREDIT_CARD or NON_CREDIT_CARD
+	Active    bool     `json:"Active"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// TaxCode represents a QBO tax code (read-only in US).
+type TaxCode struct {
+	Id          string `json:"Id"`
+	SyncToken   string `json:"SyncToken"`
+	Name        string `json:"Name"`
+	Description string `json:"Description,omitempty"`
+	Active      bool   `json:"Active"`
+	Taxable     bool   `json:"Taxable"`
+	Domain      string `json:"domain"`
+}
+
+// TaxRate represents a QBO tax rate (read-only in US).
+type TaxRate struct {
+	Id          string  `json:"Id"`
+	SyncToken   string  `json:"SyncToken"`
+	Name        string  `json:"Name"`
+	Description string  `json:"Description,omitempty"`
+	RateValue   float64 `json:"RateValue"`
+	Active      bool    `json:"Active"`
+	Domain      string  `json:"domain"`
+}
+
+// Preferences holds company-wide QBO settings.
+type Preferences struct {
+	Id                    string   `json:"Id"`
+	SyncToken             string   `json:"SyncToken"`
+	AccountingInfoPrefs   map[string]any `json:"AccountingInfoPrefs,omitempty"`
+	SalesFormsPrefs       map[string]any `json:"SalesFormsPrefs,omitempty"`
+	VendorAndPurchasesPrefs map[string]any `json:"VendorAndPurchasesPrefs,omitempty"`
+	MetaData              MetaData `json:"MetaData"`
+	Domain                string   `json:"domain"`
+}
+
+// RefundReceipt represents a QBO refund.
+type RefundReceipt struct {
+	Id                  string   `json:"Id"`
+	SyncToken           string   `json:"SyncToken"`
+	DocNumber           string   `json:"DocNumber,omitempty"`
+	TxnDate             string   `json:"TxnDate,omitempty"`
+	CustomerRef         *Ref     `json:"CustomerRef"`
+	Line                []Line   `json:"Line"`
+	TotalAmt            float64  `json:"TotalAmt"`
+	DepositToAccountRef *Ref     `json:"DepositToAccountRef,omitempty"`
+	MetaData            MetaData `json:"MetaData"`
+	Domain              string   `json:"domain"`
+}
+
+// PurchaseOrder represents a QBO purchase order.
+type PurchaseOrder struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	DocNumber string   `json:"DocNumber,omitempty"`
+	TxnDate   string   `json:"TxnDate,omitempty"`
+	VendorRef *Ref     `json:"VendorRef"`
+	Line      []Line   `json:"Line"`
+	TotalAmt  float64  `json:"TotalAmt"`
+	POStatus  string   `json:"POStatus"` // Open, Closed
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// TimeActivity represents a QBO time tracking entry.
+type TimeActivity struct {
+	Id          string   `json:"Id"`
+	SyncToken   string   `json:"SyncToken"`
+	TxnDate     string   `json:"TxnDate,omitempty"`
+	EmployeeRef *Ref     `json:"EmployeeRef,omitempty"`
+	CustomerRef *Ref     `json:"CustomerRef,omitempty"`
+	ItemRef     *Ref     `json:"ItemRef,omitempty"`
+	Hours       int      `json:"Hours,omitempty"`
+	Minutes     int      `json:"Minutes,omitempty"`
+	Description string   `json:"Description,omitempty"`
 	MetaData    MetaData `json:"MetaData"`
 	Domain      string   `json:"domain"`
 }

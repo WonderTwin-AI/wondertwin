@@ -27,10 +27,17 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v3/company/{realmId}", func(r chi.Router) {
 		r.Use(authMiddleware)
 		r.Use(realmIDMiddleware)
+		r.Use(minorVersionMiddleware)
 		r.Use(h.mw.FaultInjection)
 
 		// Query endpoint (SQL-like)
 		r.Get("/query", h.Query)
+
+		// Batch endpoint (up to 30 operations)
+		r.Post("/batch", h.Batch)
+
+		// ChangeDataCapture
+		r.Get("/cdc", h.CDC)
 
 		// Customers
 		r.Post("/customer", h.CreateOrUpdateCustomer)
@@ -51,6 +58,8 @@ func (h *Handler) Routes(r chi.Router) {
 		// Invoices
 		r.Post("/invoice", h.CreateOrUpdateInvoice)
 		r.Get("/invoice/{id}", h.GetInvoice)
+		r.Post("/invoice/{id}/send", h.SendInvoice)
+		r.Get("/invoice/{id}/pdf", h.InvoicePDF)
 
 		// Bills
 		r.Post("/bill", h.CreateOrUpdateBill)
@@ -75,6 +84,7 @@ func (h *Handler) Routes(r chi.Router) {
 		// Sales Receipts
 		r.Post("/salesreceipt", h.CreateOrUpdateSalesReceipt)
 		r.Get("/salesreceipt/{id}", h.GetSalesReceipt)
+		r.Post("/salesreceipt/{id}/send", h.SendSalesReceipt)
 
 		// Deposits
 		r.Post("/deposit", h.CreateOrUpdateDeposit)
@@ -91,17 +101,66 @@ func (h *Handler) Routes(r chi.Router) {
 		// Estimates
 		r.Post("/estimate", h.CreateOrUpdateEstimate)
 		r.Get("/estimate/{id}", h.GetEstimate)
+		r.Post("/estimate/{id}/send", h.SendEstimate)
 
 		// Purchases
 		r.Post("/purchase", h.CreateOrUpdatePurchase)
 		r.Get("/purchase/{id}", h.GetPurchase)
 
+		// Employees
+		r.Post("/employee", h.CreateOrUpdateEmployee)
+		r.Get("/employee/{id}", h.GetEmployee)
+
+		// Classes
+		r.Post("/class", h.CreateOrUpdateClass)
+		r.Get("/class/{id}", h.GetClass)
+
+		// Departments
+		r.Post("/department", h.CreateOrUpdateDepartment)
+		r.Get("/department/{id}", h.GetDepartment)
+
+		// Terms
+		r.Post("/term", h.CreateOrUpdateTerm)
+		r.Get("/term/{id}", h.GetTerm)
+
+		// Payment Methods
+		r.Post("/paymentmethod", h.CreateOrUpdatePaymentMethod)
+		r.Get("/paymentmethod/{id}", h.GetPaymentMethod)
+
+		// Tax Codes (read-only)
+		r.Get("/taxcode/{id}", h.GetTaxCode)
+
+		// Tax Rates (read-only)
+		r.Get("/taxrate/{id}", h.GetTaxRate)
+
+		// Preferences
+		r.Get("/preferences", h.GetPreferences)
+		r.Post("/preferences", h.UpdatePreferences)
+
+		// Refund Receipts
+		r.Post("/refundreceipt", h.CreateOrUpdateRefundReceipt)
+		r.Get("/refundreceipt/{id}", h.GetRefundReceipt)
+
+		// Purchase Orders
+		r.Post("/purchaseorder", h.CreateOrUpdatePurchaseOrder)
+		r.Get("/purchaseorder/{id}", h.GetPurchaseOrder)
+
+		// Time Activities
+		r.Post("/timeactivity", h.CreateOrUpdateTimeActivity)
+		r.Get("/timeactivity/{id}", h.GetTimeActivity)
+
 		// Reports
 		r.Get("/reports/ProfitAndLoss", h.ProfitAndLoss)
 		r.Get("/reports/BalanceSheet", h.BalanceSheet)
 		r.Get("/reports/TrialBalance", h.TrialBalance)
+		r.Get("/reports/AgedReceivables", h.AgedReceivables)
+		r.Get("/reports/AgedPayables", h.AgedPayables)
+		r.Get("/reports/CustomerBalance", h.CustomerBalance)
+		r.Get("/reports/VendorBalance", h.VendorBalance)
+		r.Get("/reports/GeneralLedger", h.GeneralLedger)
 
 		// Company Info
 		r.Get("/companyinfo/{id}", h.GetCompanyInfo)
+		r.Post("/companyinfo", h.UpdateCompanyInfo)
 	})
 }

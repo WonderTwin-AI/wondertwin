@@ -28,8 +28,19 @@ type MemoryStore struct {
 	JournalEntries *pkgstore.Store[JournalEntry]
 	Estimates    *pkgstore.Store[Estimate]
 	Purchases    *pkgstore.Store[Purchase]
-	CompanyInfos *pkgstore.Store[CompanyInfo]
-	Journal      *journal.Journal
+	CompanyInfos   *pkgstore.Store[CompanyInfo]
+	Employees      *pkgstore.Store[Employee]
+	Classes        *pkgstore.Store[Class]
+	Departments    *pkgstore.Store[Department]
+	Terms          *pkgstore.Store[Term]
+	PaymentMethods *pkgstore.Store[PaymentMethod]
+	TaxCodes       *pkgstore.Store[TaxCode]
+	TaxRates       *pkgstore.Store[TaxRate]
+	PreferencesStore *pkgstore.Store[Preferences]
+	RefundReceipts   *pkgstore.Store[RefundReceipt]
+	PurchaseOrders   *pkgstore.Store[PurchaseOrder]
+	TimeActivities   *pkgstore.Store[TimeActivity]
+	Journal          *journal.Journal
 	Clock        *pkgstore.Clock
 	idCounter    atomic.Uint64
 }
@@ -54,8 +65,19 @@ func New() *MemoryStore {
 		JournalEntries: pkgstore.New[JournalEntry]("je"),
 		Estimates:     pkgstore.New[Estimate]("est"),
 		Purchases:     pkgstore.New[Purchase]("pur"),
-		CompanyInfos:  pkgstore.New[CompanyInfo]("co"),
-		Journal:       journal.New(clock),
+		CompanyInfos:    pkgstore.New[CompanyInfo]("co"),
+		Employees:       pkgstore.New[Employee]("emp"),
+		Classes:         pkgstore.New[Class]("cls"),
+		Departments:     pkgstore.New[Department]("dept"),
+		Terms:           pkgstore.New[Term]("term"),
+		PaymentMethods:  pkgstore.New[PaymentMethod]("pmeth"),
+		TaxCodes:        pkgstore.New[TaxCode]("tc"),
+		TaxRates:        pkgstore.New[TaxRate]("tr"),
+		PreferencesStore: pkgstore.New[Preferences]("pref"),
+		RefundReceipts:   pkgstore.New[RefundReceipt]("rr"),
+		PurchaseOrders:   pkgstore.New[PurchaseOrder]("po"),
+		TimeActivities:   pkgstore.New[TimeActivity]("ta"),
+		Journal:          journal.New(clock),
 		Clock:         clock,
 	}
 }
@@ -93,7 +115,18 @@ type stateSnapshot struct {
 	JournalEntries map[string]JournalEntry `json:"journal_entries"`
 	Estimates     map[string]Estimate     `json:"estimates"`
 	Purchases     map[string]Purchase     `json:"purchases"`
-	CompanyInfos  map[string]CompanyInfo  `json:"company_info"`
+	CompanyInfos   map[string]CompanyInfo   `json:"company_info"`
+	Employees      map[string]Employee      `json:"employees"`
+	Classes        map[string]Class         `json:"classes"`
+	Departments    map[string]Department    `json:"departments"`
+	Terms          map[string]Term          `json:"terms"`
+	PaymentMethods map[string]PaymentMethod `json:"payment_methods"`
+	TaxCodes       map[string]TaxCode       `json:"tax_codes"`
+	TaxRates       map[string]TaxRate       `json:"tax_rates"`
+	Preferences    map[string]Preferences   `json:"preferences"`
+	RefundReceipts map[string]RefundReceipt `json:"refund_receipts"`
+	PurchaseOrders map[string]PurchaseOrder `json:"purchase_orders"`
+	TimeActivities map[string]TimeActivity  `json:"time_activities"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -114,7 +147,18 @@ func (s *MemoryStore) Snapshot() any {
 		JournalEntries: s.JournalEntries.Snapshot(),
 		Estimates:     s.Estimates.Snapshot(),
 		Purchases:     s.Purchases.Snapshot(),
-		CompanyInfos:  s.CompanyInfos.Snapshot(),
+		CompanyInfos:   s.CompanyInfos.Snapshot(),
+		Employees:      s.Employees.Snapshot(),
+		Classes:        s.Classes.Snapshot(),
+		Departments:    s.Departments.Snapshot(),
+		Terms:          s.Terms.Snapshot(),
+		PaymentMethods: s.PaymentMethods.Snapshot(),
+		TaxCodes:       s.TaxCodes.Snapshot(),
+		TaxRates:       s.TaxRates.Snapshot(),
+		Preferences:    s.PreferencesStore.Snapshot(),
+		RefundReceipts: s.RefundReceipts.Snapshot(),
+		PurchaseOrders: s.PurchaseOrders.Snapshot(),
+		TimeActivities: s.TimeActivities.Snapshot(),
 	}
 }
 
@@ -140,6 +184,17 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Estimates.LoadSnapshot(snap.Estimates)
 	s.Purchases.LoadSnapshot(snap.Purchases)
 	s.CompanyInfos.LoadSnapshot(snap.CompanyInfos)
+	s.Employees.LoadSnapshot(snap.Employees)
+	s.Classes.LoadSnapshot(snap.Classes)
+	s.Departments.LoadSnapshot(snap.Departments)
+	s.Terms.LoadSnapshot(snap.Terms)
+	s.PaymentMethods.LoadSnapshot(snap.PaymentMethods)
+	s.TaxCodes.LoadSnapshot(snap.TaxCodes)
+	s.TaxRates.LoadSnapshot(snap.TaxRates)
+	s.PreferencesStore.LoadSnapshot(snap.Preferences)
+	s.RefundReceipts.LoadSnapshot(snap.RefundReceipts)
+	s.PurchaseOrders.LoadSnapshot(snap.PurchaseOrders)
+	s.TimeActivities.LoadSnapshot(snap.TimeActivities)
 	return nil
 }
 
@@ -161,6 +216,17 @@ func (s *MemoryStore) Reset() {
 	s.Estimates.Reset()
 	s.Purchases.Reset()
 	s.CompanyInfos.Reset()
+	s.Employees.Reset()
+	s.Classes.Reset()
+	s.Departments.Reset()
+	s.Terms.Reset()
+	s.PaymentMethods.Reset()
+	s.TaxCodes.Reset()
+	s.TaxRates.Reset()
+	s.PreferencesStore.Reset()
+	s.RefundReceipts.Reset()
+	s.PurchaseOrders.Reset()
+	s.TimeActivities.Reset()
 	s.Journal.Reset()
 	s.Clock.Reset()
 	s.idCounter.Store(0)

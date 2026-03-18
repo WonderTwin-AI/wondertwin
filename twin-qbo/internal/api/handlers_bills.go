@@ -17,14 +17,33 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if op == "delete" {
-		if _, ok := h.store.Bills.Get(bill.Id); !ok {
+	if op == "delete" || op == "void" {
+		existing, ok := h.store.Bills.Get(bill.Id)
+		if !ok {
 			notFoundFault(w, "Bill", bill.Id)
 			return
 		}
-		h.store.Bills.Delete(bill.Id)
-		h.fireEvent("Bill", bill.Id, "Delete")
-		qboJSON(w, http.StatusOK, entityResponse("Bill", bill))
+		if err := ValidateSyncToken(existing.SyncToken, bill.SyncToken); err != nil {
+			staleSyncTokenFault(w)
+			return
+		}
+		if op == "void" {
+			existing.Balance = 0
+			existing.TotalAmt = 0
+			for i := range existing.Line {
+				existing.Line[i].Amount = 0
+			}
+		}
+		existing.SyncToken = IncrementSyncToken(existing.SyncToken)
+		existing.MetaData.LastUpdatedTime = h.store.Now()
+		if op == "delete" {
+			h.store.Bills.Delete(bill.Id)
+			h.fireEvent("Bill", bill.Id, "Delete")
+		} else {
+			h.store.Bills.Set(bill.Id, existing)
+			h.fireEvent("Bill", bill.Id, "Void")
+		}
+		qboJSON(w, http.StatusOK, entityResponse("Bill", existing))
 		return
 	}
 
@@ -55,6 +74,7 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		computeBillTotals(&bill)
 		bill.Balance = bill.TotalAmt
 		h.store.Bills.Set(bill.Id, bill)
+		h.journalBillCreated(&bill)
 		h.fireEvent("Bill", bill.Id, "Create")
 	}
 
@@ -72,9 +92,18 @@ func (h *Handler) GetBill(w http.ResponseWriter, r *http.Request) {
 }
 
 func computeBillTotals(bill *store.Bill) {
-	var total float64
+	var subTotal float64
 	for _, line := range bill.Line {
-		total += line.Amount
+		subTotal += line.Amount
 	}
-	bill.TotalAmt = total
+	tax := 0.0
+	if bill.TxnTaxDetail != nil {
+		tax = bill.TxnTaxDetail.TotalTax
+	}
+	bill.TotalAmt = subTotal + tax
+	if bill.ExchangeRate > 0 {
+		bill.HomeTotalAmt = bill.TotalAmt * bill.ExchangeRate
+	} else {
+		bill.HomeTotalAmt = bill.TotalAmt
+	}
 }

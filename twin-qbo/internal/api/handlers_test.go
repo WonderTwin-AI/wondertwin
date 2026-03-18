@@ -125,6 +125,42 @@ func TestCustomer_UpdateWithSyncToken(t *testing.T) {
 	}
 }
 
+func TestCustomer_SparseUpdate(t *testing.T) {
+	_, r := setupTestHandler()
+	// Create with full fields.
+	w := doReq(r, "POST", "/v3/company/123/customer", map[string]any{
+		"DisplayName": "Alice Smith",
+		"GivenName":   "Alice",
+		"FamilyName":  "Smith",
+		"CompanyName": "Acme Corp",
+	})
+	resp := parseResp(t, w)
+	id := resp["Customer"].(map[string]any)["Id"].(string)
+
+	// Sparse update — only change DisplayName, keep everything else.
+	w = doReq(r, "POST", "/v3/company/123/customer", map[string]any{
+		"Id":          id,
+		"SyncToken":   "0",
+		"sparse":      true,
+		"DisplayName": "Alice Johnson",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("sparse update: %d %s", w.Code, w.Body.String())
+	}
+	resp = parseResp(t, w)
+	cust := resp["Customer"].(map[string]any)
+	if cust["DisplayName"] != "Alice Johnson" {
+		t.Errorf("DisplayName = %v, want 'Alice Johnson'", cust["DisplayName"])
+	}
+	// GivenName should be preserved from the original.
+	if cust["GivenName"] != "Alice" {
+		t.Errorf("GivenName = %v, want 'Alice' (should be preserved in sparse update)", cust["GivenName"])
+	}
+	if cust["CompanyName"] != "Acme Corp" {
+		t.Errorf("CompanyName = %v, want 'Acme Corp' (should be preserved)", cust["CompanyName"])
+	}
+}
+
 func TestCustomer_StaleSyncToken(t *testing.T) {
 	_, r := setupTestHandler()
 	w := doReq(r, "POST", "/v3/company/123/customer", map[string]any{
@@ -288,6 +324,67 @@ func TestQuery_Pagination(t *testing.T) {
 	}
 }
 
+func TestQuery_WhereFilter(t *testing.T) {
+	_, r := setupTestHandler()
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Bob"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Charlie"})
+
+	// Filter by DisplayName equality.
+	w := doReq(r, "GET", queryURL("SELECT * FROM Customer WHERE DisplayName = 'Bob'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	custs := qr["Customer"].([]any)
+	if len(custs) != 1 {
+		t.Fatalf("WHERE DisplayName='Bob': expected 1, got %d", len(custs))
+	}
+	if custs[0].(map[string]any)["DisplayName"] != "Bob" {
+		t.Error("wrong customer returned")
+	}
+}
+
+func TestQuery_WhereLike(t *testing.T) {
+	_, r := setupTestHandler()
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice Smith"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice Jones"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Bob Smith"})
+
+	w := doReq(r, "GET", queryURL("SELECT * FROM Customer WHERE DisplayName LIKE 'Alice%'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	custs := qr["Customer"].([]any)
+	if len(custs) != 2 {
+		t.Fatalf("WHERE LIKE 'Alice%%': expected 2, got %d", len(custs))
+	}
+}
+
+func TestQuery_WhereBalance(t *testing.T) {
+	_, r := setupTestHandler()
+	// Create two invoices with different amounts.
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 100.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 100}}},
+	})
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 500.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 500}}},
+	})
+
+	// Filter Balance > 200.
+	w := doReq(r, "GET", queryURL("SELECT * FROM Invoice WHERE Balance > '200'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	invs := qr["Invoice"].([]any)
+	if len(invs) != 1 {
+		t.Fatalf("WHERE Balance > 200: expected 1, got %d", len(invs))
+	}
+	if invs[0].(map[string]any)["TotalAmt"].(float64) != 500 {
+		t.Error("wrong invoice returned")
+	}
+}
+
 // --- Bill & BillPayment ---
 
 func TestBill_CreateAndPay(t *testing.T) {
@@ -393,5 +490,223 @@ func TestReports_TrialBalance(t *testing.T) {
 	resp := parseResp(t, w)
 	if resp["Header"] == nil {
 		t.Error("expected Header in report response")
+	}
+}
+
+// --- Void/Delete Operations (GAP-003) ---
+
+func TestBill_Void(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/bill", map[string]any{
+		"VendorRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 200.00, "DetailType": "AccountBasedExpenseLineDetail",
+			"AccountBasedExpenseLineDetail": map[string]any{"AccountRef": map[string]any{"value": "1"}}}},
+	})
+	resp := parseResp(t, w)
+	billID := resp["Bill"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/bill?operation=void", map[string]any{
+		"Id": billID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("void bill: %d %s", w.Code, w.Body.String())
+	}
+	resp = parseResp(t, w)
+	bill := resp["Bill"].(map[string]any)
+	if bill["Balance"].(float64) != 0 {
+		t.Errorf("voided Balance = %v, want 0", bill["Balance"])
+	}
+	if bill["TotalAmt"].(float64) != 0 {
+		t.Errorf("voided TotalAmt = %v, want 0", bill["TotalAmt"])
+	}
+}
+
+func TestCreditMemo_Delete(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/creditmemo", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 50.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 50}}},
+	})
+	cmID := parseResp(t, w)["CreditMemo"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/creditmemo?operation=delete", map[string]any{
+		"Id": cmID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete credit memo: %d %s", w.Code, w.Body.String())
+	}
+
+	// Should be gone.
+	w = doReq(r, "GET", "/v3/company/123/creditmemo/"+cmID, nil)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 after delete, got %d", w.Code)
+	}
+}
+
+func TestSalesReceipt_Void(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/salesreceipt", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 75.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 75}}},
+	})
+	srID := parseResp(t, w)["SalesReceipt"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/salesreceipt?operation=void", map[string]any{
+		"Id": srID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("void sales receipt: %d %s", w.Code, w.Body.String())
+	}
+	resp := parseResp(t, w)
+	sr := resp["SalesReceipt"].(map[string]any)
+	if sr["TotalAmt"].(float64) != 0 {
+		t.Errorf("voided TotalAmt = %v, want 0", sr["TotalAmt"])
+	}
+}
+
+// --- Journal Entry Generation (GAP-001) ---
+
+func TestJournalEntries_InvoiceCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	// Create AR account.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Receivable", "AccountType": "Accounts Receivable",
+	})
+
+	// Create income account.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Sales", "AccountType": "Income",
+	})
+
+	// Create invoice — should generate journal entries.
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 1000.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 1000},
+		}},
+	})
+
+	// Journal should have entries.
+	txs := h.engine.Journal().Transactions()
+	if len(txs) == 0 {
+		t.Fatal("expected journal transactions after invoice create, got 0")
+	}
+
+	// Trial balance should now have data.
+	w := doReq(r, "GET", "/v3/company/123/reports/TrialBalance", nil)
+	resp := parseResp(t, w)
+	rows := resp["Rows"]
+	if rows == nil {
+		t.Fatal("expected Rows in trial balance")
+	}
+	rowList, ok := rows.([]any)
+	if !ok || len(rowList) == 0 {
+		t.Error("expected non-empty trial balance rows after invoice creation")
+	}
+}
+
+func TestJournalEntries_PaymentCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	// Create accounts.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Receivable", "AccountType": "Accounts Receivable",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Bank", "AccountType": "Bank",
+	})
+
+	// Create invoice.
+	w := doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 500.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 500},
+		}},
+	})
+	invID := parseResp(t, w)["Invoice"].(map[string]any)["Id"].(string)
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	// Create payment with bank deposit.
+	w = doReq(r, "POST", "/v3/company/123/payment", map[string]any{
+		"CustomerRef":         map[string]any{"value": "1"},
+		"TotalAmt":            500.00,
+		"DepositToAccountRef": map[string]any{"value": "2"},
+		"Line": []map[string]any{{
+			"Amount":    500.00,
+			"LinkedTxn": []map[string]any{{"TxnId": invID, "TxnType": "Invoice"}},
+		}},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("payment create: %d %s", w.Code, w.Body.String())
+	}
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from payment, before=%d after=%d", txsBefore, txsAfter)
+	}
+}
+
+func TestJournalEntries_BillCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Payable", "AccountType": "Accounts Payable",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Office Supplies", "AccountType": "Expense",
+	})
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	doReq(r, "POST", "/v3/company/123/bill", map[string]any{
+		"VendorRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 200.00, "DetailType": "AccountBasedExpenseLineDetail",
+			"AccountBasedExpenseLineDetail": map[string]any{
+				"AccountRef": map[string]any{"value": "2"},
+			},
+		}},
+	})
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from bill, before=%d after=%d", txsBefore, txsAfter)
+	}
+}
+
+func TestJournalEntries_ManualJournalEntry(t *testing.T) {
+	h, r := setupTestHandler()
+
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Bank", "AccountType": "Bank",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Revenue", "AccountType": "Income",
+	})
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	doReq(r, "POST", "/v3/company/123/journalentry", map[string]any{
+		"Line": []map[string]any{
+			{"Amount": 500.00, "DetailType": "JournalEntryLineDetail",
+				"JournalEntryLineDetail": map[string]any{
+					"PostingType": "Debit", "AccountRef": map[string]any{"value": "1"},
+				}},
+			{"Amount": 500.00, "DetailType": "JournalEntryLineDetail",
+				"JournalEntryLineDetail": map[string]any{
+					"PostingType": "Credit", "AccountRef": map[string]any{"value": "2"},
+				}},
+		},
+	})
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from JE, before=%d after=%d", txsBefore, txsAfter)
 	}
 }

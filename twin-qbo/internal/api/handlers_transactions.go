@@ -11,10 +11,20 @@ import (
 // --- Credit Memo ---
 
 func (h *Handler) CreateOrUpdateCreditMemo(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var cm store.CreditMemo
 	if err := json.NewDecoder(r.Body).Decode(&cm); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" || op == "void" {
+		existing, ok := h.store.CreditMemos.Get(cm.Id)
+		if !ok { notFoundFault(w, "CreditMemo", cm.Id); return }
+		if err := ValidateSyncToken(existing.SyncToken, cm.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		if op == "void" { existing.TotalAmt = 0; existing.RemainingCredit = 0; for i := range existing.Line { existing.Line[i].Amount = 0 } }
+		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
+		if op == "delete" { h.store.CreditMemos.Delete(cm.Id); h.fireEvent("CreditMemo", cm.Id, "Delete") } else { h.store.CreditMemos.Set(cm.Id, existing); h.fireEvent("CreditMemo", cm.Id, "Void") }
+		qboJSON(w, http.StatusOK, entityResponse("CreditMemo", existing)); return
 	}
 	if cm.Id != "" {
 		existing, ok := h.store.CreditMemos.Get(cm.Id)
@@ -54,10 +64,16 @@ func computeCreditMemoTotals(cm *store.CreditMemo) {
 // --- Vendor Credit ---
 
 func (h *Handler) CreateOrUpdateVendorCredit(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var vc store.VendorCredit
 	if err := json.NewDecoder(r.Body).Decode(&vc); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.VendorCredits.Get(vc.Id); !ok { notFoundFault(w, "VendorCredit", vc.Id); return }
+		h.store.VendorCredits.Delete(vc.Id); h.fireEvent("VendorCredit", vc.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("VendorCredit", vc)); return
 	}
 	if vc.Id != "" {
 		existing, ok := h.store.VendorCredits.Get(vc.Id)
@@ -92,10 +108,20 @@ func (h *Handler) GetVendorCredit(w http.ResponseWriter, r *http.Request) {
 // --- Sales Receipt ---
 
 func (h *Handler) CreateOrUpdateSalesReceipt(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var sr store.SalesReceipt
 	if err := json.NewDecoder(r.Body).Decode(&sr); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" || op == "void" {
+		existing, ok := h.store.SalesReceipts.Get(sr.Id)
+		if !ok { notFoundFault(w, "SalesReceipt", sr.Id); return }
+		if err := ValidateSyncToken(existing.SyncToken, sr.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		if op == "void" { existing.TotalAmt = 0; for i := range existing.Line { existing.Line[i].Amount = 0 } }
+		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
+		if op == "delete" { h.store.SalesReceipts.Delete(sr.Id); h.fireEvent("SalesReceipt", sr.Id, "Delete") } else { h.store.SalesReceipts.Set(sr.Id, existing); h.fireEvent("SalesReceipt", sr.Id, "Void") }
+		qboJSON(w, http.StatusOK, entityResponse("SalesReceipt", existing)); return
 	}
 	if sr.Id != "" {
 		existing, ok := h.store.SalesReceipts.Get(sr.Id)
@@ -118,6 +144,7 @@ func (h *Handler) CreateOrUpdateSalesReceipt(w http.ResponseWriter, r *http.Requ
 		for _, line := range sr.Line { total += line.Amount }
 		sr.TotalAmt = total
 		h.store.SalesReceipts.Set(sr.Id, sr)
+		h.journalSalesReceiptCreated(&sr)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("SalesReceipt", sr))
 }
@@ -132,10 +159,16 @@ func (h *Handler) GetSalesReceipt(w http.ResponseWriter, r *http.Request) {
 // --- Deposit ---
 
 func (h *Handler) CreateOrUpdateDeposit(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var dep store.Deposit
 	if err := json.NewDecoder(r.Body).Decode(&dep); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.Deposits.Get(dep.Id); !ok { notFoundFault(w, "Deposit", dep.Id); return }
+		h.store.Deposits.Delete(dep.Id); h.fireEvent("Deposit", dep.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("Deposit", dep)); return
 	}
 	if dep.Id != "" {
 		existing, ok := h.store.Deposits.Get(dep.Id)
@@ -155,6 +188,7 @@ func (h *Handler) CreateOrUpdateDeposit(w http.ResponseWriter, r *http.Request) 
 		for _, line := range dep.Line { total += line.Amount }
 		dep.TotalAmt = total
 		h.store.Deposits.Set(dep.Id, dep)
+		h.journalDepositCreated(&dep)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Deposit", dep))
 }
@@ -169,10 +203,16 @@ func (h *Handler) GetDeposit(w http.ResponseWriter, r *http.Request) {
 // --- Transfer ---
 
 func (h *Handler) CreateOrUpdateTransfer(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var xfer store.Transfer
 	if err := json.NewDecoder(r.Body).Decode(&xfer); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.Transfers.Get(xfer.Id); !ok { notFoundFault(w, "Transfer", xfer.Id); return }
+		h.store.Transfers.Delete(xfer.Id); h.fireEvent("Transfer", xfer.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("Transfer", xfer)); return
 	}
 	if xfer.Id != "" {
 		existing, ok := h.store.Transfers.Get(xfer.Id)
@@ -189,6 +229,7 @@ func (h *Handler) CreateOrUpdateTransfer(w http.ResponseWriter, r *http.Request)
 		xfer.Domain = "QBO"
 		xfer.MetaData = h.store.NewMetaData()
 		h.store.Transfers.Set(xfer.Id, xfer)
+		h.journalTransferCreated(&xfer)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Transfer", xfer))
 }
@@ -203,10 +244,16 @@ func (h *Handler) GetTransfer(w http.ResponseWriter, r *http.Request) {
 // --- Journal Entry ---
 
 func (h *Handler) CreateOrUpdateJournalEntry(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var je store.JournalEntry
 	if err := json.NewDecoder(r.Body).Decode(&je); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.JournalEntries.Get(je.Id); !ok { notFoundFault(w, "JournalEntry", je.Id); return }
+		h.store.JournalEntries.Delete(je.Id); h.fireEvent("JournalEntry", je.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("JournalEntry", je)); return
 	}
 	if je.Id != "" {
 		existing, ok := h.store.JournalEntries.Get(je.Id)
@@ -230,6 +277,7 @@ func (h *Handler) CreateOrUpdateJournalEntry(w http.ResponseWriter, r *http.Requ
 		}
 		je.TotalAmt = total
 		h.store.JournalEntries.Set(je.Id, je)
+		h.journalJournalEntryCreated(&je)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("JournalEntry", je))
 }
@@ -244,10 +292,16 @@ func (h *Handler) GetJournalEntry(w http.ResponseWriter, r *http.Request) {
 // --- Estimate ---
 
 func (h *Handler) CreateOrUpdateEstimate(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var est store.Estimate
 	if err := json.NewDecoder(r.Body).Decode(&est); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.Estimates.Get(est.Id); !ok { notFoundFault(w, "Estimate", est.Id); return }
+		h.store.Estimates.Delete(est.Id); h.fireEvent("Estimate", est.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("Estimate", est)); return
 	}
 	if est.Id != "" {
 		existing, ok := h.store.Estimates.Get(est.Id)
@@ -282,10 +336,16 @@ func (h *Handler) GetEstimate(w http.ResponseWriter, r *http.Request) {
 // --- Purchase ---
 
 func (h *Handler) CreateOrUpdatePurchase(w http.ResponseWriter, r *http.Request) {
+	op := r.URL.Query().Get("operation")
 	var pur store.Purchase
 	if err := json.NewDecoder(r.Body).Decode(&pur); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
+	}
+	if op == "delete" {
+		if _, ok := h.store.Purchases.Get(pur.Id); !ok { notFoundFault(w, "Purchase", pur.Id); return }
+		h.store.Purchases.Delete(pur.Id); h.fireEvent("Purchase", pur.Id, "Delete")
+		qboJSON(w, http.StatusOK, entityResponse("Purchase", pur)); return
 	}
 	if pur.Id != "" {
 		existing, ok := h.store.Purchases.Get(pur.Id)
@@ -305,6 +365,7 @@ func (h *Handler) CreateOrUpdatePurchase(w http.ResponseWriter, r *http.Request)
 		for _, line := range pur.Line { total += line.Amount }
 		pur.TotalAmt = total
 		h.store.Purchases.Set(pur.Id, pur)
+		h.journalPurchaseCreated(&pur)
 	}
 	qboJSON(w, http.StatusOK, entityResponse("Purchase", pur))
 }
@@ -322,11 +383,38 @@ func (h *Handler) GetCompanyInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ci, ok := h.store.CompanyInfos.Get(id)
 	if !ok {
-		// Return default company info.
+		// Seed a default and store it so it's updateable.
 		ci = store.CompanyInfo{
 			Id: "1", SyncToken: "0", CompanyName: "Sandbox Company",
+			Country: "US", FiscalYearStartMonth: "January",
 			Domain: "QBO", MetaData: h.store.NewMetaData(),
 		}
+		h.store.CompanyInfos.Set("1", ci)
 	}
+	qboJSON(w, http.StatusOK, entityResponse("CompanyInfo", ci))
+}
+
+func (h *Handler) UpdateCompanyInfo(w http.ResponseWriter, r *http.Request) {
+	var ci store.CompanyInfo
+	if err := json.NewDecoder(r.Body).Decode(&ci); err != nil {
+		validationFault(w, "500", "Invalid JSON", err.Error())
+		return
+	}
+	if ci.Id == "" {
+		ci.Id = "1"
+	}
+	existing, ok := h.store.CompanyInfos.Get(ci.Id)
+	if !ok {
+		existing = store.CompanyInfo{Id: "1", SyncToken: "0", Domain: "QBO", MetaData: h.store.NewMetaData()}
+	}
+	if err := ValidateSyncToken(existing.SyncToken, ci.SyncToken); err != nil {
+		staleSyncTokenFault(w)
+		return
+	}
+	ci.SyncToken = IncrementSyncToken(existing.SyncToken)
+	ci.MetaData.CreateTime = existing.MetaData.CreateTime
+	ci.MetaData.LastUpdatedTime = h.store.Now()
+	ci.Domain = "QBO"
+	h.store.CompanyInfos.Set(ci.Id, ci)
 	qboJSON(w, http.StatusOK, entityResponse("CompanyInfo", ci))
 }
