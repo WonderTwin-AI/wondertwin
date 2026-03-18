@@ -26,6 +26,9 @@ type MemoryStore struct {
 	PaymentMethods       *pkgstore.Store[PaymentMethod]
 	Charges              *pkgstore.Store[Charge]
 	Refunds              *pkgstore.Store[Refund]
+	Subscriptions        *pkgstore.Store[Subscription]
+	Invoices             *pkgstore.Store[Invoice]
+	InvoiceItems         *pkgstore.Store[InvoiceItem]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -52,6 +55,9 @@ func New() *MemoryStore {
 		PaymentMethods:      pkgstore.New[PaymentMethod]("pm"),
 		Charges:             pkgstore.New[Charge]("ch"),
 		Refunds:             pkgstore.New[Refund]("re"),
+		Subscriptions:       pkgstore.New[Subscription]("sub"),
+		Invoices:            pkgstore.New[Invoice]("in"),
+		InvoiceItems:        pkgstore.New[InvoiceItem]("ii"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -174,6 +180,9 @@ type stateSnapshot struct {
 	PaymentMethods      map[string]PaymentMethod       `json:"payment_methods"`
 	Charges             map[string]Charge              `json:"charges"`
 	Refunds             map[string]Refund              `json:"refunds"`
+	Subscriptions       map[string]Subscription        `json:"subscriptions"`
+	Invoices            map[string]Invoice             `json:"invoices"`
+	InvoiceItems        map[string]InvoiceItem         `json:"invoice_items"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -194,6 +203,9 @@ func (s *MemoryStore) Snapshot() any {
 		PaymentMethods:      s.PaymentMethods.Snapshot(),
 		Charges:             s.Charges.Snapshot(),
 		Refunds:             s.Refunds.Snapshot(),
+		Subscriptions:       s.Subscriptions.Snapshot(),
+		Invoices:            s.Invoices.Snapshot(),
+		InvoiceItems:        s.InvoiceItems.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -229,6 +241,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.PaymentMethods.LoadSnapshot(snap.PaymentMethods)
 	s.Charges.LoadSnapshot(snap.Charges)
 	s.Refunds.LoadSnapshot(snap.Refunds)
+	s.Subscriptions.LoadSnapshot(snap.Subscriptions)
+	s.Invoices.LoadSnapshot(snap.Invoices)
+	s.InvoiceItems.LoadSnapshot(snap.InvoiceItems)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -256,6 +271,9 @@ func (s *MemoryStore) Reset() {
 	s.PaymentMethods.Reset()
 	s.Charges.Reset()
 	s.Refunds.Reset()
+	s.Subscriptions.Reset()
+	s.Invoices.Reset()
+	s.InvoiceItems.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

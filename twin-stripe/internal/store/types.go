@@ -295,6 +295,117 @@ type Refund struct {
 	Created       int64             `json:"created"`
 }
 
+// Subscription represents a Stripe subscription.
+type Subscription struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Customer           string            `json:"customer"`
+	Status             string            `json:"status"` // trialing, active, past_due, canceled, unpaid, incomplete, incomplete_expired, paused
+	CurrentPeriodStart int64             `json:"current_period_start"`
+	CurrentPeriodEnd   int64             `json:"current_period_end"`
+	CancelAtPeriodEnd  bool              `json:"cancel_at_period_end"`
+	CancelAt           int64             `json:"cancel_at,omitempty"`
+	CanceledAt         int64             `json:"canceled_at,omitempty"`
+	TrialStart         int64             `json:"trial_start,omitempty"`
+	TrialEnd           int64             `json:"trial_end,omitempty"`
+	Items              *SubscriptionItems `json:"items"`
+	LatestInvoice      string            `json:"latest_invoice,omitempty"`
+	DefaultPaymentMethod string          `json:"default_payment_method,omitempty"`
+	CollectionMethod   string            `json:"collection_method"` // charge_automatically or send_invoice
+	Livemode           bool              `json:"livemode"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
+
+// SubscriptionItems wraps the list of subscription items.
+type SubscriptionItems struct {
+	Object  string             `json:"object"`
+	Data    []SubscriptionItem `json:"data"`
+	HasMore bool               `json:"has_more"`
+	URL     string             `json:"url"`
+}
+
+// SubscriptionItem represents one price in a subscription.
+type SubscriptionItem struct {
+	ID       string `json:"id"`
+	Object   string `json:"object"`
+	Price    Price  `json:"price"`
+	Quantity int64  `json:"quantity"`
+	Created  int64  `json:"created"`
+}
+
+// Invoice represents a Stripe invoice.
+type Invoice struct {
+	ID                    string            `json:"id"`
+	Object                string            `json:"object"`
+	Customer              string            `json:"customer"`
+	Subscription          string            `json:"subscription,omitempty"`
+	Status                string            `json:"status"` // draft, open, paid, uncollectible, void
+	AmountDue             int64             `json:"amount_due"`
+	AmountPaid            int64             `json:"amount_paid"`
+	AmountRemaining       int64             `json:"amount_remaining"`
+	Total                 int64             `json:"total"`
+	Subtotal              int64             `json:"subtotal"`
+	Currency              string            `json:"currency"`
+	CollectionMethod      string            `json:"collection_method"`
+	Paid                  bool              `json:"paid"`
+	Lines                 *InvoiceLines     `json:"lines,omitempty"`
+	DefaultPaymentMethod  string            `json:"default_payment_method,omitempty"`
+	PaymentIntent         string            `json:"payment_intent,omitempty"`
+	HostedInvoiceURL      string            `json:"hosted_invoice_url,omitempty"`
+	Number                string            `json:"number,omitempty"`
+	DueDate               int64             `json:"due_date,omitempty"`
+	PeriodStart           int64             `json:"period_start,omitempty"`
+	PeriodEnd             int64             `json:"period_end,omitempty"`
+	Livemode              bool              `json:"livemode"`
+	Metadata              map[string]string `json:"metadata,omitempty"`
+	Created               int64             `json:"created"`
+}
+
+// InvoiceLines wraps invoice line items.
+type InvoiceLines struct {
+	Object  string        `json:"object"`
+	Data    []InvoiceLine `json:"data"`
+	HasMore bool          `json:"has_more"`
+	URL     string        `json:"url"`
+}
+
+// InvoiceLine represents a line item on an invoice.
+type InvoiceLine struct {
+	ID          string `json:"id"`
+	Object      string `json:"object"`
+	Amount      int64  `json:"amount"`
+	Currency    string `json:"currency"`
+	Description string `json:"description,omitempty"`
+	Price       *Price `json:"price,omitempty"`
+	Quantity    int64  `json:"quantity,omitempty"`
+	Period      *Period `json:"period,omitempty"`
+	Type        string `json:"type"` // subscription or invoiceitem
+}
+
+// Period represents a billing period.
+type Period struct {
+	Start int64 `json:"start"`
+	End   int64 `json:"end"`
+}
+
+// InvoiceItem represents a standalone invoice item.
+type InvoiceItem struct {
+	ID          string            `json:"id"`
+	Object      string            `json:"object"`
+	Customer    string            `json:"customer"`
+	Invoice     string            `json:"invoice,omitempty"`
+	Price       string            `json:"price,omitempty"`
+	Amount      int64             `json:"amount"`
+	Currency    string            `json:"currency"`
+	Description string            `json:"description,omitempty"`
+	Quantity    int64             `json:"quantity"`
+	UnitAmount  int64             `json:"unit_amount,omitempty"`
+	Livemode    bool              `json:"livemode"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Created     int64             `json:"created"`
+}
+
 // AccountBalance tracks per-account balance (available and pending).
 type AccountBalance struct {
 	Available map[string]int64 // currency -> amount
