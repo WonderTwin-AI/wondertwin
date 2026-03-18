@@ -37,7 +37,10 @@ type MemoryStore struct {
 	TaxCodes       *pkgstore.Store[TaxCode]
 	TaxRates       *pkgstore.Store[TaxRate]
 	PreferencesStore *pkgstore.Store[Preferences]
-	Journal        *journal.Journal
+	RefundReceipts   *pkgstore.Store[RefundReceipt]
+	PurchaseOrders   *pkgstore.Store[PurchaseOrder]
+	TimeActivities   *pkgstore.Store[TimeActivity]
+	Journal          *journal.Journal
 	Clock        *pkgstore.Clock
 	idCounter    atomic.Uint64
 }
@@ -71,7 +74,10 @@ func New() *MemoryStore {
 		TaxCodes:        pkgstore.New[TaxCode]("tc"),
 		TaxRates:        pkgstore.New[TaxRate]("tr"),
 		PreferencesStore: pkgstore.New[Preferences]("pref"),
-		Journal:         journal.New(clock),
+		RefundReceipts:   pkgstore.New[RefundReceipt]("rr"),
+		PurchaseOrders:   pkgstore.New[PurchaseOrder]("po"),
+		TimeActivities:   pkgstore.New[TimeActivity]("ta"),
+		Journal:          journal.New(clock),
 		Clock:         clock,
 	}
 }
@@ -118,6 +124,9 @@ type stateSnapshot struct {
 	TaxCodes       map[string]TaxCode       `json:"tax_codes"`
 	TaxRates       map[string]TaxRate       `json:"tax_rates"`
 	Preferences    map[string]Preferences   `json:"preferences"`
+	RefundReceipts map[string]RefundReceipt `json:"refund_receipts"`
+	PurchaseOrders map[string]PurchaseOrder `json:"purchase_orders"`
+	TimeActivities map[string]TimeActivity  `json:"time_activities"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -147,6 +156,9 @@ func (s *MemoryStore) Snapshot() any {
 		TaxCodes:       s.TaxCodes.Snapshot(),
 		TaxRates:       s.TaxRates.Snapshot(),
 		Preferences:    s.PreferencesStore.Snapshot(),
+		RefundReceipts: s.RefundReceipts.Snapshot(),
+		PurchaseOrders: s.PurchaseOrders.Snapshot(),
+		TimeActivities: s.TimeActivities.Snapshot(),
 	}
 }
 
@@ -180,6 +192,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.TaxCodes.LoadSnapshot(snap.TaxCodes)
 	s.TaxRates.LoadSnapshot(snap.TaxRates)
 	s.PreferencesStore.LoadSnapshot(snap.Preferences)
+	s.RefundReceipts.LoadSnapshot(snap.RefundReceipts)
+	s.PurchaseOrders.LoadSnapshot(snap.PurchaseOrders)
+	s.TimeActivities.LoadSnapshot(snap.TimeActivities)
 	return nil
 }
 
@@ -209,6 +224,9 @@ func (s *MemoryStore) Reset() {
 	s.TaxCodes.Reset()
 	s.TaxRates.Reset()
 	s.PreferencesStore.Reset()
+	s.RefundReceipts.Reset()
+	s.PurchaseOrders.Reset()
+	s.TimeActivities.Reset()
 	s.Journal.Reset()
 	s.Clock.Reset()
 	s.idCounter.Store(0)
