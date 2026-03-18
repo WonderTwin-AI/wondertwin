@@ -1215,7 +1215,60 @@ This validates all 8 standard checks: health, reset, state POST/GET, fault injec
 make build && wt down && wt up && wt test
 ```
 
-### Phase 12: Publish (Optional)
+### Phase 12: Integration Finalization (Required)
+
+After the twin passes local testing, complete these integration steps. **This phase is not optional.** A twin that builds and tests but isn't integrated into the monorepo infrastructure is not complete.
+
+**1. Verify `go.work` includes the twin:**
+
+```bash
+grep "twin-{name}" go.work || echo "MISSING: add ./twin-{name} to go.work"
+```
+
+**2. Update CI twin list** in `.github/workflows/ci.yml`:
+
+Find the "Build all twins" step and add the new twin:
+
+```yaml
+for twin in stripe twilio resend posthog logodev loyaltylion smile xero qbo {name}; do
+```
+
+Failure mode: if you skip this, CI won't build or test the twin. It will silently rot.
+
+**3. Run engine conformance suites** (for fintech twins):
+
+If the twin uses a `twinkit/` engine (e.g., `twinkit/ledger/accounting`), run the engine's conformance suite against the twin's engine instance:
+
+```bash
+go test ./twinkit/ledger/accounting/... # engine invariants still hold
+go test ./twin-{name}/...              # twin-specific tests pass
+```
+
+**4. Verify full workspace builds:**
+
+```bash
+go build ./...        # entire workspace compiles
+go test ./...         # no regressions anywhere
+```
+
+**5. Update `twin-manifest.json`** with final coverage numbers — endpoint count, entity count, coverage percentage.
+
+**6. Update `provenance.json`** with final scope (implemented/not_implemented lists).
+
+**7. Commit with a descriptive message** following the repo convention:
+
+```
+feat: add twin-{name} — {Service} API twin
+
+{Brief description of what the twin simulates, key behavioral
+features, port number, and API prefix.}
+```
+
+This phase produces no new code — it verifies and records that the twin is fully integrated. Only after this phase is the twin considered complete.
+
+---
+
+### Phase 13: Publish (Optional)
 
 Once the twin passes local testing and conformance, publish it to make it installable via `wt install`.
 
@@ -1261,10 +1314,11 @@ The recommended workflow emphasizes **offline-first local development**:
  5. Generate Arazzo workflows               (Phase 9)
  6. Scaffold starter scenarios              (Phase 10)
  7. Build and test locally with wt          (Phase 11) ← Primary loop
- 8. Publish to registry when ready          (Phase 12) ← Optional
+ 8. Finalize: CI, go.work, conformance      (Phase 12) ← Required gate
+ 9. Publish to registry when ready          (Phase 13) ← Optional
 ```
 
-For private/internal twins, Phase 12 is entirely optional. The `binary:` field in `wondertwin.json` supports any local path, so you can develop and use twins without ever publishing them.
+For private/internal twins, Phase 13 is entirely optional. Phase 12 is always required — it ensures the twin is integrated into CI, the workspace builds cleanly, and conformance suites pass. The `binary:` field in `wondertwin.json` supports any local path, so you can develop and use twins without ever publishing them.
 
 ---
 
@@ -1302,6 +1356,15 @@ Before considering a twin complete, verify:
 **Webhooks (if applicable):**
 - [ ] Signer implements `webhook.Signer`, dispatcher integrated
 - [ ] `adminHandler.SetFlusher(dispatcher)` called
+
+**Integration (Phase 12 — required):**
+- [ ] `go.work` includes `./twin-{name}`
+- [ ] `.github/workflows/ci.yml` "Build all twins" includes the twin
+- [ ] `go build ./...` succeeds (full workspace)
+- [ ] `go test ./...` passes (no regressions)
+- [ ] Engine conformance suites pass (if using twinkit engines)
+- [ ] `twin-manifest.json` coverage fields are final
+- [ ] `provenance.json` scope lists are final
 
 **Validation:**
 - [ ] Passes `wt conformance` (all 8 checks)
