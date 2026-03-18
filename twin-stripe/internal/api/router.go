@@ -286,6 +286,7 @@ func (h *Handler) Routes(r chi.Router) {
 	// Stripe-specific admin endpoints (outside /v1, no auth)
 	r.Post("/admin/payouts/{id}/fail", h.AdminFailPayout)
 	r.Post("/admin/accounts/{id}/fund", h.AdminFundAccount)
+	r.Post("/admin/checkout/sessions/{id}/complete", h.AdminCompleteCheckoutSession)
 }
 
 // authMiddleware validates Stripe-style Bearer token authentication.

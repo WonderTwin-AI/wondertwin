@@ -540,11 +540,18 @@ type CheckoutSession struct {
 	Subscription  string            `json:"subscription,omitempty"`
 	PaymentStatus string            `json:"payment_status"`
 	Currency      string            `json:"currency,omitempty"`
-	AmountTotal   int64             `json:"amount_total"`
-	ExpiresAt     int64             `json:"expires_at"`
-	Livemode      bool              `json:"livemode"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
-	Created       int64             `json:"created"`
+	AmountTotal   int64                `json:"amount_total"`
+	LineItems     []CheckoutLineItem   `json:"line_items,omitempty"`
+	ExpiresAt     int64                `json:"expires_at"`
+	Livemode      bool                 `json:"livemode"`
+	Metadata      map[string]string    `json:"metadata,omitempty"`
+	Created       int64                `json:"created"`
+}
+
+// CheckoutLineItem represents a line item in a checkout session.
+type CheckoutLineItem struct {
+	Price    string `json:"price"`
+	Quantity int64  `json:"quantity"`
 }
 
 // PaymentLink represents a Stripe Payment Link.
