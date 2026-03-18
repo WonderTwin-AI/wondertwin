@@ -96,6 +96,29 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/invoiceitems/{id}", h.GetInvoiceItem)
 		r.Delete("/invoiceitems/{id}", h.DeleteInvoiceItem)
 
+		// Coupons
+		r.Post("/coupons", h.CreateCoupon)
+		r.Get("/coupons/{id}", h.GetCoupon)
+		r.Delete("/coupons/{id}", h.DeleteCoupon)
+		r.Get("/coupons", h.ListCoupons)
+
+		// Setup Intents
+		r.Post("/setup_intents", h.CreateSetupIntent)
+		r.Get("/setup_intents/{id}", h.GetSetupIntent)
+		r.Post("/setup_intents/{id}/confirm", h.ConfirmSetupIntent)
+		r.Post("/setup_intents/{id}/cancel", h.CancelSetupIntent)
+		r.Get("/setup_intents", h.ListSetupIntents)
+
+		// Tax Rates
+		r.Post("/tax_rates", h.CreateTaxRate)
+		r.Get("/tax_rates/{id}", h.GetTaxRate)
+		r.Get("/tax_rates", h.ListTaxRates)
+
+		// Disputes
+		r.Get("/disputes/{id}", h.GetDispute)
+		r.Post("/disputes/{id}/close", h.CloseDispute)
+		r.Get("/disputes", h.ListDisputes)
+
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)
 		r.Get("/accounts/{id}", h.GetAccount)
