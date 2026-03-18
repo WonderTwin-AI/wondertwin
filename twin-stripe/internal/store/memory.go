@@ -35,6 +35,10 @@ type MemoryStore struct {
 	Disputes             *pkgstore.Store[Dispute]
 	CheckoutSessions     *pkgstore.Store[CheckoutSession]
 	PaymentLinks         *pkgstore.Store[PaymentLink]
+	Tokens               *pkgstore.Store[Token]
+	Sources              *pkgstore.Store[Source]
+	Mandates             *pkgstore.Store[Mandate]
+	ConfirmationTokens   *pkgstore.Store[ConfirmationToken]
 	CreditNotes          *pkgstore.Store[CreditNote]
 	PromotionCodes       *pkgstore.Store[PromotionCode]
 	SubItems             *pkgstore.Store[SubscriptionItem]
@@ -75,6 +79,10 @@ func New() *MemoryStore {
 		Disputes:            pkgstore.New[Dispute]("dp"),
 		CheckoutSessions:    pkgstore.New[CheckoutSession]("cs"),
 		PaymentLinks:        pkgstore.New[PaymentLink]("plink"),
+		Tokens:              pkgstore.New[Token]("tok"),
+		Sources:             pkgstore.New[Source]("src"),
+		Mandates:            pkgstore.New[Mandate]("mandate"),
+		ConfirmationTokens:  pkgstore.New[ConfirmationToken]("ctoken"),
 		CreditNotes:         pkgstore.New[CreditNote]("cn"),
 		PromotionCodes:      pkgstore.New[PromotionCode]("promo"),
 		SubItems:            pkgstore.New[SubscriptionItem]("si"),
@@ -211,6 +219,10 @@ type stateSnapshot struct {
 	Disputes            map[string]Dispute             `json:"disputes"`
 	CheckoutSessions    map[string]CheckoutSession     `json:"checkout_sessions"`
 	PaymentLinks        map[string]PaymentLink         `json:"payment_links"`
+	Tokens              map[string]Token               `json:"tokens"`
+	Sources             map[string]Source              `json:"sources"`
+	Mandates            map[string]Mandate             `json:"mandates"`
+	ConfirmationTokens  map[string]ConfirmationToken   `json:"confirmation_tokens"`
 	CreditNotes         map[string]CreditNote          `json:"credit_notes"`
 	PromotionCodes      map[string]PromotionCode       `json:"promotion_codes"`
 	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
@@ -245,6 +257,10 @@ func (s *MemoryStore) Snapshot() any {
 		Disputes:            s.Disputes.Snapshot(),
 		CheckoutSessions:    s.CheckoutSessions.Snapshot(),
 		PaymentLinks:        s.PaymentLinks.Snapshot(),
+		Tokens:              s.Tokens.Snapshot(),
+		Sources:             s.Sources.Snapshot(),
+		Mandates:            s.Mandates.Snapshot(),
+		ConfirmationTokens:  s.ConfirmationTokens.Snapshot(),
 		CreditNotes:         s.CreditNotes.Snapshot(),
 		PromotionCodes:      s.PromotionCodes.Snapshot(),
 		SubItems:            s.SubItems.Snapshot(),
@@ -294,6 +310,10 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Disputes.LoadSnapshot(snap.Disputes)
 	s.CheckoutSessions.LoadSnapshot(snap.CheckoutSessions)
 	s.PaymentLinks.LoadSnapshot(snap.PaymentLinks)
+	s.Tokens.LoadSnapshot(snap.Tokens)
+	s.Sources.LoadSnapshot(snap.Sources)
+	s.Mandates.LoadSnapshot(snap.Mandates)
+	s.ConfirmationTokens.LoadSnapshot(snap.ConfirmationTokens)
 	s.CreditNotes.LoadSnapshot(snap.CreditNotes)
 	s.PromotionCodes.LoadSnapshot(snap.PromotionCodes)
 	s.SubItems.LoadSnapshot(snap.SubItems)
@@ -335,6 +355,10 @@ func (s *MemoryStore) Reset() {
 	s.Disputes.Reset()
 	s.CheckoutSessions.Reset()
 	s.PaymentLinks.Reset()
+	s.Tokens.Reset()
+	s.Sources.Reset()
+	s.Mandates.Reset()
+	s.ConfirmationTokens.Reset()
 	s.CreditNotes.Reset()
 	s.PromotionCodes.Reset()
 	s.SubItems.Reset()

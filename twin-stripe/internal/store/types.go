@@ -529,6 +529,55 @@ type PaymentLink struct {
 	Created  int64             `json:"created"`
 }
 
+// Token represents a Stripe tokenized payment source.
+type Token struct {
+	ID       string       `json:"id"`
+	Object   string       `json:"object"`
+	Type     string       `json:"type"`
+	Card     *CardDetails `json:"card,omitempty"`
+	Used     bool         `json:"used"`
+	Livemode bool         `json:"livemode"`
+	Created  int64        `json:"created"`
+}
+
+// Source represents a Stripe source object.
+type Source struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Type     string            `json:"type"`
+	Status   string            `json:"status"`
+	Amount   int64             `json:"amount,omitempty"`
+	Currency string            `json:"currency,omitempty"`
+	Customer string            `json:"customer,omitempty"`
+	Flow     string            `json:"flow,omitempty"`
+	Livemode bool              `json:"livemode"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// Mandate represents a Stripe mandate for recurring payments.
+type Mandate struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	PaymentMethod string `json:"payment_method"`
+	Status        string `json:"status"`
+	Type          string `json:"type"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
+// ConfirmationToken represents a Stripe confirmation token.
+type ConfirmationToken struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	PaymentIntent string `json:"payment_intent,omitempty"`
+	SetupIntent   string `json:"setup_intent,omitempty"`
+	PaymentMethod string `json:"payment_method_preview,omitempty"`
+	ExpiresAt     int64  `json:"expires_at"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
 // CreditNote represents a Stripe credit note.
 type CreditNote struct {
 	ID       string            `json:"id"`

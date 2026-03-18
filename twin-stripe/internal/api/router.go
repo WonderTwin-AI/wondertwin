@@ -165,6 +165,21 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/payment_links/{id}", h.UpdatePaymentLink)
 		r.Get("/payment_links", h.ListPaymentLinks)
 
+		// Tokens
+		r.Post("/tokens", h.CreateToken)
+		r.Get("/tokens/{id}", h.GetToken)
+
+		// Sources
+		r.Post("/sources", h.CreateSource)
+		r.Get("/sources/{id}", h.GetSource)
+		r.Post("/sources/{id}", h.UpdateSource)
+
+		// Mandates
+		r.Get("/mandates/{id}", h.GetMandate)
+
+		// Confirmation Tokens
+		r.Get("/confirmation_tokens/{id}", h.GetConfirmationToken)
+
 		// Credit Notes
 		r.Post("/credit_notes", h.CreateCreditNote)
 		r.Get("/credit_notes/preview", h.PreviewCreditNote)
