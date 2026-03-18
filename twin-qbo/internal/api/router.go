@@ -35,6 +35,9 @@ func (h *Handler) Routes(r chi.Router) {
 		// Batch endpoint (up to 30 operations)
 		r.Post("/batch", h.Batch)
 
+		// ChangeDataCapture
+		r.Get("/cdc", h.CDC)
+
 		// Customers
 		r.Post("/customer", h.CreateOrUpdateCustomer)
 		r.Get("/customer/{id}", h.GetCustomer)
