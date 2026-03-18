@@ -90,6 +90,34 @@ func (h *Handler) Query(w http.ResponseWriter, r *http.Request) {
 		items := FilterItems(h.store.Purchases.List(), pq)
 		page := Paginate(items, pq.StartPosition, pq.MaxResults)
 		qboJSON(w, http.StatusOK, queryResponse("Purchase", page, pq.StartPosition, len(page), len(items)))
+	case "employee":
+		items := FilterItems(h.store.Employees.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("Employee", page, pq.StartPosition, len(page), len(items)))
+	case "class":
+		items := FilterItems(h.store.Classes.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("Class", page, pq.StartPosition, len(page), len(items)))
+	case "department":
+		items := FilterItems(h.store.Departments.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("Department", page, pq.StartPosition, len(page), len(items)))
+	case "term":
+		items := FilterItems(h.store.Terms.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("Term", page, pq.StartPosition, len(page), len(items)))
+	case "paymentmethod":
+		items := FilterItems(h.store.PaymentMethods.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("PaymentMethod", page, pq.StartPosition, len(page), len(items)))
+	case "taxcode":
+		items := FilterItems(h.store.TaxCodes.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("TaxCode", page, pq.StartPosition, len(page), len(items)))
+	case "taxrate":
+		items := FilterItems(h.store.TaxRates.List(), pq)
+		page := Paginate(items, pq.StartPosition, pq.MaxResults)
+		qboJSON(w, http.StatusOK, queryResponse("TaxRate", page, pq.StartPosition, len(page), len(items)))
 	default:
 		validationFault(w, "500", "Invalid entity", "Entity '"+pq.Entity+"' is not supported.")
 	}

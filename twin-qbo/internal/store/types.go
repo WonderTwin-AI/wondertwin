@@ -298,6 +298,95 @@ type Purchase struct {
 	Domain      string   `json:"domain"`
 }
 
+// Employee represents a QBO employee.
+type Employee struct {
+	Id          string   `json:"Id"`
+	SyncToken   string   `json:"SyncToken"`
+	DisplayName string   `json:"DisplayName"`
+	GivenName   string   `json:"GivenName,omitempty"`
+	FamilyName  string   `json:"FamilyName,omitempty"`
+	Active      bool     `json:"Active"`
+	MetaData    MetaData `json:"MetaData"`
+	Domain      string   `json:"domain"`
+}
+
+// Class represents a QBO classification for tracking.
+type Class struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Active    bool     `json:"Active"`
+	ParentRef *Ref     `json:"ParentRef,omitempty"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// Department represents a QBO department/location.
+type Department struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Active    bool     `json:"Active"`
+	ParentRef *Ref     `json:"ParentRef,omitempty"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// Term represents a QBO payment term (e.g., Net 30).
+type Term struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	DueDays   int      `json:"DueDays,omitempty"`
+	Active    bool     `json:"Active"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// PaymentMethod represents a QBO payment method (Cash, Check, etc.).
+type PaymentMethod struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	Name      string   `json:"Name"`
+	Type      string   `json:"Type,omitempty"` // CREDIT_CARD or NON_CREDIT_CARD
+	Active    bool     `json:"Active"`
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// TaxCode represents a QBO tax code (read-only in US).
+type TaxCode struct {
+	Id          string `json:"Id"`
+	SyncToken   string `json:"SyncToken"`
+	Name        string `json:"Name"`
+	Description string `json:"Description,omitempty"`
+	Active      bool   `json:"Active"`
+	Taxable     bool   `json:"Taxable"`
+	Domain      string `json:"domain"`
+}
+
+// TaxRate represents a QBO tax rate (read-only in US).
+type TaxRate struct {
+	Id          string  `json:"Id"`
+	SyncToken   string  `json:"SyncToken"`
+	Name        string  `json:"Name"`
+	Description string  `json:"Description,omitempty"`
+	RateValue   float64 `json:"RateValue"`
+	Active      bool    `json:"Active"`
+	Domain      string  `json:"domain"`
+}
+
+// Preferences holds company-wide QBO settings.
+type Preferences struct {
+	Id                    string   `json:"Id"`
+	SyncToken             string   `json:"SyncToken"`
+	AccountingInfoPrefs   map[string]any `json:"AccountingInfoPrefs,omitempty"`
+	SalesFormsPrefs       map[string]any `json:"SalesFormsPrefs,omitempty"`
+	VendorAndPurchasesPrefs map[string]any `json:"VendorAndPurchasesPrefs,omitempty"`
+	MetaData              MetaData `json:"MetaData"`
+	Domain                string   `json:"domain"`
+}
+
 // CompanyInfo holds the company settings (single record, Id="1").
 type CompanyInfo struct {
 	Id                string   `json:"Id"`
