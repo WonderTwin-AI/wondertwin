@@ -152,6 +152,11 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/reports/ProfitAndLoss", h.ProfitAndLoss)
 		r.Get("/reports/BalanceSheet", h.BalanceSheet)
 		r.Get("/reports/TrialBalance", h.TrialBalance)
+		r.Get("/reports/AgedReceivables", h.AgedReceivables)
+		r.Get("/reports/AgedPayables", h.AgedPayables)
+		r.Get("/reports/CustomerBalance", h.CustomerBalance)
+		r.Get("/reports/VendorBalance", h.VendorBalance)
+		r.Get("/reports/GeneralLedger", h.GeneralLedger)
 
 		// Company Info
 		r.Get("/companyinfo/{id}", h.GetCompanyInfo)
