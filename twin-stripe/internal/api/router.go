@@ -164,6 +164,38 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/payment_links/{id}", h.GetPaymentLink)
 		r.Post("/payment_links/{id}", h.UpdatePaymentLink)
 		r.Get("/payment_links", h.ListPaymentLinks)
+
+		// Credit Notes
+		r.Post("/credit_notes", h.CreateCreditNote)
+		r.Get("/credit_notes/preview", h.PreviewCreditNote)
+		r.Get("/credit_notes/{id}", h.GetCreditNote)
+		r.Get("/credit_notes", h.ListCreditNotes)
+		r.Post("/credit_notes/{id}/void", h.VoidCreditNote)
+
+		// Promotion Codes
+		r.Post("/promotion_codes", h.CreatePromotionCode)
+		r.Get("/promotion_codes/{id}", h.GetPromotionCode)
+		r.Post("/promotion_codes/{id}", h.UpdatePromotionCode)
+		r.Get("/promotion_codes", h.ListPromotionCodes)
+
+		// Subscription Items
+		r.Post("/subscription_items", h.CreateSubscriptionItem)
+		r.Get("/subscription_items/{id}", h.GetSubscriptionItem)
+		r.Post("/subscription_items/{id}", h.UpdateSubscriptionItem)
+		r.Delete("/subscription_items/{id}", h.DeleteSubscriptionItem)
+		r.Get("/subscription_items", h.ListSubscriptionItems)
+
+		// Quotes
+		r.Post("/quotes", h.CreateQuote)
+		r.Get("/quotes/{id}", h.GetQuote)
+		r.Post("/quotes/{id}", h.UpdateQuote)
+		r.Post("/quotes/{id}/finalize", h.FinalizeQuote)
+		r.Post("/quotes/{id}/accept", h.AcceptQuote)
+		r.Post("/quotes/{id}/cancel", h.CancelQuote)
+		r.Get("/quotes", h.ListQuotes)
+
+		// Billing Portal Sessions
+		r.Post("/billing_portal/sessions", h.CreateBillingPortalSession)
 	})
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)

@@ -35,6 +35,11 @@ type MemoryStore struct {
 	Disputes             *pkgstore.Store[Dispute]
 	CheckoutSessions     *pkgstore.Store[CheckoutSession]
 	PaymentLinks         *pkgstore.Store[PaymentLink]
+	CreditNotes          *pkgstore.Store[CreditNote]
+	PromotionCodes       *pkgstore.Store[PromotionCode]
+	SubItems             *pkgstore.Store[SubscriptionItem]
+	Quotes               *pkgstore.Store[Quote]
+	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -70,6 +75,11 @@ func New() *MemoryStore {
 		Disputes:            pkgstore.New[Dispute]("dp"),
 		CheckoutSessions:    pkgstore.New[CheckoutSession]("cs"),
 		PaymentLinks:        pkgstore.New[PaymentLink]("plink"),
+		CreditNotes:         pkgstore.New[CreditNote]("cn"),
+		PromotionCodes:      pkgstore.New[PromotionCode]("promo"),
+		SubItems:            pkgstore.New[SubscriptionItem]("si"),
+		Quotes:              pkgstore.New[Quote]("qt"),
+		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -201,6 +211,11 @@ type stateSnapshot struct {
 	Disputes            map[string]Dispute             `json:"disputes"`
 	CheckoutSessions    map[string]CheckoutSession     `json:"checkout_sessions"`
 	PaymentLinks        map[string]PaymentLink         `json:"payment_links"`
+	CreditNotes         map[string]CreditNote          `json:"credit_notes"`
+	PromotionCodes      map[string]PromotionCode       `json:"promotion_codes"`
+	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
+	Quotes              map[string]Quote               `json:"quotes"`
+	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -230,6 +245,11 @@ func (s *MemoryStore) Snapshot() any {
 		Disputes:            s.Disputes.Snapshot(),
 		CheckoutSessions:    s.CheckoutSessions.Snapshot(),
 		PaymentLinks:        s.PaymentLinks.Snapshot(),
+		CreditNotes:         s.CreditNotes.Snapshot(),
+		PromotionCodes:      s.PromotionCodes.Snapshot(),
+		SubItems:            s.SubItems.Snapshot(),
+		Quotes:              s.Quotes.Snapshot(),
+		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -274,6 +294,11 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Disputes.LoadSnapshot(snap.Disputes)
 	s.CheckoutSessions.LoadSnapshot(snap.CheckoutSessions)
 	s.PaymentLinks.LoadSnapshot(snap.PaymentLinks)
+	s.CreditNotes.LoadSnapshot(snap.CreditNotes)
+	s.PromotionCodes.LoadSnapshot(snap.PromotionCodes)
+	s.SubItems.LoadSnapshot(snap.SubItems)
+	s.Quotes.LoadSnapshot(snap.Quotes)
+	s.BillingPortalSessions.LoadSnapshot(snap.BillingPortalSessions)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -310,6 +335,11 @@ func (s *MemoryStore) Reset() {
 	s.Disputes.Reset()
 	s.CheckoutSessions.Reset()
 	s.PaymentLinks.Reset()
+	s.CreditNotes.Reset()
+	s.PromotionCodes.Reset()
+	s.SubItems.Reset()
+	s.Quotes.Reset()
+	s.BillingPortalSessions.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()
