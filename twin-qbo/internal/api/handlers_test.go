@@ -457,6 +457,79 @@ func TestReports_TrialBalance(t *testing.T) {
 	}
 }
 
+// --- Void/Delete Operations (GAP-003) ---
+
+func TestBill_Void(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/bill", map[string]any{
+		"VendorRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 200.00, "DetailType": "AccountBasedExpenseLineDetail",
+			"AccountBasedExpenseLineDetail": map[string]any{"AccountRef": map[string]any{"value": "1"}}}},
+	})
+	resp := parseResp(t, w)
+	billID := resp["Bill"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/bill?operation=void", map[string]any{
+		"Id": billID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("void bill: %d %s", w.Code, w.Body.String())
+	}
+	resp = parseResp(t, w)
+	bill := resp["Bill"].(map[string]any)
+	if bill["Balance"].(float64) != 0 {
+		t.Errorf("voided Balance = %v, want 0", bill["Balance"])
+	}
+	if bill["TotalAmt"].(float64) != 0 {
+		t.Errorf("voided TotalAmt = %v, want 0", bill["TotalAmt"])
+	}
+}
+
+func TestCreditMemo_Delete(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/creditmemo", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 50.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 50}}},
+	})
+	cmID := parseResp(t, w)["CreditMemo"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/creditmemo?operation=delete", map[string]any{
+		"Id": cmID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete credit memo: %d %s", w.Code, w.Body.String())
+	}
+
+	// Should be gone.
+	w = doReq(r, "GET", "/v3/company/123/creditmemo/"+cmID, nil)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 after delete, got %d", w.Code)
+	}
+}
+
+func TestSalesReceipt_Void(t *testing.T) {
+	_, r := setupTestHandler()
+	w := doReq(r, "POST", "/v3/company/123/salesreceipt", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 75.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 75}}},
+	})
+	srID := parseResp(t, w)["SalesReceipt"].(map[string]any)["Id"].(string)
+
+	w = doReq(r, "POST", "/v3/company/123/salesreceipt?operation=void", map[string]any{
+		"Id": srID, "SyncToken": "0",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("void sales receipt: %d %s", w.Code, w.Body.String())
+	}
+	resp := parseResp(t, w)
+	sr := resp["SalesReceipt"].(map[string]any)
+	if sr["TotalAmt"].(float64) != 0 {
+		t.Errorf("voided TotalAmt = %v, want 0", sr["TotalAmt"])
+	}
+}
+
 // --- Journal Entry Generation (GAP-001) ---
 
 func TestJournalEntries_InvoiceCreatesEntries(t *testing.T) {

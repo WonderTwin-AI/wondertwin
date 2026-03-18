@@ -17,14 +17,33 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if op == "delete" {
-		if _, ok := h.store.Bills.Get(bill.Id); !ok {
+	if op == "delete" || op == "void" {
+		existing, ok := h.store.Bills.Get(bill.Id)
+		if !ok {
 			notFoundFault(w, "Bill", bill.Id)
 			return
 		}
-		h.store.Bills.Delete(bill.Id)
-		h.fireEvent("Bill", bill.Id, "Delete")
-		qboJSON(w, http.StatusOK, entityResponse("Bill", bill))
+		if err := ValidateSyncToken(existing.SyncToken, bill.SyncToken); err != nil {
+			staleSyncTokenFault(w)
+			return
+		}
+		if op == "void" {
+			existing.Balance = 0
+			existing.TotalAmt = 0
+			for i := range existing.Line {
+				existing.Line[i].Amount = 0
+			}
+		}
+		existing.SyncToken = IncrementSyncToken(existing.SyncToken)
+		existing.MetaData.LastUpdatedTime = h.store.Now()
+		if op == "delete" {
+			h.store.Bills.Delete(bill.Id)
+			h.fireEvent("Bill", bill.Id, "Delete")
+		} else {
+			h.store.Bills.Set(bill.Id, existing)
+			h.fireEvent("Bill", bill.Id, "Void")
+		}
+		qboJSON(w, http.StatusOK, entityResponse("Bill", existing))
 		return
 	}
 
