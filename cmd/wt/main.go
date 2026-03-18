@@ -36,9 +36,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wondertwin-ai/wondertwin/internal/cache"
 	"github.com/wondertwin-ai/wondertwin/internal/client"
 	"github.com/wondertwin-ai/wondertwin/internal/config"
 	"github.com/wondertwin-ai/wondertwin/internal/conformance"
+	"github.com/wondertwin-ai/wondertwin/internal/content"
 	"github.com/wondertwin-ai/wondertwin/internal/lockfile"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
@@ -113,6 +115,8 @@ func main() {
 		err = cmdAuth(args)
 	case "registry":
 		err = cmdRegistry(args)
+	case "cache":
+		err = cmdCache(manifestPath, args)
 	case "conformance":
 		err = cmdConformance(args)
 	default:
@@ -176,6 +180,8 @@ Commands:
   registry add <n> <url>     Add a named registry (--token <t> for auth)
   registry remove <name>     Remove a named registry
   registry list              List configured registries
+  cache warm [twin...]       Fetch and cache content for manifest twins
+  cache clear [twin...]      Remove cached content
   conformance <binary>       Run conformance tests against a twin binary
   version                    Print the wt version
 
@@ -183,8 +189,9 @@ Options:
   --config <path>   Path to manifest (default: ./wondertwin.json, falls back to .yaml)
 
 Environment:
-  WT_CONFIG         Override default manifest path
-  WT_REGISTRY_URL   Override registry URL
+  WT_CONFIG              Override default manifest path
+  WT_REGISTRY_URL        Override registry URL
+  WONDERTWIN_CONTENT_URL Override content API URL (default: https://api.wondertwin.ai)
 `, version)
 }
 
@@ -214,6 +221,11 @@ func cmdUp(manifestPath string) error {
 		if err := cmdInstall(manifestPath, nil); err != nil {
 			return err
 		}
+	}
+
+	// Resolve content for commercial twins (non-fatal)
+	if err := resolveContent(m); err != nil {
+		fmt.Printf("warn: content resolution: %v\n", err)
 	}
 
 	pids, _ := procmgr.LoadPids()
@@ -267,6 +279,9 @@ func cmdUp(manifestPath string) error {
 			allHealthy = false
 		}
 	}
+
+	// Load cached content into healthy twins via /admin/state
+	loadContentIntoTwins(m, ac, names)
 
 	fmt.Println()
 	if allHealthy {
@@ -1148,6 +1163,207 @@ func cmdCI(manifestPath string) error {
 		return fmt.Errorf("failed to install: %s", strings.Join(failed, ", "))
 	}
 	fmt.Println("All twins installed from lock file.")
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Content resolution helpers
+// ---------------------------------------------------------------------------
+
+const defaultContentURL = "https://api.wondertwin.ai"
+
+// contentURL returns the Content API base URL, checking env override first.
+func contentURL() string {
+	if u := os.Getenv("WONDERTWIN_CONTENT_URL"); u != "" {
+		return u
+	}
+	return defaultContentURL
+}
+
+// cacheDir returns the path to ~/.wondertwin/cache.
+func cacheDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ".wondertwin/cache"
+	}
+	return filepath.Join(home, ".wondertwin", "cache")
+}
+
+// resolveContent fetches and caches content for all twins in the manifest
+// that have a version set. Returns nil if no license is configured.
+func resolveContent(m *manifest.Manifest) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if !cfg.HasValidLicense() {
+		return nil
+	}
+
+	store := cache.NewStore(cacheDir(), cfg.LicenseKey)
+	cc := content.NewClient(contentURL(), cfg.LicenseKey)
+
+	for _, name := range m.TwinNames() {
+		twin := m.Twins[name]
+		version := twin.Version
+		if version == "" || version == "latest" {
+			continue
+		}
+
+		if store.IsValid(name, version) {
+			continue
+		}
+
+		raw, _, err := cc.FetchContent(name, version)
+		if err != nil {
+			// Graceful degradation: check for stale cache
+			_, meta, cacheErr := store.Get(name, version)
+			if cacheErr == nil && meta != nil {
+				fmt.Printf("  warn: content fetch failed for %s@%s, using stale cache: %v\n", name, version, err)
+				continue
+			}
+			fmt.Printf("  warn: content fetch failed for %s@%s: %v\n", name, version, err)
+			continue
+		}
+
+		if err := store.Put(name, version, raw, 24); err != nil {
+			fmt.Printf("  warn: caching content for %s@%s: %v\n", name, version, err)
+		}
+	}
+
+	return nil
+}
+
+// loadContentIntoTwins posts cached content payloads to healthy twins via /admin/state.
+func loadContentIntoTwins(m *manifest.Manifest, ac *client.AdminClient, names []string) {
+	cfg, _ := config.Load()
+	if cfg == nil || !cfg.HasValidLicense() {
+		return
+	}
+
+	store := cache.NewStore(cacheDir(), cfg.LicenseKey)
+
+	for _, name := range names {
+		twin := m.Twins[name]
+		version := twin.Version
+		if version == "" || version == "latest" {
+			continue
+		}
+
+		payload, _, err := store.Get(name, version)
+		if err != nil || payload == nil {
+			continue
+		}
+
+		if _, err := ac.PostState(twin.AdminPort, payload); err != nil {
+			fmt.Printf("  warn: loading content into %s: %v\n", name, err)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// wt cache warm|clear
+// ---------------------------------------------------------------------------
+
+func cmdCache(manifestPath string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: wt cache <warm|clear>")
+	}
+
+	switch args[0] {
+	case "warm":
+		return cmdCacheWarm(manifestPath, args[1:])
+	case "clear":
+		return cmdCacheClear(args[1:])
+	default:
+		return fmt.Errorf("unknown cache subcommand %q (expected warm or clear)", args[0])
+	}
+}
+
+func cmdCacheWarm(manifestPath string, args []string) error {
+	m, err := manifest.Load(manifestPath)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if !cfg.HasValidLicense() {
+		return fmt.Errorf("no valid license key — run 'wt auth login' first")
+	}
+
+	store := cache.NewStore(cacheDir(), cfg.LicenseKey)
+	cc := content.NewClient(contentURL(), cfg.LicenseKey)
+
+	// If specific twins given, use those; otherwise use manifest
+	targets := args
+	if len(targets) == 0 {
+		targets = m.TwinNames()
+	}
+
+	fmt.Println("Warming content cache...")
+	fmt.Println()
+
+	for _, name := range targets {
+		twin, err := m.Twin(name)
+		if err != nil {
+			fmt.Printf("  %-20s skipped (not in manifest)\n", name)
+			continue
+		}
+		version := twin.Version
+		if version == "" || version == "latest" {
+			fmt.Printf("  %-20s skipped (no pinned version)\n", name)
+			continue
+		}
+
+		if store.IsValid(name, version) {
+			fmt.Printf("  %-20s cached (valid)\n", name)
+			continue
+		}
+
+		raw, _, err := cc.FetchContent(name, version)
+		if err != nil {
+			fmt.Printf("  %-20s FAILED — %v\n", name, err)
+			continue
+		}
+
+		if err := store.Put(name, version, raw, 24); err != nil {
+			fmt.Printf("  %-20s FAILED — %v\n", name, err)
+			continue
+		}
+		fmt.Printf("  %-20s cached %s@%s\n", name, name, version)
+	}
+
+	fmt.Println()
+	return nil
+}
+
+func cmdCacheClear(args []string) error {
+	cfg, _ := config.Load()
+	licenseKey := ""
+	if cfg != nil {
+		licenseKey = cfg.LicenseKey
+	}
+
+	store := cache.NewStore(cacheDir(), licenseKey)
+
+	if len(args) == 0 {
+		if err := store.Clear("", ""); err != nil {
+			return fmt.Errorf("clearing cache: %w", err)
+		}
+		fmt.Println("Content cache cleared.")
+		return nil
+	}
+
+	for _, name := range args {
+		if err := store.Clear(name, ""); err != nil {
+			fmt.Printf("  warn: clearing cache for %s: %v\n", name, err)
+			continue
+		}
+		fmt.Printf("  Cleared cache for %s\n", name)
+	}
 	return nil
 }
 

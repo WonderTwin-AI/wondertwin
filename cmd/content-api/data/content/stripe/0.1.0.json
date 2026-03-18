@@ -1,0 +1,46 @@
+{
+  "twin": "stripe",
+  "version": "0.1.0",
+  "quirks": [
+    {
+      "id": "STRIPE-Q-001",
+      "service": "stripe",
+      "resource": "customer",
+      "type": "behavioral",
+      "severity": "moderate",
+      "summary": "Creating a customer with a duplicate email silently succeeds and creates a second customer record instead of returning an error."
+    },
+    {
+      "id": "STRIPE-Q-002",
+      "service": "stripe",
+      "resource": "subscription",
+      "type": "behavioral",
+      "severity": "critical",
+      "summary": "Canceling a subscription with prorate=true during a trial period still generates a zero-amount invoice rather than skipping invoice creation."
+    },
+    {
+      "id": "STRIPE-Q-003",
+      "service": "stripe",
+      "resource": "payment_intent",
+      "type": "behavioral",
+      "severity": "minor",
+      "summary": "PaymentIntent metadata is limited to 50 keys but the API accepts the request and silently drops keys beyond the limit without returning an error."
+    },
+    {
+      "id": "STRIPE-Q-004",
+      "service": "stripe",
+      "resource": "invoice",
+      "type": "temporal",
+      "severity": "moderate",
+      "summary": "Finalizing an invoice within 1 second of creation may return a 402 if the customer default payment method webhook has not yet propagated."
+    },
+    {
+      "id": "STRIPE-Q-005",
+      "service": "stripe",
+      "resource": "refund",
+      "type": "behavioral",
+      "severity": "moderate",
+      "summary": "Refunding a charge that was created with a connected account requires the Stripe-Account header even if the refund endpoint is called with the charge ID directly."
+    }
+  ]
+}
