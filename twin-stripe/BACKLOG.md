@@ -15,12 +15,9 @@ These are called constantly by SDKs after creation. Currently missing entirely.
 - [x] `AttachPaymentMethod` — validate customer exists before attaching
 - [x] `CreateSubscription` — validate customer exists before creating
 
-### 3. Customer deletion cascade
-- [ ] Cancel active subscriptions on customer delete
-- [ ] Detach payment methods on customer delete
-- [ ] (Optional) Void draft invoices on customer delete
-
-Currently deleting a customer leaves orphaned child resources.
+### 3. ~~Customer deletion cascade~~ (done)
+- [x] Cancel active subscriptions on customer delete
+- [x] Detach payment methods on customer delete
 
 ## Medium Value
 
