@@ -33,6 +33,8 @@ type MemoryStore struct {
 	SetupIntents         *pkgstore.Store[SetupIntent]
 	TaxRates             *pkgstore.Store[TaxRate]
 	Disputes             *pkgstore.Store[Dispute]
+	CheckoutSessions     *pkgstore.Store[CheckoutSession]
+	PaymentLinks         *pkgstore.Store[PaymentLink]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -66,6 +68,8 @@ func New() *MemoryStore {
 		SetupIntents:        pkgstore.New[SetupIntent]("seti"),
 		TaxRates:            pkgstore.New[TaxRate]("txr"),
 		Disputes:            pkgstore.New[Dispute]("dp"),
+		CheckoutSessions:    pkgstore.New[CheckoutSession]("cs"),
+		PaymentLinks:        pkgstore.New[PaymentLink]("plink"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -195,6 +199,8 @@ type stateSnapshot struct {
 	SetupIntents        map[string]SetupIntent         `json:"setup_intents"`
 	TaxRates            map[string]TaxRate             `json:"tax_rates"`
 	Disputes            map[string]Dispute             `json:"disputes"`
+	CheckoutSessions    map[string]CheckoutSession     `json:"checkout_sessions"`
+	PaymentLinks        map[string]PaymentLink         `json:"payment_links"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -222,6 +228,8 @@ func (s *MemoryStore) Snapshot() any {
 		SetupIntents:        s.SetupIntents.Snapshot(),
 		TaxRates:            s.TaxRates.Snapshot(),
 		Disputes:            s.Disputes.Snapshot(),
+		CheckoutSessions:    s.CheckoutSessions.Snapshot(),
+		PaymentLinks:        s.PaymentLinks.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -264,6 +272,8 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.SetupIntents.LoadSnapshot(snap.SetupIntents)
 	s.TaxRates.LoadSnapshot(snap.TaxRates)
 	s.Disputes.LoadSnapshot(snap.Disputes)
+	s.CheckoutSessions.LoadSnapshot(snap.CheckoutSessions)
+	s.PaymentLinks.LoadSnapshot(snap.PaymentLinks)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -298,6 +308,8 @@ func (s *MemoryStore) Reset() {
 	s.SetupIntents.Reset()
 	s.TaxRates.Reset()
 	s.Disputes.Reset()
+	s.CheckoutSessions.Reset()
+	s.PaymentLinks.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

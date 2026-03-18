@@ -152,6 +152,18 @@ func (h *Handler) Routes(r chi.Router) {
 		// Events
 		r.Get("/events", h.ListEvents)
 		r.Get("/events/{id}", h.GetEvent)
+
+		// Checkout Sessions
+		r.Post("/checkout/sessions", h.CreateCheckoutSession)
+		r.Get("/checkout/sessions/{id}", h.GetCheckoutSession)
+		r.Get("/checkout/sessions", h.ListCheckoutSessions)
+		r.Post("/checkout/sessions/{id}/expire", h.ExpireCheckoutSession)
+
+		// Payment Links
+		r.Post("/payment_links", h.CreatePaymentLink)
+		r.Get("/payment_links/{id}", h.GetPaymentLink)
+		r.Post("/payment_links/{id}", h.UpdatePaymentLink)
+		r.Get("/payment_links", h.ListPaymentLinks)
 	})
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)

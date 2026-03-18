@@ -493,6 +493,40 @@ const (
 	PayoutStatusCanceled  = "canceled"
 )
 
+// CheckoutSession represents a Stripe Checkout Session.
+type CheckoutSession struct {
+	ID            string            `json:"id"`
+	Object        string            `json:"object"`
+	Mode          string            `json:"mode"`
+	Status        string            `json:"status"`
+	URL           string            `json:"url,omitempty"`
+	SuccessURL    string            `json:"success_url,omitempty"`
+	CancelURL     string            `json:"cancel_url,omitempty"`
+	Customer      string            `json:"customer,omitempty"`
+	CustomerEmail string            `json:"customer_email,omitempty"`
+	PaymentIntent string            `json:"payment_intent,omitempty"`
+	Subscription  string            `json:"subscription,omitempty"`
+	PaymentStatus string            `json:"payment_status"`
+	Currency      string            `json:"currency,omitempty"`
+	AmountTotal   int64             `json:"amount_total"`
+	ExpiresAt     int64             `json:"expires_at"`
+	Livemode      bool              `json:"livemode"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Created       int64             `json:"created"`
+}
+
+// PaymentLink represents a Stripe Payment Link.
+type PaymentLink struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Active   bool              `json:"active"`
+	URL      string            `json:"url"`
+	Currency string            `json:"currency,omitempty"`
+	Livemode bool              `json:"livemode"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
 // Default timestamps for testing.
 func Now() int64 {
 	return time.Now().Unix()
