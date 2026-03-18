@@ -235,13 +235,15 @@ Add tests to the existing `handlers_test.go` file.
 
 ### Phase 8: Update Manifest and Provenance
 
+**This phase is mandatory and must be included in the same PR as the code changes.** A PR that adds handlers but doesn't update the manifest is incomplete. Do not defer manifest updates to a follow-up PR.
+
 **`twin-manifest.json`:**
 
 - Add new resources to `coverage.resources_implemented`
 - Remove them from `coverage.resources_not_implemented`
-- Update `estimated_coverage_pct`
+- Update `estimated_coverage_pct` to reflect the actual ratio of implemented vs. total SDK operations
 - Update `description` to mention new capabilities
-- Update `service_surface.resource_count`
+- Update `service_surface.resource_count` to match the implemented count
 
 **`provenance.json`:**
 
@@ -280,3 +282,4 @@ Before considering the extension complete:
 4. **Overwriting properties on upsert instead of merging** — new properties should override, but existing properties not in the update should be preserved
 5. **Forgetting to nil-check new fields in `LoadState()`** — existing seed data won't have the new fields
 6. **Updating coverage percentage without updating the resource lists** — `resources_implemented` and `resources_not_implemented` must match the declared percentage
+7. **Deferring manifest updates to a follow-up PR** — every PR that changes what the twin implements MUST update `twin-manifest.json` and `provenance.json` in the same PR. This includes coverage lists, percentage, resource count, and description

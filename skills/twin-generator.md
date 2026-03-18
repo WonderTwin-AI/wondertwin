@@ -1302,14 +1302,19 @@ Before considering a twin complete, verify:
 - [ ] Handler tests cover CRUD operations, pagination, reset, and auth
 - [ ] No hardcoded ports (uses `twincore.ParseFlags()`)
 
-**Pipeline artifacts:**
+**Pipeline artifacts (must be updated in the same PR as code changes):**
 - [ ] `twin-manifest.json` is present and validates against `schemas/twin-manifest.schema.json`
 - [ ] `provenance.json` is present and validates against `schemas/provenance.schema.json`
 - [ ] `workflows/{name}.arazzo.json` is present with at least one workflow (if multi-step sequences exist)
 - [ ] `scenarios/basic.json` is present and validates against `schemas/scenario.schema.json`
 - [ ] Manifest `service_surface` fields are populated (auth pattern, webhook support, resource count)
-- [ ] Manifest `coverage` fields reflect actual implementation status
+- [ ] Manifest `coverage.resources_implemented` lists every resource the twin actually handles
+- [ ] Manifest `coverage.resources_not_implemented` lists known gaps
+- [ ] Manifest `coverage.estimated_coverage_pct` reflects the actual ratio
+- [ ] Manifest `service_surface.resource_count` matches the implemented count
+- [ ] Manifest `description` reflects current capabilities
 - [ ] Provenance `sources` accurately records what was used during generation
+- [ ] Provenance `build` number is incremented for each change
 
 **Webhooks (if applicable):**
 - [ ] Signer implements `webhook.Signer`, dispatcher integrated
@@ -1465,3 +1470,4 @@ After generating a new twin, add it to this list in the same PR. After removing 
 18. **Forgetting to update the CI twin list** — `.github/workflows/ci.yml` has a hardcoded list of twins to build. Adding or removing a twin without updating this list breaks CI for all PRs
 19. **Assuming 1 endpoint = 1 operation** — analytics services (PostHog, Segment, Amplitude) route multiple logical operations through a single endpoint via event type discrimination. Analyze the SDK to identify all message types sent through shared endpoints
 20. **Not creating admin endpoints for derived entities** — when a single endpoint creates multiple entity types (e.g., `/capture` creates events, persons, aliases, and groups), each entity type needs its own admin endpoint for test observability
+21. **Shipping code without updating `twin-manifest.json`** — every PR that adds, removes, or changes resources MUST update the manifest in the same PR. This includes `coverage.resources_implemented`, `resources_not_implemented`, `estimated_coverage_pct`, `service_surface.resource_count`, and `description`. A PR that adds handlers but doesn't update the manifest is incomplete
