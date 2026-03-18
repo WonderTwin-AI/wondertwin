@@ -53,6 +53,29 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/prices/{id}", h.UpdatePrice)
 		r.Get("/prices", h.ListPrices)
 
+		// Payment Intents
+		r.Post("/payment_intents", h.CreatePaymentIntent)
+		r.Get("/payment_intents/{id}", h.GetPaymentIntent)
+		r.Post("/payment_intents/{id}/confirm", h.ConfirmPaymentIntent)
+		r.Post("/payment_intents/{id}/cancel", h.CancelPaymentIntent)
+		r.Get("/payment_intents", h.ListPaymentIntents)
+
+		// Payment Methods
+		r.Post("/payment_methods", h.CreatePaymentMethod)
+		r.Get("/payment_methods/{id}", h.GetPaymentMethod)
+		r.Post("/payment_methods/{id}/attach", h.AttachPaymentMethod)
+		r.Post("/payment_methods/{id}/detach", h.DetachPaymentMethod)
+		r.Get("/payment_methods", h.ListPaymentMethods)
+
+		// Charges
+		r.Get("/charges/{id}", h.GetCharge)
+		r.Get("/charges", h.ListCharges)
+
+		// Refunds
+		r.Post("/refunds", h.CreateRefund)
+		r.Get("/refunds/{id}", h.GetRefund)
+		r.Get("/refunds", h.ListRefunds)
+
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)
 		r.Get("/accounts/{id}", h.GetAccount)
