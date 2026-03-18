@@ -184,6 +184,143 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		sub.Metadata = meta
 	}
 
+	// Handle item changes (price/quantity updates) with proration.
+	prorationBehavior := r.FormValue("proration_behavior")
+	if prorationBehavior == "" {
+		prorationBehavior = "create_prorations" // Stripe default
+	}
+
+	var newItems []store.SubscriptionItem
+	hasItemChanges := false
+	for i := 0; i < 10; i++ {
+		priceID := r.FormValue("items[" + strconv.Itoa(i) + "][price]")
+		if priceID == "" {
+			break
+		}
+		hasItemChanges = true
+		price, ok := h.store.Prices.Get(priceID)
+		if !ok {
+			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+			return
+		}
+		qty := int64(1)
+		if v := r.FormValue("items[" + strconv.Itoa(i) + "][quantity]"); v != "" {
+			if q, err := strconv.ParseInt(v, 10, 64); err == nil {
+				qty = q
+			}
+		}
+		siID := id + "_si_" + strconv.Itoa(i)
+		newItems = append(newItems, store.SubscriptionItem{
+			ID:       siID,
+			Object:   "subscription_item",
+			Price:    price,
+			Quantity: qty,
+			Created:  store.Now(),
+		})
+	}
+
+	if hasItemChanges && sub.Items != nil && prorationBehavior == "create_prorations" {
+		now := h.store.Clock.Now().Unix()
+		periodTotal := sub.CurrentPeriodEnd - sub.CurrentPeriodStart
+		if periodTotal <= 0 {
+			periodTotal = 1
+		}
+		remaining := sub.CurrentPeriodEnd - now
+		if remaining < 0 {
+			remaining = 0
+		}
+		fraction := float64(remaining) / float64(periodTotal)
+
+		// Credit for unused time on old items.
+		var oldTotal int64
+		for _, item := range sub.Items.Data {
+			oldTotal += item.Price.UnitAmount * item.Quantity
+		}
+		credit := int64(float64(oldTotal) * fraction)
+
+		// Charge for remaining time on new items.
+		var newTotal int64
+		for _, item := range newItems {
+			newTotal += item.Price.UnitAmount * item.Quantity
+		}
+		charge := int64(float64(newTotal) * fraction)
+
+		prorationAmount := charge - credit
+
+		// Generate a proration invoice if there's a net difference.
+		if prorationAmount != 0 {
+			invID := h.store.Invoices.NextID()
+			currency := "usd"
+			if len(newItems) > 0 {
+				currency = newItems[0].Price.Currency
+			}
+
+			var lines []store.InvoiceLine
+			if credit > 0 {
+				lines = append(lines, store.InvoiceLine{
+					ID:          invID + "_il_credit",
+					Object:      "line_item",
+					Amount:      -credit,
+					Currency:    currency,
+					Description: "Unused time on previous plan",
+					Type:        "invoiceitem",
+				})
+			}
+			if charge > 0 {
+				lines = append(lines, store.InvoiceLine{
+					ID:          invID + "_il_charge",
+					Object:      "line_item",
+					Amount:      charge,
+					Currency:    currency,
+					Description: "Remaining time on new plan",
+					Type:        "invoiceitem",
+				})
+			}
+
+			inv := store.Invoice{
+				ID:               invID,
+				Object:           "invoice",
+				Customer:         sub.Customer,
+				Subscription:     sub.ID,
+				Status:           "paid",
+				Total:            prorationAmount,
+				Subtotal:         prorationAmount,
+				AmountDue:        prorationAmount,
+				AmountPaid:       prorationAmount,
+				Currency:         currency,
+				CollectionMethod: sub.CollectionMethod,
+				Paid:             true,
+				Lines:            &store.InvoiceLines{Object: "list", Data: lines, URL: "/v1/invoices/" + invID + "/lines"},
+				Number:           "INV-" + invID,
+				Description:      "Proration",
+				Livemode:         false,
+				Created:          store.Now(),
+			}
+			h.store.Invoices.Set(invID, inv)
+			sub.LatestInvoice = invID
+			h.emitEvent("invoice.created", mapFromJSON(inv))
+			if inv.Paid {
+				h.emitEvent("invoice.paid", mapFromJSON(inv))
+			}
+		}
+
+		// Update subscription items.
+		sub.Items = &store.SubscriptionItems{
+			Object:  "list",
+			Data:    newItems,
+			HasMore: false,
+			URL:     "/v1/subscription_items?subscription=" + id,
+		}
+	} else if hasItemChanges {
+		// proration_behavior=none: just swap items, no invoice.
+		sub.Items = &store.SubscriptionItems{
+			Object:  "list",
+			Data:    newItems,
+			HasMore: false,
+			URL:     "/v1/subscription_items?subscription=" + id,
+		}
+	}
+
 	h.store.Subscriptions.Set(id, sub)
 	h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 	twincore.JSON(w, http.StatusOK, sub)
