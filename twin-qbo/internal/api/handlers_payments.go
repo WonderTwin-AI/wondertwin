@@ -92,6 +92,7 @@ func (h *Handler) CreateOrUpdatePayment(w http.ResponseWriter, r *http.Request) 
 		pmt.UnappliedAmt = pmt.TotalAmt - applied
 
 		h.store.Payments.Set(pmt.Id, pmt)
+		h.journalPaymentCreated(&pmt)
 		h.fireEvent("Payment", pmt.Id, "Create")
 	}
 
@@ -153,6 +154,7 @@ func (h *Handler) CreateOrUpdateBillPayment(w http.ResponseWriter, r *http.Reque
 		}
 
 		h.store.BillPayments.Set(bp.Id, bp)
+		h.journalBillPaymentCreated(&bp)
 		h.fireEvent("BillPayment", bp.Id, "Create")
 	}
 

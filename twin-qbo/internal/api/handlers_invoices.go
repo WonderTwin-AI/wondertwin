@@ -78,6 +78,7 @@ func (h *Handler) CreateOrUpdateInvoice(w http.ResponseWriter, r *http.Request) 
 		computeInvoiceTotals(&inv)
 		inv.Balance = inv.TotalAmt
 		h.store.Invoices.Set(inv.Id, inv)
+		h.journalInvoiceCreated(&inv)
 		h.fireEvent("Invoice", inv.Id, "Create")
 	}
 

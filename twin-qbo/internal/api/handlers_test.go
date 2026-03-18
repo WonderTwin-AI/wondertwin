@@ -395,3 +395,148 @@ func TestReports_TrialBalance(t *testing.T) {
 		t.Error("expected Header in report response")
 	}
 }
+
+// --- Journal Entry Generation (GAP-001) ---
+
+func TestJournalEntries_InvoiceCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	// Create AR account.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Receivable", "AccountType": "Accounts Receivable",
+	})
+
+	// Create income account.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Sales", "AccountType": "Income",
+	})
+
+	// Create invoice — should generate journal entries.
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 1000.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 1000},
+		}},
+	})
+
+	// Journal should have entries.
+	txs := h.engine.Journal().Transactions()
+	if len(txs) == 0 {
+		t.Fatal("expected journal transactions after invoice create, got 0")
+	}
+
+	// Trial balance should now have data.
+	w := doReq(r, "GET", "/v3/company/123/reports/TrialBalance", nil)
+	resp := parseResp(t, w)
+	rows := resp["Rows"]
+	if rows == nil {
+		t.Fatal("expected Rows in trial balance")
+	}
+	rowList, ok := rows.([]any)
+	if !ok || len(rowList) == 0 {
+		t.Error("expected non-empty trial balance rows after invoice creation")
+	}
+}
+
+func TestJournalEntries_PaymentCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	// Create accounts.
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Receivable", "AccountType": "Accounts Receivable",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Bank", "AccountType": "Bank",
+	})
+
+	// Create invoice.
+	w := doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 500.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 500},
+		}},
+	})
+	invID := parseResp(t, w)["Invoice"].(map[string]any)["Id"].(string)
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	// Create payment with bank deposit.
+	w = doReq(r, "POST", "/v3/company/123/payment", map[string]any{
+		"CustomerRef":         map[string]any{"value": "1"},
+		"TotalAmt":            500.00,
+		"DepositToAccountRef": map[string]any{"value": "2"},
+		"Line": []map[string]any{{
+			"Amount":    500.00,
+			"LinkedTxn": []map[string]any{{"TxnId": invID, "TxnType": "Invoice"}},
+		}},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("payment create: %d %s", w.Code, w.Body.String())
+	}
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from payment, before=%d after=%d", txsBefore, txsAfter)
+	}
+}
+
+func TestJournalEntries_BillCreatesEntries(t *testing.T) {
+	h, r := setupTestHandler()
+
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Accounts Payable", "AccountType": "Accounts Payable",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Office Supplies", "AccountType": "Expense",
+	})
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	doReq(r, "POST", "/v3/company/123/bill", map[string]any{
+		"VendorRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{
+			"Amount": 200.00, "DetailType": "AccountBasedExpenseLineDetail",
+			"AccountBasedExpenseLineDetail": map[string]any{
+				"AccountRef": map[string]any{"value": "2"},
+			},
+		}},
+	})
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from bill, before=%d after=%d", txsBefore, txsAfter)
+	}
+}
+
+func TestJournalEntries_ManualJournalEntry(t *testing.T) {
+	h, r := setupTestHandler()
+
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Bank", "AccountType": "Bank",
+	})
+	doReq(r, "POST", "/v3/company/123/account", map[string]any{
+		"Name": "Revenue", "AccountType": "Income",
+	})
+
+	txsBefore := len(h.engine.Journal().Transactions())
+
+	doReq(r, "POST", "/v3/company/123/journalentry", map[string]any{
+		"Line": []map[string]any{
+			{"Amount": 500.00, "DetailType": "JournalEntryLineDetail",
+				"JournalEntryLineDetail": map[string]any{
+					"PostingType": "Debit", "AccountRef": map[string]any{"value": "1"},
+				}},
+			{"Amount": 500.00, "DetailType": "JournalEntryLineDetail",
+				"JournalEntryLineDetail": map[string]any{
+					"PostingType": "Credit", "AccountRef": map[string]any{"value": "2"},
+				}},
+		},
+	})
+
+	txsAfter := len(h.engine.Journal().Transactions())
+	if txsAfter <= txsBefore {
+		t.Errorf("expected new journal transaction from JE, before=%d after=%d", txsBefore, txsAfter)
+	}
+}
