@@ -125,6 +125,42 @@ func TestCustomer_UpdateWithSyncToken(t *testing.T) {
 	}
 }
 
+func TestCustomer_SparseUpdate(t *testing.T) {
+	_, r := setupTestHandler()
+	// Create with full fields.
+	w := doReq(r, "POST", "/v3/company/123/customer", map[string]any{
+		"DisplayName": "Alice Smith",
+		"GivenName":   "Alice",
+		"FamilyName":  "Smith",
+		"CompanyName": "Acme Corp",
+	})
+	resp := parseResp(t, w)
+	id := resp["Customer"].(map[string]any)["Id"].(string)
+
+	// Sparse update — only change DisplayName, keep everything else.
+	w = doReq(r, "POST", "/v3/company/123/customer", map[string]any{
+		"Id":          id,
+		"SyncToken":   "0",
+		"sparse":      true,
+		"DisplayName": "Alice Johnson",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("sparse update: %d %s", w.Code, w.Body.String())
+	}
+	resp = parseResp(t, w)
+	cust := resp["Customer"].(map[string]any)
+	if cust["DisplayName"] != "Alice Johnson" {
+		t.Errorf("DisplayName = %v, want 'Alice Johnson'", cust["DisplayName"])
+	}
+	// GivenName should be preserved from the original.
+	if cust["GivenName"] != "Alice" {
+		t.Errorf("GivenName = %v, want 'Alice' (should be preserved in sparse update)", cust["GivenName"])
+	}
+	if cust["CompanyName"] != "Acme Corp" {
+		t.Errorf("CompanyName = %v, want 'Acme Corp' (should be preserved)", cust["CompanyName"])
+	}
+}
+
 func TestCustomer_StaleSyncToken(t *testing.T) {
 	_, r := setupTestHandler()
 	w := doReq(r, "POST", "/v3/company/123/customer", map[string]any{
