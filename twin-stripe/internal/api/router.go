@@ -211,6 +211,35 @@ func (h *Handler) Routes(r chi.Router) {
 
 		// Billing Portal Sessions
 		r.Post("/billing_portal/sessions", h.CreateBillingPortalSession)
+
+		// Application Fees
+		r.Get("/application_fees/{id}", h.GetApplicationFee)
+		r.Get("/application_fees", h.ListApplicationFees)
+
+		// Application Fee Refunds (nested under application fees)
+		r.Post("/application_fees/{fee_id}/refunds", h.CreateApplicationFeeRefund)
+		r.Get("/application_fees/{fee_id}/refunds/{id}", h.GetApplicationFeeRefund)
+		r.Get("/application_fees/{fee_id}/refunds", h.ListApplicationFeeRefunds)
+
+		// Transfer Reversals (nested under transfers)
+		r.Post("/transfers/{transfer_id}/reversals", h.CreateTransferReversal)
+		r.Get("/transfers/{transfer_id}/reversals/{id}", h.GetTransferReversal)
+		r.Get("/transfers/{transfer_id}/reversals", h.ListTransferReversals)
+
+		// Account Links
+		r.Post("/account_links", h.CreateAccountLink)
+
+		// Persons (nested under accounts)
+		r.Post("/accounts/{account_id}/persons", h.CreatePerson)
+		r.Get("/accounts/{account_id}/persons/{id}", h.GetPerson)
+		r.Post("/accounts/{account_id}/persons/{id}", h.UpdatePerson)
+		r.Delete("/accounts/{account_id}/persons/{id}", h.DeletePerson)
+		r.Get("/accounts/{account_id}/persons", h.ListPersons)
+
+		// TopUps
+		r.Post("/topups", h.CreateTopUp)
+		r.Get("/topups/{id}", h.GetTopUp)
+		r.Get("/topups", h.ListTopUps)
 	})
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)

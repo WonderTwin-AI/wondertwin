@@ -640,6 +640,91 @@ type BillingPortalSession struct {
 	Created   int64  `json:"created"`
 }
 
+// ApplicationFee represents a Stripe application fee collected from a connected account.
+type ApplicationFee struct {
+	ID                 string `json:"id"`
+	Object             string `json:"object"`
+	Amount             int64  `json:"amount"`
+	AmountRefunded     int64  `json:"amount_refunded"`
+	Currency           string `json:"currency"`
+	Charge             string `json:"charge,omitempty"`
+	Account            string `json:"account,omitempty"`
+	BalanceTransaction string `json:"balance_transaction,omitempty"`
+	Refunded           bool   `json:"refunded"`
+	Livemode           bool   `json:"livemode"`
+	Created            int64  `json:"created"`
+}
+
+// ApplicationFeeRefund represents a refund of an application fee.
+type ApplicationFeeRefund struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Amount   int64             `json:"amount"`
+	Currency string            `json:"currency"`
+	Fee      string            `json:"fee"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// TransferReversal represents a reversal of a Stripe transfer.
+type TransferReversal struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Amount             int64             `json:"amount"`
+	Currency           string            `json:"currency"`
+	Transfer           string            `json:"transfer"`
+	BalanceTransaction string            `json:"balance_transaction,omitempty"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
+
+// AccountLink represents an ephemeral Stripe account link for Connect onboarding.
+type AccountLink struct {
+	Object    string `json:"object"`
+	URL       string `json:"url"`
+	ExpiresAt int64  `json:"expires_at"`
+	Created   int64  `json:"created"`
+}
+
+// Person represents a person associated with a Stripe Connect account.
+type Person struct {
+	ID           string              `json:"id"`
+	Object       string              `json:"object"`
+	Account      string              `json:"account"`
+	FirstName    string              `json:"first_name,omitempty"`
+	LastName     string              `json:"last_name,omitempty"`
+	Email        string              `json:"email,omitempty"`
+	Phone        string              `json:"phone,omitempty"`
+	Relationship *PersonRelationship `json:"relationship,omitempty"`
+	Livemode     bool                `json:"livemode"`
+	Metadata     map[string]string   `json:"metadata,omitempty"`
+	Created      int64               `json:"created"`
+}
+
+// PersonRelationship describes a person's relationship to the account.
+type PersonRelationship struct {
+	Director         bool    `json:"director"`
+	Executive        bool    `json:"executive"`
+	Owner            bool    `json:"owner"`
+	Representative   bool    `json:"representative"`
+	Title            string  `json:"title,omitempty"`
+	PercentOwnership float64 `json:"percent_ownership,omitempty"`
+}
+
+// TopUp represents a Stripe top-up to add funds to the platform balance.
+type TopUp struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Amount             int64             `json:"amount"`
+	Currency           string            `json:"currency"`
+	Description        string            `json:"description,omitempty"`
+	Status             string            `json:"status"`
+	BalanceTransaction string            `json:"balance_transaction,omitempty"`
+	Livemode           bool              `json:"livemode"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
+
 // Default timestamps for testing.
 func Now() int64 {
 	return time.Now().Unix()

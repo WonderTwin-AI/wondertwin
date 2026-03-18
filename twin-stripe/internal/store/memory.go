@@ -44,6 +44,11 @@ type MemoryStore struct {
 	SubItems             *pkgstore.Store[SubscriptionItem]
 	Quotes               *pkgstore.Store[Quote]
 	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
+	ApplicationFees       *pkgstore.Store[ApplicationFee]
+	ApplicationFeeRefunds *pkgstore.Store[ApplicationFeeRefund]
+	TransferReversals     *pkgstore.Store[TransferReversal]
+	Persons               *pkgstore.Store[Person]
+	TopUps                *pkgstore.Store[TopUp]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -88,6 +93,11 @@ func New() *MemoryStore {
 		SubItems:            pkgstore.New[SubscriptionItem]("si"),
 		Quotes:              pkgstore.New[Quote]("qt"),
 		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
+		ApplicationFees:       pkgstore.New[ApplicationFee]("fee"),
+		ApplicationFeeRefunds: pkgstore.New[ApplicationFeeRefund]("fr"),
+		TransferReversals:     pkgstore.New[TransferReversal]("trr"),
+		Persons:               pkgstore.New[Person]("person"),
+		TopUps:                pkgstore.New[TopUp]("tu"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -228,6 +238,11 @@ type stateSnapshot struct {
 	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
 	Quotes              map[string]Quote               `json:"quotes"`
 	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
+	ApplicationFees       map[string]ApplicationFee       `json:"application_fees"`
+	ApplicationFeeRefunds map[string]ApplicationFeeRefund `json:"application_fee_refunds"`
+	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
+	Persons               map[string]Person               `json:"persons"`
+	TopUps                map[string]TopUp                `json:"topups"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -266,6 +281,11 @@ func (s *MemoryStore) Snapshot() any {
 		SubItems:            s.SubItems.Snapshot(),
 		Quotes:              s.Quotes.Snapshot(),
 		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
+		ApplicationFees:       s.ApplicationFees.Snapshot(),
+		ApplicationFeeRefunds: s.ApplicationFeeRefunds.Snapshot(),
+		TransferReversals:     s.TransferReversals.Snapshot(),
+		Persons:               s.Persons.Snapshot(),
+		TopUps:                s.TopUps.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -319,6 +339,11 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.SubItems.LoadSnapshot(snap.SubItems)
 	s.Quotes.LoadSnapshot(snap.Quotes)
 	s.BillingPortalSessions.LoadSnapshot(snap.BillingPortalSessions)
+	s.ApplicationFees.LoadSnapshot(snap.ApplicationFees)
+	s.ApplicationFeeRefunds.LoadSnapshot(snap.ApplicationFeeRefunds)
+	s.TransferReversals.LoadSnapshot(snap.TransferReversals)
+	s.Persons.LoadSnapshot(snap.Persons)
+	s.TopUps.LoadSnapshot(snap.TopUps)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -364,6 +389,11 @@ func (s *MemoryStore) Reset() {
 	s.SubItems.Reset()
 	s.Quotes.Reset()
 	s.BillingPortalSessions.Reset()
+	s.ApplicationFees.Reset()
+	s.ApplicationFeeRefunds.Reset()
+	s.TransferReversals.Reset()
+	s.Persons.Reset()
+	s.TopUps.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()
