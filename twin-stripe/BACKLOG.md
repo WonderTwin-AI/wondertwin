@@ -9,18 +9,13 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 - [x] `POST /v1/invoices/{id}` — update metadata, description, collection_method (draft only)
 - [x] `POST /v1/payment_intents/{id}` — update metadata, description, amount, currency, customer, payment_method
 
-### 2. Customer existence validation
-- [ ] `AttachPaymentMethod` — validate customer exists before attaching
-- [ ] `CreateSubscription` — validate customer exists before creating
+### 2. ~~Customer existence validation~~ (done)
+- [x] `AttachPaymentMethod` — validate customer exists before attaching
+- [x] `CreateSubscription` — validate customer exists before creating
 
-Currently accepts any customer ID string without checking, creating orphaned references.
-
-### 3. Customer deletion cascade
-- [ ] Cancel active subscriptions on customer delete
-- [ ] Detach payment methods on customer delete
-- [ ] (Optional) Void draft invoices on customer delete
-
-Currently deleting a customer leaves orphaned child resources.
+### 3. ~~Customer deletion cascade~~ (done)
+- [x] Cancel active subscriptions on customer delete
+- [x] Detach payment methods on customer delete
 
 ## Medium Value
 

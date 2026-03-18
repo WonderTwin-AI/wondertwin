@@ -21,6 +21,10 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
+	if _, exists := h.store.Customers.Get(customer); !exists {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
+		return
+	}
 
 	now := time.Now()
 	id := h.store.Subscriptions.NextID()

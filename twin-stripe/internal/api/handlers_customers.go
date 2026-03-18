@@ -83,6 +83,27 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
+
+	// Cascade: cancel active subscriptions.
+	subs := h.store.Subscriptions.Filter(func(_ string, s store.Subscription) bool {
+		return s.Customer == id && s.Status != "canceled"
+	})
+	for _, sub := range subs {
+		sub.Status = "canceled"
+		sub.CanceledAt = store.Now()
+		h.store.Subscriptions.Set(sub.ID, sub)
+		h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
+	}
+
+	// Cascade: detach payment methods.
+	pms := h.store.PaymentMethods.Filter(func(_ string, pm store.PaymentMethod) bool {
+		return pm.Customer == id
+	})
+	for _, pm := range pms {
+		pm.Customer = ""
+		h.store.PaymentMethods.Set(pm.ID, pm)
+	}
+
 	h.emitEvent("customer.deleted", map[string]any{"id": id})
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "customer", "deleted": true})
 }
