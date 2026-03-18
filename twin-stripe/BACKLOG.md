@@ -11,11 +11,9 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 
 These are called constantly by SDKs after creation. Currently missing entirely.
 
-### 2. Customer existence validation
-- [ ] `AttachPaymentMethod` — validate customer exists before attaching
-- [ ] `CreateSubscription` — validate customer exists before creating
-
-Currently accepts any customer ID string without checking, creating orphaned references.
+### 2. ~~Customer existence validation~~ (done)
+- [x] `AttachPaymentMethod` — validate customer exists before attaching
+- [x] `CreateSubscription` — validate customer exists before creating
 
 ### 3. Customer deletion cascade
 - [ ] Cancel active subscriptions on customer delete
