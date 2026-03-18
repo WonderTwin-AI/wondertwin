@@ -41,6 +41,22 @@ func stripeGet(tc *testutil.TwinClient, path string) *testutil.Response {
 	})
 }
 
+// stripePostWithParams sends a POST with query params and Stripe auth header.
+// parseFormOrJSON calls r.ParseForm() which reads both query params and form body.
+func stripePostWithParams(tc *testutil.TwinClient, path string, params map[string]string) *testutil.Response {
+	q := ""
+	for k, v := range params {
+		if q == "" {
+			q = "?"
+		} else {
+			q += "&"
+		}
+		q += k + "=" + v
+	}
+	return tc.DoWithHeaders("POST", path+q, nil, map[string]string{
+		"Authorization": "Bearer sk_test_sim_123",
+	})
+}
 
 func TestStripeAuthRequired(t *testing.T) {
 	_, tc := setupStripe(t)

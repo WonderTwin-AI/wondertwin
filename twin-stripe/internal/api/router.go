@@ -152,6 +152,133 @@ func (h *Handler) Routes(r chi.Router) {
 		// Events
 		r.Get("/events", h.ListEvents)
 		r.Get("/events/{id}", h.GetEvent)
+
+		// Checkout Sessions
+		r.Post("/checkout/sessions", h.CreateCheckoutSession)
+		r.Get("/checkout/sessions/{id}", h.GetCheckoutSession)
+		r.Get("/checkout/sessions", h.ListCheckoutSessions)
+		r.Post("/checkout/sessions/{id}/expire", h.ExpireCheckoutSession)
+
+		// Payment Links
+		r.Post("/payment_links", h.CreatePaymentLink)
+		r.Get("/payment_links/{id}", h.GetPaymentLink)
+		r.Post("/payment_links/{id}", h.UpdatePaymentLink)
+		r.Get("/payment_links", h.ListPaymentLinks)
+
+		// Tokens
+		r.Post("/tokens", h.CreateToken)
+		r.Get("/tokens/{id}", h.GetToken)
+
+		// Sources
+		r.Post("/sources", h.CreateSource)
+		r.Get("/sources/{id}", h.GetSource)
+		r.Post("/sources/{id}", h.UpdateSource)
+
+		// Mandates
+		r.Get("/mandates/{id}", h.GetMandate)
+
+		// Confirmation Tokens
+		r.Get("/confirmation_tokens/{id}", h.GetConfirmationToken)
+
+		// Credit Notes
+		r.Post("/credit_notes", h.CreateCreditNote)
+		r.Get("/credit_notes/preview", h.PreviewCreditNote)
+		r.Get("/credit_notes/{id}", h.GetCreditNote)
+		r.Get("/credit_notes", h.ListCreditNotes)
+		r.Post("/credit_notes/{id}/void", h.VoidCreditNote)
+
+		// Promotion Codes
+		r.Post("/promotion_codes", h.CreatePromotionCode)
+		r.Get("/promotion_codes/{id}", h.GetPromotionCode)
+		r.Post("/promotion_codes/{id}", h.UpdatePromotionCode)
+		r.Get("/promotion_codes", h.ListPromotionCodes)
+
+		// Subscription Items
+		r.Post("/subscription_items", h.CreateSubscriptionItem)
+		r.Get("/subscription_items/{id}", h.GetSubscriptionItem)
+		r.Post("/subscription_items/{id}", h.UpdateSubscriptionItem)
+		r.Delete("/subscription_items/{id}", h.DeleteSubscriptionItem)
+		r.Get("/subscription_items", h.ListSubscriptionItems)
+
+		// Quotes
+		r.Post("/quotes", h.CreateQuote)
+		r.Get("/quotes/{id}", h.GetQuote)
+		r.Post("/quotes/{id}", h.UpdateQuote)
+		r.Post("/quotes/{id}/finalize", h.FinalizeQuote)
+		r.Post("/quotes/{id}/accept", h.AcceptQuote)
+		r.Post("/quotes/{id}/cancel", h.CancelQuote)
+		r.Get("/quotes", h.ListQuotes)
+
+		// Billing Portal Sessions
+		r.Post("/billing_portal/sessions", h.CreateBillingPortalSession)
+
+		// Reviews
+		r.Get("/reviews/{id}", h.GetReview)
+		r.Get("/reviews", h.ListReviews)
+		r.Post("/reviews/{id}/approve", h.ApproveReview)
+
+		// Tax IDs (nested under customers)
+		r.Post("/customers/{customer_id}/tax_ids", h.CreateTaxID)
+		r.Get("/customers/{customer_id}/tax_ids/{id}", h.GetCustomerTaxID)
+		r.Delete("/customers/{customer_id}/tax_ids/{id}", h.DeleteTaxID)
+		r.Get("/customers/{customer_id}/tax_ids", h.ListCustomerTaxIDs)
+
+		// Tax IDs (top-level)
+		r.Get("/tax_ids/{id}", h.GetTaxID)
+		r.Get("/tax_ids", h.ListTaxIDs)
+
+		// Webhook Endpoints
+		r.Post("/webhook_endpoints", h.CreateWebhookEndpoint)
+		r.Get("/webhook_endpoints/{id}", h.GetWebhookEndpoint)
+		r.Post("/webhook_endpoints/{id}", h.UpdateWebhookEndpoint)
+		r.Delete("/webhook_endpoints/{id}", h.DeleteWebhookEndpoint)
+		r.Get("/webhook_endpoints", h.ListWebhookEndpoints)
+
+		// Files
+		r.Post("/files", h.CreateFile)
+		r.Get("/files/{id}", h.GetFile)
+		r.Get("/files", h.ListFiles)
+
+		// File Links
+		r.Post("/file_links", h.CreateFileLink)
+		r.Get("/file_links/{id}", h.GetFileLink)
+		r.Post("/file_links/{id}", h.UpdateFileLink)
+		r.Get("/file_links", h.ListFileLinks)
+
+		// Shipping Rates
+		r.Post("/shipping_rates", h.CreateShippingRate)
+		r.Get("/shipping_rates/{id}", h.GetShippingRate)
+		r.Post("/shipping_rates/{id}", h.UpdateShippingRate)
+		r.Get("/shipping_rates", h.ListShippingRates)
+
+		// Application Fees
+		r.Get("/application_fees/{id}", h.GetApplicationFee)
+		r.Get("/application_fees", h.ListApplicationFees)
+
+		// Application Fee Refunds (nested under application fees)
+		r.Post("/application_fees/{fee_id}/refunds", h.CreateApplicationFeeRefund)
+		r.Get("/application_fees/{fee_id}/refunds/{id}", h.GetApplicationFeeRefund)
+		r.Get("/application_fees/{fee_id}/refunds", h.ListApplicationFeeRefunds)
+
+		// Transfer Reversals (nested under transfers)
+		r.Post("/transfers/{transfer_id}/reversals", h.CreateTransferReversal)
+		r.Get("/transfers/{transfer_id}/reversals/{id}", h.GetTransferReversal)
+		r.Get("/transfers/{transfer_id}/reversals", h.ListTransferReversals)
+
+		// Account Links
+		r.Post("/account_links", h.CreateAccountLink)
+
+		// Persons (nested under accounts)
+		r.Post("/accounts/{account_id}/persons", h.CreatePerson)
+		r.Get("/accounts/{account_id}/persons/{id}", h.GetPerson)
+		r.Post("/accounts/{account_id}/persons/{id}", h.UpdatePerson)
+		r.Delete("/accounts/{account_id}/persons/{id}", h.DeletePerson)
+		r.Get("/accounts/{account_id}/persons", h.ListPersons)
+
+		// TopUps
+		r.Post("/topups", h.CreateTopUp)
+		r.Get("/topups/{id}", h.GetTopUp)
+		r.Get("/topups", h.ListTopUps)
 	})
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)

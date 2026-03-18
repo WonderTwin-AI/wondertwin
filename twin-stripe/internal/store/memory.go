@@ -33,6 +33,28 @@ type MemoryStore struct {
 	SetupIntents         *pkgstore.Store[SetupIntent]
 	TaxRates             *pkgstore.Store[TaxRate]
 	Disputes             *pkgstore.Store[Dispute]
+	CheckoutSessions     *pkgstore.Store[CheckoutSession]
+	PaymentLinks         *pkgstore.Store[PaymentLink]
+	Tokens               *pkgstore.Store[Token]
+	Sources              *pkgstore.Store[Source]
+	Mandates             *pkgstore.Store[Mandate]
+	ConfirmationTokens   *pkgstore.Store[ConfirmationToken]
+	CreditNotes          *pkgstore.Store[CreditNote]
+	PromotionCodes       *pkgstore.Store[PromotionCode]
+	SubItems             *pkgstore.Store[SubscriptionItem]
+	Quotes               *pkgstore.Store[Quote]
+	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
+	Reviews              *pkgstore.Store[Review]
+	TaxIDs               *pkgstore.Store[TaxID]
+	WebhookEndpoints     *pkgstore.Store[WebhookEndpoint]
+	Files                *pkgstore.Store[File]
+	FileLinks            *pkgstore.Store[FileLink]
+	ShippingRates        *pkgstore.Store[ShippingRate]
+	ApplicationFees       *pkgstore.Store[ApplicationFee]
+	ApplicationFeeRefunds *pkgstore.Store[ApplicationFeeRefund]
+	TransferReversals     *pkgstore.Store[TransferReversal]
+	Persons               *pkgstore.Store[Person]
+	TopUps                *pkgstore.Store[TopUp]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -66,6 +88,28 @@ func New() *MemoryStore {
 		SetupIntents:        pkgstore.New[SetupIntent]("seti"),
 		TaxRates:            pkgstore.New[TaxRate]("txr"),
 		Disputes:            pkgstore.New[Dispute]("dp"),
+		CheckoutSessions:    pkgstore.New[CheckoutSession]("cs"),
+		PaymentLinks:        pkgstore.New[PaymentLink]("plink"),
+		Tokens:              pkgstore.New[Token]("tok"),
+		Sources:             pkgstore.New[Source]("src"),
+		Mandates:            pkgstore.New[Mandate]("mandate"),
+		ConfirmationTokens:  pkgstore.New[ConfirmationToken]("ctoken"),
+		CreditNotes:         pkgstore.New[CreditNote]("cn"),
+		PromotionCodes:      pkgstore.New[PromotionCode]("promo"),
+		SubItems:            pkgstore.New[SubscriptionItem]("si"),
+		Quotes:              pkgstore.New[Quote]("qt"),
+		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
+		Reviews:             pkgstore.New[Review]("prv"),
+		TaxIDs:              pkgstore.New[TaxID]("txi"),
+		WebhookEndpoints:    pkgstore.New[WebhookEndpoint]("we"),
+		Files:               pkgstore.New[File]("file"),
+		FileLinks:           pkgstore.New[FileLink]("link"),
+		ShippingRates:       pkgstore.New[ShippingRate]("shr"),
+		ApplicationFees:       pkgstore.New[ApplicationFee]("fee"),
+		ApplicationFeeRefunds: pkgstore.New[ApplicationFeeRefund]("fr"),
+		TransferReversals:     pkgstore.New[TransferReversal]("trr"),
+		Persons:               pkgstore.New[Person]("person"),
+		TopUps:                pkgstore.New[TopUp]("tu"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -195,6 +239,28 @@ type stateSnapshot struct {
 	SetupIntents        map[string]SetupIntent         `json:"setup_intents"`
 	TaxRates            map[string]TaxRate             `json:"tax_rates"`
 	Disputes            map[string]Dispute             `json:"disputes"`
+	CheckoutSessions    map[string]CheckoutSession     `json:"checkout_sessions"`
+	PaymentLinks        map[string]PaymentLink         `json:"payment_links"`
+	Tokens              map[string]Token               `json:"tokens"`
+	Sources             map[string]Source              `json:"sources"`
+	Mandates            map[string]Mandate             `json:"mandates"`
+	ConfirmationTokens  map[string]ConfirmationToken   `json:"confirmation_tokens"`
+	CreditNotes         map[string]CreditNote          `json:"credit_notes"`
+	PromotionCodes      map[string]PromotionCode       `json:"promotion_codes"`
+	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
+	Quotes              map[string]Quote               `json:"quotes"`
+	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
+	Reviews             map[string]Review              `json:"reviews"`
+	TaxIDs              map[string]TaxID               `json:"tax_ids"`
+	WebhookEndpoints    map[string]WebhookEndpoint     `json:"webhook_endpoints"`
+	Files               map[string]File                `json:"files"`
+	FileLinks           map[string]FileLink            `json:"file_links"`
+	ShippingRates       map[string]ShippingRate         `json:"shipping_rates"`
+	ApplicationFees       map[string]ApplicationFee       `json:"application_fees"`
+	ApplicationFeeRefunds map[string]ApplicationFeeRefund `json:"application_fee_refunds"`
+	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
+	Persons               map[string]Person               `json:"persons"`
+	TopUps                map[string]TopUp                `json:"topups"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -222,6 +288,28 @@ func (s *MemoryStore) Snapshot() any {
 		SetupIntents:        s.SetupIntents.Snapshot(),
 		TaxRates:            s.TaxRates.Snapshot(),
 		Disputes:            s.Disputes.Snapshot(),
+		CheckoutSessions:    s.CheckoutSessions.Snapshot(),
+		PaymentLinks:        s.PaymentLinks.Snapshot(),
+		Tokens:              s.Tokens.Snapshot(),
+		Sources:             s.Sources.Snapshot(),
+		Mandates:            s.Mandates.Snapshot(),
+		ConfirmationTokens:  s.ConfirmationTokens.Snapshot(),
+		CreditNotes:         s.CreditNotes.Snapshot(),
+		PromotionCodes:      s.PromotionCodes.Snapshot(),
+		SubItems:            s.SubItems.Snapshot(),
+		Quotes:              s.Quotes.Snapshot(),
+		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
+		Reviews:             s.Reviews.Snapshot(),
+		TaxIDs:              s.TaxIDs.Snapshot(),
+		WebhookEndpoints:    s.WebhookEndpoints.Snapshot(),
+		Files:               s.Files.Snapshot(),
+		FileLinks:           s.FileLinks.Snapshot(),
+		ShippingRates:       s.ShippingRates.Snapshot(),
+		ApplicationFees:       s.ApplicationFees.Snapshot(),
+		ApplicationFeeRefunds: s.ApplicationFeeRefunds.Snapshot(),
+		TransferReversals:     s.TransferReversals.Snapshot(),
+		Persons:               s.Persons.Snapshot(),
+		TopUps:                s.TopUps.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -264,6 +352,28 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.SetupIntents.LoadSnapshot(snap.SetupIntents)
 	s.TaxRates.LoadSnapshot(snap.TaxRates)
 	s.Disputes.LoadSnapshot(snap.Disputes)
+	s.CheckoutSessions.LoadSnapshot(snap.CheckoutSessions)
+	s.PaymentLinks.LoadSnapshot(snap.PaymentLinks)
+	s.Tokens.LoadSnapshot(snap.Tokens)
+	s.Sources.LoadSnapshot(snap.Sources)
+	s.Mandates.LoadSnapshot(snap.Mandates)
+	s.ConfirmationTokens.LoadSnapshot(snap.ConfirmationTokens)
+	s.CreditNotes.LoadSnapshot(snap.CreditNotes)
+	s.PromotionCodes.LoadSnapshot(snap.PromotionCodes)
+	s.SubItems.LoadSnapshot(snap.SubItems)
+	s.Quotes.LoadSnapshot(snap.Quotes)
+	s.BillingPortalSessions.LoadSnapshot(snap.BillingPortalSessions)
+	s.Reviews.LoadSnapshot(snap.Reviews)
+	s.TaxIDs.LoadSnapshot(snap.TaxIDs)
+	s.WebhookEndpoints.LoadSnapshot(snap.WebhookEndpoints)
+	s.Files.LoadSnapshot(snap.Files)
+	s.FileLinks.LoadSnapshot(snap.FileLinks)
+	s.ShippingRates.LoadSnapshot(snap.ShippingRates)
+	s.ApplicationFees.LoadSnapshot(snap.ApplicationFees)
+	s.ApplicationFeeRefunds.LoadSnapshot(snap.ApplicationFeeRefunds)
+	s.TransferReversals.LoadSnapshot(snap.TransferReversals)
+	s.Persons.LoadSnapshot(snap.Persons)
+	s.TopUps.LoadSnapshot(snap.TopUps)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -298,6 +408,28 @@ func (s *MemoryStore) Reset() {
 	s.SetupIntents.Reset()
 	s.TaxRates.Reset()
 	s.Disputes.Reset()
+	s.CheckoutSessions.Reset()
+	s.PaymentLinks.Reset()
+	s.Tokens.Reset()
+	s.Sources.Reset()
+	s.Mandates.Reset()
+	s.ConfirmationTokens.Reset()
+	s.CreditNotes.Reset()
+	s.PromotionCodes.Reset()
+	s.SubItems.Reset()
+	s.Quotes.Reset()
+	s.BillingPortalSessions.Reset()
+	s.Reviews.Reset()
+	s.TaxIDs.Reset()
+	s.WebhookEndpoints.Reset()
+	s.Files.Reset()
+	s.FileLinks.Reset()
+	s.ShippingRates.Reset()
+	s.ApplicationFees.Reset()
+	s.ApplicationFeeRefunds.Reset()
+	s.TransferReversals.Reset()
+	s.Persons.Reset()
+	s.TopUps.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

@@ -5,8 +5,8 @@
     "language": "go",
     "version": "v81"
   },
-  "build": 5,
-  "generated_at": "2026-02-12T15:26:50-08:00",
+  "build": 6,
+  "generated_at": "2026-03-18T12:00:00-07:00",
   "sources": {
     "openapi": {
       "origin": "vendor_published",

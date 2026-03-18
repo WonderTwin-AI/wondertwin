@@ -327,11 +327,13 @@ type SubscriptionItems struct {
 
 // SubscriptionItem represents one price in a subscription.
 type SubscriptionItem struct {
-	ID       string `json:"id"`
-	Object   string `json:"object"`
-	Price    Price  `json:"price"`
-	Quantity int64  `json:"quantity"`
-	Created  int64  `json:"created"`
+	ID           string            `json:"id"`
+	Object       string            `json:"object"`
+	Price        Price             `json:"price"`
+	Quantity     int64             `json:"quantity"`
+	Subscription string            `json:"subscription,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Created      int64             `json:"created"`
 }
 
 // Invoice represents a Stripe invoice.
@@ -492,6 +494,329 @@ const (
 	PayoutStatusFailed    = "failed"
 	PayoutStatusCanceled  = "canceled"
 )
+
+// CheckoutSession represents a Stripe Checkout Session.
+type CheckoutSession struct {
+	ID            string            `json:"id"`
+	Object        string            `json:"object"`
+	Mode          string            `json:"mode"`
+	Status        string            `json:"status"`
+	URL           string            `json:"url,omitempty"`
+	SuccessURL    string            `json:"success_url,omitempty"`
+	CancelURL     string            `json:"cancel_url,omitempty"`
+	Customer      string            `json:"customer,omitempty"`
+	CustomerEmail string            `json:"customer_email,omitempty"`
+	PaymentIntent string            `json:"payment_intent,omitempty"`
+	Subscription  string            `json:"subscription,omitempty"`
+	PaymentStatus string            `json:"payment_status"`
+	Currency      string            `json:"currency,omitempty"`
+	AmountTotal   int64             `json:"amount_total"`
+	ExpiresAt     int64             `json:"expires_at"`
+	Livemode      bool              `json:"livemode"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Created       int64             `json:"created"`
+}
+
+// PaymentLink represents a Stripe Payment Link.
+type PaymentLink struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Active   bool              `json:"active"`
+	URL      string            `json:"url"`
+	Currency string            `json:"currency,omitempty"`
+	Livemode bool              `json:"livemode"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// Token represents a Stripe tokenized payment source.
+type Token struct {
+	ID       string       `json:"id"`
+	Object   string       `json:"object"`
+	Type     string       `json:"type"`
+	Card     *CardDetails `json:"card,omitempty"`
+	Used     bool         `json:"used"`
+	Livemode bool         `json:"livemode"`
+	Created  int64        `json:"created"`
+}
+
+// Source represents a Stripe source object.
+type Source struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Type     string            `json:"type"`
+	Status   string            `json:"status"`
+	Amount   int64             `json:"amount,omitempty"`
+	Currency string            `json:"currency,omitempty"`
+	Customer string            `json:"customer,omitempty"`
+	Flow     string            `json:"flow,omitempty"`
+	Livemode bool              `json:"livemode"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// Mandate represents a Stripe mandate for recurring payments.
+type Mandate struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	PaymentMethod string `json:"payment_method"`
+	Status        string `json:"status"`
+	Type          string `json:"type"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
+// ConfirmationToken represents a Stripe confirmation token.
+type ConfirmationToken struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	PaymentIntent string `json:"payment_intent,omitempty"`
+	SetupIntent   string `json:"setup_intent,omitempty"`
+	PaymentMethod string `json:"payment_method_preview,omitempty"`
+	ExpiresAt     int64  `json:"expires_at"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
+// CreditNote represents a Stripe credit note.
+type CreditNote struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Invoice  string            `json:"invoice"`
+	Customer string            `json:"customer,omitempty"`
+	Amount   int64             `json:"amount"`
+	Currency string            `json:"currency"`
+	Reason   string            `json:"reason,omitempty"`
+	Status   string            `json:"status"`
+	Type     string            `json:"type"`
+	Memo     string            `json:"memo,omitempty"`
+	Number   string            `json:"number,omitempty"`
+	Livemode bool              `json:"livemode"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// PromotionCode represents a Stripe promotion code.
+type PromotionCode struct {
+	ID             string            `json:"id"`
+	Object         string            `json:"object"`
+	Code           string            `json:"code"`
+	Coupon         string            `json:"coupon"`
+	Active         bool              `json:"active"`
+	MaxRedemptions int               `json:"max_redemptions,omitempty"`
+	TimesRedeemed  int               `json:"times_redeemed"`
+	ExpiresAt      int64             `json:"expires_at,omitempty"`
+	Livemode       bool              `json:"livemode"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	Created        int64             `json:"created"`
+}
+
+// Quote represents a Stripe quote.
+type Quote struct {
+	ID             string            `json:"id"`
+	Object         string            `json:"object"`
+	Customer       string            `json:"customer,omitempty"`
+	Status         string            `json:"status"`
+	AmountTotal    int64             `json:"amount_total"`
+	AmountSubtotal int64             `json:"amount_subtotal"`
+	Currency       string            `json:"currency,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	ExpiresAt      int64             `json:"expires_at"`
+	Header         string            `json:"header,omitempty"`
+	Footer         string            `json:"footer,omitempty"`
+	Livemode       bool              `json:"livemode"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	Created        int64             `json:"created"`
+}
+
+// BillingPortalSession represents a Stripe billing portal session.
+type BillingPortalSession struct {
+	ID        string `json:"id"`
+	Object    string `json:"object"`
+	Customer  string `json:"customer"`
+	URL       string `json:"url"`
+	ReturnURL string `json:"return_url,omitempty"`
+	Livemode  bool   `json:"livemode"`
+	Created   int64  `json:"created"`
+}
+
+// Review represents a Stripe Radar review.
+type Review struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	Charge        string `json:"charge,omitempty"`
+	PaymentIntent string `json:"payment_intent,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	Status        string `json:"status"`
+	OpenedReason  string `json:"opened_reason,omitempty"`
+	ClosedReason  string `json:"closed_reason,omitempty"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
+// TaxID represents a customer tax ID.
+type TaxID struct {
+	ID           string             `json:"id"`
+	Object       string             `json:"object"`
+	Customer     string             `json:"customer"`
+	Type         string             `json:"type"`
+	Value        string             `json:"value"`
+	Verification *TaxIDVerification `json:"verification,omitempty"`
+	Livemode     bool               `json:"livemode"`
+	Created      int64              `json:"created"`
+}
+
+// TaxIDVerification represents the verification status of a tax ID.
+type TaxIDVerification struct {
+	Status          string `json:"status"`
+	VerifiedName    string `json:"verified_name,omitempty"`
+	VerifiedAddress string `json:"verified_address,omitempty"`
+}
+
+// WebhookEndpoint represents a Stripe webhook endpoint configuration.
+type WebhookEndpoint struct {
+	ID            string            `json:"id"`
+	Object        string            `json:"object"`
+	URL           string            `json:"url"`
+	Status        string            `json:"status"`
+	EnabledEvents []string          `json:"enabled_events"`
+	Secret        string            `json:"secret,omitempty"`
+	APIVersion    string            `json:"api_version,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Livemode      bool              `json:"livemode"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Created       int64             `json:"created"`
+}
+
+// File represents a Stripe file upload.
+type File struct {
+	ID       string `json:"id"`
+	Object   string `json:"object"`
+	Purpose  string `json:"purpose"`
+	Filename string `json:"filename,omitempty"`
+	Size     int64  `json:"size"`
+	Type     string `json:"type,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Livemode bool   `json:"livemode"`
+	Created  int64  `json:"created"`
+}
+
+// FileLink represents a link to a Stripe file.
+type FileLink struct {
+	ID        string            `json:"id"`
+	Object    string            `json:"object"`
+	File      string            `json:"file"`
+	URL       string            `json:"url"`
+	Expired   bool              `json:"expired"`
+	ExpiresAt int64             `json:"expires_at,omitempty"`
+	Livemode  bool              `json:"livemode"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	Created   int64             `json:"created"`
+}
+
+// ShippingRate represents a Stripe shipping rate.
+type ShippingRate struct {
+	ID          string            `json:"id"`
+	Object      string            `json:"object"`
+	Active      bool              `json:"active"`
+	DisplayName string            `json:"display_name"`
+	FixedAmount *ShippingFixed    `json:"fixed_amount,omitempty"`
+	Type        string            `json:"type"`
+	Livemode    bool              `json:"livemode"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Created     int64             `json:"created"`
+}
+
+// ShippingFixed holds fixed-amount shipping rate details.
+type ShippingFixed struct {
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
+}
+
+// ApplicationFee represents a Stripe application fee collected from a connected account.
+type ApplicationFee struct {
+	ID                 string `json:"id"`
+	Object             string `json:"object"`
+	Amount             int64  `json:"amount"`
+	AmountRefunded     int64  `json:"amount_refunded"`
+	Currency           string `json:"currency"`
+	Charge             string `json:"charge,omitempty"`
+	Account            string `json:"account,omitempty"`
+	BalanceTransaction string `json:"balance_transaction,omitempty"`
+	Refunded           bool   `json:"refunded"`
+	Livemode           bool   `json:"livemode"`
+	Created            int64  `json:"created"`
+}
+
+// ApplicationFeeRefund represents a refund of an application fee.
+type ApplicationFeeRefund struct {
+	ID       string            `json:"id"`
+	Object   string            `json:"object"`
+	Amount   int64             `json:"amount"`
+	Currency string            `json:"currency"`
+	Fee      string            `json:"fee"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Created  int64             `json:"created"`
+}
+
+// TransferReversal represents a reversal of a Stripe transfer.
+type TransferReversal struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Amount             int64             `json:"amount"`
+	Currency           string            `json:"currency"`
+	Transfer           string            `json:"transfer"`
+	BalanceTransaction string            `json:"balance_transaction,omitempty"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
+
+// AccountLink represents an ephemeral Stripe account link for Connect onboarding.
+type AccountLink struct {
+	Object    string `json:"object"`
+	URL       string `json:"url"`
+	ExpiresAt int64  `json:"expires_at"`
+	Created   int64  `json:"created"`
+}
+
+// Person represents a person associated with a Stripe Connect account.
+type Person struct {
+	ID           string              `json:"id"`
+	Object       string              `json:"object"`
+	Account      string              `json:"account"`
+	FirstName    string              `json:"first_name,omitempty"`
+	LastName     string              `json:"last_name,omitempty"`
+	Email        string              `json:"email,omitempty"`
+	Phone        string              `json:"phone,omitempty"`
+	Relationship *PersonRelationship `json:"relationship,omitempty"`
+	Livemode     bool                `json:"livemode"`
+	Metadata     map[string]string   `json:"metadata,omitempty"`
+	Created      int64               `json:"created"`
+}
+
+// PersonRelationship describes a person's relationship to the account.
+type PersonRelationship struct {
+	Director         bool    `json:"director"`
+	Executive        bool    `json:"executive"`
+	Owner            bool    `json:"owner"`
+	Representative   bool    `json:"representative"`
+	Title            string  `json:"title,omitempty"`
+	PercentOwnership float64 `json:"percent_ownership,omitempty"`
+}
+
+// TopUp represents a Stripe top-up to add funds to the platform balance.
+type TopUp struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Amount             int64             `json:"amount"`
+	Currency           string            `json:"currency"`
+	Description        string            `json:"description,omitempty"`
+	Status             string            `json:"status"`
+	BalanceTransaction string            `json:"balance_transaction,omitempty"`
+	Livemode           bool              `json:"livemode"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
 
 // Default timestamps for testing.
 func Now() int64 {
