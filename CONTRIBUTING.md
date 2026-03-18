@@ -167,6 +167,7 @@ Two additional skills support the twin lifecycle after initial creation:
 - **[`skills/twin-extender.md`](skills/twin-extender.md)** — Guides expanding an existing twin's SDK coverage: gap analysis, adding new store types, handlers, admin endpoints, and tests.
 - **[`skills/twin-maintainer.md`](skills/twin-maintainer.md)** — Covers ongoing maintenance tasks: CI twin list updates, dependency upgrades, SDK drift detection, conformance updates, coverage audits, and twin addition/removal.
 - **[`skills/twin-sidecar.md`](skills/twin-sidecar.md)** — Guides building optional companion processes that fetch real data from upstream APIs to enrich a twin's seed data.
+- **[`skills/twin-releaser.md`](skills/twin-releaser.md)** — Takes a code-complete twin from "tests pass" to "in customers' hands": CI integration, release workflow, registry publication, GitHub issue closure with structured messaging, and marketing handoff document.
 
 ### The Manifest and Provenance Files
 
