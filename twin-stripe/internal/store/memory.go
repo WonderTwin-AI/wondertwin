@@ -19,6 +19,9 @@ type MemoryStore struct {
 	Payouts          *pkgstore.Store[Payout]
 	Events               *pkgstore.Store[Event]
 	BalanceTransactions  *pkgstore.Store[BalanceTransaction]
+	Customers            *pkgstore.Store[Customer]
+	Products             *pkgstore.Store[Product]
+	Prices               *pkgstore.Store[Price]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -38,6 +41,9 @@ func New() *MemoryStore {
 		Payouts:         pkgstore.New[Payout]("po"),
 		Events:              pkgstore.New[Event]("evt"),
 		BalanceTransactions: pkgstore.New[BalanceTransaction]("txn"),
+		Customers:           pkgstore.New[Customer]("cus"),
+		Products:            pkgstore.New[Product]("prod"),
+		Prices:              pkgstore.New[Price]("price"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -153,6 +159,9 @@ type stateSnapshot struct {
 	Payouts             map[string]Payout              `json:"payouts"`
 	Events              map[string]Event               `json:"events"`
 	BalanceTransactions map[string]BalanceTransaction   `json:"balance_transactions"`
+	Customers           map[string]Customer            `json:"customers"`
+	Products            map[string]Product             `json:"products"`
+	Prices              map[string]Price               `json:"prices"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -166,6 +175,9 @@ func (s *MemoryStore) Snapshot() any {
 		Payouts:             s.Payouts.Snapshot(),
 		Events:              s.Events.Snapshot(),
 		BalanceTransactions: s.BalanceTransactions.Snapshot(),
+		Customers:           s.Customers.Snapshot(),
+		Products:            s.Products.Snapshot(),
+		Prices:              s.Prices.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -194,6 +206,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Payouts.LoadSnapshot(snap.Payouts)
 	s.Events.LoadSnapshot(snap.Events)
 	s.BalanceTransactions.LoadSnapshot(snap.BalanceTransactions)
+	s.Customers.LoadSnapshot(snap.Customers)
+	s.Products.LoadSnapshot(snap.Products)
+	s.Prices.LoadSnapshot(snap.Prices)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -214,6 +229,9 @@ func (s *MemoryStore) Reset() {
 	s.Payouts.Reset()
 	s.Events.Reset()
 	s.BalanceTransactions.Reset()
+	s.Customers.Reset()
+	s.Products.Reset()
+	s.Prices.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

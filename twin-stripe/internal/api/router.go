@@ -33,6 +33,26 @@ func (h *Handler) Routes(r chi.Router) {
 		// Fault injection for API routes (not admin)
 		r.Use(h.mw.FaultInjection)
 
+		// Customers
+		r.Post("/customers", h.CreateCustomer)
+		r.Get("/customers/{id}", h.GetCustomer)
+		r.Post("/customers/{id}", h.UpdateCustomer)
+		r.Delete("/customers/{id}", h.DeleteCustomer)
+		r.Get("/customers", h.ListCustomers)
+
+		// Products
+		r.Post("/products", h.CreateProduct)
+		r.Get("/products/{id}", h.GetProduct)
+		r.Post("/products/{id}", h.UpdateProduct)
+		r.Delete("/products/{id}", h.DeleteProduct)
+		r.Get("/products", h.ListProducts)
+
+		// Prices
+		r.Post("/prices", h.CreatePrice)
+		r.Get("/prices/{id}", h.GetPrice)
+		r.Post("/prices/{id}", h.UpdatePrice)
+		r.Get("/prices", h.ListPrices)
+
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)
 		r.Get("/accounts/{id}", h.GetAccount)

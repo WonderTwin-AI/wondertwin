@@ -150,6 +150,64 @@ type EventReq struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 }
 
+// Customer represents a Stripe customer.
+type Customer struct {
+	ID             string            `json:"id"`
+	Object         string            `json:"object"`
+	Name           string            `json:"name,omitempty"`
+	Email          string            `json:"email,omitempty"`
+	Phone          string            `json:"phone,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	Currency       string            `json:"currency,omitempty"`
+	DefaultSource  string            `json:"default_source,omitempty"`
+	InvoicePrefix  string            `json:"invoice_prefix,omitempty"`
+	Balance        int64             `json:"balance"`
+	Delinquent     bool              `json:"delinquent"`
+	Livemode       bool              `json:"livemode"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	Created        int64             `json:"created"`
+}
+
+// Product represents a Stripe product.
+type Product struct {
+	ID          string            `json:"id"`
+	Object      string            `json:"object"`
+	Name        string            `json:"name"`
+	Active      bool              `json:"active"`
+	Description string            `json:"description,omitempty"`
+	Images      []string          `json:"images,omitempty"`
+	Livemode    bool              `json:"livemode"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	DefaultPrice string           `json:"default_price,omitempty"`
+	Created     int64             `json:"created"`
+	Updated     int64             `json:"updated"`
+}
+
+// Price represents a Stripe price.
+type Price struct {
+	ID                string            `json:"id"`
+	Object            string            `json:"object"`
+	Active            bool              `json:"active"`
+	Currency          string            `json:"currency"`
+	Product           string            `json:"product"`
+	UnitAmount        int64             `json:"unit_amount,omitempty"`
+	UnitAmountDecimal string            `json:"unit_amount_decimal,omitempty"`
+	Type              string            `json:"type"` // one_time or recurring
+	BillingScheme     string            `json:"billing_scheme"` // per_unit or tiered
+	Recurring         *PriceRecurring   `json:"recurring,omitempty"`
+	Nickname          string            `json:"nickname,omitempty"`
+	Livemode          bool              `json:"livemode"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
+	Created           int64             `json:"created"`
+}
+
+// PriceRecurring holds recurring price configuration.
+type PriceRecurring struct {
+	Interval      string `json:"interval"` // day, week, month, year
+	IntervalCount int    `json:"interval_count"`
+	UsageType     string `json:"usage_type,omitempty"` // licensed or metered
+}
+
 // AccountBalance tracks per-account balance (available and pending).
 type AccountBalance struct {
 	Available map[string]int64 // currency -> amount
