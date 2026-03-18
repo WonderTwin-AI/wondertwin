@@ -1,3 +1,9 @@
+---
+skill: twin-sidecar
+skill_version: "1.0"
+schemas: {}
+---
+
 # SKILL: WonderTwin Twin Sidecar
 
 ## Purpose

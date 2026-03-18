@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://wondertwin.dev/schemas/twin-manifest.schema.json",
+  "$version": "1.0",
   "title": "Twin Contribution Manifest",
   "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
   "type": "object",

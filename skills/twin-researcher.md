@@ -1,3 +1,10 @@
+---
+skill: twin-researcher
+skill_version: "1.0"
+schemas:
+  provenance.schema.json: "1.1"
+---
+
 # SKILL: WonderTwin Twin Researcher
 
 ## Purpose
@@ -445,6 +452,7 @@ Append the completion entry:
 
 This is the file that ships with the twin (in `twin-{name}/provenance.json`). It extends the existing provenance format with research lineage:
 
+<!-- schema: provenance.schema.json -->
 ```json
 {
   "twin": "twin-{name}",
@@ -455,6 +463,7 @@ This is the file that ships with the twin (in `twin-{name}/provenance.json`). It
   "category": "{category}",
   "research_archive": "wondertwin-docs/research/{platform}",
   "research_completed": "{ISO 8601}",
+  "generated_at": "{ISO 8601 timestamp}",
   "sources": [
     {
       "type": "{source_type}",

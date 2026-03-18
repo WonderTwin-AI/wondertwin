@@ -1,3 +1,9 @@
+---
+skill: twin-maintainer
+skill_version: "1.0"
+schemas: {}
+---
+
 # SKILL: WonderTwin Twin Maintainer
 
 ## Purpose

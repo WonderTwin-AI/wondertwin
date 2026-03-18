@@ -1,47 +1,46 @@
 {
-  "name": "twin-xero",
+  "twin": "xero",
   "display_name": "Xero",
-  "version": "0.1.0",
   "category": "accounting",
   "description": "Simulates the Xero Accounting API — chart of accounts, invoices, bills, credit notes, payments, manual journals, and financial reports.",
-  "default_port": 4115,
-  "api_prefix": "/api.xro/2.0",
-  "auth_type": "bearer",
-  "fintech_primitives": ["ledger_accounting"],
-  "sdk_targets": [],
-  "admin_endpoints": [
-    "GET /admin/health",
-    "POST /admin/reset",
-    "GET /admin/state",
-    "POST /admin/state"
-  ],
-  "api_endpoints": [
-    "POST /api.xro/2.0/Contacts",
-    "GET /api.xro/2.0/Contacts",
-    "GET /api.xro/2.0/Contacts/{ContactID}",
-    "POST /api.xro/2.0/Accounts",
-    "GET /api.xro/2.0/Accounts",
-    "GET /api.xro/2.0/Accounts/{AccountID}",
-    "POST /api.xro/2.0/Invoices",
-    "GET /api.xro/2.0/Invoices",
-    "GET /api.xro/2.0/Invoices/{InvoiceID}",
-    "POST /api.xro/2.0/CreditNotes",
-    "GET /api.xro/2.0/CreditNotes",
-    "GET /api.xro/2.0/CreditNotes/{CreditNoteID}",
-    "PUT /api.xro/2.0/Payments",
-    "GET /api.xro/2.0/Payments",
-    "GET /api.xro/2.0/Payments/{PaymentID}",
-    "PUT /api.xro/2.0/BankTransactions",
-    "GET /api.xro/2.0/BankTransactions",
-    "GET /api.xro/2.0/BankTransactions/{BankTransactionID}",
-    "PUT /api.xro/2.0/ManualJournals",
-    "GET /api.xro/2.0/ManualJournals",
-    "GET /api.xro/2.0/ManualJournals/{ManualJournalID}",
-    "POST /api.xro/2.0/Items",
-    "GET /api.xro/2.0/Items",
-    "GET /api.xro/2.0/Items/{ItemID}",
-    "GET /api.xro/2.0/Reports/TrialBalance",
-    "GET /api.xro/2.0/Reports/ProfitAndLoss",
-    "GET /api.xro/2.0/Reports/BalanceSheet"
-  ]
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/xero-api/xero-go",
+      "language": "go",
+      "version": "v2.0.0",
+      "repo_url": "https://github.com/XeroAPI/xero-go"
+    }
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://raw.githubusercontent.com/XeroAPI/Xero-OpenAPI/master/xero_accounting.yaml"
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 12
+  },
+  "coverage": {
+    "resources_implemented": [
+      "Contacts", "Accounts", "Invoices", "CreditNotes",
+      "Payments", "BankTransactions", "ManualJournals", "Items",
+      "TrialBalance", "ProfitAndLoss", "BalanceSheet"
+    ],
+    "resources_not_implemented": [
+      "TrackingCategories", "TaxRates", "Currencies",
+      "RepeatingInvoices", "Prepayments", "Overpayments",
+      "PurchaseOrders", "Attachments"
+    ],
+    "estimated_coverage_pct": 60
+  },
+  "generation": {
+    "method": "wondertwin_skill",
+    "skill_version": "2.1",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": true,
+      "manual_docs": true
+    }
+  }
 }

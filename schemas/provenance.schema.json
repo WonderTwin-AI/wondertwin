@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://wondertwin.dev/schemas/provenance.schema.json",
+  "$version": "1.1",
   "title": "Twin Provenance",
   "description": "Schema for twin provenance tracking, recording how a twin was generated.",
   "type": "object",
@@ -9,6 +10,35 @@
     "twin": {
       "type": "string",
       "description": "Name of the twin."
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the twin (e.g., 0.1.0). Used by researcher-originated provenance."
+    },
+    "platform": {
+      "type": "string",
+      "description": "Display name of the target platform (e.g., QuickBooks Online)."
+    },
+    "platform_url": {
+      "type": "string",
+      "description": "URL of the platform's developer documentation."
+    },
+    "api_version": {
+      "type": "string",
+      "description": "Version of the upstream API this twin targets."
+    },
+    "category": {
+      "type": "string",
+      "description": "Functional category of the platform (e.g., accounting, payments)."
+    },
+    "research_archive": {
+      "type": "string",
+      "description": "Path to the research archive directory for this twin."
+    },
+    "research_completed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when research was completed."
     },
     "sdk_target": {
       "type": "object",
@@ -43,97 +73,162 @@
       "type": "string",
       "description": "Version of the WonderTwin skill used for generation."
     },
-    "sources": {
+    "fintech_primitives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of fintech primitives this twin maps to (e.g., ledger, billing)."
+    },
+    "twinkit_packages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of twinkit packages used by this twin."
+    },
+    "scope": {
       "type": "object",
-      "description": "Sources used during twin generation.",
+      "description": "What the twin implements and what it does not.",
       "properties": {
-        "openapi": {
-          "type": "object",
-          "description": "OpenAPI specification source.",
-          "properties": {
-            "origin": {
-              "type": "string",
-              "enum": ["vendor_published", "community_maintained", "derived", "manual", "none", "unknown"],
-              "description": "Origin of the OpenAPI spec."
-            },
-            "url": {
-              "type": "string",
-              "description": "URL where the spec was retrieved from."
-            },
-            "retrieved_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When the spec was retrieved."
-            },
-            "sha256": {
-              "type": "string",
-              "description": "SHA-256 hash of the spec content."
-            },
-            "api_version": {
-              "type": "string",
-              "description": "Version of the API described by the spec."
-            }
+        "implemented": {
+          "type": "array",
+          "items": {
+            "type": "string"
           },
-          "additionalProperties": false
+          "description": "List of implemented capabilities."
         },
-        "sdk_analysis": {
-          "type": "object",
-          "description": "SDK analysis source.",
-          "properties": {
-            "method": {
-              "type": "string",
-              "enum": ["deepwiki", "direct_repo", "manual", "none"],
-              "description": "Analysis method used."
-            },
-            "repo": {
-              "type": "string",
-              "description": "Repository URL of the SDK."
-            },
-            "repo_ref": {
-              "type": "string",
-              "description": "Git ref (tag, branch, commit) analyzed."
-            },
-            "retrieved_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When the SDK was retrieved for analysis."
-            },
-            "sha256": {
-              "type": "string",
-              "description": "SHA-256 hash of the analyzed content."
-            },
-            "fallback_used": {
-              "type": "boolean",
-              "description": "Whether a fallback analysis method was used."
-            }
+        "not_implemented": {
+          "type": "array",
+          "items": {
+            "type": "string"
           },
-          "additionalProperties": false
-        },
-        "arazzo": {
-          "type": "object",
-          "description": "Arazzo workflow source.",
-          "properties": {
-            "origin": {
-              "type": "string",
-              "enum": ["vendor_published", "community_contributed", "generated", "manual"],
-              "description": "Origin of the Arazzo workflow."
-            },
-            "generated_from": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "List of sources used to generate the Arazzo workflow."
-            },
-            "sha256": {
-              "type": "string",
-              "description": "SHA-256 hash of the Arazzo workflow."
-            }
-          },
-          "additionalProperties": false
+          "description": "List of capabilities not yet implemented."
         }
       },
       "additionalProperties": false
+    },
+    "sources": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Sources used during twin generation (generator format).",
+          "properties": {
+            "openapi": {
+              "type": "object",
+              "description": "OpenAPI specification source.",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "enum": ["vendor_published", "community_maintained", "derived", "manual", "none", "unknown"],
+                  "description": "Origin of the OpenAPI spec."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "URL where the spec was retrieved from."
+                },
+                "retrieved_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the spec was retrieved."
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "SHA-256 hash of the spec content."
+                },
+                "api_version": {
+                  "type": "string",
+                  "description": "Version of the API described by the spec."
+                }
+              },
+              "additionalProperties": false
+            },
+            "sdk_analysis": {
+              "type": "object",
+              "description": "SDK analysis source.",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": ["deepwiki", "direct_repo", "manual", "none"],
+                  "description": "Analysis method used."
+                },
+                "repo": {
+                  "type": "string",
+                  "description": "Repository URL of the SDK."
+                },
+                "repo_ref": {
+                  "type": "string",
+                  "description": "Git ref (tag, branch, commit) analyzed."
+                },
+                "retrieved_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the SDK was retrieved for analysis."
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "SHA-256 hash of the analyzed content."
+                },
+                "fallback_used": {
+                  "type": "boolean",
+                  "description": "Whether a fallback analysis method was used."
+                }
+              },
+              "additionalProperties": false
+            },
+            "arazzo": {
+              "type": "object",
+              "description": "Arazzo workflow source.",
+              "properties": {
+                "origin": {
+                  "type": "string",
+                  "enum": ["vendor_published", "community_contributed", "generated", "manual"],
+                  "description": "Origin of the Arazzo workflow."
+                },
+                "generated_from": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of sources used to generate the Arazzo workflow."
+                },
+                "sha256": {
+                  "type": "string",
+                  "description": "SHA-256 hash of the Arazzo workflow."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "description": "Sources used during research (researcher format).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Source type (e.g., official_docs, sdk, openapi, community)."
+              },
+              "url": {
+                "type": "string",
+                "description": "URL of the source."
+              },
+              "accessed": {
+                "type": "string",
+                "description": "Date the source was accessed."
+              },
+              "archived_at": {
+                "type": "string",
+                "description": "Path where the source was archived."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
     }
   },
   "additionalProperties": false
