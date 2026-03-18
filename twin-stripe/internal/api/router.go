@@ -53,6 +53,72 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/prices/{id}", h.UpdatePrice)
 		r.Get("/prices", h.ListPrices)
 
+		// Payment Intents
+		r.Post("/payment_intents", h.CreatePaymentIntent)
+		r.Get("/payment_intents/{id}", h.GetPaymentIntent)
+		r.Post("/payment_intents/{id}/confirm", h.ConfirmPaymentIntent)
+		r.Post("/payment_intents/{id}/cancel", h.CancelPaymentIntent)
+		r.Get("/payment_intents", h.ListPaymentIntents)
+
+		// Payment Methods
+		r.Post("/payment_methods", h.CreatePaymentMethod)
+		r.Get("/payment_methods/{id}", h.GetPaymentMethod)
+		r.Post("/payment_methods/{id}/attach", h.AttachPaymentMethod)
+		r.Post("/payment_methods/{id}/detach", h.DetachPaymentMethod)
+		r.Get("/payment_methods", h.ListPaymentMethods)
+
+		// Charges
+		r.Get("/charges/{id}", h.GetCharge)
+		r.Get("/charges", h.ListCharges)
+
+		// Refunds
+		r.Post("/refunds", h.CreateRefund)
+		r.Get("/refunds/{id}", h.GetRefund)
+		r.Get("/refunds", h.ListRefunds)
+
+		// Subscriptions
+		r.Post("/subscriptions", h.CreateSubscription)
+		r.Get("/subscriptions/{id}", h.GetSubscription)
+		r.Post("/subscriptions/{id}", h.UpdateSubscription)
+		r.Delete("/subscriptions/{id}", h.CancelSubscription)
+		r.Get("/subscriptions", h.ListSubscriptions)
+
+		// Invoices
+		r.Post("/invoices", h.CreateInvoice)
+		r.Get("/invoices/{id}", h.GetInvoice)
+		r.Post("/invoices/{id}/finalize", h.FinalizeInvoice)
+		r.Post("/invoices/{id}/pay", h.PayInvoice)
+		r.Post("/invoices/{id}/void", h.VoidInvoice)
+		r.Get("/invoices", h.ListInvoices)
+
+		// Invoice Items
+		r.Post("/invoiceitems", h.CreateInvoiceItem)
+		r.Get("/invoiceitems/{id}", h.GetInvoiceItem)
+		r.Delete("/invoiceitems/{id}", h.DeleteInvoiceItem)
+
+		// Coupons
+		r.Post("/coupons", h.CreateCoupon)
+		r.Get("/coupons/{id}", h.GetCoupon)
+		r.Delete("/coupons/{id}", h.DeleteCoupon)
+		r.Get("/coupons", h.ListCoupons)
+
+		// Setup Intents
+		r.Post("/setup_intents", h.CreateSetupIntent)
+		r.Get("/setup_intents/{id}", h.GetSetupIntent)
+		r.Post("/setup_intents/{id}/confirm", h.ConfirmSetupIntent)
+		r.Post("/setup_intents/{id}/cancel", h.CancelSetupIntent)
+		r.Get("/setup_intents", h.ListSetupIntents)
+
+		// Tax Rates
+		r.Post("/tax_rates", h.CreateTaxRate)
+		r.Get("/tax_rates/{id}", h.GetTaxRate)
+		r.Get("/tax_rates", h.ListTaxRates)
+
+		// Disputes
+		r.Get("/disputes/{id}", h.GetDispute)
+		r.Post("/disputes/{id}/close", h.CloseDispute)
+		r.Get("/disputes", h.ListDisputes)
+
 		// Accounts
 		r.Post("/accounts", h.CreateAccount)
 		r.Get("/accounts/{id}", h.GetAccount)
