@@ -101,4 +101,9 @@ func computeBillTotals(bill *store.Bill) {
 		tax = bill.TxnTaxDetail.TotalTax
 	}
 	bill.TotalAmt = subTotal + tax
+	if bill.ExchangeRate > 0 {
+		bill.HomeTotalAmt = bill.TotalAmt * bill.ExchangeRate
+	} else {
+		bill.HomeTotalAmt = bill.TotalAmt
+	}
 }

@@ -155,6 +155,8 @@ type Invoice struct {
 	TxnTaxDetail  *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
 	TotalAmt      float64        `json:"TotalAmt"`
 	Balance       float64        `json:"Balance"`
+	HomeTotalAmt  float64        `json:"HomeTotalAmt,omitempty"`
+	ExchangeRate  float64        `json:"ExchangeRate,omitempty"`
 	EmailStatus   string         `json:"EmailStatus,omitempty"`
 	CurrencyRef   *Ref           `json:"CurrencyRef,omitempty"`
 	SalesTermRef  *Ref           `json:"SalesTermRef,omitempty"`
@@ -175,6 +177,8 @@ type Bill struct {
 	TxnTaxDetail *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
 	TotalAmt     float64        `json:"TotalAmt"`
 	Balance      float64        `json:"Balance"`
+	HomeTotalAmt float64        `json:"HomeTotalAmt,omitempty"`
+	ExchangeRate float64        `json:"ExchangeRate,omitempty"`
 	CurrencyRef  *Ref           `json:"CurrencyRef,omitempty"`
 	APAccountRef *Ref           `json:"APAccountRef,omitempty"`
 	MetaData     MetaData       `json:"MetaData"`
