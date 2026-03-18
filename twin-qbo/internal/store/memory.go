@@ -1,0 +1,167 @@
+package store
+
+import (
+	"encoding/json"
+	"fmt"
+	"sync/atomic"
+	"time"
+
+	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+)
+
+// MemoryStore holds all QBO twin state in memory.
+type MemoryStore struct {
+	Customers    *pkgstore.Store[Customer]
+	Vendors      *pkgstore.Store[Vendor]
+	Accounts     *pkgstore.Store[Account]
+	Items        *pkgstore.Store[Item]
+	Invoices     *pkgstore.Store[Invoice]
+	Bills        *pkgstore.Store[Bill]
+	Payments     *pkgstore.Store[Payment]
+	BillPayments *pkgstore.Store[BillPayment]
+	CreditMemos  *pkgstore.Store[CreditMemo]
+	VendorCredits *pkgstore.Store[VendorCredit]
+	SalesReceipts *pkgstore.Store[SalesReceipt]
+	Deposits     *pkgstore.Store[Deposit]
+	Transfers    *pkgstore.Store[Transfer]
+	JournalEntries *pkgstore.Store[JournalEntry]
+	Estimates    *pkgstore.Store[Estimate]
+	Purchases    *pkgstore.Store[Purchase]
+	CompanyInfos *pkgstore.Store[CompanyInfo]
+	Journal      *journal.Journal
+	Clock        *pkgstore.Clock
+	idCounter    atomic.Uint64
+}
+
+// New creates a new MemoryStore with empty state.
+func New() *MemoryStore {
+	clock := pkgstore.NewClock()
+	return &MemoryStore{
+		Customers:     pkgstore.New[Customer]("cust"),
+		Vendors:       pkgstore.New[Vendor]("vend"),
+		Accounts:      pkgstore.New[Account]("acct"),
+		Items:         pkgstore.New[Item]("item"),
+		Invoices:      pkgstore.New[Invoice]("inv"),
+		Bills:         pkgstore.New[Bill]("bill"),
+		Payments:      pkgstore.New[Payment]("pmt"),
+		BillPayments:  pkgstore.New[BillPayment]("bpmt"),
+		CreditMemos:   pkgstore.New[CreditMemo]("cm"),
+		VendorCredits: pkgstore.New[VendorCredit]("vc"),
+		SalesReceipts: pkgstore.New[SalesReceipt]("sr"),
+		Deposits:      pkgstore.New[Deposit]("dep"),
+		Transfers:     pkgstore.New[Transfer]("xfer"),
+		JournalEntries: pkgstore.New[JournalEntry]("je"),
+		Estimates:     pkgstore.New[Estimate]("est"),
+		Purchases:     pkgstore.New[Purchase]("pur"),
+		CompanyInfos:  pkgstore.New[CompanyInfo]("co"),
+		Journal:       journal.New(clock),
+		Clock:         clock,
+	}
+}
+
+// NextID generates a QBO-style numeric string ID.
+func (s *MemoryStore) NextID() string {
+	return fmt.Sprintf("%d", s.idCounter.Add(1))
+}
+
+// Now returns the current time formatted as QBO ISO 8601.
+func (s *MemoryStore) Now() string {
+	return s.Clock.Now().Format(time.RFC3339)
+}
+
+// NewMetaData creates a MetaData with the current time.
+func (s *MemoryStore) NewMetaData() MetaData {
+	now := s.Now()
+	return MetaData{CreateTime: now, LastUpdatedTime: now}
+}
+
+type stateSnapshot struct {
+	Customers     map[string]Customer     `json:"customers"`
+	Vendors       map[string]Vendor       `json:"vendors"`
+	Accounts      map[string]Account      `json:"accounts"`
+	Items         map[string]Item         `json:"items"`
+	Invoices      map[string]Invoice      `json:"invoices"`
+	Bills         map[string]Bill         `json:"bills"`
+	Payments      map[string]Payment      `json:"payments"`
+	BillPayments  map[string]BillPayment  `json:"bill_payments"`
+	CreditMemos   map[string]CreditMemo   `json:"credit_memos"`
+	VendorCredits map[string]VendorCredit `json:"vendor_credits"`
+	SalesReceipts map[string]SalesReceipt `json:"sales_receipts"`
+	Deposits      map[string]Deposit      `json:"deposits"`
+	Transfers     map[string]Transfer     `json:"transfers"`
+	JournalEntries map[string]JournalEntry `json:"journal_entries"`
+	Estimates     map[string]Estimate     `json:"estimates"`
+	Purchases     map[string]Purchase     `json:"purchases"`
+	CompanyInfos  map[string]CompanyInfo  `json:"company_info"`
+}
+
+func (s *MemoryStore) Snapshot() any {
+	return stateSnapshot{
+		Customers:     s.Customers.Snapshot(),
+		Vendors:       s.Vendors.Snapshot(),
+		Accounts:      s.Accounts.Snapshot(),
+		Items:         s.Items.Snapshot(),
+		Invoices:      s.Invoices.Snapshot(),
+		Bills:         s.Bills.Snapshot(),
+		Payments:      s.Payments.Snapshot(),
+		BillPayments:  s.BillPayments.Snapshot(),
+		CreditMemos:   s.CreditMemos.Snapshot(),
+		VendorCredits: s.VendorCredits.Snapshot(),
+		SalesReceipts: s.SalesReceipts.Snapshot(),
+		Deposits:      s.Deposits.Snapshot(),
+		Transfers:     s.Transfers.Snapshot(),
+		JournalEntries: s.JournalEntries.Snapshot(),
+		Estimates:     s.Estimates.Snapshot(),
+		Purchases:     s.Purchases.Snapshot(),
+		CompanyInfos:  s.CompanyInfos.Snapshot(),
+	}
+}
+
+func (s *MemoryStore) LoadState(data []byte) error {
+	var snap stateSnapshot
+	if err := json.Unmarshal(data, &snap); err != nil {
+		return err
+	}
+	s.Customers.LoadSnapshot(snap.Customers)
+	s.Vendors.LoadSnapshot(snap.Vendors)
+	s.Accounts.LoadSnapshot(snap.Accounts)
+	s.Items.LoadSnapshot(snap.Items)
+	s.Invoices.LoadSnapshot(snap.Invoices)
+	s.Bills.LoadSnapshot(snap.Bills)
+	s.Payments.LoadSnapshot(snap.Payments)
+	s.BillPayments.LoadSnapshot(snap.BillPayments)
+	s.CreditMemos.LoadSnapshot(snap.CreditMemos)
+	s.VendorCredits.LoadSnapshot(snap.VendorCredits)
+	s.SalesReceipts.LoadSnapshot(snap.SalesReceipts)
+	s.Deposits.LoadSnapshot(snap.Deposits)
+	s.Transfers.LoadSnapshot(snap.Transfers)
+	s.JournalEntries.LoadSnapshot(snap.JournalEntries)
+	s.Estimates.LoadSnapshot(snap.Estimates)
+	s.Purchases.LoadSnapshot(snap.Purchases)
+	s.CompanyInfos.LoadSnapshot(snap.CompanyInfos)
+	return nil
+}
+
+func (s *MemoryStore) Reset() {
+	s.Customers.Reset()
+	s.Vendors.Reset()
+	s.Accounts.Reset()
+	s.Items.Reset()
+	s.Invoices.Reset()
+	s.Bills.Reset()
+	s.Payments.Reset()
+	s.BillPayments.Reset()
+	s.CreditMemos.Reset()
+	s.VendorCredits.Reset()
+	s.SalesReceipts.Reset()
+	s.Deposits.Reset()
+	s.Transfers.Reset()
+	s.JournalEntries.Reset()
+	s.Estimates.Reset()
+	s.Purchases.Reset()
+	s.CompanyInfos.Reset()
+	s.Journal.Reset()
+	s.Clock.Reset()
+	s.idCounter.Store(0)
+}
