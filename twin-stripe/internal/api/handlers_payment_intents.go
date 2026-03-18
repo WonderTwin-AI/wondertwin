@@ -59,6 +59,12 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		pi.Status = "requires_confirmation"
 	}
 	if confirm == "true" && pm != "" {
+		// Check card behavior for test cards.
+		if behavior := h.checkCardBehavior(pm); !behavior.Succeed && behavior.DeclineCode != "" {
+			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+			return
+		}
+
 		// Create a charge.
 		chargeID := h.createChargeForPI(&pi)
 		pi.LatestCharge = chargeID
@@ -110,6 +116,12 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 		if pm := r.FormValue("payment_method"); pm != "" {
 			pi.PaymentMethod = pm
 		}
+	}
+
+	// Check card behavior for test cards.
+	if behavior := h.checkCardBehavior(pi.PaymentMethod); !behavior.Succeed && behavior.DeclineCode != "" {
+		twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		return
 	}
 
 	chargeID := h.createChargeForPI(&pi)

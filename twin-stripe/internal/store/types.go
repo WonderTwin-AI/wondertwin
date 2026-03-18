@@ -251,6 +251,7 @@ type CardDetails struct {
 	ExpYear  int    `json:"exp_year"`
 	Funding  string `json:"funding"` // credit, debit, prepaid
 	Country  string `json:"country,omitempty"`
+	Number   string `json:"-"` // full card number, internal only, never serialized
 }
 
 // BillingDetails holds customer billing information.

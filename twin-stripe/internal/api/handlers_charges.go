@@ -24,6 +24,14 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
 
+	// Check card behavior if source is a payment method.
+	if source := r.FormValue("source"); source != "" {
+		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.DeclineCode != "" {
+			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+			return
+		}
+	}
+
 	id := h.store.Charges.NextID()
 	ch := store.Charge{
 		ID:            id,

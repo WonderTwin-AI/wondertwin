@@ -59,6 +59,7 @@ func (h *Handler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) {
 			ExpMonth: expMonth,
 			ExpYear:  expYear,
 			Funding:  "credit",
+			Number:   number,
 		}
 	}
 
