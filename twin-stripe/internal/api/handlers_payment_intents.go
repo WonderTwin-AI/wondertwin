@@ -59,19 +59,26 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		pi.Status = "requires_confirmation"
 	}
 	if confirm == "true" && pm != "" {
-		pi.Status = "succeeded"
-		pi.AmountReceived = amount
 		// Create a charge.
 		chargeID := h.createChargeForPI(&pi)
 		pi.LatestCharge = chargeID
-		h.store.CreditBalance("", currency, amount)
-		h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
+
+		if captureMethod == "manual" {
+			pi.Status = "requires_capture"
+		} else {
+			pi.Status = "succeeded"
+			pi.AmountReceived = amount
+			h.store.CreditBalance("", currency, amount)
+			h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
+		}
 	}
 
 	h.store.PaymentIntents.Set(id, pi)
 	h.dispatcher.Enqueue("payment_intent.created", mapFromJSON(pi))
 	if pi.Status == "succeeded" {
 		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+	} else if pi.Status == "requires_capture" {
+		h.dispatcher.Enqueue("payment_intent.amount_capturable_updated", mapFromJSON(pi))
 	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
@@ -105,13 +112,70 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pi.Status = "succeeded"
-	pi.AmountReceived = pi.Amount
 	chargeID := h.createChargeForPI(&pi)
 	pi.LatestCharge = chargeID
-	h.store.CreditBalance("", pi.Currency, pi.Amount)
-	h.store.RecordBalanceTransaction("charge", chargeID, pi.Currency, pi.Amount, 0)
 
+	if pi.CaptureMethod == "manual" {
+		pi.Status = "requires_capture"
+	} else {
+		pi.Status = "succeeded"
+		pi.AmountReceived = pi.Amount
+		h.store.CreditBalance("", pi.Currency, pi.Amount)
+		h.store.RecordBalanceTransaction("charge", chargeID, pi.Currency, pi.Amount, 0)
+	}
+
+	h.store.PaymentIntents.Set(id, pi)
+	if pi.Status == "succeeded" {
+		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+	} else {
+		h.dispatcher.Enqueue("payment_intent.amount_capturable_updated", mapFromJSON(pi))
+	}
+	twincore.JSON(w, http.StatusOK, pi)
+}
+
+// CapturePaymentIntent handles POST /v1/payment_intents/{id}/capture.
+func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	pi, ok := h.store.PaymentIntents.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		return
+	}
+	if pi.Status != "requires_capture" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+			"This PaymentIntent's status is "+pi.Status+". Only a PaymentIntent with status requires_capture can be captured.")
+		return
+	}
+
+	captureAmount := pi.Amount
+	if err := parseFormOrJSON(r); err == nil {
+		if v := r.FormValue("amount_to_capture"); v != "" {
+			if a, err := strconv.ParseInt(v, 10, 64); err == nil {
+				captureAmount = a
+			}
+		}
+	}
+	if captureAmount > pi.Amount {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
+			"Capture amount exceeds the authorized amount.")
+		return
+	}
+
+	pi.Status = "succeeded"
+	pi.AmountReceived = captureAmount
+
+	// Update charge captured flag.
+	if pi.LatestCharge != "" {
+		ch, ok := h.store.Charges.Get(pi.LatestCharge)
+		if ok {
+			ch.Captured = true
+			ch.Amount = captureAmount
+			h.store.Charges.Set(pi.LatestCharge, ch)
+		}
+	}
+
+	h.store.CreditBalance("", pi.Currency, captureAmount)
+	h.store.RecordBalanceTransaction("charge", pi.LatestCharge, pi.Currency, captureAmount, 0)
 	h.store.PaymentIntents.Set(id, pi)
 	h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
 	twincore.JSON(w, http.StatusOK, pi)

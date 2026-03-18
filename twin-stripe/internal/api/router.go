@@ -57,6 +57,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/payment_intents", h.CreatePaymentIntent)
 		r.Get("/payment_intents/{id}", h.GetPaymentIntent)
 		r.Post("/payment_intents/{id}/confirm", h.ConfirmPaymentIntent)
+		r.Post("/payment_intents/{id}/capture", h.CapturePaymentIntent)
 		r.Post("/payment_intents/{id}/cancel", h.CancelPaymentIntent)
 		r.Get("/payment_intents", h.ListPaymentIntents)
 
@@ -68,6 +69,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/payment_methods", h.ListPaymentMethods)
 
 		// Charges
+		r.Post("/charges", h.CreateCharge)
 		r.Get("/charges/{id}", h.GetCharge)
 		r.Get("/charges", h.ListCharges)
 
