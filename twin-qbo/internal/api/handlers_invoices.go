@@ -96,14 +96,18 @@ func (h *Handler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func computeInvoiceTotals(inv *store.Invoice) {
-	var total float64
+	var subTotal float64
 	for i, line := range inv.Line {
 		if line.DetailType == "SalesItemLineDetail" && line.SalesItemLineDetail != nil {
 			inv.Line[i].Amount = line.SalesItemLineDetail.Qty * line.SalesItemLineDetail.UnitPrice
 		}
 		if line.DetailType != "SubTotalLineDetail" {
-			total += inv.Line[i].Amount
+			subTotal += inv.Line[i].Amount
 		}
 	}
-	inv.TotalAmt = total
+	tax := 0.0
+	if inv.TxnTaxDetail != nil {
+		tax = inv.TxnTaxDetail.TotalTax
+	}
+	inv.TotalAmt = subTotal + tax
 }

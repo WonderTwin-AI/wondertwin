@@ -115,6 +115,28 @@ type JournalEntryLineDetail struct {
 	AccountRef  *Ref   `json:"AccountRef"`
 }
 
+// TxnTaxDetail holds tax information on a transaction.
+type TxnTaxDetail struct {
+	TxnTaxCodeRef *Ref      `json:"TxnTaxCodeRef,omitempty"`
+	TotalTax      float64   `json:"TotalTax"`
+	TaxLine       []TaxLine `json:"TaxLine,omitempty"`
+}
+
+// TaxLine is a single tax line on a transaction.
+type TaxLine struct {
+	Amount         float64        `json:"Amount"`
+	DetailType     string         `json:"DetailType"` // TaxLineDetail
+	TaxLineDetail  *TaxLineDetail `json:"TaxLineDetail,omitempty"`
+}
+
+// TaxLineDetail holds tax computation details.
+type TaxLineDetail struct {
+	TaxRateRef       *Ref    `json:"TaxRateRef,omitempty"`
+	PercentBased     bool    `json:"PercentBased"`
+	TaxPercent       float64 `json:"TaxPercent"`
+	NetAmountTaxable float64 `json:"NetAmountTaxable"`
+}
+
 // LinkedTxn links a payment to an invoice or bill.
 type LinkedTxn struct {
 	TxnId   string `json:"TxnId"`
@@ -123,38 +145,40 @@ type LinkedTxn struct {
 
 // Invoice represents a QBO invoice (ACCREC).
 type Invoice struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	DueDate     string   `json:"DueDate,omitempty"`
-	CustomerRef *Ref     `json:"CustomerRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	Balance     float64  `json:"Balance"`
-	EmailStatus string   `json:"EmailStatus,omitempty"`
-	CurrencyRef *Ref     `json:"CurrencyRef,omitempty"`
-	SalesTermRef *Ref    `json:"SalesTermRef,omitempty"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
-	Sparse      bool     `json:"sparse,omitempty"`
+	Id            string         `json:"Id"`
+	SyncToken     string         `json:"SyncToken"`
+	DocNumber     string         `json:"DocNumber,omitempty"`
+	TxnDate       string         `json:"TxnDate,omitempty"`
+	DueDate       string         `json:"DueDate,omitempty"`
+	CustomerRef   *Ref           `json:"CustomerRef"`
+	Line          []Line         `json:"Line"`
+	TxnTaxDetail  *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
+	TotalAmt      float64        `json:"TotalAmt"`
+	Balance       float64        `json:"Balance"`
+	EmailStatus   string         `json:"EmailStatus,omitempty"`
+	CurrencyRef   *Ref           `json:"CurrencyRef,omitempty"`
+	SalesTermRef  *Ref           `json:"SalesTermRef,omitempty"`
+	MetaData      MetaData       `json:"MetaData"`
+	Domain        string         `json:"domain"`
+	Sparse        bool           `json:"sparse,omitempty"`
 }
 
 // Bill represents a QBO bill (ACCPAY).
 type Bill struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	DueDate     string   `json:"DueDate,omitempty"`
-	VendorRef   *Ref     `json:"VendorRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	Balance     float64  `json:"Balance"`
-	CurrencyRef *Ref     `json:"CurrencyRef,omitempty"`
-	APAccountRef *Ref    `json:"APAccountRef,omitempty"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
+	Id           string         `json:"Id"`
+	SyncToken    string         `json:"SyncToken"`
+	DocNumber    string         `json:"DocNumber,omitempty"`
+	TxnDate      string         `json:"TxnDate,omitempty"`
+	DueDate      string         `json:"DueDate,omitempty"`
+	VendorRef    *Ref           `json:"VendorRef"`
+	Line         []Line         `json:"Line"`
+	TxnTaxDetail *TxnTaxDetail  `json:"TxnTaxDetail,omitempty"`
+	TotalAmt     float64        `json:"TotalAmt"`
+	Balance      float64        `json:"Balance"`
+	CurrencyRef  *Ref           `json:"CurrencyRef,omitempty"`
+	APAccountRef *Ref           `json:"APAccountRef,omitempty"`
+	MetaData     MetaData       `json:"MetaData"`
+	Domain       string         `json:"domain"`
 }
 
 // Payment represents a QBO customer payment.
