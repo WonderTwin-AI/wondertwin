@@ -4,12 +4,10 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 
 ## High Value
 
-### 1. Update handlers for core payment resources
-- [ ] `POST /v1/charges/{id}` — update metadata, description
-- [ ] `POST /v1/invoices/{id}` — update metadata, description, auto_advance, etc.
-- [ ] `POST /v1/payment_intents/{id}` — update metadata, description, amount, currency, customer
-
-These are called constantly by SDKs after creation. Currently missing entirely.
+### 1. ~~Update handlers for core payment resources~~ (done)
+- [x] `POST /v1/charges/{id}` — update metadata, description
+- [x] `POST /v1/invoices/{id}` — update metadata, description, collection_method (draft only)
+- [x] `POST /v1/payment_intents/{id}` — update metadata, description, amount, currency, customer, payment_method
 
 ### 2. Customer existence validation
 - [ ] `AttachPaymentMethod` — validate customer exists before attaching

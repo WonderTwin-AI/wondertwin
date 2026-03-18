@@ -128,6 +128,43 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
+// UpdateInvoice handles POST /v1/invoices/{id}.
+// Only draft invoices can be updated.
+func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	inv, ok := h.store.Invoices.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		return
+	}
+	if inv.Status != "draft" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_editable",
+			"Invoice is not a draft. Only draft invoices can be updated.")
+		return
+	}
+	if err := parseFormOrJSON(r); err != nil {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		return
+	}
+
+	if v := r.FormValue("description"); v != "" {
+		inv.Description = v
+	}
+	if v := r.FormValue("default_payment_method"); v != "" {
+		inv.DefaultPaymentMethod = v
+	}
+	if v := r.FormValue("collection_method"); v != "" {
+		inv.CollectionMethod = v
+	}
+	if meta := parseMetadata(r); len(meta) > 0 {
+		inv.Metadata = meta
+	}
+
+	h.store.Invoices.Set(id, inv)
+	h.emitEvent("invoice.updated", mapFromJSON(inv))
+	twincore.JSON(w, http.StatusOK, inv)
+}
+
 func (h *Handler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
