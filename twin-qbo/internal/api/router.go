@@ -57,6 +57,8 @@ func (h *Handler) Routes(r chi.Router) {
 		// Invoices
 		r.Post("/invoice", h.CreateOrUpdateInvoice)
 		r.Get("/invoice/{id}", h.GetInvoice)
+		r.Post("/invoice/{id}/send", h.SendInvoice)
+		r.Get("/invoice/{id}/pdf", h.InvoicePDF)
 
 		// Bills
 		r.Post("/bill", h.CreateOrUpdateBill)
@@ -81,6 +83,7 @@ func (h *Handler) Routes(r chi.Router) {
 		// Sales Receipts
 		r.Post("/salesreceipt", h.CreateOrUpdateSalesReceipt)
 		r.Get("/salesreceipt/{id}", h.GetSalesReceipt)
+		r.Post("/salesreceipt/{id}/send", h.SendSalesReceipt)
 
 		// Deposits
 		r.Post("/deposit", h.CreateOrUpdateDeposit)
@@ -97,6 +100,7 @@ func (h *Handler) Routes(r chi.Router) {
 		// Estimates
 		r.Post("/estimate", h.CreateOrUpdateEstimate)
 		r.Get("/estimate/{id}", h.GetEstimate)
+		r.Post("/estimate/{id}/send", h.SendEstimate)
 
 		// Purchases
 		r.Post("/purchase", h.CreateOrUpdatePurchase)
