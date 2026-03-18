@@ -19,11 +19,10 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 
 ## Medium Value
 
-### 4. Proration on subscription changes
-- [ ] Updating a subscription's price or quantity mid-cycle generates a prorated invoice
-- [ ] Credit for unused time on old price, charge for remaining time on new price
-
-One of the most common Stripe integration bugs — important for realistic testing.
+### 4. ~~Proration on subscription changes~~ (done)
+- [x] Updating a subscription's price or quantity mid-cycle generates a prorated invoice
+- [x] Credit for unused time on old price, charge for remaining time on new price
+- [x] `proration_behavior=none` skips proration invoice
 
 ### 5. Invoice lifecycle deepening
 - [ ] `POST /v1/invoices/{id}/send` for send_invoice mode
