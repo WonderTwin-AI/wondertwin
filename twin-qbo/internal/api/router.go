@@ -32,6 +32,9 @@ func (h *Handler) Routes(r chi.Router) {
 		// Query endpoint (SQL-like)
 		r.Get("/query", h.Query)
 
+		// Batch endpoint (up to 30 operations)
+		r.Post("/batch", h.Batch)
+
 		// Customers
 		r.Post("/customer", h.CreateOrUpdateCustomer)
 		r.Get("/customer/{id}", h.GetCustomer)
