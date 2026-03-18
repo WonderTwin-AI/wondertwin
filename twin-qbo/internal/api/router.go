@@ -126,6 +126,18 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/preferences", h.GetPreferences)
 		r.Post("/preferences", h.UpdatePreferences)
 
+		// Refund Receipts
+		r.Post("/refundreceipt", h.CreateOrUpdateRefundReceipt)
+		r.Get("/refundreceipt/{id}", h.GetRefundReceipt)
+
+		// Purchase Orders
+		r.Post("/purchaseorder", h.CreateOrUpdatePurchaseOrder)
+		r.Get("/purchaseorder/{id}", h.GetPurchaseOrder)
+
+		// Time Activities
+		r.Post("/timeactivity", h.CreateOrUpdateTimeActivity)
+		r.Get("/timeactivity/{id}", h.GetTimeActivity)
+
 		// Reports
 		r.Get("/reports/ProfitAndLoss", h.ProfitAndLoss)
 		r.Get("/reports/BalanceSheet", h.BalanceSheet)

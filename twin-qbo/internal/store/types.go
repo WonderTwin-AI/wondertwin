@@ -387,6 +387,49 @@ type Preferences struct {
 	Domain                string   `json:"domain"`
 }
 
+// RefundReceipt represents a QBO refund.
+type RefundReceipt struct {
+	Id                  string   `json:"Id"`
+	SyncToken           string   `json:"SyncToken"`
+	DocNumber           string   `json:"DocNumber,omitempty"`
+	TxnDate             string   `json:"TxnDate,omitempty"`
+	CustomerRef         *Ref     `json:"CustomerRef"`
+	Line                []Line   `json:"Line"`
+	TotalAmt            float64  `json:"TotalAmt"`
+	DepositToAccountRef *Ref     `json:"DepositToAccountRef,omitempty"`
+	MetaData            MetaData `json:"MetaData"`
+	Domain              string   `json:"domain"`
+}
+
+// PurchaseOrder represents a QBO purchase order.
+type PurchaseOrder struct {
+	Id        string   `json:"Id"`
+	SyncToken string   `json:"SyncToken"`
+	DocNumber string   `json:"DocNumber,omitempty"`
+	TxnDate   string   `json:"TxnDate,omitempty"`
+	VendorRef *Ref     `json:"VendorRef"`
+	Line      []Line   `json:"Line"`
+	TotalAmt  float64  `json:"TotalAmt"`
+	POStatus  string   `json:"POStatus"` // Open, Closed
+	MetaData  MetaData `json:"MetaData"`
+	Domain    string   `json:"domain"`
+}
+
+// TimeActivity represents a QBO time tracking entry.
+type TimeActivity struct {
+	Id          string   `json:"Id"`
+	SyncToken   string   `json:"SyncToken"`
+	TxnDate     string   `json:"TxnDate,omitempty"`
+	EmployeeRef *Ref     `json:"EmployeeRef,omitempty"`
+	CustomerRef *Ref     `json:"CustomerRef,omitempty"`
+	ItemRef     *Ref     `json:"ItemRef,omitempty"`
+	Hours       int      `json:"Hours,omitempty"`
+	Minutes     int      `json:"Minutes,omitempty"`
+	Description string   `json:"Description,omitempty"`
+	MetaData    MetaData `json:"MetaData"`
+	Domain      string   `json:"domain"`
+}
+
 // CompanyInfo holds the company settings (single record, Id="1").
 type CompanyInfo struct {
 	Id                string   `json:"Id"`
