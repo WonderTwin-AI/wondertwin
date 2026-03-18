@@ -149,6 +149,7 @@ func (h *Handler) Routes(r chi.Router) {
 		// Payouts
 		r.Post("/payouts", h.CreatePayout)
 		r.Get("/payouts/{id}", h.GetPayout)
+		r.Post("/payouts/{id}/cancel", h.CancelPayout)
 		r.Get("/payouts", h.ListPayouts)
 
 		// Balance Transactions

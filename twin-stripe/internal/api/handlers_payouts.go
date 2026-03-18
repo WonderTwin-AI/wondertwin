@@ -127,6 +127,34 @@ func (h *Handler) ListPayouts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// CancelPayout handles POST /v1/payouts/{id}/cancel.
+func (h *Handler) CancelPayout(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	payout, ok := h.store.Payouts.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payout: "+id)
+		return
+	}
+	if payout.Status != store.PayoutStatusPending {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payout_not_cancelable",
+			"Payout status is "+payout.Status+". Only pending payouts can be canceled.")
+		return
+	}
+
+	payout.Status = store.PayoutStatusCanceled
+
+	// Re-credit the balance.
+	accountID := stripeAccountFromRequest(r)
+	if accountID != "" {
+		h.store.CreditBalance(accountID, payout.Currency, payout.Amount)
+	}
+	h.store.RecordBalanceTransaction("payout_cancel", payout.ID, payout.Currency, payout.Amount, 0)
+
+	h.store.Payouts.Set(id, payout)
+	h.emitEvent("payout.canceled", payoutToMap(payout))
+	twincore.JSON(w, http.StatusOK, payout)
+}
+
 // AdminFailPayout handles POST /admin/payouts/{id}/fail
 // Forces a payout to the failed state.
 func (h *Handler) AdminFailPayout(w http.ResponseWriter, r *http.Request) {

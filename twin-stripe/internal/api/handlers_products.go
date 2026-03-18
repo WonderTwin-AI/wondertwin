@@ -87,6 +87,16 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
 		return
 	}
+
+	// Cascade: deactivate associated prices.
+	prices := h.store.Prices.Filter(func(_ string, p store.Price) bool {
+		return p.Product == id && p.Active
+	})
+	for _, p := range prices {
+		p.Active = false
+		h.store.Prices.Set(p.ID, p)
+	}
+
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "product", "deleted": true})
 }
 
