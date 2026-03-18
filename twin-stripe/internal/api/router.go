@@ -287,6 +287,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/admin/payouts/{id}/fail", h.AdminFailPayout)
 	r.Post("/admin/accounts/{id}/fund", h.AdminFundAccount)
 	r.Post("/admin/checkout/sessions/{id}/complete", h.AdminCompleteCheckoutSession)
+	r.Post("/admin/subscriptions/advance", h.AdminAdvanceSubscriptions)
 }
 
 // authMiddleware validates Stripe-style Bearer token authentication.

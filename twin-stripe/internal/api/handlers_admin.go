@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 )
 
 // fundRequest is the JSON body for POST /admin/accounts/{id}/fund.
@@ -48,4 +49,65 @@ func (h *Handler) AdminFundAccount(w http.ResponseWriter, r *http.Request) {
 
 	balance := h.store.GetBalance(accountID)
 	twincore.JSON(w, http.StatusOK, balance)
+}
+
+// AdminAdvanceSubscriptions handles POST /admin/subscriptions/advance.
+// Simulates time passing: transitions trialing→active, handles cancel_at_period_end,
+// and renews active subscriptions past their period end.
+func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Request) {
+	now := h.store.Clock.Now().Unix()
+	var advanced []string
+
+	subs := h.store.Subscriptions.Filter(func(_ string, s store.Subscription) bool {
+		return s.Status == "trialing" || s.Status == "active"
+	})
+
+	for _, sub := range subs {
+		changed := false
+
+		// Trialing → Active: if past trial_end.
+		if sub.Status == "trialing" && sub.TrialEnd > 0 && now >= sub.TrialEnd {
+			sub.Status = "active"
+			changed = true
+			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+		}
+
+		// Active + cancel_at_period_end + past period_end → Canceled.
+		if sub.Status == "active" && sub.CancelAtPeriodEnd && now >= sub.CurrentPeriodEnd {
+			sub.Status = "canceled"
+			sub.CanceledAt = now
+			changed = true
+			h.dispatcher.Enqueue("customer.subscription.deleted", mapFromJSON(sub))
+		}
+
+		// Active + past period_end → Renew (advance period, create invoice).
+		if sub.Status == "active" && !sub.CancelAtPeriodEnd && now >= sub.CurrentPeriodEnd {
+			// Advance the period.
+			periodDuration := sub.CurrentPeriodEnd - sub.CurrentPeriodStart
+			if periodDuration <= 0 {
+				periodDuration = 30 * 86400 // default 30 days
+			}
+			sub.CurrentPeriodStart = sub.CurrentPeriodEnd
+			sub.CurrentPeriodEnd = sub.CurrentPeriodStart + periodDuration
+
+			// Create renewal invoice.
+			if sub.Items != nil {
+				invoiceID := h.createSubscriptionInvoice(&sub, sub.Items.Data)
+				sub.LatestInvoice = invoiceID
+			}
+
+			changed = true
+			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+		}
+
+		if changed {
+			h.store.Subscriptions.Set(sub.ID, sub)
+			advanced = append(advanced, sub.ID)
+		}
+	}
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"advanced": advanced,
+		"count":    len(advanced),
+	})
 }
