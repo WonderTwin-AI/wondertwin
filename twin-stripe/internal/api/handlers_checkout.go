@@ -52,6 +52,31 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		Created:       now,
 	}
 
+	// Parse line items: line_items[0][price], line_items[0][quantity], etc.
+	for i := 0; i < 20; i++ {
+		priceID := r.FormValue("line_items[" + strconv.Itoa(i) + "][price]")
+		if priceID == "" {
+			break
+		}
+		qty := int64(1)
+		if v := r.FormValue("line_items[" + strconv.Itoa(i) + "][quantity]"); v != "" {
+			if q, err := strconv.ParseInt(v, 10, 64); err == nil {
+				qty = q
+			}
+		}
+		cs.LineItems = append(cs.LineItems, store.CheckoutLineItem{
+			Price:    priceID,
+			Quantity: qty,
+		})
+
+		// Compute amount_total from line items if not explicitly set.
+		if amountTotal == 0 {
+			if p, ok := h.store.Prices.Get(priceID); ok {
+				cs.AmountTotal += p.UnitAmount * qty
+			}
+		}
+	}
+
 	h.store.CheckoutSessions.Set(id, cs)
 	h.emitEvent("checkout.session.created", mapFromJSON(cs))
 	twincore.JSON(w, http.StatusOK, cs)
@@ -96,6 +121,116 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
 	h.emitEvent("checkout.session.expired", mapFromJSON(cs))
+	twincore.JSON(w, http.StatusOK, cs)
+}
+
+// AdminCompleteCheckoutSession handles POST /admin/checkout/sessions/{id}/complete.
+// This is an admin endpoint since real Stripe uses a hosted UI for completion.
+func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	cs, ok := h.store.CheckoutSessions.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
+		return
+	}
+	if cs.Status != "open" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_invalid",
+			fmt.Sprintf("This Session can not be completed because it has a status of %s.", cs.Status))
+		return
+	}
+
+	switch cs.Mode {
+	case "payment":
+		// Create a PaymentIntent + Charge.
+		var amount int64
+		currency := cs.Currency
+		if currency == "" {
+			currency = "usd"
+		}
+		if cs.AmountTotal > 0 {
+			amount = cs.AmountTotal
+		} else {
+			// Sum from line items.
+			for _, li := range cs.LineItems {
+				if p, ok := h.store.Prices.Get(li.Price); ok {
+					amount += p.UnitAmount * li.Quantity
+				}
+			}
+		}
+
+		piID := h.store.PaymentIntents.NextID()
+		pi := store.PaymentIntent{
+			ID:             piID,
+			Object:         "payment_intent",
+			Amount:         amount,
+			AmountReceived: amount,
+			Currency:       currency,
+			Customer:       cs.Customer,
+			Status:         "succeeded",
+			CaptureMethod:  "automatic",
+			ClientSecret:   piID + "_secret_" + randomHex(12),
+			Livemode:       false,
+			Created:        store.Now(),
+		}
+		chargeID := h.createChargeForPI(&pi)
+		pi.LatestCharge = chargeID
+		h.store.PaymentIntents.Set(piID, pi)
+		h.store.CreditBalance("", currency, amount)
+		h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
+		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+
+		cs.PaymentIntent = piID
+		cs.PaymentStatus = "paid"
+
+	case "subscription":
+		// Create subscription from line items.
+		if len(cs.LineItems) > 0 {
+			subID := h.store.Subscriptions.NextID()
+			var items []store.SubscriptionItem
+			now := store.Now()
+			for i, li := range cs.LineItems {
+				price, ok := h.store.Prices.Get(li.Price)
+				if !ok {
+					continue
+				}
+				items = append(items, store.SubscriptionItem{
+					ID:       subID + "_si_" + strconv.Itoa(i),
+					Object:   "subscription_item",
+					Price:    price,
+					Quantity: li.Quantity,
+					Created:  now,
+				})
+			}
+
+			sub := store.Subscription{
+				ID:                 subID,
+				Object:             "subscription",
+				Customer:           cs.Customer,
+				Status:             "active",
+				CurrentPeriodStart: now,
+				CurrentPeriodEnd:   now + 30*86400, // ~1 month
+				CollectionMethod:   "charge_automatically",
+				Livemode:           false,
+				Created:            now,
+				Items: &store.SubscriptionItems{
+					Object: "list", Data: items, URL: "/v1/subscription_items?subscription=" + subID,
+				},
+			}
+
+			invoiceID := h.createSubscriptionInvoice(&sub, items)
+			sub.LatestInvoice = invoiceID
+			h.store.Subscriptions.Set(subID, sub)
+			h.dispatcher.Enqueue("customer.subscription.created", mapFromJSON(sub))
+
+			cs.Subscription = subID
+		}
+		cs.PaymentStatus = "paid"
+	}
+
+	cs.Status = "complete"
+	cs.URL = ""
+	h.store.CheckoutSessions.Set(id, cs)
+	h.dispatcher.Enqueue("checkout.session.completed", mapFromJSON(cs))
 	twincore.JSON(w, http.StatusOK, cs)
 }
 

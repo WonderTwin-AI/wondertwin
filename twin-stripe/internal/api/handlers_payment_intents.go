@@ -177,7 +177,11 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	h.store.CreditBalance("", pi.Currency, captureAmount)
 	h.store.RecordBalanceTransaction("charge", pi.LatestCharge, pi.Currency, captureAmount, 0)
 	h.store.PaymentIntents.Set(id, pi)
-	h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
+	if pi.Status == "succeeded" {
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
+	} else {
+		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
+	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
