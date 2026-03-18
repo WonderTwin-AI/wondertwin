@@ -640,6 +640,66 @@ type BillingPortalSession struct {
 	Created   int64  `json:"created"`
 }
 
+// WebhookEndpoint represents a Stripe webhook endpoint configuration.
+type WebhookEndpoint struct {
+	ID            string            `json:"id"`
+	Object        string            `json:"object"`
+	URL           string            `json:"url"`
+	Status        string            `json:"status"`
+	EnabledEvents []string          `json:"enabled_events"`
+	Secret        string            `json:"secret,omitempty"`
+	APIVersion    string            `json:"api_version,omitempty"`
+	Description   string            `json:"description,omitempty"`
+	Livemode      bool              `json:"livemode"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+	Created       int64             `json:"created"`
+}
+
+// File represents a Stripe file upload.
+type File struct {
+	ID       string `json:"id"`
+	Object   string `json:"object"`
+	Purpose  string `json:"purpose"`
+	Filename string `json:"filename,omitempty"`
+	Size     int64  `json:"size"`
+	Type     string `json:"type,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Livemode bool   `json:"livemode"`
+	Created  int64  `json:"created"`
+}
+
+// FileLink represents a link to a Stripe file.
+type FileLink struct {
+	ID        string            `json:"id"`
+	Object    string            `json:"object"`
+	File      string            `json:"file"`
+	URL       string            `json:"url"`
+	Expired   bool              `json:"expired"`
+	ExpiresAt int64             `json:"expires_at,omitempty"`
+	Livemode  bool              `json:"livemode"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	Created   int64             `json:"created"`
+}
+
+// ShippingRate represents a Stripe shipping rate.
+type ShippingRate struct {
+	ID          string            `json:"id"`
+	Object      string            `json:"object"`
+	Active      bool              `json:"active"`
+	DisplayName string            `json:"display_name"`
+	FixedAmount *ShippingFixed    `json:"fixed_amount,omitempty"`
+	Type        string            `json:"type"`
+	Livemode    bool              `json:"livemode"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	Created     int64             `json:"created"`
+}
+
+// ShippingFixed holds fixed-amount shipping rate details.
+type ShippingFixed struct {
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
+}
+
 // ApplicationFee represents a Stripe application fee collected from a connected account.
 type ApplicationFee struct {
 	ID                 string `json:"id"`

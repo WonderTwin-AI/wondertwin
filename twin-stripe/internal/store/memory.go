@@ -44,6 +44,10 @@ type MemoryStore struct {
 	SubItems             *pkgstore.Store[SubscriptionItem]
 	Quotes               *pkgstore.Store[Quote]
 	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
+	WebhookEndpoints     *pkgstore.Store[WebhookEndpoint]
+	Files                *pkgstore.Store[File]
+	FileLinks            *pkgstore.Store[FileLink]
+	ShippingRates        *pkgstore.Store[ShippingRate]
 	ApplicationFees       *pkgstore.Store[ApplicationFee]
 	ApplicationFeeRefunds *pkgstore.Store[ApplicationFeeRefund]
 	TransferReversals     *pkgstore.Store[TransferReversal]
@@ -93,6 +97,10 @@ func New() *MemoryStore {
 		SubItems:            pkgstore.New[SubscriptionItem]("si"),
 		Quotes:              pkgstore.New[Quote]("qt"),
 		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
+		WebhookEndpoints:    pkgstore.New[WebhookEndpoint]("we"),
+		Files:               pkgstore.New[File]("file"),
+		FileLinks:           pkgstore.New[FileLink]("link"),
+		ShippingRates:       pkgstore.New[ShippingRate]("shr"),
 		ApplicationFees:       pkgstore.New[ApplicationFee]("fee"),
 		ApplicationFeeRefunds: pkgstore.New[ApplicationFeeRefund]("fr"),
 		TransferReversals:     pkgstore.New[TransferReversal]("trr"),
@@ -238,6 +246,10 @@ type stateSnapshot struct {
 	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
 	Quotes              map[string]Quote               `json:"quotes"`
 	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
+	WebhookEndpoints    map[string]WebhookEndpoint     `json:"webhook_endpoints"`
+	Files               map[string]File                `json:"files"`
+	FileLinks           map[string]FileLink            `json:"file_links"`
+	ShippingRates       map[string]ShippingRate         `json:"shipping_rates"`
 	ApplicationFees       map[string]ApplicationFee       `json:"application_fees"`
 	ApplicationFeeRefunds map[string]ApplicationFeeRefund `json:"application_fee_refunds"`
 	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
@@ -281,6 +293,10 @@ func (s *MemoryStore) Snapshot() any {
 		SubItems:            s.SubItems.Snapshot(),
 		Quotes:              s.Quotes.Snapshot(),
 		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
+		WebhookEndpoints:    s.WebhookEndpoints.Snapshot(),
+		Files:               s.Files.Snapshot(),
+		FileLinks:           s.FileLinks.Snapshot(),
+		ShippingRates:       s.ShippingRates.Snapshot(),
 		ApplicationFees:       s.ApplicationFees.Snapshot(),
 		ApplicationFeeRefunds: s.ApplicationFeeRefunds.Snapshot(),
 		TransferReversals:     s.TransferReversals.Snapshot(),
@@ -339,6 +355,10 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.SubItems.LoadSnapshot(snap.SubItems)
 	s.Quotes.LoadSnapshot(snap.Quotes)
 	s.BillingPortalSessions.LoadSnapshot(snap.BillingPortalSessions)
+	s.WebhookEndpoints.LoadSnapshot(snap.WebhookEndpoints)
+	s.Files.LoadSnapshot(snap.Files)
+	s.FileLinks.LoadSnapshot(snap.FileLinks)
+	s.ShippingRates.LoadSnapshot(snap.ShippingRates)
 	s.ApplicationFees.LoadSnapshot(snap.ApplicationFees)
 	s.ApplicationFeeRefunds.LoadSnapshot(snap.ApplicationFeeRefunds)
 	s.TransferReversals.LoadSnapshot(snap.TransferReversals)
@@ -389,6 +409,10 @@ func (s *MemoryStore) Reset() {
 	s.SubItems.Reset()
 	s.Quotes.Reset()
 	s.BillingPortalSessions.Reset()
+	s.WebhookEndpoints.Reset()
+	s.Files.Reset()
+	s.FileLinks.Reset()
+	s.ShippingRates.Reset()
 	s.ApplicationFees.Reset()
 	s.ApplicationFeeRefunds.Reset()
 	s.TransferReversals.Reset()

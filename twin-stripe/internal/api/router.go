@@ -212,6 +212,30 @@ func (h *Handler) Routes(r chi.Router) {
 		// Billing Portal Sessions
 		r.Post("/billing_portal/sessions", h.CreateBillingPortalSession)
 
+		// Webhook Endpoints
+		r.Post("/webhook_endpoints", h.CreateWebhookEndpoint)
+		r.Get("/webhook_endpoints/{id}", h.GetWebhookEndpoint)
+		r.Post("/webhook_endpoints/{id}", h.UpdateWebhookEndpoint)
+		r.Delete("/webhook_endpoints/{id}", h.DeleteWebhookEndpoint)
+		r.Get("/webhook_endpoints", h.ListWebhookEndpoints)
+
+		// Files
+		r.Post("/files", h.CreateFile)
+		r.Get("/files/{id}", h.GetFile)
+		r.Get("/files", h.ListFiles)
+
+		// File Links
+		r.Post("/file_links", h.CreateFileLink)
+		r.Get("/file_links/{id}", h.GetFileLink)
+		r.Post("/file_links/{id}", h.UpdateFileLink)
+		r.Get("/file_links", h.ListFileLinks)
+
+		// Shipping Rates
+		r.Post("/shipping_rates", h.CreateShippingRate)
+		r.Get("/shipping_rates/{id}", h.GetShippingRate)
+		r.Post("/shipping_rates/{id}", h.UpdateShippingRate)
+		r.Get("/shipping_rates", h.ListShippingRates)
+
 		// Application Fees
 		r.Get("/application_fees/{id}", h.GetApplicationFee)
 		r.Get("/application_fees", h.ListApplicationFees)
