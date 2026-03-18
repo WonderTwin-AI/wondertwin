@@ -640,6 +640,39 @@ type BillingPortalSession struct {
 	Created   int64  `json:"created"`
 }
 
+// Review represents a Stripe Radar review.
+type Review struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	Charge        string `json:"charge,omitempty"`
+	PaymentIntent string `json:"payment_intent,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	Status        string `json:"status"`
+	OpenedReason  string `json:"opened_reason,omitempty"`
+	ClosedReason  string `json:"closed_reason,omitempty"`
+	Livemode      bool   `json:"livemode"`
+	Created       int64  `json:"created"`
+}
+
+// TaxID represents a customer tax ID.
+type TaxID struct {
+	ID           string             `json:"id"`
+	Object       string             `json:"object"`
+	Customer     string             `json:"customer"`
+	Type         string             `json:"type"`
+	Value        string             `json:"value"`
+	Verification *TaxIDVerification `json:"verification,omitempty"`
+	Livemode     bool               `json:"livemode"`
+	Created      int64              `json:"created"`
+}
+
+// TaxIDVerification represents the verification status of a tax ID.
+type TaxIDVerification struct {
+	Status          string `json:"status"`
+	VerifiedName    string `json:"verified_name,omitempty"`
+	VerifiedAddress string `json:"verified_address,omitempty"`
+}
+
 // WebhookEndpoint represents a Stripe webhook endpoint configuration.
 type WebhookEndpoint struct {
 	ID            string            `json:"id"`

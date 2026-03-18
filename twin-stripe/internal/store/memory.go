@@ -44,6 +44,8 @@ type MemoryStore struct {
 	SubItems             *pkgstore.Store[SubscriptionItem]
 	Quotes               *pkgstore.Store[Quote]
 	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
+	Reviews              *pkgstore.Store[Review]
+	TaxIDs               *pkgstore.Store[TaxID]
 	WebhookEndpoints     *pkgstore.Store[WebhookEndpoint]
 	Files                *pkgstore.Store[File]
 	FileLinks            *pkgstore.Store[FileLink]
@@ -97,6 +99,8 @@ func New() *MemoryStore {
 		SubItems:            pkgstore.New[SubscriptionItem]("si"),
 		Quotes:              pkgstore.New[Quote]("qt"),
 		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
+		Reviews:             pkgstore.New[Review]("prv"),
+		TaxIDs:              pkgstore.New[TaxID]("txi"),
 		WebhookEndpoints:    pkgstore.New[WebhookEndpoint]("we"),
 		Files:               pkgstore.New[File]("file"),
 		FileLinks:           pkgstore.New[FileLink]("link"),
@@ -246,6 +250,8 @@ type stateSnapshot struct {
 	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
 	Quotes              map[string]Quote               `json:"quotes"`
 	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
+	Reviews             map[string]Review              `json:"reviews"`
+	TaxIDs              map[string]TaxID               `json:"tax_ids"`
 	WebhookEndpoints    map[string]WebhookEndpoint     `json:"webhook_endpoints"`
 	Files               map[string]File                `json:"files"`
 	FileLinks           map[string]FileLink            `json:"file_links"`
@@ -293,6 +299,8 @@ func (s *MemoryStore) Snapshot() any {
 		SubItems:            s.SubItems.Snapshot(),
 		Quotes:              s.Quotes.Snapshot(),
 		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
+		Reviews:             s.Reviews.Snapshot(),
+		TaxIDs:              s.TaxIDs.Snapshot(),
 		WebhookEndpoints:    s.WebhookEndpoints.Snapshot(),
 		Files:               s.Files.Snapshot(),
 		FileLinks:           s.FileLinks.Snapshot(),
@@ -355,6 +363,8 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.SubItems.LoadSnapshot(snap.SubItems)
 	s.Quotes.LoadSnapshot(snap.Quotes)
 	s.BillingPortalSessions.LoadSnapshot(snap.BillingPortalSessions)
+	s.Reviews.LoadSnapshot(snap.Reviews)
+	s.TaxIDs.LoadSnapshot(snap.TaxIDs)
 	s.WebhookEndpoints.LoadSnapshot(snap.WebhookEndpoints)
 	s.Files.LoadSnapshot(snap.Files)
 	s.FileLinks.LoadSnapshot(snap.FileLinks)
@@ -409,6 +419,8 @@ func (s *MemoryStore) Reset() {
 	s.SubItems.Reset()
 	s.Quotes.Reset()
 	s.BillingPortalSessions.Reset()
+	s.Reviews.Reset()
+	s.TaxIDs.Reset()
 	s.WebhookEndpoints.Reset()
 	s.Files.Reset()
 	s.FileLinks.Reset()

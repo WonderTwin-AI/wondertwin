@@ -212,6 +212,21 @@ func (h *Handler) Routes(r chi.Router) {
 		// Billing Portal Sessions
 		r.Post("/billing_portal/sessions", h.CreateBillingPortalSession)
 
+		// Reviews
+		r.Get("/reviews/{id}", h.GetReview)
+		r.Get("/reviews", h.ListReviews)
+		r.Post("/reviews/{id}/approve", h.ApproveReview)
+
+		// Tax IDs (nested under customers)
+		r.Post("/customers/{customer_id}/tax_ids", h.CreateTaxID)
+		r.Get("/customers/{customer_id}/tax_ids/{id}", h.GetCustomerTaxID)
+		r.Delete("/customers/{customer_id}/tax_ids/{id}", h.DeleteTaxID)
+		r.Get("/customers/{customer_id}/tax_ids", h.ListCustomerTaxIDs)
+
+		// Tax IDs (top-level)
+		r.Get("/tax_ids/{id}", h.GetTaxID)
+		r.Get("/tax_ids", h.ListTaxIDs)
+
 		// Webhook Endpoints
 		r.Post("/webhook_endpoints", h.CreateWebhookEndpoint)
 		r.Get("/webhook_endpoints/{id}", h.GetWebhookEndpoint)
