@@ -37,3 +37,6 @@ validate-schemas: ## Validate all twin JSON files against their schemas
 
 verify-registry: ## Validate the live twin registry
 	go run ./cmd/verify-registry
+
+build-content-api: ## Build the content API server
+	go build $(LDFLAGS) -o bin/content-api ./cmd/content-api/

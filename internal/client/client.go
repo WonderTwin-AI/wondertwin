@@ -88,6 +88,24 @@ func (c *AdminClient) adminGet(adminPort int, path string) (string, error) {
 	return string(body), nil
 }
 
+// PostState POSTs raw JSON bytes to POST /admin/state on a twin.
+func (c *AdminClient) PostState(adminPort int, data []byte) (string, error) {
+	resp, err := c.http.Post(
+		fmt.Sprintf("http://localhost:%d/admin/state", adminPort),
+		"application/json",
+		bytes.NewReader(data),
+	)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("POST /admin/state returned status %d: %s", resp.StatusCode, body)
+	}
+	return strings.TrimSpace(string(body)), nil
+}
+
 // Seed POSTs the contents of a JSON file to POST /admin/state on a twin.
 func (c *AdminClient) Seed(adminPort int, filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
