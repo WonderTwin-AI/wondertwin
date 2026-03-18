@@ -29,6 +29,10 @@ type MemoryStore struct {
 	Subscriptions        *pkgstore.Store[Subscription]
 	Invoices             *pkgstore.Store[Invoice]
 	InvoiceItems         *pkgstore.Store[InvoiceItem]
+	Coupons              *pkgstore.Store[Coupon]
+	SetupIntents         *pkgstore.Store[SetupIntent]
+	TaxRates             *pkgstore.Store[TaxRate]
+	Disputes             *pkgstore.Store[Dispute]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -58,6 +62,10 @@ func New() *MemoryStore {
 		Subscriptions:       pkgstore.New[Subscription]("sub"),
 		Invoices:            pkgstore.New[Invoice]("in"),
 		InvoiceItems:        pkgstore.New[InvoiceItem]("ii"),
+		Coupons:             pkgstore.New[Coupon]("coup"),
+		SetupIntents:        pkgstore.New[SetupIntent]("seti"),
+		TaxRates:            pkgstore.New[TaxRate]("txr"),
+		Disputes:            pkgstore.New[Dispute]("dp"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
@@ -183,6 +191,10 @@ type stateSnapshot struct {
 	Subscriptions       map[string]Subscription        `json:"subscriptions"`
 	Invoices            map[string]Invoice             `json:"invoices"`
 	InvoiceItems        map[string]InvoiceItem         `json:"invoice_items"`
+	Coupons             map[string]Coupon              `json:"coupons"`
+	SetupIntents        map[string]SetupIntent         `json:"setup_intents"`
+	TaxRates            map[string]TaxRate             `json:"tax_rates"`
+	Disputes            map[string]Dispute             `json:"disputes"`
 	Balances            map[string]*AccountBalance     `json:"balances"`
 	PlatformBalance     *AccountBalance                `json:"platform_balance"`
 }
@@ -206,6 +218,10 @@ func (s *MemoryStore) Snapshot() any {
 		Subscriptions:       s.Subscriptions.Snapshot(),
 		Invoices:            s.Invoices.Snapshot(),
 		InvoiceItems:        s.InvoiceItems.Snapshot(),
+		Coupons:             s.Coupons.Snapshot(),
+		SetupIntents:        s.SetupIntents.Snapshot(),
+		TaxRates:            s.TaxRates.Snapshot(),
+		Disputes:            s.Disputes.Snapshot(),
 		Balances:            s.snapshotBalances(),
 		PlatformBalance:     s.PlatformBalance,
 	}
@@ -244,6 +260,10 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Subscriptions.LoadSnapshot(snap.Subscriptions)
 	s.Invoices.LoadSnapshot(snap.Invoices)
 	s.InvoiceItems.LoadSnapshot(snap.InvoiceItems)
+	s.Coupons.LoadSnapshot(snap.Coupons)
+	s.SetupIntents.LoadSnapshot(snap.SetupIntents)
+	s.TaxRates.LoadSnapshot(snap.TaxRates)
+	s.Disputes.LoadSnapshot(snap.Disputes)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -274,6 +294,10 @@ func (s *MemoryStore) Reset() {
 	s.Subscriptions.Reset()
 	s.Invoices.Reset()
 	s.InvoiceItems.Reset()
+	s.Coupons.Reset()
+	s.SetupIntents.Reset()
+	s.TaxRates.Reset()
+	s.Disputes.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

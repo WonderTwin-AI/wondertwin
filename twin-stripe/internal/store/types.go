@@ -406,6 +406,70 @@ type InvoiceItem struct {
 	Created     int64             `json:"created"`
 }
 
+// Coupon represents a Stripe coupon.
+type Coupon struct {
+	ID               string            `json:"id"`
+	Object           string            `json:"object"`
+	AmountOff        int64             `json:"amount_off,omitempty"`
+	PercentOff       float64           `json:"percent_off,omitempty"`
+	Currency         string            `json:"currency,omitempty"`
+	Duration         string            `json:"duration"` // forever, once, repeating
+	DurationInMonths int               `json:"duration_in_months,omitempty"`
+	MaxRedemptions   int               `json:"max_redemptions,omitempty"`
+	TimesRedeemed    int               `json:"times_redeemed"`
+	Name             string            `json:"name,omitempty"`
+	Valid            bool              `json:"valid"`
+	Livemode         bool              `json:"livemode"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
+	Created          int64             `json:"created"`
+}
+
+// SetupIntent represents a Stripe setup intent for future payments.
+type SetupIntent struct {
+	ID                 string            `json:"id"`
+	Object             string            `json:"object"`
+	Customer           string            `json:"customer,omitempty"`
+	PaymentMethod      string            `json:"payment_method,omitempty"`
+	Status             string            `json:"status"` // requires_payment_method, requires_confirmation, requires_action, processing, succeeded, canceled
+	ClientSecret       string            `json:"client_secret"`
+	Usage              string            `json:"usage"` // off_session or on_session
+	Livemode           bool              `json:"livemode"`
+	Metadata           map[string]string `json:"metadata,omitempty"`
+	Created            int64             `json:"created"`
+}
+
+// TaxRate represents a Stripe tax rate.
+type TaxRate struct {
+	ID           string            `json:"id"`
+	Object       string            `json:"object"`
+	Active       bool              `json:"active"`
+	DisplayName  string            `json:"display_name"`
+	Description  string            `json:"description,omitempty"`
+	Inclusive    bool              `json:"inclusive"`
+	Percentage   float64           `json:"percentage"`
+	Country      string            `json:"country,omitempty"`
+	State        string            `json:"state,omitempty"`
+	Jurisdiction string            `json:"jurisdiction,omitempty"`
+	Livemode     bool              `json:"livemode"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Created      int64             `json:"created"`
+}
+
+// Dispute represents a Stripe dispute/chargeback.
+type Dispute struct {
+	ID              string            `json:"id"`
+	Object          string            `json:"object"`
+	Amount          int64             `json:"amount"`
+	Currency        string            `json:"currency"`
+	Charge          string            `json:"charge"`
+	PaymentIntent   string            `json:"payment_intent,omitempty"`
+	Reason          string            `json:"reason"` // fraudulent, duplicate, etc.
+	Status          string            `json:"status"` // needs_response, under_review, won, lost
+	Livemode        bool              `json:"livemode"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
+	Created         int64             `json:"created"`
+}
+
 // AccountBalance tracks per-account balance (available and pending).
 type AccountBalance struct {
 	Available map[string]int64 // currency -> amount
