@@ -89,6 +89,53 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
+// UpdatePaymentIntent handles POST /v1/payment_intents/{id}.
+func (h *Handler) UpdatePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	pi, ok := h.store.PaymentIntents.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		return
+	}
+	if pi.Status == "succeeded" || pi.Status == "canceled" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+			"This PaymentIntent's status is "+pi.Status+", which is not updatable.")
+		return
+	}
+	if err := parseFormOrJSON(r); err != nil {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		return
+	}
+
+	if v := r.FormValue("amount"); v != "" {
+		if a, err := strconv.ParseInt(v, 10, 64); err == nil {
+			pi.Amount = a
+		}
+	}
+	if v := r.FormValue("currency"); v != "" {
+		pi.Currency = v
+	}
+	if v := r.FormValue("customer"); v != "" {
+		pi.Customer = v
+	}
+	if v := r.FormValue("description"); v != "" {
+		pi.Description = v
+	}
+	if v := r.FormValue("payment_method"); v != "" {
+		pi.PaymentMethod = v
+		if pi.Status == "requires_payment_method" {
+			pi.Status = "requires_confirmation"
+		}
+	}
+	if meta := parseMetadata(r); len(meta) > 0 {
+		pi.Metadata = meta
+	}
+
+	h.store.PaymentIntents.Set(id, pi)
+	h.emitEvent("payment_intent.updated", mapFromJSON(pi))
+	twincore.JSON(w, http.StatusOK, pi)
+}
+
 func (h *Handler) GetPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)

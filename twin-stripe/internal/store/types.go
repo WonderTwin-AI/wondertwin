@@ -367,6 +367,7 @@ type Invoice struct {
 	Paid                  bool              `json:"paid"`
 	Lines                 *InvoiceLines     `json:"lines,omitempty"`
 	DefaultPaymentMethod  string            `json:"default_payment_method,omitempty"`
+	Description           string            `json:"description,omitempty"`
 	PaymentIntent         string            `json:"payment_intent,omitempty"`
 	HostedInvoiceURL      string            `json:"hosted_invoice_url,omitempty"`
 	Number                string            `json:"number,omitempty"`
