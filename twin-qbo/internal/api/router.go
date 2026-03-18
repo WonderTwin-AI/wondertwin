@@ -96,6 +96,36 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/purchase", h.CreateOrUpdatePurchase)
 		r.Get("/purchase/{id}", h.GetPurchase)
 
+		// Employees
+		r.Post("/employee", h.CreateOrUpdateEmployee)
+		r.Get("/employee/{id}", h.GetEmployee)
+
+		// Classes
+		r.Post("/class", h.CreateOrUpdateClass)
+		r.Get("/class/{id}", h.GetClass)
+
+		// Departments
+		r.Post("/department", h.CreateOrUpdateDepartment)
+		r.Get("/department/{id}", h.GetDepartment)
+
+		// Terms
+		r.Post("/term", h.CreateOrUpdateTerm)
+		r.Get("/term/{id}", h.GetTerm)
+
+		// Payment Methods
+		r.Post("/paymentmethod", h.CreateOrUpdatePaymentMethod)
+		r.Get("/paymentmethod/{id}", h.GetPaymentMethod)
+
+		// Tax Codes (read-only)
+		r.Get("/taxcode/{id}", h.GetTaxCode)
+
+		// Tax Rates (read-only)
+		r.Get("/taxrate/{id}", h.GetTaxRate)
+
+		// Preferences
+		r.Get("/preferences", h.GetPreferences)
+		r.Post("/preferences", h.UpdatePreferences)
+
 		// Reports
 		r.Get("/reports/ProfitAndLoss", h.ProfitAndLoss)
 		r.Get("/reports/BalanceSheet", h.BalanceSheet)
