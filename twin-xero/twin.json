@@ -1,10 +1,10 @@
 {
   "name": "xero",
-  "description": "Behavioral clone of the Xero Accounting API",
+  "description": "Simulates the Xero Accounting API — chart of accounts, invoices, bills, credit notes, payments, manual journals, and financial reports.",
   "category": "accounting",
   "sdk": {
-    "package": "github.com/xero-api/xero-go",
-    "version": "v2.0.0"
+    "package": "github.com/XeroAPI/xerogolang",
+    "version": "v2.0"
   },
   "default_port": 4115
 }

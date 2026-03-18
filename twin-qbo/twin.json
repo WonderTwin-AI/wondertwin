@@ -1,10 +1,10 @@
 {
   "name": "qbo",
-  "description": "Behavioral clone of the QuickBooks Online Accounting API",
+  "description": "Simulates the QuickBooks Online Accounting API v3 — chart of accounts, customers, vendors, invoices, bills, payments, journal entries, and financial reports with SQL-like query language.",
   "category": "accounting",
   "sdk": {
     "package": "github.com/rwestlund/quickbooks-go",
-    "version": "v0.0.0"
+    "version": "v0.5"
   },
   "default_port": 4116
 }
