@@ -64,10 +64,64 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inv.Lines = &store.InvoiceLines{Object: "list", Data: lines, URL: "/v1/invoices/" + id + "/lines"}
-	inv.Total = total
 	inv.Subtotal = total
-	inv.AmountDue = total
-	inv.AmountRemaining = total
+
+	// Apply discount if coupon provided.
+	var discountAmount int64
+	if couponID := r.FormValue("discounts[0][coupon]"); couponID != "" {
+		coup, ok := h.store.Coupons.Get(couponID)
+		if !ok {
+			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
+			return
+		}
+		if coup.PercentOff > 0 {
+			discountAmount = int64(float64(total) * coup.PercentOff / 100)
+		} else if coup.AmountOff > 0 {
+			discountAmount = coup.AmountOff
+			if discountAmount > total {
+				discountAmount = total
+			}
+		}
+		coup.TimesRedeemed++
+		h.store.Coupons.Set(couponID, coup)
+
+		discountID := "di_" + id
+		inv.Discount = &store.Discount{
+			ID:       discountID,
+			Object:   "discount",
+			Coupon:   &coup,
+			Customer: customer,
+		}
+		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discountID}}
+	}
+
+	// Apply default tax rates if provided.
+	var taxAmount int64
+	taxableAmount := total - discountAmount
+	for i := 0; i < 10; i++ {
+		trID := r.FormValue("default_tax_rates[" + strconv.Itoa(i) + "]")
+		if trID == "" {
+			break
+		}
+		tr, ok := h.store.TaxRates.Get(trID)
+		if !ok {
+			continue
+		}
+		inv.DefaultTaxRates = append(inv.DefaultTaxRates, tr)
+		lineTax := int64(float64(taxableAmount) * tr.Percentage / 100)
+		inv.TotalTaxAmounts = append(inv.TotalTaxAmounts, store.TaxAmount{
+			Amount:    lineTax,
+			Inclusive: tr.Inclusive,
+			TaxRate:   trID,
+		})
+		if !tr.Inclusive {
+			taxAmount += lineTax
+		}
+	}
+
+	inv.Total = total - discountAmount + taxAmount
+	inv.AmountDue = inv.Total
+	inv.AmountRemaining = inv.Total
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.created", mapFromJSON(inv))

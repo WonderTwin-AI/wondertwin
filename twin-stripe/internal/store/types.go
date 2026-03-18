@@ -310,6 +310,8 @@ type Subscription struct {
 	TrialEnd           int64             `json:"trial_end,omitempty"`
 	Items              *SubscriptionItems `json:"items"`
 	LatestInvoice      string            `json:"latest_invoice,omitempty"`
+	Discount           *Discount         `json:"discount,omitempty"`
+	DefaultTaxRates    []TaxRate         `json:"default_tax_rates,omitempty"`
 	DefaultPaymentMethod string          `json:"default_payment_method,omitempty"`
 	CollectionMethod   string            `json:"collection_method"` // charge_automatically or send_invoice
 	Livemode           bool              `json:"livemode"`
@@ -336,6 +338,17 @@ type SubscriptionItem struct {
 	Created      int64             `json:"created"`
 }
 
+// Discount represents a discount applied to an invoice or subscription.
+type Discount struct {
+	ID             string  `json:"id"`
+	Object         string  `json:"object"`
+	Coupon         *Coupon `json:"coupon"`
+	Customer       string  `json:"customer,omitempty"`
+	Subscription   string  `json:"subscription,omitempty"`
+	Start          int64   `json:"start,omitempty"`
+	End            int64   `json:"end,omitempty"`
+}
+
 // Invoice represents a Stripe invoice.
 type Invoice struct {
 	ID                    string            `json:"id"`
@@ -356,6 +369,10 @@ type Invoice struct {
 	PaymentIntent         string            `json:"payment_intent,omitempty"`
 	HostedInvoiceURL      string            `json:"hosted_invoice_url,omitempty"`
 	Number                string            `json:"number,omitempty"`
+	TotalDiscountAmounts  []DiscountAmount   `json:"total_discount_amounts,omitempty"`
+	TotalTaxAmounts       []TaxAmount        `json:"total_tax_amounts,omitempty"`
+	Discount              *Discount          `json:"discount,omitempty"`
+	DefaultTaxRates       []TaxRate          `json:"default_tax_rates,omitempty"`
 	DueDate               int64             `json:"due_date,omitempty"`
 	PeriodStart           int64             `json:"period_start,omitempty"`
 	PeriodEnd             int64             `json:"period_end,omitempty"`
@@ -383,6 +400,19 @@ type InvoiceLine struct {
 	Quantity    int64  `json:"quantity,omitempty"`
 	Period      *Period `json:"period,omitempty"`
 	Type        string `json:"type"` // subscription or invoiceitem
+}
+
+// DiscountAmount represents a discount amount on an invoice.
+type DiscountAmount struct {
+	Amount   int64  `json:"amount"`
+	Discount string `json:"discount"`
+}
+
+// TaxAmount represents a tax amount on an invoice.
+type TaxAmount struct {
+	Amount    int64  `json:"amount"`
+	Inclusive bool   `json:"inclusive"`
+	TaxRate   string `json:"tax_rate"`
 }
 
 // Period represents a billing period.

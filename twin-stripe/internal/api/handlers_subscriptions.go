@@ -102,6 +102,38 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		URL:     "/v1/subscription_items?subscription=" + id,
 	}
 
+	// Apply coupon if provided.
+	if couponID := r.FormValue("coupon"); couponID != "" {
+		coup, ok := h.store.Coupons.Get(couponID)
+		if !ok {
+			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
+			return
+		}
+		coup.TimesRedeemed++
+		h.store.Coupons.Set(couponID, coup)
+		sub.Discount = &store.Discount{
+			ID:           "di_" + id,
+			Object:       "discount",
+			Coupon:       &coup,
+			Customer:     customer,
+			Subscription: id,
+			Start:        now.Unix(),
+		}
+	}
+
+	// Parse default tax rates.
+	for i := 0; i < 10; i++ {
+		trID := r.FormValue("default_tax_rates[" + strconv.Itoa(i) + "]")
+		if trID == "" {
+			break
+		}
+		tr, ok := h.store.TaxRates.Get(trID)
+		if !ok {
+			continue
+		}
+		sub.DefaultTaxRates = append(sub.DefaultTaxRates, tr)
+	}
+
 	// Create initial invoice.
 	invoiceID := h.createSubscriptionInvoice(&sub, items)
 	sub.LatestInvoice = invoiceID
@@ -214,20 +246,57 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		currency = items[0].Price.Currency
 	}
 
+	// Apply discount from subscription.
+	var discountAmount int64
+	var discount *store.Discount
+	if sub.Discount != nil && sub.Discount.Coupon != nil {
+		coup := sub.Discount.Coupon
+		if coup.PercentOff > 0 {
+			discountAmount = int64(float64(total) * coup.PercentOff / 100)
+		} else if coup.AmountOff > 0 {
+			discountAmount = coup.AmountOff
+			if discountAmount > total {
+				discountAmount = total
+			}
+		}
+		discount = sub.Discount
+	}
+
+	// Apply tax rates from subscription.
+	var taxAmount int64
+	taxableAmount := total - discountAmount
+	var taxAmounts []store.TaxAmount
+	for _, tr := range sub.DefaultTaxRates {
+		lineTax := int64(float64(taxableAmount) * tr.Percentage / 100)
+		taxAmounts = append(taxAmounts, store.TaxAmount{
+			Amount:    lineTax,
+			Inclusive: tr.Inclusive,
+			TaxRate:   tr.ID,
+		})
+		if !tr.Inclusive {
+			taxAmount += lineTax
+		}
+	}
+
+	invoiceTotal := total - discountAmount + taxAmount
+
 	inv := store.Invoice{
 		ID:               id,
 		Object:           "invoice",
 		Customer:         sub.Customer,
 		Subscription:     sub.ID,
 		Status:           "paid", // auto-paid for charge_automatically
-		AmountDue:        total,
-		AmountPaid:       total,
+		AmountDue:        invoiceTotal,
+		AmountPaid:       invoiceTotal,
 		AmountRemaining:  0,
-		Total:            total,
+		Total:            invoiceTotal,
 		Subtotal:         total,
 		Currency:         currency,
 		CollectionMethod: sub.CollectionMethod,
 		Paid:             true,
+		Discount:         discount,
+		DefaultTaxRates:  sub.DefaultTaxRates,
+		TotalTaxAmounts:  taxAmounts,
 		Lines: &store.InvoiceLines{
 			Object:  "list",
 			Data:    lines,
@@ -241,11 +310,15 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		Created:     store.Now(),
 	}
 
+	if discountAmount > 0 {
+		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discount.ID}}
+	}
+
 	if sub.CollectionMethod == "send_invoice" {
 		inv.Status = "open"
 		inv.Paid = false
 		inv.AmountPaid = 0
-		inv.AmountRemaining = total
+		inv.AmountRemaining = invoiceTotal
 	}
 
 	h.store.Invoices.Set(id, inv)
