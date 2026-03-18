@@ -1,10 +1,3 @@
----
-skill: twin-researcher
-skill_version: "1.0"
-schemas:
-  provenance.schema.json: "1.1"
----
-
 # SKILL: WonderTwin Twin Researcher
 
 ## Purpose
@@ -463,41 +456,42 @@ Append the completion entry:
 
 **2. Generate the twin's `provenance.json` template:**
 
-This is the file that ships with the twin (in `twin-{name}/provenance.json`). It extends the existing provenance format with research lineage:
+This is the file that ships with the twin (in `twin-{name}/provenance.json`). It **must** conform to `schemas/provenance.schema.json`. The twin-generator skill will fill in build-time details, but the researcher seeds the initial values:
 
-<!-- schema: provenance.schema.json -->
 ```json
 {
-  "twin": "twin-{name}",
-  "version": "0.1.0",
-  "api_version": "{pinned API version}",
-  "platform": "{Platform}",
-  "platform_url": "{developer docs URL}",
-  "category": "{category}",
-  "research_archive": "wondertwin-docs/research/{platform}",
-  "research_completed": "{ISO 8601}",
-  "generated_at": "{ISO 8601 timestamp}",
-  "sources": [
-    {
-      "type": "{source_type}",
-      "url": "{url}",
-      "accessed": "{date}",
-      "archived_at": "{archive_path}"
-    }
-  ],
-  "fintech_primitives": [],
-  "twinkit_packages": [],
+  "twin": "{name}",
   "sdk_target": {
     "package": "{sdk_import_path}",
-    "version": "{pinned version}",
-    "language": "go"
+    "language": "go",
+    "version": "{pinned SDK version}"
   },
-  "scope": {
-    "implemented": [],
-    "not_implemented": []
+  "build": 1,
+  "generated_at": "{ISO 8601 timestamp}",
+  "skill_version": "2.0",
+  "sources": {
+    "openapi": {
+      "origin": "vendor_published",
+      "url": "{OpenAPI spec URL, if available}",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{SHA-256 hash of spec content}",
+      "api_version": "{pinned API version}"
+    },
+    "sdk_analysis": {
+      "method": "deepwiki",
+      "repo": "https://github.com/{org}/{sdk-repo}",
+      "repo_ref": "{tag or commit}",
+      "retrieved_at": "{ISO 8601 timestamp}",
+      "sha256": "{SHA-256 hash of analyzed content}",
+      "fallback_used": false
+    }
   }
 }
 ```
+
+If no OpenAPI spec is available, omit the `openapi` field or set `origin` to `"none"`. If no SDK exists, set `sdk_analysis.method` to `"none"`.
+
+**Note:** Research-specific metadata (platform URL, research archive path, category, fintech primitives, scope lists) belongs in the research artifacts (`system-model.md`, `feasibility.md`, `source-catalog.json`) — NOT in `provenance.json`. The provenance file tracks only how the twin was *generated*, not how it was *researched*.
 
 ---
 
