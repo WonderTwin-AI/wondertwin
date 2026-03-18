@@ -185,6 +185,58 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
+// CapturePaymentIntent handles POST /v1/payment_intents/{id}/capture.
+func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	pi, ok := h.store.PaymentIntents.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		return
+	}
+	if pi.Status != "requires_capture" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+			"This PaymentIntent's status is "+pi.Status+". Only a PaymentIntent with status requires_capture can be captured.")
+		return
+	}
+
+	captureAmount := pi.Amount
+	if err := parseFormOrJSON(r); err == nil {
+		if v := r.FormValue("amount_to_capture"); v != "" {
+			if a, err := strconv.ParseInt(v, 10, 64); err == nil {
+				captureAmount = a
+			}
+		}
+	}
+	if captureAmount > pi.Amount {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
+			"Capture amount exceeds the authorized amount.")
+		return
+	}
+
+	pi.Status = "succeeded"
+	pi.AmountReceived = captureAmount
+
+	// Update charge captured flag.
+	if pi.LatestCharge != "" {
+		ch, ok := h.store.Charges.Get(pi.LatestCharge)
+		if ok {
+			ch.Captured = true
+			ch.Amount = captureAmount
+			h.store.Charges.Set(pi.LatestCharge, ch)
+		}
+	}
+
+	h.store.CreditBalance("", pi.Currency, captureAmount)
+	h.store.RecordBalanceTransaction("charge", pi.LatestCharge, pi.Currency, captureAmount, 0)
+	h.store.PaymentIntents.Set(id, pi)
+	if pi.Status == "succeeded" {
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
+	} else {
+		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
+	}
+	twincore.JSON(w, http.StatusOK, pi)
+}
+
 func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
