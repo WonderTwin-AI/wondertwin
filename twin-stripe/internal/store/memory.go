@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // MemoryStore holds all Stripe twin state in memory.
@@ -114,6 +115,23 @@ func New() *MemoryStore {
 		PlatformBalance: NewAccountBalance(),
 		Clock:           pkgstore.NewClock(),
 	}
+}
+
+// ActiveEndpoints returns all enabled webhook endpoints, implementing webhook.EndpointProvider.
+func (s *MemoryStore) ActiveEndpoints() []webhook.Endpoint {
+	all := s.WebhookEndpoints.Filter(func(_ string, we WebhookEndpoint) bool {
+		return we.Status == "enabled"
+	})
+	endpoints := make([]webhook.Endpoint, 0, len(all))
+	for _, we := range all {
+		endpoints = append(endpoints, webhook.Endpoint{
+			URL:           we.URL,
+			Secret:        we.Secret,
+			EnabledEvents: we.EnabledEvents,
+			Enabled:       true,
+		})
+	}
+	return endpoints
 }
 
 // GetOrCreateBalance returns the balance for an account, creating it if needed.
