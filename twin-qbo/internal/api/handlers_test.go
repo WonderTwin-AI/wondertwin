@@ -288,6 +288,67 @@ func TestQuery_Pagination(t *testing.T) {
 	}
 }
 
+func TestQuery_WhereFilter(t *testing.T) {
+	_, r := setupTestHandler()
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Bob"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Charlie"})
+
+	// Filter by DisplayName equality.
+	w := doReq(r, "GET", queryURL("SELECT * FROM Customer WHERE DisplayName = 'Bob'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	custs := qr["Customer"].([]any)
+	if len(custs) != 1 {
+		t.Fatalf("WHERE DisplayName='Bob': expected 1, got %d", len(custs))
+	}
+	if custs[0].(map[string]any)["DisplayName"] != "Bob" {
+		t.Error("wrong customer returned")
+	}
+}
+
+func TestQuery_WhereLike(t *testing.T) {
+	_, r := setupTestHandler()
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice Smith"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Alice Jones"})
+	doReq(r, "POST", "/v3/company/123/customer", map[string]any{"DisplayName": "Bob Smith"})
+
+	w := doReq(r, "GET", queryURL("SELECT * FROM Customer WHERE DisplayName LIKE 'Alice%'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	custs := qr["Customer"].([]any)
+	if len(custs) != 2 {
+		t.Fatalf("WHERE LIKE 'Alice%%': expected 2, got %d", len(custs))
+	}
+}
+
+func TestQuery_WhereBalance(t *testing.T) {
+	_, r := setupTestHandler()
+	// Create two invoices with different amounts.
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 100.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 100}}},
+	})
+	doReq(r, "POST", "/v3/company/123/invoice", map[string]any{
+		"CustomerRef": map[string]any{"value": "1"},
+		"Line": []map[string]any{{"Amount": 500.00, "DetailType": "SalesItemLineDetail",
+			"SalesItemLineDetail": map[string]any{"Qty": 1, "UnitPrice": 500}}},
+	})
+
+	// Filter Balance > 200.
+	w := doReq(r, "GET", queryURL("SELECT * FROM Invoice WHERE Balance > '200'"), nil)
+	resp := parseResp(t, w)
+	qr := resp["QueryResponse"].(map[string]any)
+	invs := qr["Invoice"].([]any)
+	if len(invs) != 1 {
+		t.Fatalf("WHERE Balance > 200: expected 1, got %d", len(invs))
+	}
+	if invs[0].(map[string]any)["TotalAmt"].(float64) != 500 {
+		t.Error("wrong invoice returned")
+	}
+}
+
 // --- Bill & BillPayment ---
 
 func TestBill_CreateAndPay(t *testing.T) {
