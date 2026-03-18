@@ -27,6 +27,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v3/company/{realmId}", func(r chi.Router) {
 		r.Use(authMiddleware)
 		r.Use(realmIDMiddleware)
+		r.Use(minorVersionMiddleware)
 		r.Use(h.mw.FaultInjection)
 
 		// Query endpoint (SQL-like)
