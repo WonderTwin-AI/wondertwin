@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,8 +12,13 @@ import (
 func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 	op := r.URL.Query().Get("operation")
 
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		validationFault(w, "500", "Failed to read body", err.Error())
+		return
+	}
 	var bill store.Bill
-	if err := json.NewDecoder(r.Body).Decode(&bill); err != nil {
+	if err := json.Unmarshal(body, &bill); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
 	}
@@ -28,6 +34,16 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if op == "void" {
+			h.journalBillVoided(&existing)
+			if existing.VendorRef != nil {
+				if v, ok := h.store.Vendors.Get(existing.VendorRef.Value); ok {
+					v.Balance -= existing.TotalAmt
+					if v.Balance < 0 {
+						v.Balance = 0
+					}
+					h.store.Vendors.Set(v.Id, v)
+				}
+			}
 			existing.Balance = 0
 			existing.TotalAmt = 0
 			for i := range existing.Line {
@@ -37,6 +53,16 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		existing.SyncToken = IncrementSyncToken(existing.SyncToken)
 		existing.MetaData.LastUpdatedTime = h.store.Now()
 		if op == "delete" {
+			h.journalBillVoided(&existing)
+			if existing.VendorRef != nil {
+				if v, ok := h.store.Vendors.Get(existing.VendorRef.Value); ok {
+					v.Balance -= existing.TotalAmt
+					if v.Balance < 0 {
+						v.Balance = 0
+					}
+					h.store.Vendors.Set(v.Id, v)
+				}
+			}
 			h.store.Bills.Delete(bill.Id)
 			h.fireEvent("Bill", bill.Id, "Delete")
 		} else {
@@ -57,6 +83,14 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 			staleSyncTokenFault(w)
 			return
 		}
+		if IsSparse(body) {
+			merged, err := SparseUpdate(existing, body)
+			if err != nil {
+				validationFault(w, "500", "Sparse merge failed", err.Error())
+				return
+			}
+			bill = merged
+		}
 		computeBillTotals(&bill)
 		paid := existing.TotalAmt - existing.Balance
 		bill.Balance = bill.TotalAmt - paid
@@ -71,10 +105,18 @@ func (h *Handler) CreateOrUpdateBill(w http.ResponseWriter, r *http.Request) {
 		bill.SyncToken = "0"
 		bill.Domain = "QBO"
 		bill.MetaData = h.store.NewMetaData()
+		bill.TxnTaxDetail = h.computeTaxForLines(bill.Line, bill.TxnTaxDetail)
 		computeBillTotals(&bill)
 		bill.Balance = bill.TotalAmt
 		h.store.Bills.Set(bill.Id, bill)
 		h.journalBillCreated(&bill)
+		// Update vendor balance.
+		if bill.VendorRef != nil {
+			if v, ok := h.store.Vendors.Get(bill.VendorRef.Value); ok {
+				v.Balance += bill.TotalAmt
+				h.store.Vendors.Set(v.Id, v)
+			}
+		}
 		h.fireEvent("Bill", bill.Id, "Create")
 	}
 

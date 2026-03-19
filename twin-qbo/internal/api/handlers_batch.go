@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,7 +59,7 @@ func (h *Handler) Batch(w http.ResponseWriter, r *http.Request) {
 	var responses []map[string]any
 
 	for _, item := range req.BatchItemRequest {
-		result := h.executeBatchItem(r, item)
+		result := h.executeBatchItemSafe(r, item)
 		result["bId"] = item.BId
 		responses = append(responses, result)
 	}
@@ -67,6 +68,15 @@ func (h *Handler) Batch(w http.ResponseWriter, r *http.Request) {
 		"BatchItemResponse": responses,
 		"time":              h.store.Now(),
 	})
+}
+
+func (h *Handler) executeBatchItemSafe(parentReq *http.Request, item BatchItemRequest) (result map[string]any) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = batchFault("SystemFault", "500", fmt.Sprintf("Internal error processing batch item: %v", r))
+		}
+	}()
+	return h.executeBatchItem(parentReq, item)
 }
 
 func (h *Handler) executeBatchItem(parentReq *http.Request, item BatchItemRequest) map[string]any {
@@ -100,6 +110,10 @@ func (h *Handler) executeBatchItem(parentReq *http.Request, item BatchItemReques
 		return batchFault("ValidationFault", "500", "Entity type is required")
 	}
 
+	if (op == "create" || op == "update" || op == "") && item.Body == nil {
+		return batchFault("ValidationFault", "400", "Body is required for "+op+" operations")
+	}
+
 	var method string
 	path := "/v3/company/0/" + entityName
 	switch op {
@@ -122,6 +136,12 @@ func (h *Handler) executeBatchItem(parentReq *http.Request, item BatchItemReques
 
 	var resp map[string]any
 	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if rec.Code >= 400 {
+		// The handler already returned a fault response, pass it through.
+		return resp
+	}
+
 	return resp
 }
 
@@ -162,6 +182,20 @@ func (h *Handler) routeEntityRequest(w http.ResponseWriter, r *http.Request, ent
 		h.CreateOrUpdatePurchase(w, r)
 	case "employee":
 		h.CreateOrUpdateEmployee(w, r)
+	case "refundreceipt":
+		h.CreateOrUpdateRefundReceipt(w, r)
+	case "purchaseorder":
+		h.CreateOrUpdatePurchaseOrder(w, r)
+	case "timeactivity":
+		h.CreateOrUpdateTimeActivity(w, r)
+	case "class":
+		h.CreateOrUpdateClass(w, r)
+	case "department":
+		h.CreateOrUpdateDepartment(w, r)
+	case "term":
+		h.CreateOrUpdateTerm(w, r)
+	case "paymentmethod":
+		h.CreateOrUpdatePaymentMethod(w, r)
 	default:
 		validationFault(w, "500", "Unknown entity", "Entity '"+entity+"' is not supported in batch.")
 	}
