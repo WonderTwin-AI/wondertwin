@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
@@ -49,6 +50,14 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 				docType = accounting.DocTypeInvoice
 			}
 
+			if pmt.PaymentType == "" {
+				if inv.Type == "ACCPAY" {
+					pmt.PaymentType = "ACCPAYPAYMENT"
+				} else {
+					pmt.PaymentType = "ACCRECPAYMENT"
+				}
+			}
+
 			// Apply via engine.
 			enginePmt := &accounting.Payment{
 				ID:            pmt.PaymentID,
@@ -82,6 +91,7 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 			inv.AmountDue = float64(doc.AmountDue) / 100
 			inv.UpdatedDateUTC = store.XeroDateNow()
 			h.store.Invoices.Set(inv.InvoiceID, inv)
+			h.updateContactBalance(inv.Contact.ContactID)
 		}
 
 		h.store.Payments.Set(pmt.PaymentID, pmt)
@@ -104,5 +114,78 @@ func (h *Handler) GetPayment(w http.ResponseWriter, r *http.Request) {
 		xeroError(w, http.StatusNotFound, "ValidationException", "Payment not found")
 		return
 	}
+	xeroJSON(w, http.StatusOK, map[string]any{"Payments": []store.Payment{pmt}})
+}
+
+func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "PaymentID")
+	pmt, ok := h.store.Payments.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Payment not found")
+		return
+	}
+	if pmt.Status == "DELETED" {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Payment already deleted")
+		return
+	}
+
+	// Reverse the payment on the linked invoice.
+	if pmt.Invoice != nil && pmt.Invoice.InvoiceID != "" {
+		inv, ok := h.store.Invoices.Get(pmt.Invoice.InvoiceID)
+		if ok {
+			inv.AmountPaid -= pmt.Amount
+			inv.AmountDue += pmt.Amount
+			if inv.AmountPaid < 0 {
+				inv.AmountPaid = 0
+			}
+			if inv.AmountDue > inv.Total {
+				inv.AmountDue = inv.Total
+			}
+			// Revert status from PAID to AUTHORISED if needed.
+			if inv.Status == "PAID" && inv.AmountDue > 0 {
+				inv.Status = "AUTHORISED"
+			}
+			inv.UpdatedDateUTC = store.XeroDateNow()
+			h.store.Invoices.Set(inv.InvoiceID, inv)
+		}
+
+		// Reverse journal entries.
+		amtCents := int64(pmt.Amount * 100)
+		currency := "USD"
+		if inv, ok := h.store.Invoices.Get(pmt.Invoice.InvoiceID); ok && inv.CurrencyCode != "" {
+			currency = inv.CurrencyCode
+		}
+		bankAcctID := pmt.Account.AccountID
+		if bankAcctID == "" {
+			bankAcctID = pmt.Account.Code
+		}
+
+		// Determine AR/AP based on invoice type.
+		arAcctID := h.resolveAccountCode("200") // fallback
+		if inv, ok := h.store.Invoices.Get(pmt.Invoice.InvoiceID); ok && inv.Type == "ACCPAY" {
+			// Reverse bill payment: Credit AP, Debit Bank
+			entries := []journal.Entry{
+				{AccountID: arAcctID, Type: journal.Credit, Amount: amtCents,
+					Currency: currency, SourceType: "payment_reversal", SourceID: id},
+				{AccountID: bankAcctID, Type: journal.Debit, Amount: amtCents,
+					Currency: currency, SourceType: "payment_reversal", SourceID: id},
+			}
+			h.engine.Journal().Append(journal.Transaction{Entries: entries})
+		} else {
+			// Reverse invoice payment: Debit AR, Credit Bank
+			entries := []journal.Entry{
+				{AccountID: arAcctID, Type: journal.Debit, Amount: amtCents,
+					Currency: currency, SourceType: "payment_reversal", SourceID: id},
+				{AccountID: bankAcctID, Type: journal.Credit, Amount: amtCents,
+					Currency: currency, SourceType: "payment_reversal", SourceID: id},
+			}
+			h.engine.Journal().Append(journal.Transaction{Entries: entries})
+		}
+	}
+
+	pmt.Status = "DELETED"
+	pmt.UpdatedDateUTC = store.XeroDateNow()
+	h.store.Payments.Set(id, pmt)
+
 	xeroJSON(w, http.StatusOK, map[string]any{"Payments": []store.Payment{pmt}})
 }

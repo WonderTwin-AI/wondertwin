@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -43,8 +45,46 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 		inv.InvoiceID = newUUID()
 	}
 
+	// Validate contact exists.
+	if inv.Contact.ContactID != "" {
+		if _, ok := h.store.Contacts.Get(inv.Contact.ContactID); !ok {
+			return inv, fmt.Errorf("contact not found: %s", inv.Contact.ContactID)
+		}
+	}
+
 	if inv.Type == "" {
 		inv.Type = "ACCREC"
+	}
+
+	// Resolve item defaults for line items.
+	for i := range inv.LineItems {
+		li := &inv.LineItems[i]
+		if li.ItemCode != "" {
+			items := h.store.Items.Filter(func(_ string, item store.Item) bool {
+				return item.Code == li.ItemCode
+			})
+			if len(items) > 0 {
+				item := items[0]
+				if inv.Type == "ACCPAY" {
+					if li.UnitAmount == 0 && item.PurchaseDetails.UnitPrice > 0 {
+						li.UnitAmount = item.PurchaseDetails.UnitPrice
+					}
+					if li.AccountCode == "" && item.PurchaseDetails.AccountCode != "" {
+						li.AccountCode = item.PurchaseDetails.AccountCode
+					}
+				} else {
+					if li.UnitAmount == 0 && item.SalesDetails.UnitPrice > 0 {
+						li.UnitAmount = item.SalesDetails.UnitPrice
+					}
+					if li.AccountCode == "" && item.SalesDetails.AccountCode != "" {
+						li.AccountCode = item.SalesDetails.AccountCode
+					}
+				}
+				if li.Description == "" {
+					li.Description = item.Description
+				}
+			}
+		}
 	}
 
 	// Compute line item totals.
@@ -54,8 +94,21 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 		li.LineAmount = li.Quantity * li.UnitAmount
 		subTotal += li.LineAmount
 	}
+
+	// Calculate tax for line items.
+	var totalTax float64
+	for i := range inv.LineItems {
+		li := &inv.LineItems[i]
+		if li.TaxType != "" {
+			if tr, ok := h.store.TaxRates.Get(li.TaxType); ok && tr.EffectiveRate > 0 {
+				li.TaxAmount = li.LineAmount * tr.EffectiveRate / 100.0
+				totalTax += li.TaxAmount
+			}
+		}
+	}
+
 	inv.SubTotal = subTotal
-	inv.Total = subTotal
+	inv.Total = subTotal + totalTax
 	inv.UpdatedDateUTC = store.XeroDateNow()
 
 	// Determine target status.
@@ -115,6 +168,11 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 	// Walk through state transitions.
 	transitions := statePathTo(accounting.DocumentStatus(currentStatus), accounting.DocumentStatus(targetStatus))
 	for _, to := range transitions {
+		// PAID → VOIDED: the engine considers PAID terminal, so handle directly.
+		if doc.Status == accounting.StatusPaid && to == accounting.StatusVoided {
+			doc.Status = accounting.StatusVoided
+			continue
+		}
 		if err := h.engine.TransitionDocument(ctx, doc, to); err != nil {
 			return inv, err
 		}
@@ -124,6 +182,7 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 	inv.AmountDue = float64(doc.AmountDue) / 100
 
 	h.store.Invoices.Set(inv.InvoiceID, inv)
+	h.updateContactBalance(inv.Contact.ContactID)
 
 	if isNew && h.dispatcher != nil {
 		evtType := "INVOICE.CREATE"
@@ -139,6 +198,19 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 func (h *Handler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	page, pageSize := parsePagination(r)
 	all := h.store.Invoices.List()
+
+	// Filter by status if specified.
+	if statusFilter := r.URL.Query().Get("where"); statusFilter != "" {
+		// Simple status filter: where=Status=="AUTHORISED"
+		var filtered []store.Invoice
+		for _, inv := range all {
+			if matchesStatusFilter(inv.Status, statusFilter) {
+				filtered = append(filtered, inv)
+			}
+		}
+		all = filtered
+	}
+
 	xeroJSON(w, http.StatusOK, map[string]any{"Invoices": paginate(all, page, pageSize)})
 }
 
@@ -149,6 +221,54 @@ func (h *Handler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 		xeroError(w, http.StatusNotFound, "ValidationException", "Invoice not found")
 		return
 	}
+	xeroJSON(w, http.StatusOK, map[string]any{"Invoices": []store.Invoice{inv}})
+}
+
+func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "InvoiceID")
+	_, ok := h.store.Invoices.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Invoice not found")
+		return
+	}
+
+	var req struct {
+		Invoices []store.Invoice `json:"Invoices"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Invalid JSON: "+err.Error())
+		return
+	}
+	if len(req.Invoices) == 0 {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "At least one invoice is required")
+		return
+	}
+
+	inv := req.Invoices[0]
+	inv.InvoiceID = id
+	processed, err := h.processInvoice(r.Context(), inv)
+	if err != nil {
+		xeroError(w, http.StatusBadRequest, "ValidationException", err.Error())
+		return
+	}
+
+	xeroJSON(w, http.StatusOK, map[string]any{"Invoices": []store.Invoice{processed}})
+}
+
+func (h *Handler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "InvoiceID")
+	inv, ok := h.store.Invoices.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Invoice not found")
+		return
+	}
+	if inv.Status != "DRAFT" && inv.Status != "SUBMITTED" {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Only DRAFT or SUBMITTED invoices can be deleted")
+		return
+	}
+	inv.Status = "DELETED"
+	inv.UpdatedDateUTC = store.XeroDateNow()
+	h.store.Invoices.Set(id, inv)
 	xeroJSON(w, http.StatusOK, map[string]any{"Invoices": []store.Invoice{inv}})
 }
 
@@ -168,6 +288,9 @@ func statePathTo(from, to accounting.DocumentStatus) []accounting.DocumentStatus
 			accounting.StatusDeleted:    {accounting.StatusDeleted},
 		},
 		accounting.StatusAuthorised: {
+			accounting.StatusVoided: {accounting.StatusVoided},
+		},
+		accounting.StatusPaid: {
 			accounting.StatusVoided: {accounting.StatusVoided},
 		},
 	}
@@ -203,4 +326,23 @@ func parseXeroDate(s string) time.Time {
 		}
 	}
 	return t
+}
+
+func matchesStatusFilter(status, filter string) bool {
+	// Parse simple filter like Status=="AUTHORISED" or Status!="DELETED"
+	if strings.Contains(filter, "!=") {
+		parts := strings.SplitN(filter, "!=", 2)
+		if len(parts) == 2 {
+			val := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			return status != val
+		}
+	}
+	if strings.Contains(filter, "==") {
+		parts := strings.SplitN(filter, "==", 2)
+		if len(parts) == 2 {
+			val := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+			return status == val
+		}
+	}
+	return true
 }

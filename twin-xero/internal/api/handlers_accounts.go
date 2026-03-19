@@ -60,6 +60,49 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 	xeroJSON(w, http.StatusOK, map[string]any{"Accounts": []store.Account{a}})
 }
 
+func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "AccountID")
+	existing, ok := h.store.Accounts.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Account not found")
+		return
+	}
+
+	var req store.Account
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Invalid JSON: "+err.Error())
+		return
+	}
+
+	req.AccountID = id
+	if req.Name == "" {
+		req.Name = existing.Name
+	}
+	if req.Code == "" {
+		req.Code = existing.Code
+	}
+	if req.Type == "" {
+		req.Type = existing.Type
+	}
+	if req.Status == "" {
+		req.Status = existing.Status
+	}
+	h.store.Accounts.Set(id, req)
+	xeroJSON(w, http.StatusOK, map[string]any{"Accounts": []store.Account{req}})
+}
+
+func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "AccountID")
+	acct, ok := h.store.Accounts.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Account not found")
+		return
+	}
+	acct.Status = "ARCHIVED"
+	h.store.Accounts.Set(id, acct)
+	xeroJSON(w, http.StatusOK, map[string]any{"Accounts": []store.Account{acct}})
+}
+
 func xeroTypeToEngine(t string) accounting.AccountType {
 	switch t {
 	case "ASSET", "BANK", "CURRENT", "FIXED":

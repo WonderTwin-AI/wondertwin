@@ -33,31 +33,40 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/Contacts", h.CreateContact)
 		r.Get("/Contacts", h.ListContacts)
 		r.Get("/Contacts/{ContactID}", h.GetContact)
+		r.Put("/Contacts/{ContactID}", h.UpdateContact)
+		r.Delete("/Contacts/{ContactID}", h.DeleteContact)
 
 		// Accounts — CRUD + engine.CreateAccount
 		r.Post("/Accounts", h.CreateAccount)
 		r.Get("/Accounts", h.ListAccounts)
 		r.Get("/Accounts/{AccountID}", h.GetAccount)
+		r.Put("/Accounts/{AccountID}", h.UpdateAccount)
+		r.Delete("/Accounts/{AccountID}", h.DeleteAccount)
 
 		// Invoices — engine state transitions
 		r.Post("/Invoices", h.CreateOrUpdateInvoice)
 		r.Get("/Invoices", h.ListInvoices)
 		r.Get("/Invoices/{InvoiceID}", h.GetInvoice)
+		r.Put("/Invoices/{InvoiceID}", h.UpdateInvoice)
+		r.Delete("/Invoices/{InvoiceID}", h.DeleteInvoice)
 
 		// Credit Notes
 		r.Post("/CreditNotes", h.CreateOrUpdateCreditNote)
 		r.Get("/CreditNotes", h.ListCreditNotes)
 		r.Get("/CreditNotes/{CreditNoteID}", h.GetCreditNote)
+		r.Put("/CreditNotes/{CreditNoteID}/Allocations", h.AllocateCreditNote)
 
 		// Payments — PUT per Xero convention
 		r.Put("/Payments", h.CreatePayment)
 		r.Get("/Payments", h.ListPayments)
 		r.Get("/Payments/{PaymentID}", h.GetPayment)
+		r.Delete("/Payments/{PaymentID}", h.DeletePayment)
 
 		// Bank Transactions — PUT per Xero convention
 		r.Put("/BankTransactions", h.CreateBankTransaction)
 		r.Get("/BankTransactions", h.ListBankTransactions)
 		r.Get("/BankTransactions/{BankTransactionID}", h.GetBankTransaction)
+		r.Delete("/BankTransactions/{BankTransactionID}", h.DeleteBankTransaction)
 
 		// Manual Journals — PUT per Xero convention
 		r.Put("/ManualJournals", h.CreateManualJournal)
@@ -68,6 +77,29 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/Items", h.CreateItem)
 		r.Get("/Items", h.ListItems)
 		r.Get("/Items/{ItemID}", h.GetItem)
+		r.Put("/Items/{ItemID}", h.UpdateItem)
+		r.Delete("/Items/{ItemID}", h.DeleteItem)
+
+		// Tax Rates
+		r.Put("/TaxRates", h.CreateTaxRate)
+		r.Get("/TaxRates", h.ListTaxRates)
+
+		// Tracking Categories
+		r.Post("/TrackingCategories", h.CreateTrackingCategory)
+		r.Get("/TrackingCategories", h.ListTrackingCategories)
+		r.Get("/TrackingCategories/{TrackingCategoryID}", h.GetTrackingCategory)
+		r.Put("/TrackingCategories/{TrackingCategoryID}", h.UpdateTrackingCategory)
+		r.Delete("/TrackingCategories/{TrackingCategoryID}", h.DeleteTrackingCategory)
+
+		// Prepayments
+		r.Put("/Prepayments", h.CreatePrepayment)
+		r.Get("/Prepayments", h.ListPrepayments)
+		r.Get("/Prepayments/{PrepaymentID}", h.GetPrepayment)
+
+		// Overpayments
+		r.Put("/Overpayments", h.CreateOverpayment)
+		r.Get("/Overpayments", h.ListOverpayments)
+		r.Get("/Overpayments/{OverpaymentID}", h.GetOverpayment)
 
 		// Reports
 		r.Get("/Reports/TrialBalance", h.TrialBalance)
