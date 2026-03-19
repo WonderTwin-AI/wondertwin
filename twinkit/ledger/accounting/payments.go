@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 )
 
 // applyPayment handles the payment application logic including journal entry generation.

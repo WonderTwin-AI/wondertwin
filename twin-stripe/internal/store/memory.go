@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
@@ -14,48 +14,48 @@ import (
 type MemoryStore struct {
 	mu sync.RWMutex
 
-	Accounts         *pkgstore.Store[Account]
-	ExternalAccts    *pkgstore.Store[ExternalAccount]
-	Transfers        *pkgstore.Store[Transfer]
-	Payouts          *pkgstore.Store[Payout]
-	Events               *pkgstore.Store[Event]
-	BalanceTransactions  *pkgstore.Store[BalanceTransaction]
-	Customers            *pkgstore.Store[Customer]
-	Products             *pkgstore.Store[Product]
-	Prices               *pkgstore.Store[Price]
-	PaymentIntents       *pkgstore.Store[PaymentIntent]
-	PaymentMethods       *pkgstore.Store[PaymentMethod]
-	Charges              *pkgstore.Store[Charge]
-	Refunds              *pkgstore.Store[Refund]
-	Subscriptions        *pkgstore.Store[Subscription]
-	Invoices             *pkgstore.Store[Invoice]
-	InvoiceItems         *pkgstore.Store[InvoiceItem]
-	Coupons              *pkgstore.Store[Coupon]
-	SetupIntents         *pkgstore.Store[SetupIntent]
-	TaxRates             *pkgstore.Store[TaxRate]
-	Disputes             *pkgstore.Store[Dispute]
-	CheckoutSessions     *pkgstore.Store[CheckoutSession]
-	PaymentLinks         *pkgstore.Store[PaymentLink]
-	Tokens               *pkgstore.Store[Token]
-	Sources              *pkgstore.Store[Source]
-	Mandates             *pkgstore.Store[Mandate]
-	ConfirmationTokens   *pkgstore.Store[ConfirmationToken]
-	CreditNotes          *pkgstore.Store[CreditNote]
-	PromotionCodes       *pkgstore.Store[PromotionCode]
-	SubItems             *pkgstore.Store[SubscriptionItem]
-	Quotes               *pkgstore.Store[Quote]
-	BillingPortalSessions *pkgstore.Store[BillingPortalSession]
-	Reviews              *pkgstore.Store[Review]
-	TaxIDs               *pkgstore.Store[TaxID]
-	WebhookEndpoints     *pkgstore.Store[WebhookEndpoint]
-	Files                *pkgstore.Store[File]
-	FileLinks            *pkgstore.Store[FileLink]
-	ShippingRates        *pkgstore.Store[ShippingRate]
-	ApplicationFees       *pkgstore.Store[ApplicationFee]
-	ApplicationFeeRefunds *pkgstore.Store[ApplicationFeeRefund]
-	TransferReversals     *pkgstore.Store[TransferReversal]
-	Persons               *pkgstore.Store[Person]
-	TopUps                *pkgstore.Store[TopUp]
+	Accounts         *pkgstate.Store[Account]
+	ExternalAccts    *pkgstate.Store[ExternalAccount]
+	Transfers        *pkgstate.Store[Transfer]
+	Payouts          *pkgstate.Store[Payout]
+	Events               *pkgstate.Store[Event]
+	BalanceTransactions  *pkgstate.Store[BalanceTransaction]
+	Customers            *pkgstate.Store[Customer]
+	Products             *pkgstate.Store[Product]
+	Prices               *pkgstate.Store[Price]
+	PaymentIntents       *pkgstate.Store[PaymentIntent]
+	PaymentMethods       *pkgstate.Store[PaymentMethod]
+	Charges              *pkgstate.Store[Charge]
+	Refunds              *pkgstate.Store[Refund]
+	Subscriptions        *pkgstate.Store[Subscription]
+	Invoices             *pkgstate.Store[Invoice]
+	InvoiceItems         *pkgstate.Store[InvoiceItem]
+	Coupons              *pkgstate.Store[Coupon]
+	SetupIntents         *pkgstate.Store[SetupIntent]
+	TaxRates             *pkgstate.Store[TaxRate]
+	Disputes             *pkgstate.Store[Dispute]
+	CheckoutSessions     *pkgstate.Store[CheckoutSession]
+	PaymentLinks         *pkgstate.Store[PaymentLink]
+	Tokens               *pkgstate.Store[Token]
+	Sources              *pkgstate.Store[Source]
+	Mandates             *pkgstate.Store[Mandate]
+	ConfirmationTokens   *pkgstate.Store[ConfirmationToken]
+	CreditNotes          *pkgstate.Store[CreditNote]
+	PromotionCodes       *pkgstate.Store[PromotionCode]
+	SubItems             *pkgstate.Store[SubscriptionItem]
+	Quotes               *pkgstate.Store[Quote]
+	BillingPortalSessions *pkgstate.Store[BillingPortalSession]
+	Reviews              *pkgstate.Store[Review]
+	TaxIDs               *pkgstate.Store[TaxID]
+	WebhookEndpoints     *pkgstate.Store[WebhookEndpoint]
+	Files                *pkgstate.Store[File]
+	FileLinks            *pkgstate.Store[FileLink]
+	ShippingRates        *pkgstate.Store[ShippingRate]
+	ApplicationFees       *pkgstate.Store[ApplicationFee]
+	ApplicationFeeRefunds *pkgstate.Store[ApplicationFeeRefund]
+	TransferReversals     *pkgstate.Store[TransferReversal]
+	Persons               *pkgstate.Store[Person]
+	TopUps                *pkgstate.Store[TopUp]
 
 	// Per-account balances (account ID -> balance)
 	Balances         map[string]*AccountBalance
@@ -63,57 +63,57 @@ type MemoryStore struct {
 	// Platform balance (the main Stripe account)
 	PlatformBalance  *AccountBalance
 
-	Clock            *pkgstore.Clock
+	Clock            *pkgstate.Clock
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Accounts:        pkgstore.New[Account]("acct"),
-		ExternalAccts:   pkgstore.New[ExternalAccount]("ba"),
-		Transfers:       pkgstore.New[Transfer]("tr"),
-		Payouts:         pkgstore.New[Payout]("po"),
-		Events:              pkgstore.New[Event]("evt"),
-		BalanceTransactions: pkgstore.New[BalanceTransaction]("txn"),
-		Customers:           pkgstore.New[Customer]("cus"),
-		Products:            pkgstore.New[Product]("prod"),
-		Prices:              pkgstore.New[Price]("price"),
-		PaymentIntents:      pkgstore.New[PaymentIntent]("pi"),
-		PaymentMethods:      pkgstore.New[PaymentMethod]("pm"),
-		Charges:             pkgstore.New[Charge]("ch"),
-		Refunds:             pkgstore.New[Refund]("re"),
-		Subscriptions:       pkgstore.New[Subscription]("sub"),
-		Invoices:            pkgstore.New[Invoice]("in"),
-		InvoiceItems:        pkgstore.New[InvoiceItem]("ii"),
-		Coupons:             pkgstore.New[Coupon]("coup"),
-		SetupIntents:        pkgstore.New[SetupIntent]("seti"),
-		TaxRates:            pkgstore.New[TaxRate]("txr"),
-		Disputes:            pkgstore.New[Dispute]("dp"),
-		CheckoutSessions:    pkgstore.New[CheckoutSession]("cs"),
-		PaymentLinks:        pkgstore.New[PaymentLink]("plink"),
-		Tokens:              pkgstore.New[Token]("tok"),
-		Sources:             pkgstore.New[Source]("src"),
-		Mandates:            pkgstore.New[Mandate]("mandate"),
-		ConfirmationTokens:  pkgstore.New[ConfirmationToken]("ctoken"),
-		CreditNotes:         pkgstore.New[CreditNote]("cn"),
-		PromotionCodes:      pkgstore.New[PromotionCode]("promo"),
-		SubItems:            pkgstore.New[SubscriptionItem]("si"),
-		Quotes:              pkgstore.New[Quote]("qt"),
-		BillingPortalSessions: pkgstore.New[BillingPortalSession]("bps"),
-		Reviews:             pkgstore.New[Review]("prv"),
-		TaxIDs:              pkgstore.New[TaxID]("txi"),
-		WebhookEndpoints:    pkgstore.New[WebhookEndpoint]("we"),
-		Files:               pkgstore.New[File]("file"),
-		FileLinks:           pkgstore.New[FileLink]("link"),
-		ShippingRates:       pkgstore.New[ShippingRate]("shr"),
-		ApplicationFees:       pkgstore.New[ApplicationFee]("fee"),
-		ApplicationFeeRefunds: pkgstore.New[ApplicationFeeRefund]("fr"),
-		TransferReversals:     pkgstore.New[TransferReversal]("trr"),
-		Persons:               pkgstore.New[Person]("person"),
-		TopUps:                pkgstore.New[TopUp]("tu"),
+		Accounts:        pkgstate.New[Account]("acct"),
+		ExternalAccts:   pkgstate.New[ExternalAccount]("ba"),
+		Transfers:       pkgstate.New[Transfer]("tr"),
+		Payouts:         pkgstate.New[Payout]("po"),
+		Events:              pkgstate.New[Event]("evt"),
+		BalanceTransactions: pkgstate.New[BalanceTransaction]("txn"),
+		Customers:           pkgstate.New[Customer]("cus"),
+		Products:            pkgstate.New[Product]("prod"),
+		Prices:              pkgstate.New[Price]("price"),
+		PaymentIntents:      pkgstate.New[PaymentIntent]("pi"),
+		PaymentMethods:      pkgstate.New[PaymentMethod]("pm"),
+		Charges:             pkgstate.New[Charge]("ch"),
+		Refunds:             pkgstate.New[Refund]("re"),
+		Subscriptions:       pkgstate.New[Subscription]("sub"),
+		Invoices:            pkgstate.New[Invoice]("in"),
+		InvoiceItems:        pkgstate.New[InvoiceItem]("ii"),
+		Coupons:             pkgstate.New[Coupon]("coup"),
+		SetupIntents:        pkgstate.New[SetupIntent]("seti"),
+		TaxRates:            pkgstate.New[TaxRate]("txr"),
+		Disputes:            pkgstate.New[Dispute]("dp"),
+		CheckoutSessions:    pkgstate.New[CheckoutSession]("cs"),
+		PaymentLinks:        pkgstate.New[PaymentLink]("plink"),
+		Tokens:              pkgstate.New[Token]("tok"),
+		Sources:             pkgstate.New[Source]("src"),
+		Mandates:            pkgstate.New[Mandate]("mandate"),
+		ConfirmationTokens:  pkgstate.New[ConfirmationToken]("ctoken"),
+		CreditNotes:         pkgstate.New[CreditNote]("cn"),
+		PromotionCodes:      pkgstate.New[PromotionCode]("promo"),
+		SubItems:            pkgstate.New[SubscriptionItem]("si"),
+		Quotes:              pkgstate.New[Quote]("qt"),
+		BillingPortalSessions: pkgstate.New[BillingPortalSession]("bps"),
+		Reviews:             pkgstate.New[Review]("prv"),
+		TaxIDs:              pkgstate.New[TaxID]("txi"),
+		WebhookEndpoints:    pkgstate.New[WebhookEndpoint]("we"),
+		Files:               pkgstate.New[File]("file"),
+		FileLinks:           pkgstate.New[FileLink]("link"),
+		ShippingRates:       pkgstate.New[ShippingRate]("shr"),
+		ApplicationFees:       pkgstate.New[ApplicationFee]("fee"),
+		ApplicationFeeRefunds: pkgstate.New[ApplicationFeeRefund]("fr"),
+		TransferReversals:     pkgstate.New[TransferReversal]("trr"),
+		Persons:               pkgstate.New[Person]("person"),
+		TopUps:                pkgstate.New[TopUp]("tu"),
 		Balances:        make(map[string]*AccountBalance),
 		PlatformBalance: NewAccountBalance(),
-		Clock:           pkgstore.NewClock(),
+		Clock:           pkgstate.NewClock(),
 	}
 }
 

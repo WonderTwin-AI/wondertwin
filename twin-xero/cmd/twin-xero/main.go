@@ -12,7 +12,7 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/api"

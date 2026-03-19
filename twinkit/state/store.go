@@ -1,7 +1,7 @@
-// Package store provides a generic, thread-safe, in-memory key-value store
-// for use by WonderTwin twins. It supports CRUD operations, listing with cursor-based
-// pagination, and deterministic ID generation.
-package store
+// Package state provides a generic, thread-safe, in-memory key-value store
+// and simulated clock for use by WonderTwin twins. It supports CRUD operations,
+// listing with cursor-based pagination, and deterministic ID generation.
+package state
 
 import (
 	"encoding/json"

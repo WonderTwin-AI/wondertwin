@@ -20,7 +20,7 @@
   ],
   "fintech_primitives": ["ledger_accounting"],
   "twinkit_packages": [
-    "twinkit/store/journal",
+    "twinkit/state/journal",
     "twinkit/ledger/accounting"
   ],
   "scope": {

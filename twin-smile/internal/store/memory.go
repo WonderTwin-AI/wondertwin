@@ -3,22 +3,22 @@ package store
 import (
 	"encoding/json"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all Smile.io twin state in memory.
 type MemoryStore struct {
-	Customers   *pkgstore.Store[Customer]
-	Redemptions *pkgstore.Store[Redemption]
-	Clock       *pkgstore.Clock
+	Customers   *pkgstate.Store[Customer]
+	Redemptions *pkgstate.Store[Redemption]
+	Clock       *pkgstate.Clock
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Customers:   pkgstore.New[Customer]("cust"),
-		Redemptions: pkgstore.New[Redemption]("red"),
-		Clock:       pkgstore.NewClock(),
+		Customers:   pkgstate.New[Customer]("cust"),
+		Redemptions: pkgstate.New[Redemption]("red"),
+		Clock:       pkgstate.NewClock(),
 	}
 }
 

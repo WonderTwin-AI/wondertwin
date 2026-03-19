@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 

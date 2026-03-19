@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/store"
 )
 

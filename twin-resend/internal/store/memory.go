@@ -3,20 +3,20 @@ package store
 import (
 	"encoding/json"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all Resend twin state in memory.
 type MemoryStore struct {
-	Emails *pkgstore.Store[Email]
-	Clock  *pkgstore.Clock
+	Emails *pkgstate.Store[Email]
+	Clock  *pkgstate.Clock
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Emails: pkgstore.New[Email]("email"),
-		Clock:  pkgstore.NewClock(),
+		Emails: pkgstate.New[Email]("email"),
+		Clock:  pkgstate.NewClock(),
 	}
 }
 

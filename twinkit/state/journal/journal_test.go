@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 func newTestJournal() *Journal {
-	return New(store.NewClock())
+	return New(state.NewClock())
 }
 
 func balancedTx(debitAcct, creditAcct, currency string, amount int64) Transaction {
@@ -196,7 +196,7 @@ func TestBalance(t *testing.T) {
 }
 
 func TestBalanceAt(t *testing.T) {
-	clock := store.NewClock()
+	clock := state.NewClock()
 	j := New(clock)
 
 	if err := j.Append(balancedTx("a", "b", "USD", 100)); err != nil {
@@ -246,7 +246,7 @@ func TestEntries(t *testing.T) {
 }
 
 func TestEntriesBetween(t *testing.T) {
-	clock := store.NewClock()
+	clock := state.NewClock()
 	j := New(clock)
 
 	if err := j.Append(balancedTx("a", "b", "USD", 100)); err != nil {

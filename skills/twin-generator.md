@@ -371,7 +371,7 @@ package store
 
 import (
     "encoding/json"
-    pkgstore "github.com/wondertwin-ai/twinkit/store"
+    pkgstore "github.com/wondertwin-ai/twinkit/state"
 )
 
 type MemoryStore struct {

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -139,13 +139,13 @@ func (m *mockQuirkStore) IsEnabled(id string) bool {
 
 type testServerOpts struct {
 	state   StateStore
-	clock   *store.Clock
+	clock   *pkgstate.Clock
 	flusher WebhookFlusher
 	config  ConfigProvider
 	quirks  QuirkStore
 }
 
-func setupTestServer(state StateStore, clock *store.Clock, flusher WebhookFlusher) *httptest.Server {
+func setupTestServer(state StateStore, clock *pkgstate.Clock, flusher WebhookFlusher) *httptest.Server {
 	return setupTestServerFull(testServerOpts{state: state, clock: clock, flusher: flusher})
 }
 
@@ -178,7 +178,7 @@ func setupTestServerFull(opts testServerOpts) *httptest.Server {
 // ---------------------------------------------------------------------------
 
 func TestHandleHealth(t *testing.T) {
-	srv := setupTestServer(newMockState(), store.NewClock(), nil)
+	srv := setupTestServer(newMockState(), pkgstate.NewClock(), nil)
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/admin/health")
@@ -200,7 +200,7 @@ func TestHandleHealth(t *testing.T) {
 
 func TestHandleReset(t *testing.T) {
 	state := newMockState()
-	clk := store.NewClock()
+	clk := pkgstate.NewClock()
 	clk.Advance(1000)
 
 	srv := setupTestServer(state, clk, nil)
@@ -432,7 +432,7 @@ func TestHandleGetRequests(t *testing.T) {
 }
 
 func TestHandleTimeAdvance(t *testing.T) {
-	clk := store.NewClock()
+	clk := pkgstate.NewClock()
 	srv := setupTestServer(newMockState(), clk, nil)
 	defer srv.Close()
 
@@ -471,7 +471,7 @@ func TestHandleTimeAdvanceNoClock(t *testing.T) {
 }
 
 func TestHandleTimeAdvanceInvalidDuration(t *testing.T) {
-	clk := store.NewClock()
+	clk := pkgstate.NewClock()
 	srv := setupTestServer(newMockState(), clk, nil)
 	defer srv.Close()
 
@@ -488,7 +488,7 @@ func TestHandleTimeAdvanceInvalidDuration(t *testing.T) {
 }
 
 func TestHandleTimeAdvanceInvalidJSON(t *testing.T) {
-	clk := store.NewClock()
+	clk := pkgstate.NewClock()
 	srv := setupTestServer(newMockState(), clk, nil)
 	defer srv.Close()
 
@@ -504,7 +504,7 @@ func TestHandleTimeAdvanceInvalidJSON(t *testing.T) {
 }
 
 func TestHandleGetTime(t *testing.T) {
-	clk := store.NewClock()
+	clk := pkgstate.NewClock()
 	srv := setupTestServer(newMockState(), clk, nil)
 	defer srv.Close()
 

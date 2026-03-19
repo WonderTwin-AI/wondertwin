@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/store"
 )

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 )
 
 // testHooks records hook invocations for testing.
@@ -43,8 +43,8 @@ func (h *testHooks) OnPaymentApplied(_ context.Context, pmt *Payment, doc *Docum
 	return nil
 }
 
-func setupEngine() (*Engine, *testHooks, *store.Clock) {
-	clock := store.NewClock()
+func setupEngine() (*Engine, *testHooks, *state.Clock) {
+	clock := state.NewClock()
 	hooks := &testHooks{}
 	j := journal.New(clock)
 	e := NewEngine(WithJournal(j), WithHooks(hooks), WithClock(clock))

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 )
 
 // Engine is the accounting ledger engine. It enforces accounting invariants
@@ -16,7 +16,7 @@ type Engine struct {
 	mu         sync.RWMutex
 	journal    *journal.Journal
 	hooks      AccountingHooks
-	clock      *store.Clock
+	clock      *state.Clock
 	accounts   map[string]*Account
 	acctOrder  []string // insertion order
 	periodLock time.Time // reject entries before this time
@@ -41,7 +41,7 @@ func WithHooks(h AccountingHooks) Option {
 }
 
 // WithClock sets the clock for timestamps.
-func WithClock(c *store.Clock) Option {
+func WithClock(c *state.Clock) Option {
 	return func(e *Engine) { e.clock = c }
 }
 
@@ -59,7 +59,7 @@ func NewEngine(opts ...Option) *Engine {
 		opt(e)
 	}
 	if e.clock == nil {
-		e.clock = store.NewClock()
+		e.clock = state.NewClock()
 	}
 	if e.journal == nil {
 		e.journal = journal.New(e.clock)
