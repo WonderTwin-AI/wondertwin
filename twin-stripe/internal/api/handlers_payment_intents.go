@@ -60,22 +60,26 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	if confirm == "true" && pm != "" {
 		// Check card behavior for test cards.
-		if behavior := h.checkCardBehavior(pm); !behavior.Succeed && behavior.DeclineCode != "" {
+		behavior := h.checkCardBehavior(pm)
+		if !behavior.Succeed && behavior.DeclineCode != "" {
 			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
 			return
 		}
-
-		// Create a charge.
-		chargeID := h.createChargeForPI(&pi)
-		pi.LatestCharge = chargeID
-
-		if captureMethod == "manual" {
-			pi.Status = "requires_capture"
+		if behavior.RequiresAction {
+			pi.Status = "requires_action"
 		} else {
-			pi.Status = "succeeded"
-			pi.AmountReceived = amount
-			h.store.CreditBalance("", currency, amount)
-			h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
+			// Create a charge.
+			chargeID := h.createChargeForPI(&pi)
+			pi.LatestCharge = chargeID
+
+			if captureMethod == "manual" {
+				pi.Status = "requires_capture"
+			} else {
+				pi.Status = "succeeded"
+				pi.AmountReceived = amount
+				h.store.CreditBalance("", currency, amount)
+				h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
+			}
 		}
 	}
 
@@ -166,8 +170,16 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check card behavior for test cards.
-	if behavior := h.checkCardBehavior(pi.PaymentMethod); !behavior.Succeed && behavior.DeclineCode != "" {
+	behavior := h.checkCardBehavior(pi.PaymentMethod)
+	if !behavior.Succeed && behavior.DeclineCode != "" {
 		twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		return
+	}
+	if behavior.RequiresAction {
+		pi.Status = "requires_action"
+		h.store.PaymentIntents.Set(id, pi)
+		h.emitEvent("payment_intent.requires_action", mapFromJSON(pi))
+		twincore.JSON(w, http.StatusOK, pi)
 		return
 	}
 
