@@ -1,78 +1,177 @@
 package api
 
 import (
-	"math"
 	"net/http"
 	"time"
 )
 
-// AgedReceivables computes AR aging from unpaid invoices.
+// AgedReceivables computes AR aging from unpaid invoices, grouped by customer.
 func (h *Handler) AgedReceivables(w http.ResponseWriter, r *http.Request) {
 	now := h.store.Clock.Now()
-	var rows []map[string]any
-	var total float64
+
+	type customerAging struct {
+		CustomerName string
+		Current      float64
+		Days1_30     float64
+		Days31_60    float64
+		Days61_90    float64
+		Days91Plus   float64
+		Total        float64
+	}
+
+	aging := make(map[string]*customerAging)
 
 	for _, inv := range h.store.Invoices.List() {
 		if inv.Balance <= 0 {
 			continue
 		}
-		dueDate := parseDateParam(inv.DueDate)
-		daysOverdue := 0
-		if !dueDate.IsZero() {
-			daysOverdue = int(math.Max(0, now.Sub(dueDate).Hours()/24))
+		custID := "unknown"
+		custName := ""
+		if inv.CustomerRef != nil {
+			custID = inv.CustomerRef.Value
+			custName = inv.CustomerRef.Name
+			if custName == "" {
+				if c, ok := h.store.Customers.Get(custID); ok {
+					custName = c.DisplayName
+				}
+			}
 		}
-		bucket := agingBucket(daysOverdue)
+
+		ca, ok := aging[custID]
+		if !ok {
+			ca = &customerAging{CustomerName: custName}
+			aging[custID] = ca
+		}
+
+		dueDate := inv.DueDate
+		if dueDate == "" {
+			dueDate = inv.TxnDate
+		}
+		if dueDate == "" {
+			dueDate = inv.MetaData.CreateTime
+		}
+
+		days := daysSince(dueDate, now)
+
+		switch {
+		case days <= 0:
+			ca.Current += inv.Balance
+		case days <= 30:
+			ca.Days1_30 += inv.Balance
+		case days <= 60:
+			ca.Days31_60 += inv.Balance
+		case days <= 90:
+			ca.Days61_90 += inv.Balance
+		default:
+			ca.Days91Plus += inv.Balance
+		}
+		ca.Total += inv.Balance
+	}
+
+	var rows []map[string]any
+	for _, ca := range aging {
 		rows = append(rows, map[string]any{
-			"InvoiceId":    inv.Id,
-			"CustomerRef":  inv.CustomerRef,
-			"DueDate":      inv.DueDate,
-			"Balance":      inv.Balance,
-			"DaysOverdue":  daysOverdue,
-			"AgingBucket":  bucket,
+			"CustomerName": ca.CustomerName,
+			"Current":      ca.Current,
+			"1-30":         ca.Days1_30,
+			"31-60":        ca.Days31_60,
+			"61-90":        ca.Days61_90,
+			"91+":          ca.Days91Plus,
+			"Total":        ca.Total,
 		})
-		total += inv.Balance
 	}
 
 	qboJSON(w, http.StatusOK, map[string]any{
-		"Header": map[string]any{"ReportName": "AgedReceivables"},
-		"Rows":   rows,
-		"Total":  total,
-		"time":   time.Now().Format(time.RFC3339),
+		"Header": map[string]any{
+			"ReportName": "AgedReceivables",
+			"Time":       h.store.Now(),
+		},
+		"Rows": rows,
 	})
 }
 
-// AgedPayables computes AP aging from unpaid bills.
+// AgedPayables computes AP aging from unpaid bills, grouped by vendor.
 func (h *Handler) AgedPayables(w http.ResponseWriter, r *http.Request) {
 	now := h.store.Clock.Now()
-	var rows []map[string]any
-	var total float64
+
+	type vendorAging struct {
+		VendorName string
+		Current    float64
+		Days1_30   float64
+		Days31_60  float64
+		Days61_90  float64
+		Days91Plus float64
+		Total      float64
+	}
+
+	aging := make(map[string]*vendorAging)
 
 	for _, bill := range h.store.Bills.List() {
 		if bill.Balance <= 0 {
 			continue
 		}
-		dueDate := parseDateParam(bill.DueDate)
-		daysOverdue := 0
-		if !dueDate.IsZero() {
-			daysOverdue = int(math.Max(0, now.Sub(dueDate).Hours()/24))
+		vendID := "unknown"
+		vendName := ""
+		if bill.VendorRef != nil {
+			vendID = bill.VendorRef.Value
+			vendName = bill.VendorRef.Name
+			if vendName == "" {
+				if v, ok := h.store.Vendors.Get(vendID); ok {
+					vendName = v.DisplayName
+				}
+			}
 		}
-		bucket := agingBucket(daysOverdue)
+
+		va, ok := aging[vendID]
+		if !ok {
+			va = &vendorAging{VendorName: vendName}
+			aging[vendID] = va
+		}
+
+		dueDate := bill.DueDate
+		if dueDate == "" {
+			dueDate = bill.TxnDate
+		}
+		if dueDate == "" {
+			dueDate = bill.MetaData.CreateTime
+		}
+
+		days := daysSince(dueDate, now)
+
+		switch {
+		case days <= 0:
+			va.Current += bill.Balance
+		case days <= 30:
+			va.Days1_30 += bill.Balance
+		case days <= 60:
+			va.Days31_60 += bill.Balance
+		case days <= 90:
+			va.Days61_90 += bill.Balance
+		default:
+			va.Days91Plus += bill.Balance
+		}
+		va.Total += bill.Balance
+	}
+
+	var rows []map[string]any
+	for _, va := range aging {
 		rows = append(rows, map[string]any{
-			"BillId":       bill.Id,
-			"VendorRef":    bill.VendorRef,
-			"DueDate":      bill.DueDate,
-			"Balance":      bill.Balance,
-			"DaysOverdue":  daysOverdue,
-			"AgingBucket":  bucket,
+			"VendorName": va.VendorName,
+			"Current":    va.Current,
+			"1-30":       va.Days1_30,
+			"31-60":      va.Days31_60,
+			"61-90":      va.Days61_90,
+			"91+":        va.Days91Plus,
+			"Total":      va.Total,
 		})
-		total += bill.Balance
 	}
 
 	qboJSON(w, http.StatusOK, map[string]any{
-		"Header": map[string]any{"ReportName": "AgedPayables"},
-		"Rows":   rows,
-		"Total":  total,
-		"time":   time.Now().Format(time.RFC3339),
+		"Header": map[string]any{
+			"ReportName": "AgedPayables",
+			"Time":       h.store.Now(),
+		},
+		"Rows": rows,
 	})
 }
 
@@ -182,4 +281,18 @@ func agingBucket(daysOverdue int) string {
 	default:
 		return "91+"
 	}
+}
+
+// daysSince parses a date string and returns the number of days between it and now.
+func daysSince(dateStr string, now time.Time) int {
+	for _, layout := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05-07:00",
+		"2006-01-02",
+	} {
+		if t, err := time.Parse(layout, dateStr); err == nil {
+			return int(now.Sub(t).Hours() / 24)
+		}
+	}
+	return 0
 }

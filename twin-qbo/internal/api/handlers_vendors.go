@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,8 +10,13 @@ import (
 )
 
 func (h *Handler) CreateOrUpdateVendor(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		validationFault(w, "500", "Failed to read body", err.Error())
+		return
+	}
 	var v store.Vendor
-	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+	if err := json.Unmarshal(body, &v); err != nil {
 		validationFault(w, "500", "Invalid JSON", err.Error())
 		return
 	}
@@ -24,6 +30,14 @@ func (h *Handler) CreateOrUpdateVendor(w http.ResponseWriter, r *http.Request) {
 		if err := ValidateSyncToken(existing.SyncToken, v.SyncToken); err != nil {
 			staleSyncTokenFault(w)
 			return
+		}
+		if IsSparse(body) {
+			merged, err := SparseUpdate(existing, body)
+			if err != nil {
+				validationFault(w, "500", "Sparse merge failed", err.Error())
+				return
+			}
+			v = merged
 		}
 		v.SyncToken = IncrementSyncToken(existing.SyncToken)
 		v.MetaData.CreateTime = existing.MetaData.CreateTime

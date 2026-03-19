@@ -23,6 +23,7 @@ func (h *Handler) CreateOrUpdatePayment(w http.ResponseWriter, r *http.Request) 
 			notFoundFault(w, "Payment", pmt.Id)
 			return
 		}
+		h.journalPaymentVoided(&existing)
 		// Un-apply from linked invoices.
 		for _, line := range existing.Line {
 			for _, link := range line.LinkedTxn {
@@ -35,6 +36,13 @@ func (h *Handler) CreateOrUpdatePayment(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 		}
+		// Update customer balance.
+		if existing.CustomerRef != nil {
+			if cust, ok := h.store.Customers.Get(existing.CustomerRef.Value); ok {
+				cust.Balance += existing.TotalAmt
+				h.store.Customers.Set(cust.Id, cust)
+			}
+		}
 		existing.SyncToken = IncrementSyncToken(existing.SyncToken)
 		existing.MetaData.LastUpdatedTime = h.store.Now()
 		h.store.Payments.Set(existing.Id, existing)
@@ -44,6 +52,9 @@ func (h *Handler) CreateOrUpdatePayment(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if op == "delete" {
+		if existing, ok := h.store.Payments.Get(pmt.Id); ok {
+			h.journalPaymentVoided(&existing)
+		}
 		h.store.Payments.Delete(pmt.Id)
 		h.fireEvent("Payment", pmt.Id, "Delete")
 		qboJSON(w, http.StatusOK, entityResponse("Payment", pmt))
@@ -93,6 +104,16 @@ func (h *Handler) CreateOrUpdatePayment(w http.ResponseWriter, r *http.Request) 
 
 		h.store.Payments.Set(pmt.Id, pmt)
 		h.journalPaymentCreated(&pmt)
+		// Update customer balance.
+		if pmt.CustomerRef != nil {
+			if cust, ok := h.store.Customers.Get(pmt.CustomerRef.Value); ok {
+				cust.Balance -= pmt.TotalAmt
+				if cust.Balance < 0 {
+					cust.Balance = 0
+				}
+				h.store.Customers.Set(cust.Id, cust)
+			}
+		}
 		h.fireEvent("Payment", pmt.Id, "Create")
 	}
 
@@ -121,6 +142,7 @@ func (h *Handler) CreateOrUpdateBillPayment(w http.ResponseWriter, r *http.Reque
 		existing, ok := h.store.BillPayments.Get(bp.Id)
 		if !ok { notFoundFault(w, "BillPayment", bp.Id); return }
 		if err := ValidateSyncToken(existing.SyncToken, bp.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		h.journalBillPaymentVoided(&existing)
 		// Un-apply from linked bills.
 		for _, line := range existing.Line {
 			for _, link := range line.LinkedTxn {
@@ -132,11 +154,21 @@ func (h *Handler) CreateOrUpdateBillPayment(w http.ResponseWriter, r *http.Reque
 				}
 			}
 		}
+		// Update vendor balance.
+		if existing.VendorRef != nil {
+			if v, ok := h.store.Vendors.Get(existing.VendorRef.Value); ok {
+				v.Balance += existing.TotalAmt
+				h.store.Vendors.Set(v.Id, v)
+			}
+		}
 		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
 		h.store.BillPayments.Set(existing.Id, existing); h.fireEvent("BillPayment", existing.Id, "Void")
 		qboJSON(w, http.StatusOK, entityResponse("BillPayment", existing)); return
 	}
 	if op == "delete" {
+		if existing, ok := h.store.BillPayments.Get(bp.Id); ok {
+			h.journalBillPaymentVoided(&existing)
+		}
 		h.store.BillPayments.Delete(bp.Id); h.fireEvent("BillPayment", bp.Id, "Delete")
 		qboJSON(w, http.StatusOK, entityResponse("BillPayment", bp)); return
 	}
@@ -180,6 +212,16 @@ func (h *Handler) CreateOrUpdateBillPayment(w http.ResponseWriter, r *http.Reque
 
 		h.store.BillPayments.Set(bp.Id, bp)
 		h.journalBillPaymentCreated(&bp)
+		// Update vendor balance.
+		if bp.VendorRef != nil {
+			if v, ok := h.store.Vendors.Get(bp.VendorRef.Value); ok {
+				v.Balance -= bp.TotalAmt
+				if v.Balance < 0 {
+					v.Balance = 0
+				}
+				h.store.Vendors.Set(v.Id, v)
+			}
+		}
 		h.fireEvent("BillPayment", bp.Id, "Create")
 	}
 

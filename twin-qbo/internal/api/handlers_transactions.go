@@ -21,6 +21,13 @@ func (h *Handler) CreateOrUpdateCreditMemo(w http.ResponseWriter, r *http.Reques
 		existing, ok := h.store.CreditMemos.Get(cm.Id)
 		if !ok { notFoundFault(w, "CreditMemo", cm.Id); return }
 		if err := ValidateSyncToken(existing.SyncToken, cm.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		// Restore customer balance (credit memo had decreased it).
+		if existing.CustomerRef != nil {
+			if cust, ok := h.store.Customers.Get(existing.CustomerRef.Value); ok {
+				cust.Balance += existing.TotalAmt
+				h.store.Customers.Set(cust.Id, cust)
+			}
+		}
 		if op == "void" { existing.TotalAmt = 0; existing.RemainingCredit = 0; for i := range existing.Line { existing.Line[i].Amount = 0 } }
 		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
 		if op == "delete" { h.store.CreditMemos.Delete(cm.Id); h.fireEvent("CreditMemo", cm.Id, "Delete") } else { h.store.CreditMemos.Set(cm.Id, existing); h.fireEvent("CreditMemo", cm.Id, "Void") }
@@ -34,6 +41,36 @@ func (h *Handler) CreateOrUpdateCreditMemo(w http.ResponseWriter, r *http.Reques
 		cm.MetaData.CreateTime = existing.MetaData.CreateTime
 		cm.MetaData.LastUpdatedTime = h.store.Now()
 		cm.Domain = "QBO"
+		// Apply credit to linked invoices.
+		for _, link := range cm.LinkedTxn {
+			if link.TxnType == "Invoice" {
+				if inv, ok := h.store.Invoices.Get(link.TxnId); ok {
+					// Determine how much to apply.
+					applyAmt := cm.RemainingCredit
+					if applyAmt <= 0 {
+						applyAmt = existing.RemainingCredit
+					}
+					if applyAmt > inv.Balance {
+						applyAmt = inv.Balance
+					}
+					if applyAmt <= 0 {
+						continue
+					}
+					inv.Balance -= applyAmt
+					if inv.Balance < 0 {
+						inv.Balance = 0
+					}
+					inv.MetaData.LastUpdatedTime = h.store.Now()
+					h.store.Invoices.Set(inv.Id, inv)
+
+					// Reduce remaining credit.
+					cm.RemainingCredit = existing.RemainingCredit - applyAmt
+
+					// Generate reversing journal entry for applied amount.
+					h.journalCreditMemoApplied(cm.Id, applyAmt)
+				}
+			}
+		}
 		h.store.CreditMemos.Set(cm.Id, cm)
 	} else {
 		cm.Id = h.store.NextID()
@@ -43,6 +80,17 @@ func (h *Handler) CreateOrUpdateCreditMemo(w http.ResponseWriter, r *http.Reques
 		computeCreditMemoTotals(&cm)
 		cm.RemainingCredit = cm.TotalAmt
 		h.store.CreditMemos.Set(cm.Id, cm)
+		h.journalCreditMemoCreated(&cm)
+		// Update customer balance.
+		if cm.CustomerRef != nil {
+			if cust, ok := h.store.Customers.Get(cm.CustomerRef.Value); ok {
+				cust.Balance -= cm.TotalAmt
+				if cust.Balance < 0 {
+					cust.Balance = 0
+				}
+				h.store.Customers.Set(cust.Id, cust)
+			}
+		}
 		h.fireEvent("CreditMemo", cm.Id, "Create")
 	}
 	qboJSON(w, http.StatusOK, entityResponse("CreditMemo", cm))
@@ -118,9 +166,9 @@ func (h *Handler) CreateOrUpdateSalesReceipt(w http.ResponseWriter, r *http.Requ
 		existing, ok := h.store.SalesReceipts.Get(sr.Id)
 		if !ok { notFoundFault(w, "SalesReceipt", sr.Id); return }
 		if err := ValidateSyncToken(existing.SyncToken, sr.SyncToken); err != nil { staleSyncTokenFault(w); return }
-		if op == "void" { existing.TotalAmt = 0; for i := range existing.Line { existing.Line[i].Amount = 0 } }
+		if op == "void" { h.journalSalesReceiptVoided(&existing); existing.TotalAmt = 0; for i := range existing.Line { existing.Line[i].Amount = 0 } }
 		existing.SyncToken = IncrementSyncToken(existing.SyncToken); existing.MetaData.LastUpdatedTime = h.store.Now()
-		if op == "delete" { h.store.SalesReceipts.Delete(sr.Id); h.fireEvent("SalesReceipt", sr.Id, "Delete") } else { h.store.SalesReceipts.Set(sr.Id, existing); h.fireEvent("SalesReceipt", sr.Id, "Void") }
+		if op == "delete" { h.journalSalesReceiptVoided(&existing); h.store.SalesReceipts.Delete(sr.Id); h.fireEvent("SalesReceipt", sr.Id, "Delete") } else { h.store.SalesReceipts.Set(sr.Id, existing); h.fireEvent("SalesReceipt", sr.Id, "Void") }
 		qboJSON(w, http.StatusOK, entityResponse("SalesReceipt", existing)); return
 	}
 	if sr.Id != "" {
@@ -307,6 +355,14 @@ func (h *Handler) CreateOrUpdateEstimate(w http.ResponseWriter, r *http.Request)
 		existing, ok := h.store.Estimates.Get(est.Id)
 		if !ok { notFoundFault(w, "Estimate", est.Id); return }
 		if err := ValidateSyncToken(existing.SyncToken, est.SyncToken); err != nil { staleSyncTokenFault(w); return }
+		// Validate status transitions.
+		if est.TxnStatus != "" && est.TxnStatus != existing.TxnStatus {
+			if !validEstimateTransition(existing.TxnStatus, est.TxnStatus) {
+				validationFault(w, "500", "Invalid status transition",
+					"Cannot transition from "+existing.TxnStatus+" to "+est.TxnStatus)
+				return
+			}
+		}
 		est.SyncToken = IncrementSyncToken(existing.SyncToken)
 		est.MetaData.CreateTime = existing.MetaData.CreateTime
 		est.MetaData.LastUpdatedTime = h.store.Now()
@@ -331,6 +387,63 @@ func (h *Handler) GetEstimate(w http.ResponseWriter, r *http.Request) {
 	est, ok := h.store.Estimates.Get(id)
 	if !ok { notFoundFault(w, "Estimate", id); return }
 	qboJSON(w, http.StatusOK, entityResponse("Estimate", est))
+}
+
+// validEstimateTransition checks whether a status transition is allowed.
+func validEstimateTransition(from, to string) bool {
+	switch from {
+	case "Pending":
+		return to == "Accepted" || to == "Rejected" || to == "Closed"
+	case "Accepted":
+		return to == "Closed" || to == "Rejected"
+	default:
+		return false // Closed and Rejected are terminal
+	}
+}
+
+// ConvertEstimate creates an invoice from an estimate and marks it Closed.
+func (h *Handler) ConvertEstimate(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	est, ok := h.store.Estimates.Get(id)
+	if !ok {
+		notFoundFault(w, "Estimate", id)
+		return
+	}
+	if est.TxnStatus == "Closed" || est.TxnStatus == "Rejected" {
+		validationFault(w, "500", "Cannot convert estimate",
+			"Estimate is "+est.TxnStatus)
+		return
+	}
+
+	// Create invoice from estimate.
+	inv := store.Invoice{
+		Id:          h.store.NextID(),
+		SyncToken:   "0",
+		CustomerRef: est.CustomerRef,
+		Line:        est.Line,
+		TotalAmt:    est.TotalAmt,
+		Balance:     est.TotalAmt,
+		Domain:      "QBO",
+		MetaData:    h.store.NewMetaData(),
+	}
+	if est.SalesTermRef != nil {
+		inv.SalesTermRef = est.SalesTermRef
+	}
+	computeInvoiceTotals(&inv)
+	inv.Balance = inv.TotalAmt
+	h.store.Invoices.Set(inv.Id, inv)
+	h.journalInvoiceCreated(&inv)
+	h.fireEvent("Invoice", inv.Id, "Create")
+
+	// Update estimate status to Closed and link to invoice.
+	est.TxnStatus = "Closed"
+	est.LinkedTxnId = inv.Id
+	est.SyncToken = IncrementSyncToken(est.SyncToken)
+	est.MetaData.LastUpdatedTime = h.store.Now()
+	h.store.Estimates.Set(est.Id, est)
+	h.fireEvent("Estimate", est.Id, "Update")
+
+	qboJSON(w, http.StatusOK, entityResponse("Invoice", inv))
 }
 
 // --- Purchase ---

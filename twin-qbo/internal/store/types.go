@@ -49,6 +49,7 @@ type Vendor struct {
 	Balance          float64  `json:"Balance"`
 	MetaData         MetaData `json:"MetaData"`
 	Domain           string   `json:"domain"`
+	Sparse           bool     `json:"sparse,omitempty"`
 }
 
 // Account represents a QBO chart-of-accounts entry.
@@ -66,6 +67,7 @@ type Account struct {
 	Description     string   `json:"Description,omitempty"`
 	MetaData        MetaData `json:"MetaData"`
 	Domain          string   `json:"domain"`
+	Sparse          bool     `json:"sparse,omitempty"`
 }
 
 // Item represents a QBO product/service item.
@@ -80,6 +82,7 @@ type Item struct {
 	Active           bool     `json:"Active"`
 	MetaData         MetaData `json:"MetaData"`
 	Domain           string   `json:"domain"`
+	Sparse           bool     `json:"sparse,omitempty"`
 }
 
 // Line is a polymorphic line item on a transaction.
@@ -90,6 +93,7 @@ type Line struct {
 	DetailType                  string                       `json:"DetailType"`
 	SalesItemLineDetail         *SalesItemLineDetail         `json:"SalesItemLineDetail,omitempty"`
 	AccountBasedExpenseLineDetail *AccountBasedExpenseLineDetail `json:"AccountBasedExpenseLineDetail,omitempty"`
+	DiscountLineDetail          *DiscountLineDetail          `json:"DiscountLineDetail,omitempty"`
 	JournalEntryLineDetail      *JournalEntryLineDetail      `json:"JournalEntryLineDetail,omitempty"`
 	LinkedTxn                   []LinkedTxn                  `json:"LinkedTxn,omitempty"`
 }
@@ -107,6 +111,13 @@ type AccountBasedExpenseLineDetail struct {
 	AccountRef  *Ref   `json:"AccountRef"`
 	TaxCodeRef  *Ref   `json:"TaxCodeRef,omitempty"`
 	CustomerRef *Ref   `json:"CustomerRef,omitempty"`
+}
+
+// DiscountLineDetail is the detail for discount line items.
+type DiscountLineDetail struct {
+	PercentBased    bool    `json:"PercentBased,omitempty"`
+	DiscountPercent float64 `json:"DiscountPercent,omitempty"`
+	DiscountAccountRef *Ref `json:"DiscountAccountRef,omitempty"`
 }
 
 // JournalEntryLineDetail is the detail for journal entry lines.
@@ -183,6 +194,7 @@ type Bill struct {
 	APAccountRef *Ref           `json:"APAccountRef,omitempty"`
 	MetaData     MetaData       `json:"MetaData"`
 	Domain       string         `json:"domain"`
+	Sparse       bool           `json:"sparse,omitempty"`
 }
 
 // Payment represents a QBO customer payment.
@@ -223,16 +235,17 @@ type CheckPayment struct {
 
 // CreditMemo represents a QBO credit memo.
 type CreditMemo struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	CustomerRef *Ref     `json:"CustomerRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	RemainingCredit float64 `json:"RemainingCredit"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
+	Id              string      `json:"Id"`
+	SyncToken       string      `json:"SyncToken"`
+	DocNumber       string      `json:"DocNumber,omitempty"`
+	TxnDate         string      `json:"TxnDate,omitempty"`
+	CustomerRef     *Ref        `json:"CustomerRef"`
+	Line            []Line      `json:"Line"`
+	TotalAmt        float64     `json:"TotalAmt"`
+	RemainingCredit float64     `json:"RemainingCredit"`
+	LinkedTxn       []LinkedTxn `json:"LinkedTxn,omitempty"`
+	MetaData        MetaData    `json:"MetaData"`
+	Domain          string      `json:"domain"`
 }
 
 // VendorCredit represents a QBO vendor credit.
@@ -300,16 +313,21 @@ type JournalEntry struct {
 
 // Estimate represents a QBO estimate/quote.
 type Estimate struct {
-	Id          string   `json:"Id"`
-	SyncToken   string   `json:"SyncToken"`
-	DocNumber   string   `json:"DocNumber,omitempty"`
-	TxnDate     string   `json:"TxnDate,omitempty"`
-	TxnStatus   string   `json:"TxnStatus"` // Pending, Accepted, Closed, Rejected
-	CustomerRef *Ref     `json:"CustomerRef"`
-	Line        []Line   `json:"Line"`
-	TotalAmt    float64  `json:"TotalAmt"`
-	MetaData    MetaData `json:"MetaData"`
-	Domain      string   `json:"domain"`
+	Id             string   `json:"Id"`
+	SyncToken      string   `json:"SyncToken"`
+	DocNumber      string   `json:"DocNumber,omitempty"`
+	TxnDate        string   `json:"TxnDate,omitempty"`
+	ExpirationDate string   `json:"ExpirationDate,omitempty"`
+	AcceptedDate   string   `json:"AcceptedDate,omitempty"`
+	AcceptedBy     string   `json:"AcceptedBy,omitempty"`
+	TxnStatus      string   `json:"TxnStatus"` // Pending, Accepted, Closed, Rejected
+	CustomerRef    *Ref     `json:"CustomerRef"`
+	SalesTermRef   *Ref     `json:"SalesTermRef,omitempty"`
+	Line           []Line   `json:"Line"`
+	TotalAmt       float64  `json:"TotalAmt"`
+	LinkedTxnId    string   `json:"LinkedTxnId,omitempty"`
+	MetaData       MetaData `json:"MetaData"`
+	Domain         string   `json:"domain"`
 }
 
 // Purchase represents a QBO expense (check/cash/credit card purchase).
@@ -456,6 +474,21 @@ type TimeActivity struct {
 	Description string   `json:"Description,omitempty"`
 	MetaData    MetaData `json:"MetaData"`
 	Domain      string   `json:"domain"`
+}
+
+// RecurringTransaction is a template for auto-generated transactions.
+type RecurringTransaction struct {
+	Id           string         `json:"Id"`
+	SyncToken    string         `json:"SyncToken"`
+	TemplateName string         `json:"TemplateName"`
+	TemplateType string         `json:"TemplateType"` // Invoice, Bill, etc.
+	Schedule     string         `json:"Schedule,omitempty"` // e.g., "Monthly", "Weekly"
+	NextDate     string         `json:"NextDate,omitempty"`
+	EndDate      string         `json:"EndDate,omitempty"`
+	Active       bool           `json:"Active"`
+	Body         map[string]any `json:"Body,omitempty"` // Template body
+	MetaData     MetaData       `json:"MetaData"`
+	Domain       string         `json:"domain"`
 }
 
 // CompanyInfo holds the company settings (single record, Id="1").

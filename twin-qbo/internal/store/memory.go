@@ -39,8 +39,9 @@ type MemoryStore struct {
 	PreferencesStore *pkgstore.Store[Preferences]
 	RefundReceipts   *pkgstore.Store[RefundReceipt]
 	PurchaseOrders   *pkgstore.Store[PurchaseOrder]
-	TimeActivities   *pkgstore.Store[TimeActivity]
-	Journal          *journal.Journal
+	TimeActivities         *pkgstore.Store[TimeActivity]
+	RecurringTransactions  *pkgstore.Store[RecurringTransaction]
+	Journal                *journal.Journal
 	Clock        *pkgstore.Clock
 	idCounter    atomic.Uint64
 }
@@ -76,8 +77,9 @@ func New() *MemoryStore {
 		PreferencesStore: pkgstore.New[Preferences]("pref"),
 		RefundReceipts:   pkgstore.New[RefundReceipt]("rr"),
 		PurchaseOrders:   pkgstore.New[PurchaseOrder]("po"),
-		TimeActivities:   pkgstore.New[TimeActivity]("ta"),
-		Journal:          journal.New(clock),
+		TimeActivities:        pkgstore.New[TimeActivity]("ta"),
+		RecurringTransactions: pkgstore.New[RecurringTransaction]("rt"),
+		Journal:               journal.New(clock),
 		Clock:         clock,
 	}
 }
@@ -126,7 +128,8 @@ type stateSnapshot struct {
 	Preferences    map[string]Preferences   `json:"preferences"`
 	RefundReceipts map[string]RefundReceipt `json:"refund_receipts"`
 	PurchaseOrders map[string]PurchaseOrder `json:"purchase_orders"`
-	TimeActivities map[string]TimeActivity  `json:"time_activities"`
+	TimeActivities        map[string]TimeActivity        `json:"time_activities"`
+	RecurringTransactions map[string]RecurringTransaction `json:"recurring_transactions"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -158,7 +161,8 @@ func (s *MemoryStore) Snapshot() any {
 		Preferences:    s.PreferencesStore.Snapshot(),
 		RefundReceipts: s.RefundReceipts.Snapshot(),
 		PurchaseOrders: s.PurchaseOrders.Snapshot(),
-		TimeActivities: s.TimeActivities.Snapshot(),
+		TimeActivities:        s.TimeActivities.Snapshot(),
+		RecurringTransactions: s.RecurringTransactions.Snapshot(),
 	}
 }
 
@@ -195,6 +199,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.RefundReceipts.LoadSnapshot(snap.RefundReceipts)
 	s.PurchaseOrders.LoadSnapshot(snap.PurchaseOrders)
 	s.TimeActivities.LoadSnapshot(snap.TimeActivities)
+	s.RecurringTransactions.LoadSnapshot(snap.RecurringTransactions)
 	return nil
 }
 
@@ -227,6 +232,7 @@ func (s *MemoryStore) Reset() {
 	s.RefundReceipts.Reset()
 	s.PurchaseOrders.Reset()
 	s.TimeActivities.Reset()
+	s.RecurringTransactions.Reset()
 	s.Journal.Reset()
 	s.Clock.Reset()
 	s.idCounter.Store(0)

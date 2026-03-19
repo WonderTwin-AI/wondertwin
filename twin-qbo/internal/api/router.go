@@ -102,6 +102,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/estimate", h.CreateOrUpdateEstimate)
 		r.Get("/estimate/{id}", h.GetEstimate)
 		r.Post("/estimate/{id}/send", h.SendEstimate)
+		r.Post("/estimate/{id}/convert", h.ConvertEstimate)
 
 		// Purchases
 		r.Post("/purchase", h.CreateOrUpdatePurchase)
@@ -148,6 +149,10 @@ func (h *Handler) Routes(r chi.Router) {
 		// Time Activities
 		r.Post("/timeactivity", h.CreateOrUpdateTimeActivity)
 		r.Get("/timeactivity/{id}", h.GetTimeActivity)
+
+		// Recurring Transactions
+		r.Post("/recurringtransaction", h.CreateOrUpdateRecurringTransaction)
+		r.Get("/recurringtransaction/{id}", h.GetRecurringTransaction)
 
 		// Reports
 		r.Get("/reports/ProfitAndLoss", h.ProfitAndLoss)

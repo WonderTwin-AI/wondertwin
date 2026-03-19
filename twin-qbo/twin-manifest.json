@@ -17,7 +17,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 18
+    "resource_count": 26
   },
   "coverage": {
     "resources_implemented": [
@@ -25,13 +25,15 @@
       "Invoice", "Bill", "Payment", "BillPayment",
       "CreditMemo", "VendorCredit", "SalesReceipt", "Deposit",
       "Transfer", "JournalEntry", "Estimate", "Purchase",
-      "CompanyInfo", "Query"
+      "CompanyInfo", "Query", "Batch", "ChangeDataCapture",
+      "TaxCode", "TaxRate", "TimeActivity", "RecurringTransaction",
+      "Employee", "RefundReceipt", "PurchaseOrder", "PaymentMethod",
+      "Class", "Department", "Term", "Preferences"
     ],
     "resources_not_implemented": [
-      "Batch", "ChangeDataCapture", "Attachments",
-      "TaxCode", "TimeActivity", "Budget"
+      "Attachments", "Budget"
     ],
-    "estimated_coverage_pct": 75
+    "estimated_coverage_pct": 95
   },
   "generation": {
     "method": "wondertwin_skill",
