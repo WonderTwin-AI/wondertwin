@@ -2,9 +2,10 @@ package api
 
 // cardBehavior describes the outcome when a test card number is used.
 type cardBehavior struct {
-	Succeed     bool
-	DeclineCode string // e.g. "card_declined", "insufficient_funds"
-	Message     string
+	Succeed        bool
+	DeclineCode    string // e.g. "card_declined", "insufficient_funds"
+	Message        string
+	RequiresAction bool // 3D Secure authentication required
 }
 
 // testCardBehaviors maps Stripe test card numbers to their expected behavior.
@@ -15,6 +16,11 @@ var testCardBehaviors = map[string]cardBehavior{
 	"4000056655665556": {Succeed: true},
 	"5555555555554444": {Succeed: true},
 	"5200828282828210": {Succeed: true},
+
+	// 3D Secure cards
+	"4000000000003220": {RequiresAction: true}, // 3DS2 required
+	"4000000000003063": {RequiresAction: true}, // 3DS1 required
+	"4000000000003097": {RequiresAction: true}, // 3DS required, will fail auth
 
 	// Decline cards
 	"4000000000000002": {DeclineCode: "card_declined", Message: "Your card was declined."},

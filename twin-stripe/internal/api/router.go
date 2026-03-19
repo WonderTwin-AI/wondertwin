@@ -122,6 +122,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 		// Disputes
 		r.Get("/disputes/{id}", h.GetDispute)
+		r.Post("/disputes/{id}", h.UpdateDispute)
 		r.Post("/disputes/{id}/close", h.CloseDispute)
 		r.Get("/disputes", h.ListDisputes)
 
@@ -293,6 +294,9 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/admin/accounts/{id}/fund", h.AdminFundAccount)
 	r.Post("/admin/checkout/sessions/{id}/complete", h.AdminCompleteCheckoutSession)
 	r.Post("/admin/subscriptions/advance", h.AdminAdvanceSubscriptions)
+	r.Post("/admin/payment_intents/{id}/authenticate", h.AdminAuthenticatePaymentIntent)
+	r.Post("/admin/disputes", h.AdminCreateDispute)
+	r.Post("/admin/disputes/{id}/resolve", h.AdminResolveDispute)
 }
 
 // authMiddleware validates Stripe-style Bearer token authentication.

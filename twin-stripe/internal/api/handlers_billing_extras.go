@@ -242,11 +242,63 @@ func (h *Handler) GetDispute(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, dp)
 }
 
+// UpdateDispute handles POST /v1/disputes/{id} — submit evidence.
+func (h *Handler) UpdateDispute(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	dp, ok := h.store.Disputes.Get(id)
+	if !ok {
+		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
+		return
+	}
+	if dp.Status != "needs_response" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_not_updatable",
+			"Dispute status is "+dp.Status+", which cannot accept evidence.")
+		return
+	}
+	if err := parseFormOrJSON(r); err != nil {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		return
+	}
+
+	// Parse evidence fields.
+	if dp.Evidence == nil {
+		dp.Evidence = make(map[string]string)
+	}
+	for _, field := range []string{
+		"uncategorized_text", "customer_name", "customer_email_address",
+		"product_description", "shipping_tracking_number",
+	} {
+		if v := r.FormValue("evidence[" + field + "]"); v != "" {
+			dp.Evidence[field] = v
+		}
+	}
+
+	if submit := r.FormValue("submit"); submit == "true" {
+		dp.Status = "under_review"
+		h.emitEvent("charge.dispute.updated", mapFromJSON(dp))
+	}
+
+	if meta := parseMetadata(r); len(meta) > 0 {
+		dp.Metadata = meta
+	}
+
+	h.store.Disputes.Set(id, dp)
+	h.emitEvent("charge.dispute.updated", mapFromJSON(dp))
+	twincore.JSON(w, http.StatusOK, dp)
+}
+
+// CloseDispute handles POST /v1/disputes/{id}/close.
+// Accepts the dispute (loses it). Won disputes are handled via admin.
 func (h *Handler) CloseDispute(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	dp, ok := h.store.Disputes.Get(id)
 	if !ok {
 		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
+		return
+	}
+	if dp.Status == "won" || dp.Status == "lost" {
+		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_already_closed",
+			"Dispute has already been closed with status: "+dp.Status)
 		return
 	}
 	dp.Status = "lost"

@@ -499,6 +499,7 @@ type Dispute struct {
 	PaymentIntent   string            `json:"payment_intent,omitempty"`
 	Reason          string            `json:"reason"` // fraudulent, duplicate, etc.
 	Status          string            `json:"status"` // needs_response, under_review, won, lost
+	Evidence        map[string]string `json:"evidence,omitempty"`
 	Livemode        bool              `json:"livemode"`
 	Metadata        map[string]string `json:"metadata,omitempty"`
 	Created         int64             `json:"created"`
