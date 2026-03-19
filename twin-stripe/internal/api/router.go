@@ -93,6 +93,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/invoices/{id}", h.UpdateInvoice)
 		r.Post("/invoices/{id}/finalize", h.FinalizeInvoice)
 		r.Post("/invoices/{id}/pay", h.PayInvoice)
+		r.Post("/invoices/{id}/send", h.SendInvoice)
 		r.Post("/invoices/{id}/void", h.VoidInvoice)
 		r.Get("/invoices", h.ListInvoices)
 
@@ -148,6 +149,7 @@ func (h *Handler) Routes(r chi.Router) {
 		// Payouts
 		r.Post("/payouts", h.CreatePayout)
 		r.Get("/payouts/{id}", h.GetPayout)
+		r.Post("/payouts/{id}/cancel", h.CancelPayout)
 		r.Get("/payouts", h.ListPayouts)
 
 		// Balance Transactions

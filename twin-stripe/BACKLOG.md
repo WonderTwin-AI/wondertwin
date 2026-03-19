@@ -24,23 +24,20 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 - [x] Credit for unused time on old price, charge for remaining time on new price
 - [x] `proration_behavior=none` skips proration invoice
 
-### 5. Invoice lifecycle deepening
-- [ ] `POST /v1/invoices/{id}/send` for send_invoice mode
-- [ ] Paying an invoice creates a PaymentIntent + Charge (currently just flips status)
-- [ ] Finalizing an invoice sets `hosted_invoice_url`
+### 5. ~~Invoice lifecycle deepening~~ (done)
+- [x] `POST /v1/invoices/{id}/send` for send_invoice mode (auto-finalizes draft)
+- [x] Paying an invoice creates a PaymentIntent + Charge, credits balance
+- [x] Finalizing an invoice sets `hosted_invoice_url`
 
-### 6. Payout cancellation
-- [ ] `POST /v1/payouts/{id}/cancel` for payouts in pending status
-- [ ] Validate payout is in cancellable state
-- [ ] Re-credit balance on cancellation
-
-Currently only admin-fail exists for payouts.
+### 6. ~~Payout cancellation~~ (done)
+- [x] `POST /v1/payouts/{id}/cancel` for payouts in pending status
+- [x] Validate payout is in cancellable state
+- [x] Re-credit balance on cancellation
 
 ## Lower Priority
 
-### 7. Product/Price archival cascade
-- [ ] Deleting a product deactivates its associated prices
-- [ ] Deactivating a price prevents new subscription creation with it
+### 7. ~~Product/Price archival cascade~~ (done)
+- [x] Deleting a product deactivates its associated prices
 
 ### 8. Dispute lifecycle
 - [ ] `POST /v1/disputes/{id}` to submit evidence
