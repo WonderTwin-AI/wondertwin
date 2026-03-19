@@ -77,3 +77,56 @@ func (h *Handler) GetContact(w http.ResponseWriter, r *http.Request) {
 	}
 	xeroJSON(w, http.StatusOK, map[string]any{"Contacts": []store.Contact{c}})
 }
+
+func (h *Handler) UpdateContact(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "ContactID")
+	existing, ok := h.store.Contacts.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Contact not found")
+		return
+	}
+
+	var req struct {
+		Contacts []store.Contact `json:"Contacts"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Invalid JSON: "+err.Error())
+		return
+	}
+	if len(req.Contacts) == 0 {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "At least one contact is required")
+		return
+	}
+
+	c := req.Contacts[0]
+	c.ContactID = id
+	if c.ContactStatus == "" {
+		c.ContactStatus = existing.ContactStatus
+	}
+	if c.Name == "" {
+		c.Name = existing.Name
+	}
+	c.UpdatedDateUTC = store.XeroDateNow()
+	h.store.Contacts.Set(id, c)
+
+	if h.dispatcher != nil {
+		h.dispatcher.Enqueue("CONTACT.UPDATE", map[string]any{
+			"resourceId": id, "eventType": "CONTACT.UPDATE",
+		})
+	}
+
+	xeroJSON(w, http.StatusOK, map[string]any{"Contacts": []store.Contact{c}})
+}
+
+func (h *Handler) DeleteContact(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "ContactID")
+	c, ok := h.store.Contacts.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Contact not found")
+		return
+	}
+	c.ContactStatus = "ARCHIVED"
+	c.UpdatedDateUTC = store.XeroDateNow()
+	h.store.Contacts.Set(id, c)
+	xeroJSON(w, http.StatusOK, map[string]any{"Contacts": []store.Contact{c}})
+}

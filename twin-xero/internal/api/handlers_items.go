@@ -49,3 +49,47 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	xeroJSON(w, http.StatusOK, map[string]any{"Items": []store.Item{item}})
 }
+
+func (h *Handler) UpdateItem(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "ItemID")
+	existing, ok := h.store.Items.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Item not found")
+		return
+	}
+
+	var req struct {
+		Items []store.Item `json:"Items"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "Invalid JSON: "+err.Error())
+		return
+	}
+	if len(req.Items) == 0 {
+		xeroError(w, http.StatusBadRequest, "ValidationException", "At least one item is required")
+		return
+	}
+
+	item := req.Items[0]
+	item.ItemID = id
+	if item.Code == "" {
+		item.Code = existing.Code
+	}
+	if item.Name == "" {
+		item.Name = existing.Name
+	}
+	item.UpdatedDateUTC = store.XeroDateNow()
+	h.store.Items.Set(id, item)
+	xeroJSON(w, http.StatusOK, map[string]any{"Items": []store.Item{item}})
+}
+
+func (h *Handler) DeleteItem(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "ItemID")
+	_, ok := h.store.Items.Get(id)
+	if !ok {
+		xeroError(w, http.StatusNotFound, "ValidationException", "Item not found")
+		return
+	}
+	h.store.Items.Delete(id)
+	xeroJSON(w, http.StatusOK, map[string]any{"Items": []store.Item{}})
+}

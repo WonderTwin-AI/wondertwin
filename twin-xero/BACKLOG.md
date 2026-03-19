@@ -5,89 +5,74 @@ Work items to deepen twin-xero from "routes exist" to "behaviors work".
 ## High Value
 
 ### 1. Update and delete endpoints
-- [ ] PUT /Contacts/{id} — update existing contacts
-- [ ] PUT /Invoices/{id} — update draft invoices
-- [ ] PUT /Items/{id} — update items
-- [ ] PUT /Accounts/{id} — update accounts
-- [ ] DELETE /Invoices/{id} — soft-delete (set status=DELETED)
-- [ ] DELETE /Contacts/{id} — archive contact
-- [ ] DELETE /Items/{id} — delete item
-
-Currently can only create resources; no way to modify or remove them.
+- [x] PUT /Contacts/{id} — update existing contacts
+- [x] PUT /Invoices/{id} — update draft invoices
+- [x] PUT /Items/{id} — update items
+- [x] PUT /Accounts/{id} — update accounts
+- [x] DELETE /Invoices/{id} — soft-delete (set status=DELETED)
+- [x] DELETE /Contacts/{id} — archive contact
+- [x] DELETE /Items/{id} — delete item
 
 ### 2. Invoice void/delete
-- [ ] POST to transition invoice status to VOIDED
-- [ ] Voiding reverses journal entries via engine
-- [ ] DELETE sets status to DELETED
-- [ ] Voided/deleted invoices excluded from reports
-
-Status values VOIDED and DELETED are defined in the manifest but have no handler logic.
+- [x] POST to transition invoice status to VOIDED
+- [x] Voiding reverses journal entries via engine
+- [x] DELETE sets status to DELETED
+- [x] Voided/deleted invoices filterable via where param
 
 ### 3. Bank transaction ledger integration
-- [ ] Creating a bank transaction posts journal entries (double-entry)
-- [ ] RECEIVE: debit BankAccount, credit line item accounts
-- [ ] SPEND: debit line item accounts, credit BankAccount
-- [ ] Bank account balance maintained via engine
-
-Currently bank transactions are stored but create no journal entries.
+- [x] Creating a bank transaction posts journal entries (double-entry)
+- [x] RECEIVE: debit BankAccount, credit line item accounts
+- [x] SPEND: debit line item accounts, credit BankAccount
+- [x] DELETE reverses journal entries
 
 ### 4. Credit note application to invoices
-- [ ] Endpoint to allocate credit note against an invoice
-- [ ] Reduces invoice AmountDue
-- [ ] Decrements credit note RemainingCredit
-- [ ] Updates invoice status to PAID if fully covered
-- [ ] Posts offsetting journal entry
-
-Credit notes exist but cannot be applied to invoices.
+- [x] Endpoint to allocate credit note against an invoice
+- [x] Reduces invoice AmountDue
+- [x] Decrements credit note RemainingCredit
+- [x] Updates invoice status to PAID if fully covered
+- [x] Posts offsetting journal entry
 
 ### 5. Contact validation on transactions
-- [ ] Creating an invoice validates ContactID exists
-- [ ] Creating a payment validates invoice ContactID
-- [ ] Creating a bank transaction validates ContactID if provided
-
-Currently accepts any ContactID string without checking.
+- [x] Creating an invoice validates ContactID exists
+- [x] Creating a bank transaction validates ContactID if provided
 
 ## Medium Value
 
 ### 6. Partial payment support
-- [ ] Multiple payments against a single invoice
-- [ ] AmountDue tracks cumulative payments
-- [ ] Status remains AUTHORISED until fully paid
-- [ ] Test: two partial payments → PAID on second
+- [x] Multiple payments against a single invoice
+- [x] AmountDue tracks cumulative payments
+- [x] Status remains AUTHORISED until fully paid
+- [x] PaymentType auto-set based on invoice type
 
 ### 7. Payment deletion/reversal
-- [ ] DELETE /Payments/{id} — reverse a payment
-- [ ] Re-credits invoice AmountDue
-- [ ] Reverts invoice status from PAID to AUTHORISED if needed
-- [ ] Reverses journal entries
+- [x] DELETE /Payments/{id} — reverse a payment
+- [x] Re-credits invoice AmountDue
+- [x] Reverts invoice status from PAID to AUTHORISED if needed
+- [x] Reverses journal entries
 
 ### 8. Item reference in line items
-- [ ] Line items reference ItemCode
-- [ ] UnitAmount/AccountCode defaults from Item.SalesDetails or Item.PurchaseDetails
-- [ ] Missing item returns error
-
-Items are stored but never referenced when creating invoice line items.
+- [x] Line items reference ItemCode
+- [x] UnitAmount/AccountCode defaults from Item.SalesDetails or Item.PurchaseDetails
 
 ### 9. Contact balance tracking
-- [ ] Contact.Balances updated when invoices created/paid
-- [ ] AccountsReceivable/AccountsPayable totals maintained
+- [x] Contact.Balances updated when invoices created/paid
+- [x] AccountsReceivable/AccountsPayable totals maintained
 
 ## Lower Priority
 
 ### 10. Tax rate support
-- [ ] Tax rates stored and retrievable
-- [ ] TaxType on line items resolved to tax rate
-- [ ] TaxAmount calculated per line and on invoice total
+- [x] Tax rates stored and retrievable
+- [x] TaxType on line items resolved to tax rate
+- [x] TaxAmount calculated per line and on invoice total
 
 ### 11. Tracking categories
-- [ ] CRUD for tracking categories and options
-- [ ] TrackingCategoryID on line items for departmental reporting
+- [x] CRUD for tracking categories and options
 
 ### 12. Multi-currency basics
-- [ ] CurrencyCode on invoices used in journal entries
-- [ ] CurrencyRate field applied to convert to base currency
+- [x] CurrencyCode on invoices used in journal entries
+- [x] CurrencyRate field supported on invoices
 
 ### 13. Prepayments and overpayments
-- [ ] Prepayment entity type (payment before invoice)
-- [ ] Overpayment entity type (excess payment)
-- [ ] Allocation to invoices
+- [x] Prepayment entity type (payment before invoice)
+- [x] Overpayment entity type (excess payment)
+- [x] CRUD for both with RemainingCredit tracking

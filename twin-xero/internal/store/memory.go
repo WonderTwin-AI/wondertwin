@@ -16,9 +16,13 @@ type MemoryStore struct {
 	Payments       *pkgstore.Store[Payment]
 	BankTxns       *pkgstore.Store[BankTransaction]
 	ManualJournals *pkgstore.Store[ManualJournal]
-	Items          *pkgstore.Store[Item]
-	Journal        *journal.Journal
-	Clock          *pkgstore.Clock
+	Items               *pkgstore.Store[Item]
+	TaxRates            *pkgstore.Store[TaxRate]
+	TrackingCategories  *pkgstore.Store[TrackingCategory]
+	Prepayments         *pkgstore.Store[Prepayment]
+	Overpayments        *pkgstore.Store[Overpayment]
+	Journal             *journal.Journal
+	Clock               *pkgstore.Clock
 }
 
 // New creates a new MemoryStore with empty state.
@@ -32,8 +36,12 @@ func New() *MemoryStore {
 		Payments:       pkgstore.New[Payment]("pmt"),
 		BankTxns:       pkgstore.New[BankTransaction]("btxn"),
 		ManualJournals: pkgstore.New[ManualJournal]("mj"),
-		Items:          pkgstore.New[Item]("item"),
-		Journal:        journal.New(clock),
+		Items:              pkgstore.New[Item]("item"),
+		TaxRates:           pkgstore.New[TaxRate]("tax"),
+		TrackingCategories: pkgstore.New[TrackingCategory]("tc"),
+		Prepayments:        pkgstore.New[Prepayment]("pp"),
+		Overpayments:       pkgstore.New[Overpayment]("op"),
+		Journal:            journal.New(clock),
 		Clock:          clock,
 	}
 }
@@ -46,7 +54,11 @@ type stateSnapshot struct {
 	Payments       map[string]Payment         `json:"payments"`
 	BankTxns       map[string]BankTransaction `json:"bank_transactions"`
 	ManualJournals map[string]ManualJournal   `json:"manual_journals"`
-	Items          map[string]Item            `json:"items"`
+	Items              map[string]Item              `json:"items"`
+	TaxRates           map[string]TaxRate           `json:"tax_rates"`
+	TrackingCategories map[string]TrackingCategory  `json:"tracking_categories"`
+	Prepayments        map[string]Prepayment        `json:"prepayments"`
+	Overpayments       map[string]Overpayment       `json:"overpayments"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
@@ -59,7 +71,11 @@ func (s *MemoryStore) Snapshot() any {
 		Payments:       s.Payments.Snapshot(),
 		BankTxns:       s.BankTxns.Snapshot(),
 		ManualJournals: s.ManualJournals.Snapshot(),
-		Items:          s.Items.Snapshot(),
+		Items:              s.Items.Snapshot(),
+		TaxRates:           s.TaxRates.Snapshot(),
+		TrackingCategories: s.TrackingCategories.Snapshot(),
+		Prepayments:        s.Prepayments.Snapshot(),
+		Overpayments:       s.Overpayments.Snapshot(),
 	}
 }
 
@@ -77,6 +93,10 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.BankTxns.LoadSnapshot(snap.BankTxns)
 	s.ManualJournals.LoadSnapshot(snap.ManualJournals)
 	s.Items.LoadSnapshot(snap.Items)
+	s.TaxRates.LoadSnapshot(snap.TaxRates)
+	s.TrackingCategories.LoadSnapshot(snap.TrackingCategories)
+	s.Prepayments.LoadSnapshot(snap.Prepayments)
+	s.Overpayments.LoadSnapshot(snap.Overpayments)
 	return nil
 }
 
@@ -90,6 +110,10 @@ func (s *MemoryStore) Reset() {
 	s.BankTxns.Reset()
 	s.ManualJournals.Reset()
 	s.Items.Reset()
+	s.TaxRates.Reset()
+	s.TrackingCategories.Reset()
+	s.Prepayments.Reset()
+	s.Overpayments.Reset()
 	s.Journal.Reset()
 	s.Clock.Reset()
 }

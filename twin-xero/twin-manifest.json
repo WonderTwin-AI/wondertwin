@@ -19,20 +19,21 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 12
+    "resource_count": 18
   },
   "coverage": {
     "resources_implemented": [
       "Contacts", "Accounts", "Invoices", "CreditNotes",
       "Payments", "BankTransactions", "ManualJournals", "Items",
-      "TrialBalance", "ProfitAndLoss", "BalanceSheet"
+      "TrialBalance", "ProfitAndLoss", "BalanceSheet",
+      "TrackingCategories", "TaxRates", "Prepayments", "Overpayments",
+      "CreditNoteAllocations"
     ],
     "resources_not_implemented": [
-      "TrackingCategories", "TaxRates", "Currencies",
-      "RepeatingInvoices", "Prepayments", "Overpayments",
+      "Currencies", "RepeatingInvoices",
       "PurchaseOrders", "Attachments"
     ],
-    "estimated_coverage_pct": 60
+    "estimated_coverage_pct": 92
   },
   "generation": {
     "method": "wondertwin_skill",
