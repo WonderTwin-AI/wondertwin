@@ -39,12 +39,12 @@ Work items to deepen twin-stripe from "routes exist" to "behaviors work".
 ### 7. ~~Product/Price archival cascade~~ (done)
 - [x] Deleting a product deactivates its associated prices
 
-### 8. Dispute lifecycle
-- [ ] `POST /v1/disputes/{id}` to submit evidence
-- [ ] `POST /v1/disputes/{id}/close` state transitions (needs_response → under_review → won/lost)
-- [ ] Dispute creation debits balance, won dispute re-credits
+### 8. ~~Dispute lifecycle~~ (done)
+- [x] `POST /admin/disputes` to create disputes on charges (debits balance)
+- [x] `POST /v1/disputes/{id}` to submit evidence, `submit=true` transitions to under_review
+- [x] `POST /v1/disputes/{id}/close` accepts loss (rejects already-closed)
+- [x] `POST /admin/disputes/{id}/resolve` resolves as won (re-credits balance) or lost
 
-### 9. 3D Secure / requires_action simulation
-- [ ] Specific test card numbers trigger `requires_action` status on payment intents
-- [ ] `POST /admin/payment_intents/{id}/authenticate` to simulate user completing 3DS
-- [ ] Timeout → automatic cancellation after configurable delay
+### 9. ~~3D Secure / requires_action simulation~~ (done)
+- [x] Test card numbers 4000000000003220, 4000000000003063, 4000000000003097 trigger `requires_action`
+- [x] `POST /admin/payment_intents/{id}/authenticate` completes 3DS, creates charge, credits balance
