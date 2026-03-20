@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-smile/internal/store"
 )
@@ -89,6 +91,19 @@ func (h *Handler) RedeemPoints(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Redemptions.Set(redID, redemption)
 
+	// Track redemption event through events engine for telemetry.
+	if h.eventsEngine != nil {
+		h.eventsEngine.Track(context.Background(), &pkgevents.Event{
+			EventName:  "points_redeemed",
+			DistinctID: req.CustomerID,
+			Properties: map[string]any{
+				"points":        req.Points,
+				"value_cents":   valueCents,
+				"redemption_id": redID,
+			},
+		})
+	}
+
 	twincore.JSON(w, http.StatusCreated, redemption)
 }
 
@@ -142,6 +157,18 @@ func (h *Handler) RefundPoints(w http.ResponseWriter, r *http.Request) {
 	// Update redemption status
 	redemption.Status = "refunded"
 	h.store.Redemptions.Set(req.RedemptionID, redemption)
+
+	// Track refund event through events engine for telemetry.
+	if h.eventsEngine != nil {
+		h.eventsEngine.Track(context.Background(), &pkgevents.Event{
+			EventName:  "points_refunded",
+			DistinctID: redemption.CustomerID,
+			Properties: map[string]any{
+				"points":        refundPoints,
+				"redemption_id": req.RedemptionID,
+			},
+		})
+	}
 
 	twincore.JSON(w, http.StatusOK, redemption)
 }

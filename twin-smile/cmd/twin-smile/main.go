@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -41,11 +42,17 @@ func main() {
 		defer emitter.Stop()
 	}
 
+	// Events engine for points activity tracking + telemetry bridge.
+	eventsEngine := pkgevents.NewEngine(
+		pkgevents.WithClock(memStore.Clock),
+		pkgevents.WithTelemetry(emitter),
+	)
+
 	// Quirks engine — loaded at runtime from Content API intelligence.
 	quirksEngine := quirks.NewEngine()
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine, eventsEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

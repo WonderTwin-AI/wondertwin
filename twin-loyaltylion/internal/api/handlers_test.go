@@ -20,7 +20,7 @@ func setupLoyaltyLion(t *testing.T) (*testutil.TwinClient, *testutil.AdminClient
 	cfg := &twincore.Config{Name: "twin-loyaltylion-test"}
 	twin := twincore.New(cfg)
 	mw := twin.Middleware()
-	handler := api.NewHandler(memStore, mw, nil, nil)
+	handler := api.NewHandler(memStore, mw, nil, nil, nil)
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, mw, memStore.Clock)
 	adminHandler.Routes(twin.Router)
