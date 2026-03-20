@@ -10,14 +10,15 @@ import (
 
 // Engine manages workspace entities, their lifecycles, and event emission.
 type Engine struct {
-	mu        sync.RWMutex
-	entities  map[string]map[string]*Entity // type → id → entity
-	comments  map[string][]*Comment         // entityID → comments
-	members   map[string][]*Member          // containerID → members
-	workflows map[string]*WorkflowConfig    // entityType → workflow
-	hooks     WorkspaceHooks
-	clock     *state.Clock
-	idCounter int
+	mu          sync.RWMutex
+	entities    map[string]map[string]*Entity // type → id → entity
+	entityOrder map[string][]string           // type → insertion-ordered IDs
+	comments    map[string][]*Comment         // entityID → comments
+	members     map[string][]*Member          // containerID → members
+	workflows   map[string]*WorkflowConfig    // entityType → workflow
+	hooks       WorkspaceHooks
+	clock       *state.Clock
+	idCounter   int
 }
 
 // Option configures the Engine.
@@ -44,10 +45,11 @@ func WithWorkflow(cfg WorkflowConfig) Option {
 // NewEngine creates a new workspace engine with the given options.
 func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
-		entities:  make(map[string]map[string]*Entity),
-		comments:  make(map[string][]*Comment),
-		members:   make(map[string][]*Member),
-		workflows: make(map[string]*WorkflowConfig),
+		entities:    make(map[string]map[string]*Entity),
+		entityOrder: make(map[string][]string),
+		comments:    make(map[string][]*Comment),
+		members:     make(map[string][]*Member),
+		workflows:   make(map[string]*WorkflowConfig),
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -100,6 +102,9 @@ func (e *Engine) CreateEntity(ctx context.Context, entity *Entity) (*MutationEve
 	// Store entity.
 	if e.entities[entity.Type] == nil {
 		e.entities[entity.Type] = make(map[string]*Entity)
+	}
+	if _, exists := e.entities[entity.Type][entity.ID]; !exists {
+		e.entityOrder[entity.Type] = append(e.entityOrder[entity.Type], entity.ID)
 	}
 	e.entities[entity.Type][entity.ID] = entity
 
@@ -180,6 +185,16 @@ func (e *Engine) DeleteEntity(ctx context.Context, entityType, entityID string) 
 	// Remove entity.
 	delete(e.entities[entityType], entityID)
 
+	// Remove from insertion order.
+	if order, ok := e.entityOrder[entityType]; ok {
+		for i, id := range order {
+			if id == entityID {
+				e.entityOrder[entityType] = append(order[:i], order[i+1:]...)
+				break
+			}
+		}
+	}
+
 	// Remove associated comments.
 	delete(e.comments, entityID)
 
@@ -252,40 +267,47 @@ func (e *Engine) GetEntity(entityType, entityID string) (*Entity, error) {
 	return e.getEntityLocked(entityType, entityID)
 }
 
-// ListEntities returns all entities of the given type.
+// ListEntities returns all entities of the given type in insertion order.
 func (e *Engine) ListEntities(entityType string) []*Entity {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	typeMap := e.entities[entityType]
-	result := make([]*Entity, 0, len(typeMap))
-	for _, ent := range typeMap {
-		result = append(result, ent)
-	}
-	return result
-}
-
-// ListByParent returns all entities of the given type with the specified parent.
-func (e *Engine) ListByParent(entityType, parentID string) []*Entity {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	typeMap := e.entities[entityType]
-	var result []*Entity
-	for _, ent := range typeMap {
-		if ent.ParentID == parentID {
+	order := e.entityOrder[entityType]
+	result := make([]*Entity, 0, len(order))
+	for _, id := range order {
+		if ent, ok := typeMap[id]; ok {
 			result = append(result, ent)
 		}
 	}
 	return result
 }
 
-// FilterEntities returns entities of the given type matching a predicate.
+// ListByParent returns all entities of the given type with the specified parent,
+// in insertion order.
+func (e *Engine) ListByParent(entityType, parentID string) []*Entity {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	typeMap := e.entities[entityType]
+	order := e.entityOrder[entityType]
+	var result []*Entity
+	for _, id := range order {
+		if ent, ok := typeMap[id]; ok && ent.ParentID == parentID {
+			result = append(result, ent)
+		}
+	}
+	return result
+}
+
+// FilterEntities returns entities of the given type matching a predicate,
+// in insertion order.
 func (e *Engine) FilterEntities(entityType string, predicate func(*Entity) bool) []*Entity {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	typeMap := e.entities[entityType]
+	order := e.entityOrder[entityType]
 	var result []*Entity
-	for _, ent := range typeMap {
-		if predicate(ent) {
+	for _, id := range order {
+		if ent, ok := typeMap[id]; ok && predicate(ent) {
 			result = append(result, ent)
 		}
 	}
