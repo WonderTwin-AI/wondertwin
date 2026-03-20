@@ -14,12 +14,14 @@ const (
 
 // Event is the base telemetry event envelope.
 type Event struct {
-	EventType   EventType `json:"event_type"`
-	Twin        string    `json:"twin"`
-	TwinVersion string    `json:"twin_version"`
-	OrgID       string    `json:"org_id"`
-	Timestamp   int64     `json:"timestamp"`
-	Payload     any       `json:"payload"`
+	EventID       string    `json:"event_id,omitempty"`
+	EventType     EventType `json:"event_type"`
+	Twin          string    `json:"twin"`
+	TwinVersion   string    `json:"twin_version"`
+	OrgID         string    `json:"org_id"`
+	Timestamp     int64     `json:"timestamp"`
+	CorrelationID string    `json:"correlation_id,omitempty"`
+	Payload       any       `json:"payload"`
 }
 
 // HTTPObservation captures the shape of an HTTP request/response pair.
@@ -31,15 +33,20 @@ type HTTPObservation struct {
 	RequestBodyShape  map[string]string `json:"request_body_shape,omitempty"`
 	ResponseBodyShape map[string]string `json:"response_body_shape,omitempty"`
 	ErrorCode         string            `json:"error_code,omitempty"`
+	Resource          string            `json:"resource,omitempty"`
 }
 
-// DomainEvent captures a state transition in a domain engine.
+// DomainEvent captures a behavioral inflection point in a domain engine.
 type DomainEvent struct {
-	Engine     string `json:"engine"`
-	Hook       string `json:"hook"`
-	EntityType string `json:"entity_type,omitempty"`
-	StateFrom  string `json:"state_from,omitempty"`
-	StateTo    string `json:"state_to,omitempty"`
+	Engine     string         `json:"engine"`
+	Hook       string         `json:"hook"`
+	Resource   string         `json:"resource,omitempty"`
+	Action     string         `json:"action,omitempty"`
+	EntityType string         `json:"entity_type,omitempty"`
+	EntityID   string         `json:"entity_id,omitempty"`
+	StateFrom  string         `json:"state_from,omitempty"`
+	StateTo    string         `json:"state_to,omitempty"`
+	Context    map[string]any `json:"context,omitempty"`
 }
 
 // ScenarioResult captures the outcome of a scenario run.
