@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/api"
@@ -35,11 +36,15 @@ func main() {
 		defer emitter.Stop()
 	}
 
-	apiHandler := api.NewHandler(memStore, emitter)
+	// Quirks engine — loaded at runtime from Content API intelligence.
+	quirksEngine := quirks.NewEngine()
+
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
 	apiHandler.Routes(twin.Router)
 
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	if cfg.SeedFile != "" {

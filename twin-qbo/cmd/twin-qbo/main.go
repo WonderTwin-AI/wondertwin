@@ -18,6 +18,7 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -78,14 +79,18 @@ func main() {
 		ledger.WithClock(memStore.Clock),
 	)
 
+	// Quirks engine — loaded at runtime from Content API intelligence.
+	quirksEngine := quirks.NewEngine()
+
 	// API handlers.
-	apiHandler := api.NewHandler(memStore, engine, dispatcher, twin.Middleware(), emitter)
+	apiHandler := api.NewHandler(memStore, engine, dispatcher, twin.Middleware(), emitter, quirksEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane.
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetFlusher(dispatcher)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided.
