@@ -264,17 +264,25 @@ func cmdUp(manifestPath string) error {
 		return fmt.Errorf("saving pid state: %w", err)
 	}
 
-	// Give twins a moment to bind their ports
+	// Wait for twins to pass health checks (retry with backoff, up to 5s per twin).
 	fmt.Println()
 	fmt.Println("Waiting for health checks...")
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond) // initial grace period
 	fmt.Println()
 
 	allHealthy := true
 	for _, name := range names {
 		twin := m.Twins[name]
-		ok, _ := ac.Health(twin.AdminPort)
-		if ok {
+		healthy := false
+		for attempt := 0; attempt < 10; attempt++ {
+			ok, _ := ac.Health(twin.AdminPort)
+			if ok {
+				healthy = true
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if healthy {
 			fmt.Printf("  %-20s healthy    http://localhost:%d\n", name, twin.Port)
 		} else {
 			fmt.Printf("  %-20s unhealthy  http://localhost:%d\n", name, twin.Port)
