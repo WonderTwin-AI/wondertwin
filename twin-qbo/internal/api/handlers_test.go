@@ -24,7 +24,7 @@ func setupTestHandler() (*Handler, *chi.Mux) {
 	)
 	cfg := &twincore.Config{Name: "test-qbo", Port: 0}
 	twin := twincore.New(cfg)
-	h := NewHandler(memStore, engine, nil, twin.Middleware())
+	h := NewHandler(memStore, engine, nil, twin.Middleware(), nil, nil)
 	r := chi.NewRouter()
 	h.Routes(r)
 	return h, r

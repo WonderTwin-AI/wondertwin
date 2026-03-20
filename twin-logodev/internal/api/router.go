@@ -8,22 +8,31 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 )
 
 // Handler holds logo API state.
 type Handler struct {
-	store *store.MemoryStore
+	store   *store.MemoryStore
+	mw      *twincore.Middleware
+	emitter *telemetry.Emitter
+	quirks  *quirks.Engine
 }
 
 // NewHandler creates a new logo API handler.
-func NewHandler(s *store.MemoryStore) *Handler {
-	return &Handler{store: s}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+	return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
 }
 
 // Routes mounts the Logo.dev-compatible routes.
 func (h *Handler) Routes(r chi.Router) {
+	r.Use(h.mw.FaultInjection)
+	r.Use(quirks.Middleware(h.quirks))
+	r.Use(telemetry.Middleware(h.emitter))
+
 	// Logo.dev uses GET /{domain} with ?token= param
 	r.Get("/{domain}", h.GetLogo)
 
