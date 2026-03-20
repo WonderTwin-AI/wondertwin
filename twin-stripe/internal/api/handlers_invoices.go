@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 )
 
@@ -126,6 +128,22 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.created", mapFromJSON(inv))
+
+	// Track invoice lifecycle through workspace engine for telemetry.
+	if h.wsEngine != nil {
+		h.wsEngine.CreateEntity(context.Background(), &workspace.Entity{
+			ID:     id,
+			Type:   "invoice",
+			Status: "draft",
+			Properties: map[string]any{
+				"customer":          customer,
+				"currency":          inv.Currency,
+				"total":             inv.Total,
+				"collection_method": inv.CollectionMethod,
+			},
+		})
+	}
+
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -191,6 +209,9 @@ func (h *Handler) FinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 	inv.HostedInvoiceURL = fmt.Sprintf("https://invoice.stripe.com/i/%s", id)
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.finalized", mapFromJSON(inv))
+	if h.wsEngine != nil {
+		h.wsEngine.TransitionStatus(context.Background(), "invoice", id, "open")
+	}
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -265,6 +286,9 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.paid", mapFromJSON(inv))
+	if h.wsEngine != nil {
+		h.wsEngine.TransitionStatus(context.Background(), "invoice", id, "paid")
+	}
 	twincore.JSON(w, http.StatusOK, inv)
 }
 
@@ -282,6 +306,9 @@ func (h *Handler) VoidInvoice(w http.ResponseWriter, r *http.Request) {
 	inv.Status = "void"
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.voided", mapFromJSON(inv))
+	if h.wsEngine != nil {
+		h.wsEngine.TransitionStatus(context.Background(), "invoice", id, "void")
+	}
 	twincore.JSON(w, http.StatusOK, inv)
 }
 

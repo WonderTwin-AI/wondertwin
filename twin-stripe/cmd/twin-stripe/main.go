@@ -15,6 +15,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
+	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
@@ -47,6 +48,47 @@ func main() {
 	// Quirks engine — loaded at runtime from Content API intelligence.
 	quirksEngine := quirks.NewEngine()
 
+	// Workspace engine for invoice, subscription, and payment_intent lifecycle telemetry.
+	wsEngine := workspace.NewEngine(
+		workspace.WithClock(memStore.Clock),
+		workspace.WithTelemetry(emitter),
+		workspace.WithWorkflow(workspace.WorkflowConfig{
+			EntityType:     "invoice",
+			InitialStatus:  "draft",
+			TerminalStates: []string{"paid", "void", "uncollectible"},
+			Transitions: map[string][]string{
+				"draft": {"open", "void"},
+				"open":  {"paid", "void", "uncollectible"},
+			},
+		}),
+		workspace.WithWorkflow(workspace.WorkflowConfig{
+			EntityType:     "subscription",
+			InitialStatus:  "active",
+			TerminalStates: []string{"canceled", "incomplete_expired"},
+			Transitions: map[string][]string{
+				"incomplete":         {"active", "incomplete_expired"},
+				"trialing":           {"active", "canceled"},
+				"active":             {"past_due", "canceled", "unpaid", "paused"},
+				"past_due":           {"active", "canceled", "unpaid"},
+				"unpaid":             {"active", "canceled"},
+				"paused":             {"active", "canceled"},
+				"canceled":           {},
+				"incomplete_expired": {},
+			},
+		}),
+		workspace.WithWorkflow(workspace.WorkflowConfig{
+			EntityType:     "payment_intent",
+			InitialStatus:  "requires_payment_method",
+			TerminalStates: []string{"succeeded", "canceled"},
+			Transitions: map[string][]string{
+				"requires_payment_method": {"requires_confirmation", "canceled"},
+				"requires_confirmation":   {"requires_action", "requires_capture", "succeeded", "canceled"},
+				"requires_action":         {"requires_confirmation", "requires_capture", "succeeded", "canceled"},
+				"requires_capture":        {"succeeded", "canceled"},
+			},
+		}),
+	)
+
 	// Webhook secret from env or default
 	webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 	if webhookSecret == "" {
@@ -67,7 +109,7 @@ func main() {
 	dispatcher.SetEndpointProvider(memStore)
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), emitter, quirksEngine)
+	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), emitter, quirksEngine, wsEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
