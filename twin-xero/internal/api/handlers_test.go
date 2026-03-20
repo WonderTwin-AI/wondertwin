@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
@@ -18,9 +18,9 @@ func setupTestHandler() (*Handler, *chi.Mux) {
 	memStore := store.New()
 	clock := memStore.Clock
 	j := journal.New(clock)
-	engine := accounting.NewEngine(
-		accounting.WithJournal(j),
-		accounting.WithClock(clock),
+	engine := ledger.NewEngine(
+		ledger.WithJournal(j),
+		ledger.WithClock(clock),
 	)
 
 	cfg := &twincore.Config{Name: "test-xero", Port: 0}

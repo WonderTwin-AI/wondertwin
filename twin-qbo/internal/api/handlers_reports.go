@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 )
 
 func (h *Handler) TrialBalance(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +80,7 @@ func parseDateParam(s string) time.Time {
 	return t
 }
 
-func reportSectionToQBO(s accounting.ReportSection) map[string]any {
+func reportSectionToQBO(s ledger.ReportSection) map[string]any {
 	var rows []map[string]any
 	for _, row := range s.Rows {
 		rows = append(rows, map[string]any{

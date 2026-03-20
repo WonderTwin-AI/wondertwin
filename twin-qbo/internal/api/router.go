@@ -3,7 +3,7 @@ package api
 
 import (
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/store"
@@ -12,13 +12,13 @@ import (
 // Handler holds all API handler state.
 type Handler struct {
 	store      *store.MemoryStore
-	engine     *accounting.Engine
+	engine     *ledger.Engine
 	dispatcher *webhook.Dispatcher
 	mw         *twincore.Middleware
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, engine *accounting.Engine, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
+func NewHandler(s *store.MemoryStore, engine *ledger.Engine, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
 	return &Handler{store: s, engine: engine, dispatcher: d, mw: mw}
 }
 

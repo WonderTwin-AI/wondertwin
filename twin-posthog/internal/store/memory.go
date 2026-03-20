@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"sync"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all PostHog twin state in memory.
 type MemoryStore struct {
-	Events  *pkgstore.Store[CapturedEvent]
-	Persons *pkgstore.Store[Person]
-	Aliases *pkgstore.Store[AliasMapping]
-	Groups  *pkgstore.Store[Group]
-	Clock   *pkgstore.Clock
+	Events  *pkgstate.Store[CapturedEvent]
+	Persons *pkgstate.Store[Person]
+	Aliases *pkgstate.Store[AliasMapping]
+	Groups  *pkgstate.Store[Group]
+	Clock   *pkgstate.Clock
 
 	mu           sync.RWMutex
 	FeatureFlags map[string]FeatureFlag
@@ -22,11 +22,11 @@ type MemoryStore struct {
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Events:       pkgstore.New[CapturedEvent]("evt"),
-		Persons:      pkgstore.New[Person]("per"),
-		Aliases:      pkgstore.New[AliasMapping]("als"),
-		Groups:       pkgstore.New[Group]("grp"),
-		Clock:        pkgstore.NewClock(),
+		Events:       pkgstate.New[CapturedEvent]("evt"),
+		Persons:      pkgstate.New[Person]("per"),
+		Aliases:      pkgstate.New[AliasMapping]("als"),
+		Groups:       pkgstate.New[Group]("grp"),
+		Clock:        pkgstate.NewClock(),
 		FeatureFlags: make(map[string]FeatureFlag),
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
@@ -29,7 +29,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Register with the accounting engine for ledger tracking.
-	engineAcct := accounting.Account{
+	engineAcct := ledger.Account{
 		ID:       req.AccountID,
 		Code:     req.Code,
 		Name:     req.Name,
@@ -103,52 +103,52 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	xeroJSON(w, http.StatusOK, map[string]any{"Accounts": []store.Account{acct}})
 }
 
-func xeroTypeToEngine(t string) accounting.AccountType {
+func xeroTypeToEngine(t string) ledger.AccountType {
 	switch t {
 	case "ASSET", "BANK", "CURRENT", "FIXED":
-		return accounting.AccountTypeAsset
+		return ledger.AccountTypeAsset
 	case "EQUITY":
-		return accounting.AccountTypeEquity
+		return ledger.AccountTypeEquity
 	case "EXPENSE", "DIRECTCOSTS", "OVERHEADS":
-		return accounting.AccountTypeExpense
+		return ledger.AccountTypeExpense
 	case "LIABILITY", "CURRLIAB", "TERMLIAB":
-		return accounting.AccountTypeLiability
+		return ledger.AccountTypeLiability
 	case "REVENUE", "SALES", "OTHERINCOME":
-		return accounting.AccountTypeRevenue
+		return ledger.AccountTypeRevenue
 	default:
-		return accounting.AccountTypeAsset
+		return ledger.AccountTypeAsset
 	}
 }
 
-func xeroClassToEngine(class, acctType string) accounting.AccountClass {
+func xeroClassToEngine(class, acctType string) ledger.AccountClass {
 	switch class {
 	case "ASSET":
-		return accounting.ClassCurrentAsset
+		return ledger.ClassCurrentAsset
 	case "EQUITY":
-		return accounting.ClassEquity
+		return ledger.ClassEquity
 	case "EXPENSE":
-		return accounting.ClassExpense
+		return ledger.ClassExpense
 	case "LIABILITY":
-		return accounting.ClassCurrentLiability
+		return ledger.ClassCurrentLiability
 	case "REVENUE":
-		return accounting.ClassRevenue
+		return ledger.ClassRevenue
 	default:
 		// Infer from type.
 		switch acctType {
 		case "BANK":
-			return accounting.ClassCurrentAsset
+			return ledger.ClassCurrentAsset
 		case "REVENUE", "SALES":
-			return accounting.ClassRevenue
+			return ledger.ClassRevenue
 		case "DIRECTCOSTS":
-			return accounting.ClassDirectCost
+			return ledger.ClassDirectCost
 		case "EXPENSE", "OVERHEADS":
-			return accounting.ClassExpense
+			return ledger.ClassExpense
 		case "CURRLIAB":
-			return accounting.ClassCurrentLiability
+			return ledger.ClassCurrentLiability
 		case "TERMLIAB":
-			return accounting.ClassLongTermLiab
+			return ledger.ClassLongTermLiab
 		default:
-			return accounting.ClassCurrentAsset
+			return ledger.ClassCurrentAsset
 		}
 	}
 }

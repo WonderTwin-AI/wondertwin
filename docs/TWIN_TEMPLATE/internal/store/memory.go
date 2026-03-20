@@ -3,21 +3,21 @@ package store
 import (
 	"encoding/json"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all twin state in memory.
-// Add a pkgstore.Store field for each resource type your twin implements.
+// Add a pkgstate.Store field for each resource type your twin implements.
 type MemoryStore struct {
-	Resources *pkgstore.Store[Resource]
-	Clock     *pkgstore.Clock
+	Resources *pkgstate.Store[Resource]
+	Clock     *pkgstate.Clock
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Resources: pkgstore.New[Resource]("res"), // Prefix for generated IDs (e.g., "res_abc123")
-		Clock:     pkgstore.NewClock(),
+		Resources: pkgstate.New[Resource]("res"), // Prefix for generated IDs (e.g., "res_abc123")
+		Clock:     pkgstate.NewClock(),
 	}
 }
 

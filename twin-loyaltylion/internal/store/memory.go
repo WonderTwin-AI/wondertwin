@@ -6,19 +6,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all twin state in memory.
 type MemoryStore struct {
-	Merchants      *pkgstore.Store[Merchant]
-	Customers      *pkgstore.Store[Customer]
-	Transactions   *pkgstore.Store[PointsTransaction]
-	Rewards        *pkgstore.Store[Reward]
-	ClaimedRewards *pkgstore.Store[ClaimedReward]
-	Activities     *pkgstore.Store[Activity]
-	ExpiringPoints *pkgstore.Store[ExpiringPoints]
-	Clock          *pkgstore.Clock
+	Merchants      *pkgstate.Store[Merchant]
+	Customers      *pkgstate.Store[Customer]
+	Transactions   *pkgstate.Store[PointsTransaction]
+	Rewards        *pkgstate.Store[Reward]
+	ClaimedRewards *pkgstate.Store[ClaimedReward]
+	Activities     *pkgstate.Store[Activity]
+	ExpiringPoints *pkgstate.Store[ExpiringPoints]
+	Clock          *pkgstate.Clock
 
 	customerCounter      atomic.Int64
 	transactionCounter   atomic.Int64
@@ -31,14 +31,14 @@ type MemoryStore struct {
 // New creates a new MemoryStore.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Merchants:      pkgstore.New[Merchant]("merchant"),
-		Customers:      pkgstore.New[Customer]("cust"),
-		Transactions:   pkgstore.New[PointsTransaction]("txn"),
-		Rewards:        pkgstore.New[Reward]("reward"),
-		ClaimedRewards: pkgstore.New[ClaimedReward]("claim"),
-		Activities:     pkgstore.New[Activity]("act"),
-		ExpiringPoints: pkgstore.New[ExpiringPoints]("exp"),
-		Clock:          pkgstore.NewClock(),
+		Merchants:      pkgstate.New[Merchant]("merchant"),
+		Customers:      pkgstate.New[Customer]("cust"),
+		Transactions:   pkgstate.New[PointsTransaction]("txn"),
+		Rewards:        pkgstate.New[Reward]("reward"),
+		ClaimedRewards: pkgstate.New[ClaimedReward]("claim"),
+		Activities:     pkgstate.New[Activity]("act"),
+		ExpiringPoints: pkgstate.New[ExpiringPoints]("exp"),
+		Clock:          pkgstate.NewClock(),
 	}
 }
 

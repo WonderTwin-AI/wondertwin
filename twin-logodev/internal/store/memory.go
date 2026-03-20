@@ -5,22 +5,22 @@ import (
 	"encoding/json"
 	"time"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all logo twin state.
 type MemoryStore struct {
-	Requests    *pkgstore.Store[LogoRequest]
+	Requests    *pkgstate.Store[LogoRequest]
 	CustomLogos map[string]CustomLogo
-	Clock       *pkgstore.Clock
+	Clock       *pkgstate.Clock
 }
 
 // New creates a new MemoryStore.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Requests:    pkgstore.New[LogoRequest]("logo"),
+		Requests:    pkgstate.New[LogoRequest]("logo"),
 		CustomLogos: make(map[string]CustomLogo),
-		Clock:       pkgstore.NewClock(),
+		Clock:       pkgstate.NewClock(),
 	}
 }
 

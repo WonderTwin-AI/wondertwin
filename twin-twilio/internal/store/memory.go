@@ -3,23 +3,23 @@ package store
 import (
 	"encoding/json"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // MemoryStore holds all Twilio twin state in memory.
 type MemoryStore struct {
-	Messages      *pkgstore.Store[Message]
-	Verifications *pkgstore.Store[Verification]
-	Clock         *pkgstore.Clock
+	Messages      *pkgstate.Store[Message]
+	Verifications *pkgstate.Store[Verification]
+	Clock         *pkgstate.Clock
 	OTPTTLSeconds int // verification code TTL, default 600 (10 min)
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Messages:      pkgstore.New[Message]("SM"),
-		Verifications: pkgstore.New[Verification]("VE"),
-		Clock:         pkgstore.NewClock(),
+		Messages:      pkgstate.New[Message]("SM"),
+		Verifications: pkgstate.New[Verification]("VE"),
+		Clock:         pkgstate.NewClock(),
 		OTPTTLSeconds: 600,
 	}
 }

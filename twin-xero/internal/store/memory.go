@@ -3,44 +3,44 @@ package store
 import (
 	"encoding/json"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 )
 
 // MemoryStore holds all Xero twin state in memory.
 type MemoryStore struct {
-	Contacts       *pkgstore.Store[Contact]
-	Accounts       *pkgstore.Store[Account]
-	Invoices       *pkgstore.Store[Invoice]
-	CreditNotes    *pkgstore.Store[CreditNote]
-	Payments       *pkgstore.Store[Payment]
-	BankTxns       *pkgstore.Store[BankTransaction]
-	ManualJournals *pkgstore.Store[ManualJournal]
-	Items               *pkgstore.Store[Item]
-	TaxRates            *pkgstore.Store[TaxRate]
-	TrackingCategories  *pkgstore.Store[TrackingCategory]
-	Prepayments         *pkgstore.Store[Prepayment]
-	Overpayments        *pkgstore.Store[Overpayment]
+	Contacts       *pkgstate.Store[Contact]
+	Accounts       *pkgstate.Store[Account]
+	Invoices       *pkgstate.Store[Invoice]
+	CreditNotes    *pkgstate.Store[CreditNote]
+	Payments       *pkgstate.Store[Payment]
+	BankTxns       *pkgstate.Store[BankTransaction]
+	ManualJournals *pkgstate.Store[ManualJournal]
+	Items               *pkgstate.Store[Item]
+	TaxRates            *pkgstate.Store[TaxRate]
+	TrackingCategories  *pkgstate.Store[TrackingCategory]
+	Prepayments         *pkgstate.Store[Prepayment]
+	Overpayments        *pkgstate.Store[Overpayment]
 	Journal             *journal.Journal
-	Clock               *pkgstore.Clock
+	Clock               *pkgstate.Clock
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
-	clock := pkgstore.NewClock()
+	clock := pkgstate.NewClock()
 	return &MemoryStore{
-		Contacts:       pkgstore.New[Contact]("con"),
-		Accounts:       pkgstore.New[Account]("acct"),
-		Invoices:       pkgstore.New[Invoice]("inv"),
-		CreditNotes:    pkgstore.New[CreditNote]("cn"),
-		Payments:       pkgstore.New[Payment]("pmt"),
-		BankTxns:       pkgstore.New[BankTransaction]("btxn"),
-		ManualJournals: pkgstore.New[ManualJournal]("mj"),
-		Items:              pkgstore.New[Item]("item"),
-		TaxRates:           pkgstore.New[TaxRate]("tax"),
-		TrackingCategories: pkgstore.New[TrackingCategory]("tc"),
-		Prepayments:        pkgstore.New[Prepayment]("pp"),
-		Overpayments:       pkgstore.New[Overpayment]("op"),
+		Contacts:       pkgstate.New[Contact]("con"),
+		Accounts:       pkgstate.New[Account]("acct"),
+		Invoices:       pkgstate.New[Invoice]("inv"),
+		CreditNotes:    pkgstate.New[CreditNote]("cn"),
+		Payments:       pkgstate.New[Payment]("pmt"),
+		BankTxns:       pkgstate.New[BankTransaction]("btxn"),
+		ManualJournals: pkgstate.New[ManualJournal]("mj"),
+		Items:              pkgstate.New[Item]("item"),
+		TaxRates:           pkgstate.New[TaxRate]("tax"),
+		TrackingCategories: pkgstate.New[TrackingCategory]("tc"),
+		Prepayments:        pkgstate.New[Prepayment]("pp"),
+		Overpayments:       pkgstate.New[Overpayment]("op"),
 		Journal:            journal.New(clock),
 		Clock:          clock,
 	}

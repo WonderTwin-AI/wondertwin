@@ -11,8 +11,8 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/api"
@@ -49,10 +49,10 @@ func main() {
 	// Accounting engine with Xero hooks.
 	xeroHooks := &hooks.XeroHooks{Dispatcher: dispatcher}
 	j := journal.New(memStore.Clock)
-	engine := accounting.NewEngine(
-		accounting.WithJournal(j),
-		accounting.WithHooks(xeroHooks),
-		accounting.WithClock(memStore.Clock),
+	engine := ledger.NewEngine(
+		ledger.WithJournal(j),
+		ledger.WithHooks(xeroHooks),
+		ledger.WithClock(memStore.Clock),
 	)
 
 	// API handlers.

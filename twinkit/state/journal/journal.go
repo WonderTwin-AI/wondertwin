@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
 // EntryType distinguishes debit from credit entries.
@@ -45,13 +45,13 @@ type Transaction struct {
 type Journal struct {
 	mu           sync.RWMutex
 	transactions []Transaction
-	clock        *store.Clock
+	clock        *state.Clock
 	txCounter    int
 	entryCounter int
 }
 
 // New creates a new empty Journal using the given clock for timestamps.
-func New(clock *store.Clock) *Journal {
+func New(clock *state.Clock) *Journal {
 	return &Journal{
 		transactions: make([]Transaction, 0),
 		clock:        clock,

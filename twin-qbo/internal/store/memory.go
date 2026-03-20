@@ -6,79 +6,79 @@ import (
 	"sync/atomic"
 	"time"
 
-	pkgstore "github.com/wondertwin-ai/wondertwin/twinkit/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store/journal"
+	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 )
 
 // MemoryStore holds all QBO twin state in memory.
 type MemoryStore struct {
-	Customers    *pkgstore.Store[Customer]
-	Vendors      *pkgstore.Store[Vendor]
-	Accounts     *pkgstore.Store[Account]
-	Items        *pkgstore.Store[Item]
-	Invoices     *pkgstore.Store[Invoice]
-	Bills        *pkgstore.Store[Bill]
-	Payments     *pkgstore.Store[Payment]
-	BillPayments *pkgstore.Store[BillPayment]
-	CreditMemos  *pkgstore.Store[CreditMemo]
-	VendorCredits *pkgstore.Store[VendorCredit]
-	SalesReceipts *pkgstore.Store[SalesReceipt]
-	Deposits     *pkgstore.Store[Deposit]
-	Transfers    *pkgstore.Store[Transfer]
-	JournalEntries *pkgstore.Store[JournalEntry]
-	Estimates    *pkgstore.Store[Estimate]
-	Purchases    *pkgstore.Store[Purchase]
-	CompanyInfos   *pkgstore.Store[CompanyInfo]
-	Employees      *pkgstore.Store[Employee]
-	Classes        *pkgstore.Store[Class]
-	Departments    *pkgstore.Store[Department]
-	Terms          *pkgstore.Store[Term]
-	PaymentMethods *pkgstore.Store[PaymentMethod]
-	TaxCodes       *pkgstore.Store[TaxCode]
-	TaxRates       *pkgstore.Store[TaxRate]
-	PreferencesStore *pkgstore.Store[Preferences]
-	RefundReceipts   *pkgstore.Store[RefundReceipt]
-	PurchaseOrders   *pkgstore.Store[PurchaseOrder]
-	TimeActivities         *pkgstore.Store[TimeActivity]
-	RecurringTransactions  *pkgstore.Store[RecurringTransaction]
+	Customers    *pkgstate.Store[Customer]
+	Vendors      *pkgstate.Store[Vendor]
+	Accounts     *pkgstate.Store[Account]
+	Items        *pkgstate.Store[Item]
+	Invoices     *pkgstate.Store[Invoice]
+	Bills        *pkgstate.Store[Bill]
+	Payments     *pkgstate.Store[Payment]
+	BillPayments *pkgstate.Store[BillPayment]
+	CreditMemos  *pkgstate.Store[CreditMemo]
+	VendorCredits *pkgstate.Store[VendorCredit]
+	SalesReceipts *pkgstate.Store[SalesReceipt]
+	Deposits     *pkgstate.Store[Deposit]
+	Transfers    *pkgstate.Store[Transfer]
+	JournalEntries *pkgstate.Store[JournalEntry]
+	Estimates    *pkgstate.Store[Estimate]
+	Purchases    *pkgstate.Store[Purchase]
+	CompanyInfos   *pkgstate.Store[CompanyInfo]
+	Employees      *pkgstate.Store[Employee]
+	Classes        *pkgstate.Store[Class]
+	Departments    *pkgstate.Store[Department]
+	Terms          *pkgstate.Store[Term]
+	PaymentMethods *pkgstate.Store[PaymentMethod]
+	TaxCodes       *pkgstate.Store[TaxCode]
+	TaxRates       *pkgstate.Store[TaxRate]
+	PreferencesStore *pkgstate.Store[Preferences]
+	RefundReceipts   *pkgstate.Store[RefundReceipt]
+	PurchaseOrders   *pkgstate.Store[PurchaseOrder]
+	TimeActivities         *pkgstate.Store[TimeActivity]
+	RecurringTransactions  *pkgstate.Store[RecurringTransaction]
 	Journal                *journal.Journal
-	Clock        *pkgstore.Clock
+	Clock        *pkgstate.Clock
 	idCounter    atomic.Uint64
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
-	clock := pkgstore.NewClock()
+	clock := pkgstate.NewClock()
 	return &MemoryStore{
-		Customers:     pkgstore.New[Customer]("cust"),
-		Vendors:       pkgstore.New[Vendor]("vend"),
-		Accounts:      pkgstore.New[Account]("acct"),
-		Items:         pkgstore.New[Item]("item"),
-		Invoices:      pkgstore.New[Invoice]("inv"),
-		Bills:         pkgstore.New[Bill]("bill"),
-		Payments:      pkgstore.New[Payment]("pmt"),
-		BillPayments:  pkgstore.New[BillPayment]("bpmt"),
-		CreditMemos:   pkgstore.New[CreditMemo]("cm"),
-		VendorCredits: pkgstore.New[VendorCredit]("vc"),
-		SalesReceipts: pkgstore.New[SalesReceipt]("sr"),
-		Deposits:      pkgstore.New[Deposit]("dep"),
-		Transfers:     pkgstore.New[Transfer]("xfer"),
-		JournalEntries: pkgstore.New[JournalEntry]("je"),
-		Estimates:     pkgstore.New[Estimate]("est"),
-		Purchases:     pkgstore.New[Purchase]("pur"),
-		CompanyInfos:    pkgstore.New[CompanyInfo]("co"),
-		Employees:       pkgstore.New[Employee]("emp"),
-		Classes:         pkgstore.New[Class]("cls"),
-		Departments:     pkgstore.New[Department]("dept"),
-		Terms:           pkgstore.New[Term]("term"),
-		PaymentMethods:  pkgstore.New[PaymentMethod]("pmeth"),
-		TaxCodes:        pkgstore.New[TaxCode]("tc"),
-		TaxRates:        pkgstore.New[TaxRate]("tr"),
-		PreferencesStore: pkgstore.New[Preferences]("pref"),
-		RefundReceipts:   pkgstore.New[RefundReceipt]("rr"),
-		PurchaseOrders:   pkgstore.New[PurchaseOrder]("po"),
-		TimeActivities:        pkgstore.New[TimeActivity]("ta"),
-		RecurringTransactions: pkgstore.New[RecurringTransaction]("rt"),
+		Customers:     pkgstate.New[Customer]("cust"),
+		Vendors:       pkgstate.New[Vendor]("vend"),
+		Accounts:      pkgstate.New[Account]("acct"),
+		Items:         pkgstate.New[Item]("item"),
+		Invoices:      pkgstate.New[Invoice]("inv"),
+		Bills:         pkgstate.New[Bill]("bill"),
+		Payments:      pkgstate.New[Payment]("pmt"),
+		BillPayments:  pkgstate.New[BillPayment]("bpmt"),
+		CreditMemos:   pkgstate.New[CreditMemo]("cm"),
+		VendorCredits: pkgstate.New[VendorCredit]("vc"),
+		SalesReceipts: pkgstate.New[SalesReceipt]("sr"),
+		Deposits:      pkgstate.New[Deposit]("dep"),
+		Transfers:     pkgstate.New[Transfer]("xfer"),
+		JournalEntries: pkgstate.New[JournalEntry]("je"),
+		Estimates:     pkgstate.New[Estimate]("est"),
+		Purchases:     pkgstate.New[Purchase]("pur"),
+		CompanyInfos:    pkgstate.New[CompanyInfo]("co"),
+		Employees:       pkgstate.New[Employee]("emp"),
+		Classes:         pkgstate.New[Class]("cls"),
+		Departments:     pkgstate.New[Department]("dept"),
+		Terms:           pkgstate.New[Term]("term"),
+		PaymentMethods:  pkgstate.New[PaymentMethod]("pmeth"),
+		TaxCodes:        pkgstate.New[TaxCode]("tc"),
+		TaxRates:        pkgstate.New[TaxRate]("tr"),
+		PreferencesStore: pkgstate.New[Preferences]("pref"),
+		RefundReceipts:   pkgstate.New[RefundReceipt]("rr"),
+		PurchaseOrders:   pkgstate.New[PurchaseOrder]("po"),
+		TimeActivities:        pkgstate.New[TimeActivity]("ta"),
+		RecurringTransactions: pkgstate.New[RecurringTransaction]("rt"),
 		Journal:               journal.New(clock),
 		Clock:         clock,
 	}

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/state"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -56,13 +56,13 @@ type Handler struct {
 	state   StateStore
 	flusher WebhookFlusher
 	mw      *twincore.Middleware
-	clock   *store.Clock
+	clock   *state.Clock
 	config  ConfigProvider
 	quirks  QuirkStore
 }
 
 // NewHandler creates a new admin handler.
-func NewHandler(state StateStore, mw *twincore.Middleware, clock *store.Clock) *Handler {
+func NewHandler(state StateStore, mw *twincore.Middleware, clock *state.Clock) *Handler {
 	return &Handler{
 		state: state,
 		mw:    mw,
