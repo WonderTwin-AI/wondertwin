@@ -6,17 +6,17 @@ package hooks
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
-// QBOHooks implements accounting.AccountingHooks for the QBO twin.
+// QBOHooks implements ledger.AccountingHooks for the QBO twin.
 type QBOHooks struct {
-	accounting.NoOpAccountingHooks
+	ledger.NoOpAccountingHooks
 	Dispatcher *webhook.Dispatcher
 }
 
-func (h *QBOHooks) OnPaymentApplied(_ context.Context, pmt *accounting.Payment, _ *accounting.Document) error {
+func (h *QBOHooks) OnPaymentApplied(_ context.Context, pmt *ledger.Payment, _ *ledger.Document) error {
 	if h.Dispatcher == nil {
 		return nil
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/store"
@@ -18,9 +18,9 @@ import (
 func setupTestHandler() (*Handler, *chi.Mux) {
 	memStore := store.New()
 	j := journal.New(memStore.Clock)
-	engine := accounting.NewEngine(
-		accounting.WithJournal(j),
-		accounting.WithClock(memStore.Clock),
+	engine := ledger.NewEngine(
+		ledger.WithJournal(j),
+		ledger.WithClock(memStore.Clock),
 	)
 	cfg := &twincore.Config{Name: "test-qbo", Port: 0}
 	twin := twincore.New(cfg)

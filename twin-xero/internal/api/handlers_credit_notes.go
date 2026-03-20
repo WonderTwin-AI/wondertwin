@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
@@ -69,10 +69,10 @@ func (h *Handler) processCreditNote(ctx context.Context, cn store.CreditNote) (s
 
 	cn.RemainingCredit = cn.Total
 
-	var engineLineItems []accounting.LineItem
+	var engineLineItems []ledger.LineItem
 	for _, li := range cn.LineItems {
 		acctID := h.resolveAccountCode(li.AccountCode)
-		engineLineItems = append(engineLineItems, accounting.LineItem{
+		engineLineItems = append(engineLineItems, ledger.LineItem{
 			Description: li.Description,
 			AccountID:   acctID,
 			Quantity:    int64(li.Quantity * 100),
@@ -81,10 +81,10 @@ func (h *Handler) processCreditNote(ctx context.Context, cn store.CreditNote) (s
 		})
 	}
 
-	doc := &accounting.Document{
+	doc := &ledger.Document{
 		ID:        cn.CreditNoteID,
-		Type:      accounting.DocTypeCreditNote,
-		Status:    accounting.DocumentStatus(currentStatus),
+		Type:      ledger.DocTypeCreditNote,
+		Status:    ledger.DocumentStatus(currentStatus),
 		ContactID: cn.Contact.ContactID,
 		Currency:  cn.CurrencyCode,
 		LineItems: engineLineItems,
@@ -93,9 +93,9 @@ func (h *Handler) processCreditNote(ctx context.Context, cn store.CreditNote) (s
 		AmountDue: int64(cn.Total * 100),
 		Date:      parseXeroDate(cn.Date),
 	}
-	accounting.ComputeLineItemTotals(doc)
+	ledger.ComputeLineItemTotals(doc)
 
-	transitions := statePathTo(accounting.DocumentStatus(currentStatus), accounting.DocumentStatus(targetStatus))
+	transitions := statePathTo(ledger.DocumentStatus(currentStatus), ledger.DocumentStatus(targetStatus))
 	for _, to := range transitions {
 		if err := h.engine.TransitionDocument(ctx, doc, to); err != nil {
 			return cn, err

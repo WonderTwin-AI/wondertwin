@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
@@ -30,7 +30,7 @@ func (h *Handler) CreateManualJournal(w http.ResponseWriter, r *http.Request) {
 		mj.UpdatedDateUTC = store.XeroDateNow()
 
 		// Build engine manual journal lines.
-		var engineLines []accounting.ManualJournalLine
+		var engineLines []ledger.ManualJournalLine
 		for _, line := range mj.JournalLines {
 			acctID := h.resolveAccountCode(line.AccountCode)
 			var debit, credit int64
@@ -40,7 +40,7 @@ func (h *Handler) CreateManualJournal(w http.ResponseWriter, r *http.Request) {
 			} else if amt < 0 {
 				credit = -amt
 			}
-			engineLines = append(engineLines, accounting.ManualJournalLine{
+			engineLines = append(engineLines, ledger.ManualJournalLine{
 				AccountID:    acctID,
 				Description:  line.Description,
 				DebitAmount:  debit,
@@ -48,7 +48,7 @@ func (h *Handler) CreateManualJournal(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		engineMJ := &accounting.ManualJournal{
+		engineMJ := &ledger.ManualJournal{
 			ID:        mj.ManualJournalID,
 			Narration: mj.Narration,
 			Lines:     engineLines,

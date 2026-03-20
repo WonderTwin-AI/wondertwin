@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/store"
 )
 
@@ -60,7 +60,7 @@ func (h *Handler) CreateOrUpdateAccount(w http.ResponseWriter, r *http.Request) 
 		a.MetaData = h.store.NewMetaData()
 
 		// Register with accounting engine.
-		h.engine.CreateAccount(accounting.Account{
+		h.engine.CreateAccount(ledger.Account{
 			ID:       a.Id,
 			Code:     a.AcctNum,
 			Name:     a.Name,
@@ -103,47 +103,47 @@ func classifyAccountType(acctType string) string {
 	}
 }
 
-func qboTypeToEngine(t string) accounting.AccountType {
+func qboTypeToEngine(t string) ledger.AccountType {
 	switch t {
 	case "Bank", "Accounts Receivable", "Other Current Asset", "Fixed Asset", "Other Asset":
-		return accounting.AccountTypeAsset
+		return ledger.AccountTypeAsset
 	case "Accounts Payable", "Credit Card", "Other Current Liability", "Long Term Liability":
-		return accounting.AccountTypeLiability
+		return ledger.AccountTypeLiability
 	case "Equity":
-		return accounting.AccountTypeEquity
+		return ledger.AccountTypeEquity
 	case "Income", "Other Income":
-		return accounting.AccountTypeRevenue
+		return ledger.AccountTypeRevenue
 	case "Cost of Goods Sold", "Expense", "Other Expense":
-		return accounting.AccountTypeExpense
+		return ledger.AccountTypeExpense
 	default:
-		return accounting.AccountTypeAsset
+		return ledger.AccountTypeAsset
 	}
 }
 
-func qboClassToEngine(acctType string) accounting.AccountClass {
+func qboClassToEngine(acctType string) ledger.AccountClass {
 	switch acctType {
 	case "Bank", "Accounts Receivable", "Other Current Asset":
-		return accounting.ClassCurrentAsset
+		return ledger.ClassCurrentAsset
 	case "Fixed Asset", "Other Asset":
-		return accounting.ClassFixedAsset
+		return ledger.ClassFixedAsset
 	case "Accounts Payable", "Credit Card", "Other Current Liability":
-		return accounting.ClassCurrentLiability
+		return ledger.ClassCurrentLiability
 	case "Long Term Liability":
-		return accounting.ClassLongTermLiab
+		return ledger.ClassLongTermLiab
 	case "Equity":
-		return accounting.ClassEquity
+		return ledger.ClassEquity
 	case "Income":
-		return accounting.ClassRevenue
+		return ledger.ClassRevenue
 	case "Other Income":
-		return accounting.ClassOtherIncome
+		return ledger.ClassOtherIncome
 	case "Cost of Goods Sold":
-		return accounting.ClassDirectCost
+		return ledger.ClassDirectCost
 	case "Expense":
-		return accounting.ClassExpense
+		return ledger.ClassExpense
 	case "Other Expense":
-		return accounting.ClassOtherExpense
+		return ledger.ClassOtherExpense
 	default:
-		return accounting.ClassCurrentAsset
+		return ledger.ClassCurrentAsset
 	}
 }
 

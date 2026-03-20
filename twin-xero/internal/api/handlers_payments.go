@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
@@ -35,7 +35,7 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 
 		// Determine which document this payment applies to.
 		var docID string
-		var docType accounting.DocumentType
+		var docType ledger.DocumentType
 		if pmt.Invoice != nil && pmt.Invoice.InvoiceID != "" {
 			docID = pmt.Invoice.InvoiceID
 			// Determine type from stored invoice.
@@ -45,9 +45,9 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if inv.Type == "ACCPAY" {
-				docType = accounting.DocTypeBill
+				docType = ledger.DocTypeBill
 			} else {
-				docType = accounting.DocTypeInvoice
+				docType = ledger.DocTypeInvoice
 			}
 
 			if pmt.PaymentType == "" {
@@ -59,7 +59,7 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Apply via engine.
-			enginePmt := &accounting.Payment{
+			enginePmt := &ledger.Payment{
 				ID:            pmt.PaymentID,
 				DocumentID:    docID,
 				DocumentType:  docType,
@@ -70,10 +70,10 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Build engine doc from stored invoice.
-			doc := &accounting.Document{
+			doc := &ledger.Document{
 				ID:         inv.InvoiceID,
 				Type:       docType,
-				Status:     accounting.DocumentStatus(inv.Status),
+				Status:     ledger.DocumentStatus(inv.Status),
 				Currency:   inv.CurrencyCode,
 				Total:      int64(inv.Total * 100),
 				AmountPaid: int64(inv.AmountPaid * 100),

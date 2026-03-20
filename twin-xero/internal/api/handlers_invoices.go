@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
@@ -118,9 +118,9 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 	}
 
 	// Build engine document for state transitions.
-	docType := accounting.DocTypeInvoice
+	docType := ledger.DocTypeInvoice
 	if inv.Type == "ACCPAY" {
-		docType = accounting.DocTypeBill
+		docType = ledger.DocTypeBill
 	}
 
 	// If updating an existing invoice, get current state.
@@ -136,10 +136,10 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 	inv.AmountDue = inv.Total - inv.AmountPaid
 
 	// Build engine line items.
-	var engineLineItems []accounting.LineItem
+	var engineLineItems []ledger.LineItem
 	for _, li := range inv.LineItems {
 		acctID := h.resolveAccountCode(li.AccountCode)
-		engineLineItems = append(engineLineItems, accounting.LineItem{
+		engineLineItems = append(engineLineItems, ledger.LineItem{
 			Description: li.Description,
 			AccountID:   acctID,
 			Quantity:    int64(li.Quantity * 100),
@@ -148,10 +148,10 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 		})
 	}
 
-	doc := &accounting.Document{
+	doc := &ledger.Document{
 		ID:        inv.InvoiceID,
 		Type:      docType,
-		Status:    accounting.DocumentStatus(currentStatus),
+		Status:    ledger.DocumentStatus(currentStatus),
 		ContactID: inv.Contact.ContactID,
 		Currency:  inv.CurrencyCode,
 		LineItems: engineLineItems,
@@ -162,15 +162,15 @@ func (h *Handler) processInvoice(ctx context.Context, inv store.Invoice) (store.
 		Date:      parseXeroDate(inv.Date),
 		DueDate:   parseXeroDate(inv.DueDate),
 	}
-	accounting.ComputeLineItemTotals(doc)
+	ledger.ComputeLineItemTotals(doc)
 	doc.AmountDue = doc.Total - doc.AmountPaid
 
 	// Walk through state transitions.
-	transitions := statePathTo(accounting.DocumentStatus(currentStatus), accounting.DocumentStatus(targetStatus))
+	transitions := statePathTo(ledger.DocumentStatus(currentStatus), ledger.DocumentStatus(targetStatus))
 	for _, to := range transitions {
 		// PAID → VOIDED: the engine considers PAID terminal, so handle directly.
-		if doc.Status == accounting.StatusPaid && to == accounting.StatusVoided {
-			doc.Status = accounting.StatusVoided
+		if doc.Status == ledger.StatusPaid && to == ledger.StatusVoided {
+			doc.Status = ledger.StatusVoided
 			continue
 		}
 		if err := h.engine.TransitionDocument(ctx, doc, to); err != nil {
@@ -273,25 +273,25 @@ func (h *Handler) DeleteInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 // statePathTo returns the intermediate states to walk from→to.
-func statePathTo(from, to accounting.DocumentStatus) []accounting.DocumentStatus {
+func statePathTo(from, to ledger.DocumentStatus) []ledger.DocumentStatus {
 	if from == to {
 		return nil
 	}
-	path := map[accounting.DocumentStatus]map[accounting.DocumentStatus][]accounting.DocumentStatus{
-		accounting.StatusDraft: {
-			accounting.StatusSubmitted:  {accounting.StatusSubmitted},
-			accounting.StatusAuthorised: {accounting.StatusSubmitted, accounting.StatusAuthorised},
-			accounting.StatusDeleted:    {accounting.StatusDeleted},
+	path := map[ledger.DocumentStatus]map[ledger.DocumentStatus][]ledger.DocumentStatus{
+		ledger.StatusDraft: {
+			ledger.StatusSubmitted:  {ledger.StatusSubmitted},
+			ledger.StatusAuthorised: {ledger.StatusSubmitted, ledger.StatusAuthorised},
+			ledger.StatusDeleted:    {ledger.StatusDeleted},
 		},
-		accounting.StatusSubmitted: {
-			accounting.StatusAuthorised: {accounting.StatusAuthorised},
-			accounting.StatusDeleted:    {accounting.StatusDeleted},
+		ledger.StatusSubmitted: {
+			ledger.StatusAuthorised: {ledger.StatusAuthorised},
+			ledger.StatusDeleted:    {ledger.StatusDeleted},
 		},
-		accounting.StatusAuthorised: {
-			accounting.StatusVoided: {accounting.StatusVoided},
+		ledger.StatusAuthorised: {
+			ledger.StatusVoided: {ledger.StatusVoided},
 		},
-		accounting.StatusPaid: {
-			accounting.StatusVoided: {accounting.StatusVoided},
+		ledger.StatusPaid: {
+			ledger.StatusVoided: {ledger.StatusVoided},
 		},
 	}
 	if paths, ok := path[from]; ok {
@@ -300,7 +300,7 @@ func statePathTo(from, to accounting.DocumentStatus) []accounting.DocumentStatus
 		}
 	}
 	// Direct transition attempt (may fail in engine).
-	return []accounting.DocumentStatus{to}
+	return []ledger.DocumentStatus{to}
 }
 
 func (h *Handler) resolveAccountCode(code string) string {

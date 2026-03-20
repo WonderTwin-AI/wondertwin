@@ -1,7 +1,7 @@
 // Package accounting provides an accounting ledger engine that enforces
 // double-entry bookkeeping, document state machines, period locking, and
 // financial report generation. Platform-specific behavior is delegated to hooks.
-package accounting
+package ledger
 
 import "time"
 

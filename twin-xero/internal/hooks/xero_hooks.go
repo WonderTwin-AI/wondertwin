@@ -5,35 +5,35 @@ package hooks
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/ledger/accounting"
+	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
-// XeroHooks implements accounting.AccountingHooks for the Xero twin.
+// XeroHooks implements ledger.AccountingHooks for the Xero twin.
 type XeroHooks struct {
-	accounting.NoOpAccountingHooks
+	ledger.NoOpAccountingHooks
 	Dispatcher *webhook.Dispatcher
 }
 
-func (h *XeroHooks) OnDocumentStateTransition(_ context.Context, doc *accounting.Document, from, to accounting.DocumentStatus) error {
+func (h *XeroHooks) OnDocumentStateTransition(_ context.Context, doc *ledger.Document, from, to ledger.DocumentStatus) error {
 	if h.Dispatcher == nil {
 		return nil
 	}
 
 	var eventCategory string
 	switch doc.Type {
-	case accounting.DocTypeInvoice:
+	case ledger.DocTypeInvoice:
 		eventCategory = "INVOICE"
-	case accounting.DocTypeBill:
+	case ledger.DocTypeBill:
 		eventCategory = "INVOICE" // Xero treats bills as invoices (Type=ACCPAY)
-	case accounting.DocTypeCreditNote:
+	case ledger.DocTypeCreditNote:
 		eventCategory = "CREDITNOTE"
 	default:
 		return nil
 	}
 
 	eventType := eventCategory + ".UPDATE"
-	if from == accounting.StatusDraft && (to == accounting.StatusSubmitted || to == accounting.StatusDraft) {
+	if from == ledger.StatusDraft && (to == ledger.StatusSubmitted || to == ledger.StatusDraft) {
 		eventType = eventCategory + ".CREATE"
 	}
 
@@ -45,7 +45,7 @@ func (h *XeroHooks) OnDocumentStateTransition(_ context.Context, doc *accounting
 	return nil
 }
 
-func (h *XeroHooks) OnPaymentApplied(_ context.Context, pmt *accounting.Payment, _ *accounting.Document) error {
+func (h *XeroHooks) OnPaymentApplied(_ context.Context, pmt *ledger.Payment, _ *ledger.Document) error {
 	if h.Dispatcher == nil {
 		return nil
 	}
