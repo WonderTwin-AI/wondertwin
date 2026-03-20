@@ -10,6 +10,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
+	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 )
 
@@ -20,11 +21,12 @@ type Handler struct {
 	mw         *twincore.Middleware
 	emitter    *telemetry.Emitter
 	quirks     *quirks.Engine
+	wsEngine   *workspace.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
-	return &Handler{store: s, dispatcher: d, mw: mw, emitter: em, quirks: qe}
+func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine, ws *workspace.Engine) *Handler {
+	return &Handler{store: s, dispatcher: d, mw: mw, emitter: em, quirks: qe, wsEngine: ws}
 }
 
 // Routes mounts the Stripe v1 API routes.
