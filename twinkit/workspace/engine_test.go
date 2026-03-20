@@ -241,6 +241,45 @@ func TestWorkflow_NoWorkflowAllowsAnyStatus(t *testing.T) {
 	}
 }
 
+// --- Insertion Order ---
+
+func TestListEntities_InsertionOrder(t *testing.T) {
+	e := newTestEngine()
+
+	ids := []string{"charlie", "alpha", "bravo"}
+	for _, id := range ids {
+		e.CreateEntity(ctx(), &Entity{ID: id, Type: "user", Properties: map[string]any{"name": id}})
+	}
+
+	result := e.ListEntities("user")
+	if len(result) != 3 {
+		t.Fatalf("expected 3, got %d", len(result))
+	}
+	for i, ent := range result {
+		if ent.ID != ids[i] {
+			t.Errorf("position %d: got %q, want %q", i, ent.ID, ids[i])
+		}
+	}
+}
+
+func TestListEntities_OrderPreservedAfterDelete(t *testing.T) {
+	e := newTestEngine()
+
+	e.CreateEntity(ctx(), &Entity{ID: "a", Type: "msg"})
+	e.CreateEntity(ctx(), &Entity{ID: "b", Type: "msg"})
+	e.CreateEntity(ctx(), &Entity{ID: "c", Type: "msg"})
+
+	e.DeleteEntity(ctx(), "msg", "b")
+
+	result := e.ListEntities("msg")
+	if len(result) != 2 {
+		t.Fatalf("expected 2, got %d", len(result))
+	}
+	if result[0].ID != "a" || result[1].ID != "c" {
+		t.Errorf("order = [%s, %s], want [a, c]", result[0].ID, result[1].ID)
+	}
+}
+
 // --- Container Hierarchy ---
 
 func TestListByParent(t *testing.T) {
