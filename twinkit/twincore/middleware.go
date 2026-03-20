@@ -180,21 +180,25 @@ func (it *IdempotencyTracker) Reset() {
 
 // Middleware provides common middleware functions for all twins.
 type Middleware struct {
-	cfg        *Config
-	logger     *slog.Logger
-	ReqLog     *RequestLog
-	Faults     *FaultRegistry
-	Idempotent *IdempotencyTracker
+	cfg           *Config
+	logger        *slog.Logger
+	ReqLog        *RequestLog
+	Faults        *FaultRegistry
+	Idempotent    *IdempotencyTracker
+	RateLimiter   *RateLimiter
+	TokenRegistry *TokenRegistry
 }
 
 // NewMiddleware creates a new Middleware instance.
 func NewMiddleware(cfg *Config, logger *slog.Logger) *Middleware {
 	return &Middleware{
-		cfg:        cfg,
-		logger:     logger,
-		ReqLog:     NewRequestLog(1000),
-		Faults:     NewFaultRegistry(),
-		Idempotent: NewIdempotencyTracker(),
+		cfg:           cfg,
+		logger:        logger,
+		ReqLog:        NewRequestLog(1000),
+		Faults:        NewFaultRegistry(),
+		Idempotent:    NewIdempotencyTracker(),
+		RateLimiter:   NewRateLimiter(),
+		TokenRegistry: NewTokenRegistry(),
 	}
 }
 
