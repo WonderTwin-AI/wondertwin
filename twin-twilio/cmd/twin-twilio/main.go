@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -42,11 +43,32 @@ func main() {
 		defer emitter.Stop()
 	}
 
+	// Messaging engine for SMS lifecycle + telemetry bridge.
+	msgEngine := messaging.NewEngine(
+		messaging.WithClock(memStore.Clock),
+		messaging.WithTelemetry(emitter),
+		messaging.WithLifecycle(messaging.ChannelSMS, &messaging.Lifecycle{
+			InitialStatus: messaging.StatusQueued,
+			Transitions: map[messaging.MessageStatus][]messaging.MessageStatus{
+				messaging.StatusQueued:    {messaging.StatusSending},
+				messaging.StatusSending:   {messaging.StatusSent, messaging.StatusFailed},
+				messaging.StatusSent:      {messaging.StatusDelivered, messaging.StatusUndelivered},
+				messaging.StatusDelivered: {},
+				messaging.StatusFailed:    {},
+			},
+			AutoAdvance: map[messaging.MessageStatus]messaging.AutoAdvanceConfig{
+				messaging.StatusQueued:  {To: messaging.StatusSending},
+				messaging.StatusSending: {To: messaging.StatusSent},
+				messaging.StatusSent:    {To: messaging.StatusDelivered},
+			},
+		}),
+	)
+
 	// Quirks engine — loaded at runtime from Content API intelligence.
 	quirksEngine := quirks.NewEngine()
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine, msgEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

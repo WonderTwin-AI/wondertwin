@@ -16,7 +16,7 @@ func setupSmile(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-smile-test"}
 	twin := twincore.New(cfg)
-	handler := api.NewHandler(memStore, twin.Middleware(), nil, nil)
+	handler := api.NewHandler(memStore, twin.Middleware(), nil, nil, nil)
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)

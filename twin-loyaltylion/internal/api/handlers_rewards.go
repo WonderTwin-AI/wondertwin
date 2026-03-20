@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 	"github.com/wondertwin-ai/wondertwin/twin-loyaltylion/internal/store"
 )
 
@@ -115,6 +117,22 @@ func (h *Handler) ClaimReward(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.ClaimedRewards.Set(store.ClaimedRewardKey(claimID), claimed)
 
+	// Track claimed reward entity through workspace engine for lifecycle + telemetry.
+	if h.wsEngine != nil {
+		h.wsEngine.CreateEntity(context.Background(), &workspace.Entity{
+			ID:         store.ClaimedRewardKey(claimID),
+			Type:       "claimed_reward",
+			ParentID:   merchantID,
+			ParentType: "customer",
+			Status:     "claimed",
+			Properties: map[string]any{
+				"reward_id":  req.RewardID,
+				"point_cost": totalCost,
+				"multiplier": req.Multiplier,
+			},
+		})
+	}
+
 	twincore.JSON(w, http.StatusCreated, map[string]any{
 		"claimed_reward": claimed,
 	})
@@ -175,6 +193,11 @@ func (h *Handler) RefundClaimedReward(w http.ResponseWriter, r *http.Request) {
 	// Mark as refunded
 	claimed.Refunded = true
 	h.store.ClaimedRewards.Set(store.ClaimedRewardKey(id), claimed)
+
+	// Transition claimed reward to refunded via workspace engine for telemetry.
+	if h.wsEngine != nil {
+		h.wsEngine.TransitionStatus(context.Background(), "claimed_reward", store.ClaimedRewardKey(id), "refunded")
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"claimed_reward": claimed,

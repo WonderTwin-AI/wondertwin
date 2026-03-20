@@ -13,6 +13,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 	"github.com/wondertwin-ai/wondertwin/twin-loyaltylion/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-loyaltylion/internal/store"
 )
@@ -42,11 +43,26 @@ func main() {
 		defer emitter.Stop()
 	}
 
+	// Workspace engine for customer/reward entity lifecycle + telemetry bridge.
+	wsEngine := workspace.NewEngine(
+		workspace.WithClock(memStore.Clock),
+		workspace.WithTelemetry(emitter),
+		workspace.WithWorkflow(workspace.WorkflowConfig{
+			EntityType:     "claimed_reward",
+			InitialStatus:  "claimed",
+			TerminalStates: []string{"refunded"},
+			Transitions: map[string][]string{
+				"claimed":  {"refunded"},
+				"refunded": {},
+			},
+		}),
+	)
+
 	// Quirks engine — loaded at runtime from Content API intelligence.
 	quirksEngine := quirks.NewEngine()
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine, wsEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
 	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -13,15 +14,16 @@ import (
 
 // Handler holds all API handler state.
 type Handler struct {
-	store   *store.MemoryStore
-	mw      *twincore.Middleware
-	emitter *telemetry.Emitter
-	quirks  *quirks.Engine
+	store        *store.MemoryStore
+	mw           *twincore.Middleware
+	emitter      *telemetry.Emitter
+	quirks       *quirks.Engine
+	eventsEngine *pkgevents.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
-	return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine, ee *pkgevents.Engine) *Handler {
+	return &Handler{store: s, mw: mw, emitter: em, quirks: qe, eventsEngine: ee}
 }
 
 // Routes mounts the PostHog API routes and admin extras.

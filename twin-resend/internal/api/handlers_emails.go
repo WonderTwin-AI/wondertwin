@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
 )
@@ -132,6 +134,31 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	}
 
 	h.store.Emails.Set(id, email)
+
+	// Feed through messaging engine for lifecycle hooks + telemetry.
+	if h.msgEngine != nil {
+		body := req.HTML
+		if body == "" {
+			body = req.Text
+		}
+		msg := &messaging.Message{
+			ID:      id,
+			Channel: messaging.ChannelEmail,
+			From:    req.From,
+			To:      req.To,
+			Subject: req.Subject,
+			Body:    body,
+		}
+		h.msgEngine.Send(context.Background(), msg)
+		// Auto-advance through lifecycle to match sim instant delivery.
+		for {
+			evt, _ := h.msgEngine.Advance(context.Background(), id)
+			if evt == nil {
+				break
+			}
+		}
+	}
+
 	return email
 }
 
