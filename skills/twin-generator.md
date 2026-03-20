@@ -1,6 +1,6 @@
 ---
 skill: twin-generator
-skill_version: "2.1"
+skill_version: "3.0"
 schemas:
   provenance.schema.json: "1.1"
   twin-manifest.schema.json: "1.0"
@@ -24,9 +24,96 @@ In addition to the twin source code, generation produces a set of pipeline artif
 
 Before using this skill, ensure you have access to:
 
-1. The WonderTwin shared libraries via `github.com/wondertwin-ai/twinkit` (`twincore`, `store`, `admin`, `webhook`, `testutil`)
+1. The WonderTwin shared libraries via `github.com/wondertwin-ai/twinkit` (`twincore`, `state`, `admin`, `webhook`, `testutil`, and domain engines: `ledger`, `workspace`, `messaging`, `events`, `search`)
 2. The target service's public API documentation or SDK reference
 3. Optionally, the official SDK client library source code for compatibility verification
+
+## Commercial Infrastructure
+
+Every twin MUST integrate with the commercial infrastructure:
+
+### Telemetry (mandatory for all tiers)
+
+Every twin emits anonymized behavioral telemetry via `twinkit/telemetry`. This is not optional — the pricing model requires it for both free and Pro tiers.
+
+**In `main.go`, after creating the twin server:**
+
+```go
+    // Telemetry emitter — always created, enabled via env var or admin config.
+    telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
+    emitter := telemetry.NewEmitter(telemetry.Config{
+        Enabled:      telemetryEnabled,
+        CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
+        IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
+        OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
+        TwinName:     "{name}",
+        TwinVersion:  "0.1.0",
+    })
+    if telemetryEnabled {
+        emitter.Start()
+        defer emitter.Stop()
+    }
+```
+
+**In the route group, add telemetry middleware:**
+
+```go
+    r.Route("/v1", func(r chi.Router) {
+        r.Use(h.authMiddleware)
+        r.Use(h.mw.FaultInjection)
+        r.Use(telemetry.Middleware(emitter))  // Emit HTTP observations
+        // ... resource routes
+    })
+```
+
+### Quirks Engine (Pro tier behavioral intelligence)
+
+Every twin supports runtime behavioral modification via `twinkit/quirks`. Quirk rules are loaded by the CLI from the Content API at startup.
+
+**In `main.go`:**
+
+```go
+    // Quirks engine — loaded at runtime from Content API intelligence.
+    quirksEngine := quirks.NewEngine()
+
+    // Mount quirks middleware INSIDE the API route group.
+    // It sits between auth and the handler, intercepting requests
+    // that match loaded quirk rules.
+```
+
+**In the route group:**
+
+```go
+    r.Route("/v1", func(r chi.Router) {
+        r.Use(h.authMiddleware)
+        r.Use(h.mw.FaultInjection)
+        r.Use(quirks.Middleware(quirksEngine))  // Apply behavioral intelligence
+        r.Use(telemetry.Middleware(emitter))     // Emit HTTP observations
+        // ... resource routes
+    })
+```
+
+**Register quirks engine with admin handler:**
+
+```go
+    adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+    adminHandler.SetQuirkStore(quirksEngine)  // Exposes /admin/quirks endpoints
+```
+
+### Domain Engine Selection
+
+Choose the appropriate twinkit domain engine based on the service category:
+
+| Service category | Engine | Package | When to use |
+|---|---|---|---|
+| Accounting/fintech | Ledger | `twinkit/ledger` | Double-entry bookkeeping, financial reports |
+| Email/SMS/notifications | Messaging | `twinkit/messaging` | Message lifecycle, delivery tracking, suppression |
+| Collaboration/CRM/project mgmt | Workspace | `twinkit/workspace` | Entity CRUD with events, workflows, containment |
+| Analytics/CDP/feature flags | Events | `twinkit/events` | Event ingestion, user profiles, segments |
+| Search platforms | Search | `twinkit/search` | Index management, full-text search, facets |
+| Simple CRUD (payments, etc.) | None | — | Handle directly in handlers (like twin-stripe) |
+
+Twins can compose multiple engines when a platform spans categories (e.g., HubSpot uses workspace + messaging).
 
 ## Inputs
 
@@ -352,7 +439,7 @@ type Contact struct {
 
 #### `internal/store/memory.go`
 
-Implement `MemoryStore` using the generic `pkgstore.Store[T]`.
+Implement `MemoryStore` using the generic `pkgstate.Store[T]`.
 
 **Mandatory interface — every MemoryStore MUST implement `admin.StateStore`:**
 
@@ -371,20 +458,20 @@ package store
 
 import (
     "encoding/json"
-    pkgstore "github.com/wondertwin-ai/twinkit/state"
+    pkgstate "github.com/wondertwin-ai/twinkit/state"
 )
 
 type MemoryStore struct {
-    Contacts  *pkgstore.Store[Contact]
-    Messages  *pkgstore.Store[Message]
-    Clock     *pkgstore.Clock
+    Contacts  *pkgstate.Store[Contact]
+    Messages  *pkgstate.Store[Message]
+    Clock     *pkgstate.Clock
 }
 
 func New() *MemoryStore {
     return &MemoryStore{
-        Contacts: pkgstore.New[Contact]("con"),    // Prefix matches service's ID format
-        Messages: pkgstore.New[Message]("msg"),
-        Clock:    pkgstore.NewClock(),
+        Contacts: pkgstate.New[Contact]("con"),    // Prefix matches service's ID format
+        Messages: pkgstate.New[Message]("msg"),
+        Clock:    pkgstate.NewClock(),
     }
 }
 
@@ -424,8 +511,8 @@ func (s *MemoryStore) Reset() {
 ```
 
 **Rules:**
-- One `pkgstore.Store[T]` per entity type
-- Prefix passed to `pkgstore.New[T]()` should match the service's ID prefix format
+- One `pkgstate.Store[T]` per entity type
+- Prefix passed to `pkgstate.New[T]()` should match the service's ID prefix format
 - `stateSnapshot` struct field names become the JSON keys in seed data files
 - Always nil-check snapshot fields in `LoadState()` to support partial seeding
 - Always reset the Clock in `Reset()`
@@ -442,18 +529,22 @@ package api
 
 import (
     "github.com/go-chi/chi/v5"
+    "github.com/wondertwin-ai/twinkit/quirks"
+    "github.com/wondertwin-ai/twinkit/telemetry"
     "github.com/wondertwin-ai/twinkit/twincore"
     "github.com/{org}/twin-{name}/internal/store"
 )
 
 type Handler struct {
-    store *store.MemoryStore
-    mw    *twincore.Middleware
+    store   *store.MemoryStore
+    mw      *twincore.Middleware
+    emitter *telemetry.Emitter
+    quirks  *quirks.Engine
     // Add dispatcher *webhook.Dispatcher if the service has webhooks
 }
 
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-    return &Handler{store: s, mw: mw}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+    return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
 }
 ```
 
@@ -464,6 +555,8 @@ func (h *Handler) Routes(r chi.Router) {
     r.Route("/v1", func(r chi.Router) {     // Match the real API's base path
         r.Use(h.authMiddleware)              // Auth check
         r.Use(h.mw.FaultInjection)           // Enable fault injection
+        r.Use(quirks.Middleware(h.quirks))    // Apply behavioral intelligence
+        r.Use(telemetry.Middleware(h.emitter)) // Emit HTTP observations
 
         // Resource: Contacts
         r.Get("/contacts", h.ListContacts)
@@ -725,10 +818,13 @@ Follow this EXACT bootstrap pattern:
 package main
 
 import (
+    "log"
     "os"
 
     // Shared WonderTwin packages (from twinkit)
     "github.com/wondertwin-ai/twinkit/admin"
+    "github.com/wondertwin-ai/twinkit/quirks"
+    "github.com/wondertwin-ai/twinkit/telemetry"
     "github.com/wondertwin-ai/twinkit/twincore"
 
     // Twin-specific packages
@@ -749,53 +845,81 @@ func main() {
     // 3. Create store
     memStore := store.New()
 
-    // 4. Create API handler and register routes
-    apiHandler := api.NewHandler(memStore, twin.Middleware())
+    // 4. Set up telemetry emitter (mandatory for all tiers).
+    telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
+    emitter := telemetry.NewEmitter(telemetry.Config{
+        Enabled:      telemetryEnabled,
+        CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
+        IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
+        OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
+        TwinName:     "{name}",
+        TwinVersion:  "0.1.0",
+    })
+    if telemetryEnabled {
+        emitter.Start()
+        defer emitter.Stop()
+    }
+
+    // 5. Set up quirks engine (loaded at runtime from Content API).
+    quirksEngine := quirks.NewEngine()
+
+    // 6. Create API handler and register routes.
+    //    Pass the emitter and quirks engine so they can be wired as middleware.
+    apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
     apiHandler.Routes(twin.Router)
 
-    // 5. Create admin handler and register /admin/* routes
-    //    This provides: /admin/health, /admin/reset, /admin/state,
-    //    /admin/fault/*, /admin/time/*, /admin/webhooks/flush,
-    //    /admin/config (GET/PUT), /admin/quirks (GET/PUT/DELETE)
+    // 7. Create admin handler and register /admin/* routes.
     adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
-    // Optionally wire in config and quirk providers:
-    // adminHandler.SetConfigProvider(myConfigProvider)
-    // adminHandler.SetQuirkStore(myQuirkStore)
+    adminHandler.SetConfigProvider(twin)
+    adminHandler.SetQuirkStore(quirksEngine)  // Exposes /admin/quirks endpoints
     adminHandler.Routes(twin.Router)
 
-    // 6. Load seed data if provided via --seed-file flag
+    // 8. Load seed data if provided via --seed-file flag.
     if cfg.SeedFile != "" {
         data, err := os.ReadFile(cfg.SeedFile)
-        if err == nil {
+        if err != nil {
+            log.Printf("warn: failed to read seed file: %v", err)
+        } else {
             memStore.LoadState(data)
         }
     }
 
-    // 7. Start server (blocks until SIGTERM)
-    twin.Serve()
+    // 9. Start server (blocks until SIGTERM).
+    twin.Logger.Info("twin-{name} ready",
+        "port", cfg.Port,
+    )
+    if err := twin.Serve(); err != nil {
+        log.Fatalf("server error: %v", err)
+    }
 }
 ```
 
-**For twins WITH webhooks, insert between steps 3 and 4:**
+**For twins WITH webhooks, insert between steps 3 and 5:**
 
 ```go
-    // 4a. Set up webhook dispatcher
+    // 3a. Set up webhook dispatcher
+    webhookSecret := os.Getenv("{SERVICE}_WEBHOOK_SECRET")
+    if webhookSecret == "" {
+        webhookSecret = "whsec_test_default"
+    }
     dispatcher := pkgwebhook.NewDispatcher(pkgwebhook.Config{
         URL:         cfg.WebhookURL,
-        Secret:      "whsec_test_default",    // Default test secret
+        Secret:      webhookSecret,
         Signer:      twinwebhook.NewServiceSigner(),
         Logger:      twin.Logger,
-        EventPrefix: "{evt_prefix}",           // Match the service's event ID prefix
+        EventPrefix: "{evt_prefix}",
         AutoDeliver: cfg.WebhookURL != "",
     })
 
-    // 4b. Create API handler WITH dispatcher
-    apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware())
+    // 6. Create API handler WITH dispatcher, emitter, and quirks
+    apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), emitter, quirksEngine)
     apiHandler.Routes(twin.Router)
 
-    // 5. Create admin handler with webhook flusher
+    // 7. Create admin handler with webhook flusher and quirks
     adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
-    adminHandler.SetFlusher(dispatcher)        // Enables POST /admin/webhooks/flush
+    adminHandler.SetFlusher(dispatcher)
+    adminHandler.SetConfigProvider(twin)
+    adminHandler.SetQuirkStore(quirksEngine)
     adminHandler.Routes(twin.Router)
 ```
 
@@ -1316,6 +1440,14 @@ Before considering a twin complete, verify:
 - [ ] Provenance `sources` accurately records what was used during generation
 - [ ] Provenance `build` number is incremented for each change
 
+**Commercial infrastructure (mandatory):**
+- [ ] Telemetry emitter created and started in `main.go`
+- [ ] `telemetry.Middleware(emitter)` applied in route group
+- [ ] Quirks engine created in `main.go`
+- [ ] `quirks.Middleware(quirksEngine)` applied in route group
+- [ ] `adminHandler.SetQuirkStore(quirksEngine)` called
+- [ ] Telemetry env vars read: `WT_TELEMETRY_REQUIRED`, `WT_TELEMETRY_COLLECTOR_URL`, `WT_TELEMETRY_INGEST_KEY`, `WT_TELEMETRY_ORG_ID`
+
 **Webhooks (if applicable):**
 - [ ] Signer implements `webhook.Signer`, dispatcher integrated
 - [ ] `adminHandler.SetFlusher(dispatcher)` called
@@ -1470,4 +1602,8 @@ After generating a new twin, add it to this list in the same PR. After removing 
 18. **Forgetting to update the CI twin list** — `.github/workflows/ci.yml` has a hardcoded list of twins to build. Adding or removing a twin without updating this list breaks CI for all PRs
 19. **Assuming 1 endpoint = 1 operation** — analytics services (PostHog, Segment, Amplitude) route multiple logical operations through a single endpoint via event type discrimination. Analyze the SDK to identify all message types sent through shared endpoints
 20. **Not creating admin endpoints for derived entities** — when a single endpoint creates multiple entity types (e.g., `/capture` creates events, persons, aliases, and groups), each entity type needs its own admin endpoint for test observability
-21. **Shipping code without updating `twin-manifest.json`** — every PR that adds, removes, or changes resources MUST update the manifest in the same PR. This includes `coverage.resources_implemented`, `resources_not_implemented`, `estimated_coverage_pct`, `service_surface.resource_count`, and `description`. A PR that adds handlers but doesn't update the manifest is incomplete
+21. **Not setting up telemetry emitter** — every twin MUST create and start a telemetry emitter in main.go. Telemetry is mandatory for all tiers. Twins without telemetry will not be accepted.
+22. **Not mounting quirks middleware** — every twin MUST mount `quirks.Middleware()` in the route group. Without it, Pro tier behavioral intelligence has no delivery mechanism.
+23. **Mounting telemetry/quirks middleware outside the route group** — both must be INSIDE the route group (after auth, after fault injection) so they only fire on API requests, not admin endpoints.
+24. **Not registering quirks engine with admin handler** — `adminHandler.SetQuirkStore(quirksEngine)` is required so the CLI can load quirk rules via `POST /admin/quirks/load`.
+25. **Shipping code without updating `twin-manifest.json`** — every PR that adds, removes, or changes resources MUST update the manifest in the same PR. This includes `coverage.resources_implemented`, `resources_not_implemented`, `estimated_coverage_pct`, `service_surface.resource_count`, and `description`. A PR that adds handlers but doesn't update the manifest is incomplete
