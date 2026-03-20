@@ -15,7 +15,7 @@ import (
 func main() {
 	cfg := twincore.ParseFlags("twin-logodev")
 	if cfg.Port == 0 {
-		cfg.Port = 4116
+		cfg.Port = 4117
 	}
 
 	twin := twincore.New(cfg)
