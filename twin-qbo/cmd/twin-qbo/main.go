@@ -19,6 +19,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state/journal"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-qbo/internal/api"
@@ -36,6 +37,21 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
+	// Telemetry emitter — always created, enabled via env var or admin config.
+	telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
+	emitter := telemetry.NewEmitter(telemetry.Config{
+		Enabled:      telemetryEnabled,
+		CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
+		IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
+		OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
+		TwinName:     "qbo",
+		TwinVersion:  "0.3.0",
+	})
+	if telemetryEnabled {
+		emitter.Start()
+		defer emitter.Stop()
+	}
+
 	// Webhook verifier token from env or default.
 	verifierToken := os.Getenv("QBO_WEBHOOK_VERIFIER")
 	if verifierToken == "" {
@@ -52,17 +68,18 @@ func main() {
 		AutoDeliver: cfg.WebhookURL != "",
 	})
 
-	// Accounting engine with QBO hooks.
+	// Accounting engine with QBO hooks + telemetry bridge.
 	qboHooks := &hooks.QBOHooks{Dispatcher: dispatcher}
 	j := journal.New(memStore.Clock)
 	engine := ledger.NewEngine(
 		ledger.WithJournal(j),
 		ledger.WithHooks(qboHooks),
+		ledger.WithTelemetry(emitter),
 		ledger.WithClock(memStore.Clock),
 	)
 
 	// API handlers.
-	apiHandler := api.NewHandler(memStore, engine, dispatcher, twin.Middleware())
+	apiHandler := api.NewHandler(memStore, engine, dispatcher, twin.Middleware(), emitter)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane.

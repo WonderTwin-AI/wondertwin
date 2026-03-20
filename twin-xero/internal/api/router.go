@@ -4,6 +4,7 @@ package api
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/ledger"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
@@ -15,11 +16,12 @@ type Handler struct {
 	engine     *ledger.Engine
 	dispatcher *webhook.Dispatcher
 	mw         *twincore.Middleware
+	emitter    *telemetry.Emitter
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, engine *ledger.Engine, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, engine: engine, dispatcher: d, mw: mw}
+func NewHandler(s *store.MemoryStore, engine *ledger.Engine, d *webhook.Dispatcher, mw *twincore.Middleware, em *telemetry.Emitter) *Handler {
+	return &Handler{store: s, engine: engine, dispatcher: d, mw: mw, emitter: em}
 }
 
 // Routes mounts the Xero API routes.
@@ -28,6 +30,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(authMiddleware)
 		r.Use(tenantMiddleware)
 		r.Use(h.mw.FaultInjection)
+		r.Use(telemetry.Middleware(h.emitter))
 
 		// Contacts — CRUD only (no engine)
 		r.Post("/Contacts", h.CreateContact)
