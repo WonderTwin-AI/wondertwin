@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-loyaltylion/internal/store"
 )
@@ -20,8 +22,10 @@ const merchantAPIKeyCtxKey contextKey = "merchant_api_key"
 
 // Handler holds all API handler state.
 type Handler struct {
-	store *store.MemoryStore
-	mw    *twincore.Middleware
+	store   *store.MemoryStore
+	mw      *twincore.Middleware
+	emitter *telemetry.Emitter
+	quirks  *quirks.Engine
 
 	// Rate limit tracking per API key
 	rateMu       sync.Mutex
@@ -34,10 +38,12 @@ type rateCounter struct {
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
 	return &Handler{
 		store:        s,
 		mw:           mw,
+		emitter:      em,
+		quirks:       qe,
 		rateCounters: make(map[string]*rateCounter),
 	}
 }
@@ -48,6 +54,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.authMiddleware)
 		r.Use(h.rateLimitHeaders)
 		r.Use(h.mw.FaultInjection)
+		r.Use(quirks.Middleware(h.quirks))
+		r.Use(telemetry.Middleware(h.emitter))
 
 		// Customers
 		r.Get("/customers", h.ListCustomers)

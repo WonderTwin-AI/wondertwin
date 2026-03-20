@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
@@ -16,11 +18,13 @@ type Handler struct {
 	store      *store.MemoryStore
 	dispatcher *webhook.Dispatcher
 	mw         *twincore.Middleware
+	emitter    *telemetry.Emitter
+	quirks     *quirks.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, dispatcher: d, mw: mw}
+func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+	return &Handler{store: s, dispatcher: d, mw: mw, emitter: em, quirks: qe}
 }
 
 // Routes mounts the Stripe v1 API routes.
@@ -32,6 +36,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
 		r.Use(h.mw.FaultInjection)
+		r.Use(quirks.Middleware(h.quirks))
+		r.Use(telemetry.Middleware(h.emitter))
 
 		// Customers
 		r.Post("/customers", h.CreateCustomer)

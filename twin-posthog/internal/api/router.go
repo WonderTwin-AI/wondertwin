@@ -5,19 +5,23 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )
 
 // Handler holds all API handler state.
 type Handler struct {
-	store *store.MemoryStore
-	mw    *twincore.Middleware
+	store   *store.MemoryStore
+	mw      *twincore.Middleware
+	emitter *telemetry.Emitter
+	quirks  *quirks.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+	return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
 }
 
 // Routes mounts the PostHog API routes and admin extras.
@@ -25,6 +29,8 @@ func (h *Handler) Routes(r chi.Router) {
 	// PostHog capture API routes (minimal auth - accept api_key in body/header)
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
+		r.Use(quirks.Middleware(h.quirks))
+		r.Use(telemetry.Middleware(h.emitter))
 
 		r.Post("/capture", h.CaptureEvent)
 		r.Post("/capture/", h.CaptureEvent)

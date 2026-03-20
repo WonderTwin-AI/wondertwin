@@ -10,6 +10,8 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-smile/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-smile/internal/store"
@@ -24,13 +26,32 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
+	// Telemetry emitter — always created, enabled via env var or admin config.
+	telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
+	emitter := telemetry.NewEmitter(telemetry.Config{
+		Enabled:      telemetryEnabled,
+		CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
+		IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
+		OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
+		TwinName:     "smile",
+		TwinVersion:  "0.1.0",
+	})
+	if telemetryEnabled {
+		emitter.Start()
+		defer emitter.Stop()
+	}
+
+	// Quirks engine — loaded at runtime from Content API intelligence.
+	quirksEngine := quirks.NewEngine()
+
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware())
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided
