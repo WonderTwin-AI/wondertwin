@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -18,6 +19,7 @@ type Engine struct {
 	hooks        MessagingHooks
 	clock        *state.Clock
 	idCounter    int
+	rng          *rand.Rand // deterministic random for weighted outcomes
 }
 
 // Option configures the Engine.
@@ -38,6 +40,11 @@ func WithLifecycle(channel ChannelType, lc *Lifecycle) Option {
 	return func(e *Engine) { e.lifecycles[channel] = lc }
 }
 
+// WithSeed sets the random seed for deterministic weighted outcomes.
+func WithSeed(seed int64) Option {
+	return func(e *Engine) { e.rng = rand.New(rand.NewSource(seed)) }
+}
+
 // NewEngine creates a new messaging engine with the given options.
 func NewEngine(opts ...Option) *Engine {
 	e := &Engine{
@@ -51,6 +58,9 @@ func NewEngine(opts ...Option) *Engine {
 	}
 	if e.clock == nil {
 		e.clock = state.NewClock()
+	}
+	if e.rng == nil {
+		e.rng = rand.New(rand.NewSource(42))
 	}
 	return e
 }
@@ -157,7 +167,13 @@ func (e *Engine) Advance(ctx context.Context, msgID string) (*DeliveryEvent, err
 		return nil, nil // no auto-advance from this status
 	}
 
-	return e.transitionLocked(ctx, msg, aa.To)
+	// Pick target status.
+	target := aa.To
+	if len(aa.Outcomes) > 0 {
+		target = e.pickWeightedStatus(aa.Outcomes)
+	}
+
+	return e.transitionLocked(ctx, msg, target)
 }
 
 // Transition explicitly moves a message to a specific status.
@@ -253,7 +269,11 @@ func (e *Engine) AdvanceAll(ctx context.Context) ([]*DeliveryEvent, error) {
 			continue
 		}
 		aa := lc.AutoAdvance[msg.Status]
-		event, err := e.transitionLocked(ctx, msg, aa.To)
+		target := aa.To
+		if len(aa.Outcomes) > 0 {
+			target = e.pickWeightedStatus(aa.Outcomes)
+		}
+		event, err := e.transitionLocked(ctx, msg, target)
 		if err != nil {
 			return events, err
 		}
@@ -262,6 +282,22 @@ func (e *Engine) AdvanceAll(ctx context.Context) ([]*DeliveryEvent, error) {
 		}
 	}
 	return events, nil
+}
+
+func (e *Engine) pickWeightedStatus(outcomes []WeightedStatus) MessageStatus {
+	var total float64
+	for _, o := range outcomes {
+		total += o.Weight
+	}
+	roll := e.rng.Float64() * total
+	var cumulative float64
+	for _, o := range outcomes {
+		cumulative += o.Weight
+		if roll < cumulative {
+			return o.Status
+		}
+	}
+	return outcomes[len(outcomes)-1].Status
 }
 
 // GetMessage returns a message by ID.
