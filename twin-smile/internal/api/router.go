@@ -3,25 +3,31 @@ package api
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-smile/internal/store"
 )
 
 // Handler holds all API handler state.
 type Handler struct {
-	store *store.MemoryStore
-	mw    *twincore.Middleware
+	store   *store.MemoryStore
+	mw      *twincore.Middleware
+	emitter *telemetry.Emitter
+	quirks  *quirks.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+	return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
 }
 
 // Routes mounts the Smile.io v1 API routes.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
+		r.Use(quirks.Middleware(h.quirks))
+		r.Use(telemetry.Middleware(h.emitter))
 
 		// Customers
 		r.Get("/customers/{id}", h.GetCustomer)
