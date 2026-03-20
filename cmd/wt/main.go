@@ -36,6 +36,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wondertwin-ai/wondertwin/internal/auth"
 	"github.com/wondertwin-ai/wondertwin/internal/cache"
 	"github.com/wondertwin-ai/wondertwin/internal/client"
 	"github.com/wondertwin-ai/wondertwin/internal/config"
@@ -223,9 +224,10 @@ func cmdUp(manifestPath string) error {
 		}
 	}
 
-	// Resolve content for commercial twins (non-fatal)
+	// Resolve content for commercial twins.
+	// When wt-auth is configured, auth failures are fatal — the twin does not start.
 	if err := resolveContent(m); err != nil {
-		fmt.Printf("warn: content resolution: %v\n", err)
+		return fmt.Errorf("content resolution failed: %w", err)
 	}
 
 	pids, _ := procmgr.LoadPids()
@@ -1189,8 +1191,20 @@ func cacheDir() string {
 	return filepath.Join(home, ".wondertwin", "cache")
 }
 
+// authURL returns the wt-auth service URL, checking env override first.
+func authURL() string {
+	if u := os.Getenv("WT_AUTH_URL"); u != "" {
+		return u
+	}
+	return ""
+}
+
 // resolveContent fetches and caches content for all twins in the manifest
 // that have a version set. Returns nil if no license is configured.
+//
+// When wt-auth is configured (WT_AUTH_URL set), this function requests a JIT
+// token for each twin before fetching content. Auth failures are FATAL — the
+// twin does not start. No graceful degradation, no stale cache fallback.
 func resolveContent(m *manifest.Manifest) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -1200,8 +1214,15 @@ func resolveContent(m *manifest.Manifest) error {
 		return nil
 	}
 
-	store := cache.NewStore(cacheDir(), cfg.LicenseKey)
-	cc := content.NewClient(contentURL(), cfg.LicenseKey)
+	cacheStore := cache.NewStore(cacheDir(), cfg.LicenseKey)
+
+	// If wt-auth is configured, use JIT tokens. Otherwise fall back to
+	// direct license key auth (development mode).
+	authEndpoint := authURL()
+	var ac *auth.Client
+	if authEndpoint != "" {
+		ac = auth.NewClient(authEndpoint)
+	}
 
 	for _, name := range m.TwinNames() {
 		twin := m.Twins[name]
@@ -1210,14 +1231,35 @@ func resolveContent(m *manifest.Manifest) error {
 			continue
 		}
 
-		if store.IsValid(name, version) {
+		if cacheStore.IsValid(name, version) {
 			continue
 		}
 
+		// Determine the bearer token for the Content API.
+		bearerToken := cfg.LicenseKey // development mode fallback
+		if ac != nil {
+			// Production mode: request JIT token from wt-auth.
+			tokenResp, err := ac.RequestToken(cfg.LicenseKey, name)
+			if err != nil {
+				// Auth failures are fatal for licensed twins.
+				// No graceful degradation. No stale cache. Twin does not start.
+				if authErr, ok := err.(*auth.AuthError); ok {
+					return fmt.Errorf("authorization failed for %s: %s", name, authErr.Error())
+				}
+				return fmt.Errorf("authorization failed for %s: %v", name, err)
+			}
+			bearerToken = tokenResp.Token
+		}
+
+		cc := content.NewClient(contentURL(), bearerToken)
 		raw, _, err := cc.FetchContent(name, version)
 		if err != nil {
-			// Graceful degradation: check for stale cache
-			_, meta, cacheErr := store.Get(name, version)
+			if ac != nil {
+				// With auth configured, content fetch failures are also fatal.
+				return fmt.Errorf("content fetch failed for %s@%s: %v", name, version, err)
+			}
+			// Development mode: graceful degradation with stale cache.
+			_, meta, cacheErr := cacheStore.Get(name, version)
 			if cacheErr == nil && meta != nil {
 				fmt.Printf("  warn: content fetch failed for %s@%s, using stale cache: %v\n", name, version, err)
 				continue
@@ -1226,7 +1268,7 @@ func resolveContent(m *manifest.Manifest) error {
 			continue
 		}
 
-		if err := store.Put(name, version, raw, 24); err != nil {
+		if err := cacheStore.Put(name, version, raw, 24); err != nil {
 			fmt.Printf("  warn: caching content for %s@%s: %v\n", name, version, err)
 		}
 	}
