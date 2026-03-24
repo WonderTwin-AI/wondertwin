@@ -135,6 +135,12 @@ func TestSmoke_FullPipeline(t *testing.T) {
 	if httpObs.EventID == "" {
 		t.Error("HTTP observation should have an event ID for deduplication")
 	}
+	if httpObs.InstanceID == "" {
+		t.Error("HTTP observation should have an instance ID")
+	}
+	if httpObs.Seq < 1 {
+		t.Errorf("HTTP observation seq = %d, want >= 1", httpObs.Seq)
+	}
 
 	// Verify the HTTP observation payload.
 	payloadBytes, _ := json.Marshal(httpObs.Payload)
@@ -153,10 +159,16 @@ func TestSmoke_FullPipeline(t *testing.T) {
 		t.Error("request body shape should not be nil")
 	}
 	if obs.RequestBodyShape["email"] != "string" {
-		t.Errorf("request body shape email = %q, want string", obs.RequestBodyShape["email"])
+		t.Errorf("request body shape email = %v, want string", obs.RequestBodyShape["email"])
 	}
 	if obs.ResponseBodyShape == nil {
 		t.Error("response body shape should not be nil")
+	}
+	if obs.RequestFieldCount < 1 {
+		t.Errorf("request field count = %d, want >= 1", obs.RequestFieldCount)
+	}
+	if obs.ResponseFieldCount < 1 {
+		t.Errorf("response field count = %d, want >= 1", obs.ResponseFieldCount)
 	}
 
 	// Verify domain event.
@@ -168,6 +180,15 @@ func TestSmoke_FullPipeline(t *testing.T) {
 	}
 	if domainEvt.EventID == "" {
 		t.Error("domain event should have an event ID")
+	}
+	if domainEvt.InstanceID == "" {
+		t.Error("domain event should have an instance ID")
+	}
+	if domainEvt.InstanceID != httpObs.InstanceID {
+		t.Errorf("instance IDs should match: http=%q domain=%q", httpObs.InstanceID, domainEvt.InstanceID)
+	}
+	if domainEvt.Seq <= httpObs.Seq {
+		t.Errorf("domain event seq (%d) should be after http obs seq (%d)", domainEvt.Seq, httpObs.Seq)
 	}
 
 	// Verify the domain event payload.

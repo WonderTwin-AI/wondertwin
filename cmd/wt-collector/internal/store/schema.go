@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_twin ON events(twin, twin_version);
 CREATE INDEX IF NOT EXISTS idx_events_org ON events(org_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type, received_at);
+CREATE INDEX IF NOT EXISTS idx_events_agent ON events(org_id, twin, received_at);
 `
 
 // Open opens (or creates) the collector database and runs migrations.

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -42,6 +43,8 @@ type Emitter struct {
 	orgID         string
 	twinName      string
 	twinVersion   string
+	instanceID    string
+	seq           atomic.Int64
 	batch         []Event
 	client        *http.Client
 	stopCh        chan struct{}
@@ -98,6 +101,7 @@ func NewEmitter(cfg Config) *Emitter {
 		orgID:         cfg.OrgID,
 		twinName:      cfg.TwinName,
 		twinVersion:   cfg.TwinVersion,
+		instanceID:    generateInstanceID(),
 		batch:         make([]Event, 0, batchSize),
 		client:        &http.Client{Timeout: 10 * time.Second},
 		flushInterval: flushInterval,
@@ -144,6 +148,8 @@ func (e *Emitter) Emit(ev Event) {
 	ev.Twin = e.twinName
 	ev.TwinVersion = e.twinVersion
 	ev.OrgID = e.orgID
+	ev.InstanceID = e.instanceID
+	ev.Seq = e.seq.Add(1)
 	if ev.Timestamp == 0 {
 		ev.Timestamp = time.Now().Unix()
 	}
@@ -166,16 +172,22 @@ func (e *Emitter) EmitHTTP(method, path string, status int, durationMS int64, re
 	if !e.enabled {
 		return
 	}
+	reqStats := ExtractBodyShapeWithStats(reqBody)
+	respStats := ExtractBodyShapeWithStats(respBody)
 	e.Emit(Event{
 		EventType: EventHTTPObservation,
 		Timestamp: time.Now().Unix(),
 		Payload: HTTPObservation{
-			Method:            method,
-			PathTemplate:      TemplatePath(path),
-			Status:            status,
-			DurationMS:        durationMS,
-			RequestBodyShape:  ExtractBodyShape(reqBody),
-			ResponseBodyShape: ExtractBodyShape(respBody),
+			Method:             method,
+			PathTemplate:       TemplatePath(path),
+			Status:             status,
+			DurationMS:         durationMS,
+			RequestBodyShape:   reqStats.Shape,
+			ResponseBodyShape:  respStats.Shape,
+			RequestBodyDepth:   reqStats.Depth,
+			ResponseBodyDepth:  respStats.Depth,
+			RequestFieldCount:  reqStats.FieldCount,
+			ResponseFieldCount: respStats.FieldCount,
 		},
 	})
 }
@@ -185,17 +197,23 @@ func (e *Emitter) EmitHTTPWithContext(correlationID, method, path string, status
 	if !e.enabled {
 		return
 	}
+	reqStats := ExtractBodyShapeWithStats(reqBody)
+	respStats := ExtractBodyShapeWithStats(respBody)
 	e.Emit(Event{
 		EventType:     EventHTTPObservation,
 		Timestamp:     time.Now().Unix(),
 		CorrelationID: correlationID,
 		Payload: HTTPObservation{
-			Method:            method,
-			PathTemplate:      TemplatePath(path),
-			Status:            status,
-			DurationMS:        durationMS,
-			RequestBodyShape:  ExtractBodyShape(reqBody),
-			ResponseBodyShape: ExtractBodyShape(respBody),
+			Method:             method,
+			PathTemplate:       TemplatePath(path),
+			Status:             status,
+			DurationMS:         durationMS,
+			RequestBodyShape:   reqStats.Shape,
+			ResponseBodyShape:  respStats.Shape,
+			RequestBodyDepth:   reqStats.Depth,
+			ResponseBodyDepth:  respStats.Depth,
+			RequestFieldCount:  reqStats.FieldCount,
+			ResponseFieldCount: respStats.FieldCount,
 		},
 	})
 }
@@ -271,6 +289,11 @@ func (e *Emitter) BatchLen() int {
 // DeliveryConfig returns the current delivery mode (for testing/diagnostics).
 func (e *Emitter) DeliveryConfig() DeliveryMode {
 	return e.delivery
+}
+
+// InstanceID returns the emitter's unique instance identifier.
+func (e *Emitter) InstanceID() string {
+	return e.instanceID
 }
 
 func (e *Emitter) flushLoop() {
@@ -434,4 +457,13 @@ func generateShortID() string {
 	b := make([]byte, 4)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// generateInstanceID produces a unique ID for this emitter lifecycle.
+func generateInstanceID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("inst_%d", time.Now().UnixNano())
+	}
+	return "inst_" + hex.EncodeToString(b)
 }
