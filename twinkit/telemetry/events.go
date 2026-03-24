@@ -21,19 +21,25 @@ type Event struct {
 	OrgID         string    `json:"org_id"`
 	Timestamp     int64     `json:"timestamp"`
 	CorrelationID string    `json:"correlation_id,omitempty"`
+	InstanceID    string    `json:"instance_id,omitempty"`
+	Seq           int64     `json:"seq,omitempty"`
 	Payload       any       `json:"payload"`
 }
 
 // HTTPObservation captures the shape of an HTTP request/response pair.
 type HTTPObservation struct {
-	Method            string            `json:"method"`
-	PathTemplate      string            `json:"path_template"`
-	Status            int               `json:"status"`
-	DurationMS        int64             `json:"duration_ms"`
-	RequestBodyShape  map[string]string `json:"request_body_shape,omitempty"`
-	ResponseBodyShape map[string]string `json:"response_body_shape,omitempty"`
-	ErrorCode         string            `json:"error_code,omitempty"`
-	Resource          string            `json:"resource,omitempty"`
+	Method             string         `json:"method"`
+	PathTemplate       string         `json:"path_template"`
+	Status             int            `json:"status"`
+	DurationMS         int64          `json:"duration_ms"`
+	RequestBodyShape   map[string]any `json:"request_body_shape,omitempty"`
+	ResponseBodyShape  map[string]any `json:"response_body_shape,omitempty"`
+	RequestBodyDepth   int            `json:"request_body_depth,omitempty"`
+	ResponseBodyDepth  int            `json:"response_body_depth,omitempty"`
+	RequestFieldCount  int            `json:"request_field_count,omitempty"`
+	ResponseFieldCount int            `json:"response_field_count,omitempty"`
+	ErrorCode          string         `json:"error_code,omitempty"`
+	Resource           string         `json:"resource,omitempty"`
 }
 
 // DomainEvent captures a behavioral inflection point in a domain engine.

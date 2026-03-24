@@ -34,16 +34,69 @@ func TestExtractBodyShape(t *testing.T) {
 		t.Fatal("expected non-nil shape")
 	}
 	if shape["amount"] != "number" {
-		t.Errorf("amount = %q, want number", shape["amount"])
+		t.Errorf("amount = %v, want number", shape["amount"])
 	}
 	if shape["currency"] != "string" {
-		t.Errorf("currency = %q, want string", shape["currency"])
+		t.Errorf("currency = %v, want string", shape["currency"])
 	}
-	if shape["metadata"] != "object" {
-		t.Errorf("metadata = %q, want object", shape["metadata"])
+
+	// metadata should now be a nested shape, not just "object"
+	meta, ok := shape["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata should be nested shape map, got %T", shape["metadata"])
 	}
-	if shape["items"] != "array" {
-		t.Errorf("items = %q, want array", shape["items"])
+	if meta["_type"] != "object" {
+		t.Errorf("metadata._type = %v, want object", meta["_type"])
+	}
+	nested, ok := meta["_shape"].(map[string]any)
+	if !ok {
+		t.Fatalf("metadata._shape should be map, got %T", meta["_shape"])
+	}
+	if nested["key"] != "string" {
+		t.Errorf("metadata._shape.key = %v, want string", nested["key"])
+	}
+
+	// items should be a nested array shape
+	items, ok := shape["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("items should be nested shape map, got %T", shape["items"])
+	}
+	if items["_type"] != "array" {
+		t.Errorf("items._type = %v, want array", items["_type"])
+	}
+	if items["_element"] != "number" {
+		t.Errorf("items._element = %v, want number", items["_element"])
+	}
+}
+
+func TestExtractBodyShapeWithStats(t *testing.T) {
+	body := []byte(`{
+		"amount": 500,
+		"metadata": {"key": "val", "nested": {"deep": 1}},
+		"items": [{"id": "x", "qty": 2}]
+	}`)
+	stats := ExtractBodyShapeWithStats(body)
+	if stats.Shape == nil {
+		t.Fatal("expected non-nil shape")
+	}
+	if stats.Depth < 3 {
+		t.Errorf("depth = %d, want >= 3", stats.Depth)
+	}
+	if stats.FieldCount < 5 {
+		t.Errorf("field_count = %d, want >= 5", stats.FieldCount)
+	}
+}
+
+func TestExtractBodyShape_DepthLimit(t *testing.T) {
+	// 5 levels deep — should collapse at maxShapeDepth (4)
+	body := []byte(`{"a": {"b": {"c": {"d": {"e": "too deep"}}}}}`)
+	shape := ExtractBodyShape(body)
+	// Navigate to depth 3 — d should be collapsed to "object"
+	a := shape["a"].(map[string]any)["_shape"].(map[string]any)
+	b := a["b"].(map[string]any)["_shape"].(map[string]any)
+	c := b["c"].(map[string]any)["_shape"].(map[string]any)
+	if c["d"] != "object" {
+		t.Errorf("at depth 4, d should be collapsed to 'object', got %v (type %T)", c["d"], c["d"])
 	}
 }
 
@@ -104,6 +157,61 @@ func TestEmitter_SetsEnvelope(t *testing.T) {
 	}
 	if ev.EventType != EventDomainEvent {
 		t.Errorf("type = %q, want domain_event", ev.EventType)
+	}
+	if ev.InstanceID == "" {
+		t.Error("event should have an instance ID")
+	}
+	if ev.Seq != 1 {
+		t.Errorf("seq = %d, want 1", ev.Seq)
+	}
+}
+
+func TestEmitter_SequenceIncrement(t *testing.T) {
+	e := NewEmitter(Config{
+		Enabled:      true,
+		CollectorURL: "http://localhost:9999",
+		TwinName:     "test",
+		TwinVersion:  "0.1.0",
+	})
+	e.EmitHTTP("GET", "/a", 200, 1, nil, nil)
+	e.EmitHTTP("GET", "/b", 200, 1, nil, nil)
+	e.EmitHTTP("GET", "/c", 200, 1, nil, nil)
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for i, ev := range e.batch {
+		want := int64(i + 1)
+		if ev.Seq != want {
+			t.Errorf("event %d: seq = %d, want %d", i, ev.Seq, want)
+		}
+		if ev.InstanceID == "" {
+			t.Errorf("event %d: missing instance ID", i)
+		}
+	}
+}
+
+func TestEmitter_InstanceIDConsistent(t *testing.T) {
+	e := NewEmitter(Config{
+		Enabled:      true,
+		CollectorURL: "http://localhost:9999",
+		TwinName:     "test",
+		TwinVersion:  "0.1.0",
+	})
+	id := e.InstanceID()
+	if id == "" {
+		t.Fatal("instance ID should not be empty")
+	}
+	e.EmitHTTP("GET", "/a", 200, 1, nil, nil)
+	e.EmitHTTP("GET", "/b", 200, 1, nil, nil)
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	for i, ev := range e.batch {
+		if ev.InstanceID != id {
+			t.Errorf("event %d: instance ID = %q, want %q", i, ev.InstanceID, id)
+		}
 	}
 }
 
