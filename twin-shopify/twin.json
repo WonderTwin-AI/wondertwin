@@ -1,0 +1,10 @@
+{
+  "name": "shopify",
+  "description": "Simulates the Shopify Admin REST API including products, orders, customers, inventory, fulfillments, collections, webhooks, metafields, themes, and more.",
+  "category": "workspace",
+  "sdk": {
+    "package": "github.com/bold-commerce/go-shopify",
+    "version": "v3"
+  },
+  "default_port": 4120
+}
