@@ -1,0 +1,53 @@
+{
+  "twin": "algolia",
+  "display_name": "Algolia",
+  "category": "search",
+  "description": "Simulates the Algolia Search REST API: search, multi-index search, facet search, browse, indexing (add/save/partial update/delete/batch/clear), index management (list/delete/copy/move/settings), synonyms, rules, API keys, and task status.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/algolia/algoliasearch-client-go",
+      "language": "go",
+      "version": "v3",
+      "repo_url": "https://github.com/algolia/algoliasearch-client-go",
+      "docs_url": "https://www.algolia.com/doc/rest-api/search"
+    },
+    "additional": [
+      {
+        "package": "algoliasearch",
+        "language": "javascript",
+        "version": "v5",
+        "repo_url": "https://github.com/algolia/algoliasearch-client-javascript"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": false,
+    "resource_count": 8
+  },
+  "coverage": {
+    "resources_implemented": [
+      "search",
+      "objects",
+      "indices",
+      "settings",
+      "synonyms",
+      "rules",
+      "api_keys",
+      "logs"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 100
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}
