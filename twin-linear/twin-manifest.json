@@ -1,0 +1,56 @@
+{
+  "twin": "linear",
+  "display_name": "Linear",
+  "category": "workspace",
+  "description": "Simulates the Linear GraphQL API: issues, teams, projects, cycles, workflow states, labels, comments, attachments, relations, documents, project updates, webhooks, reactions, notifications, and favorites.",
+  "sdk_target": {
+    "primary": {
+      "package": "@linear/sdk",
+      "language": "typescript",
+      "version": "latest",
+      "repo_url": "https://github.com/linear/linear",
+      "docs_url": "https://linear.app/developers"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": true,
+    "resource_count": 16
+  },
+  "coverage": {
+    "resources_implemented": [
+      "issues",
+      "teams",
+      "workflow_states",
+      "users",
+      "projects",
+      "project_updates",
+      "cycles",
+      "issue_labels",
+      "comments",
+      "attachments",
+      "issue_relations",
+      "documents",
+      "webhooks",
+      "reactions",
+      "notifications",
+      "favorites",
+      "organization",
+      "file_upload"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 100
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

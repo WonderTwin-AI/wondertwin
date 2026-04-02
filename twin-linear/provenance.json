@@ -1,0 +1,20 @@
+{
+  "twin": "linear",
+  "sdk_target": {
+    "package": "@linear/sdk",
+    "language": "typescript",
+    "version": "latest"
+  },
+  "build": 1,
+  "generated_at": "2026-04-02T00:00:00Z",
+  "sources": {
+    "openapi": {
+      "origin": "none",
+      "url": ""
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/linear/linear"
+    }
+  }
+}
