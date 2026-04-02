@@ -70,7 +70,7 @@
       "git_tags"
     ],
     "resources_not_implemented": [],
-    "estimated_coverage_pct": 95
+    "estimated_coverage_pct": 100
   },
   "generation": {
     "method": "manual",
