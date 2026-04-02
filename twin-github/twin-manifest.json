@@ -2,7 +2,7 @@
   "twin": "github",
   "display_name": "GitHub",
   "category": "workspace",
-  "description": "Simulates the GitHub REST API: repos, issues, PRs, reviews, checks, labels, milestones, contents, deployments, orgs, teams, reactions, search, and webhooks.",
+  "description": "Simulates the GitHub REST API: repos, issues, PRs, reviews, checks, labels, milestones, contents, deployments, orgs, teams, reactions, search, webhooks, Actions, and Git data.",
   "sdk_target": {
     "primary": {
       "package": "github.com/google/go-github",
@@ -27,7 +27,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 25
+    "resource_count": 38
   },
   "coverage": {
     "resources_implemented": [
@@ -57,17 +57,20 @@
       "collaborators",
       "search",
       "topics",
-      "forks"
-    ],
-    "resources_not_implemented": [
+      "forks",
       "actions_workflows",
       "actions_runs",
       "actions_jobs",
       "actions_artifacts",
       "actions_secrets",
-      "git_data"
+      "git_refs",
+      "git_commits",
+      "git_trees",
+      "git_blobs",
+      "git_tags"
     ],
-    "estimated_coverage_pct": 75
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 95
   },
   "generation": {
     "method": "manual",
