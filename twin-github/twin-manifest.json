@@ -2,7 +2,7 @@
   "twin": "github",
   "display_name": "GitHub",
   "category": "workspace",
-  "description": "Simulates the GitHub REST API including repos, issues, pull requests, labels, comments, commit statuses, releases, branches, and webhooks.",
+  "description": "Simulates the GitHub REST API: repos, issues, PRs, reviews, checks, labels, milestones, contents, deployments, orgs, teams, reactions, search, and webhooks.",
   "sdk_target": {
     "primary": {
       "package": "github.com/google/go-github",
@@ -27,7 +27,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 12
+    "resource_count": 25
   },
   "coverage": {
     "resources_implemented": [
@@ -35,35 +35,39 @@
       "issues",
       "issue_comments",
       "labels",
-      "pull_requests",
-      "commit_statuses",
-      "releases",
-      "branches",
-      "webhooks",
-      "users"
-    ],
-    "resources_not_implemented": [
       "milestones",
+      "pull_requests",
       "pr_reviews",
       "pr_review_comments",
+      "commit_statuses",
       "check_runs",
       "check_suites",
-      "actions_workflows",
-      "actions_runs",
-      "actions_artifacts",
-      "actions_secrets",
-      "git_data",
-      "deploy_keys",
-      "deployments",
-      "reactions",
-      "search",
+      "releases",
+      "release_assets",
+      "branches",
+      "webhooks",
+      "users",
       "organizations",
       "teams",
-      "collaborators",
       "contents",
-      "release_assets"
+      "deploy_keys",
+      "deployments",
+      "deployment_statuses",
+      "reactions",
+      "collaborators",
+      "search",
+      "topics",
+      "forks"
     ],
-    "estimated_coverage_pct": 35
+    "resources_not_implemented": [
+      "actions_workflows",
+      "actions_runs",
+      "actions_jobs",
+      "actions_artifacts",
+      "actions_secrets",
+      "git_data"
+    ],
+    "estimated_coverage_pct": 75
   },
   "generation": {
     "method": "manual",

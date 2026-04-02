@@ -340,6 +340,233 @@ func TestWebhooks(t *testing.T) {
 	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/hook-repo/hooks/%d", hookID)).AssertStatus(204)
 }
 
+// --- Milestone Tests ---
+
+func TestMilestones(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "ms-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/ms-repo/milestones", map[string]any{
+		"title": "v1.0",
+	})
+	resp.AssertStatus(201)
+	num := int(resp.JSONMap()["number"].(float64))
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/ms-repo/milestones/%d", num))
+	resp.AssertStatus(200)
+	if resp.JSONMap()["title"] != "v1.0" {
+		t.Error("expected title=v1.0")
+	}
+
+	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/ms-repo/milestones/%d", num)).AssertStatus(204)
+}
+
+// --- PR Review Tests ---
+
+func TestPRReviews(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "review-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/review-repo/pulls", map[string]any{
+		"title": "Review me", "head": "feature", "base": "main",
+	})
+	num := int(resp.JSONMap()["number"].(float64))
+
+	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/review-repo/pulls/%d/reviews", num), map[string]any{
+		"body":  "LGTM",
+		"event": "APPROVE",
+	})
+	resp.AssertStatus(200)
+	if resp.JSONMap()["state"] != "APPROVED" {
+		t.Error("expected state=APPROVED")
+	}
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/review-repo/pulls/%d/reviews", num))
+	var reviews []map[string]any
+	json.Unmarshal(resp.Body, &reviews)
+	if len(reviews) != 1 {
+		t.Errorf("expected 1 review, got %d", len(reviews))
+	}
+}
+
+// --- PR Review Comment Tests ---
+
+func TestPRReviewComments(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "rc-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/rc-repo/pulls", map[string]any{
+		"title": "Comment me", "head": "feature", "base": "main",
+	})
+	num := int(resp.JSONMap()["number"].(float64))
+
+	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/rc-repo/pulls/%d/comments", num), map[string]any{
+		"body": "Nitpick here",
+		"path": "main.go",
+	})
+	resp.AssertStatus(201)
+	commentID := int(resp.JSONMap()["id"].(float64))
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/rc-repo/pulls/%d/comments", num))
+	var comments []map[string]any
+	json.Unmarshal(resp.Body, &comments)
+	if len(comments) != 1 {
+		t.Errorf("expected 1 review comment, got %d", len(comments))
+	}
+
+	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/rc-repo/pulls/comments/%d", commentID)).AssertStatus(204)
+}
+
+// --- Check Run Tests ---
+
+func TestCheckRuns(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "check-repo")
+	sha := "abc123"
+
+	resp := ghPost(tc, "/repos/twin-bot/check-repo/check-runs", map[string]any{
+		"name":       "ci/test",
+		"head_sha":   sha,
+		"status":     "completed",
+		"conclusion": "success",
+	})
+	resp.AssertStatus(201)
+	crID := int(resp.JSONMap()["id"].(float64))
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/check-repo/check-runs/%d", crID))
+	resp.AssertStatus(200)
+	if resp.JSONMap()["conclusion"] != "success" {
+		t.Error("expected conclusion=success")
+	}
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/check-repo/commits/%s/check-runs", sha))
+	m := resp.JSONMap()
+	if m["total_count"].(float64) != 1 {
+		t.Error("expected 1 check run")
+	}
+}
+
+// --- Contents Tests ---
+
+func TestContents(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "content-repo")
+
+	// Create a file
+	resp := ghPut(tc, "/repos/twin-bot/content-repo/contents/hello.txt", map[string]any{
+		"message": "add hello",
+		"content": "SGVsbG8gV29ybGQ=", // "Hello World" base64
+	})
+	resp.AssertStatus(201)
+
+	// Read it back
+	resp = ghGet(tc, "/repos/twin-bot/content-repo/contents/hello.txt")
+	resp.AssertStatus(200)
+	if resp.JSONMap()["name"] != "hello.txt" {
+		t.Error("expected name=hello.txt")
+	}
+}
+
+// --- Deployment Tests ---
+
+func TestDeployments(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "deploy-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/deploy-repo/deployments", map[string]any{
+		"ref":         "main",
+		"environment": "production",
+	})
+	resp.AssertStatus(201)
+	deployID := int(resp.JSONMap()["id"].(float64))
+
+	ghPost(tc, fmt.Sprintf("/repos/twin-bot/deploy-repo/deployments/%d/statuses", deployID), map[string]any{
+		"state": "success",
+	}).AssertStatus(201)
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/deploy-repo/deployments/%d/statuses", deployID))
+	var statuses []map[string]any
+	json.Unmarshal(resp.Body, &statuses)
+	if len(statuses) != 1 {
+		t.Errorf("expected 1 deployment status, got %d", len(statuses))
+	}
+}
+
+// --- Reaction Tests ---
+
+func TestIssueReactions(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "react-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/react-repo/issues", map[string]any{"title": "React to me"})
+	num := int(resp.JSONMap()["number"].(float64))
+
+	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/react-repo/issues/%d/reactions", num), map[string]any{
+		"content": "+1",
+	})
+	resp.AssertStatus(201)
+	rxID := int(resp.JSONMap()["id"].(float64))
+
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/react-repo/issues/%d/reactions", num))
+	var reactions []map[string]any
+	json.Unmarshal(resp.Body, &reactions)
+	if len(reactions) != 1 {
+		t.Errorf("expected 1 reaction, got %d", len(reactions))
+	}
+
+	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/react-repo/issues/%d/reactions/%d", num, rxID)).AssertStatus(204)
+}
+
+// --- Org/Team Tests ---
+
+func TestOrgTeams(t *testing.T) {
+	_, tc := setupGitHub(t)
+
+	resp := ghPost(tc, "/orgs/test-org/teams", map[string]any{
+		"name": "Engineering",
+	})
+	resp.AssertStatus(201)
+	if resp.JSONMap()["slug"] != "engineering" {
+		t.Error("expected slug=engineering")
+	}
+
+	resp = ghGet(tc, "/orgs/test-org/teams")
+	var teams []map[string]any
+	json.Unmarshal(resp.Body, &teams)
+	if len(teams) != 1 {
+		t.Errorf("expected 1 team, got %d", len(teams))
+	}
+
+	ghDelete(tc, "/orgs/test-org/teams/engineering").AssertStatus(204)
+}
+
+// --- Search Tests ---
+
+func TestSearchIssues(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "search-repo")
+	ghPost(tc, "/repos/twin-bot/search-repo/issues", map[string]any{"title": "Search me"})
+
+	resp := ghGet(tc, "/search/issues?q=search")
+	resp.AssertStatus(200)
+	if resp.JSONMap()["total_count"].(float64) < 1 {
+		t.Error("expected at least 1 result")
+	}
+}
+
+// --- Fork Tests ---
+
+func TestCreateFork(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "fork-me")
+
+	resp := ghPost(tc, "/repos/twin-bot/fork-me/forks", nil)
+	resp.AssertStatus(202)
+	if resp.JSONMap()["fork"] != true {
+		t.Error("expected fork=true")
+	}
+}
+
 // --- Admin Tests ---
 
 func TestAdminHealth(t *testing.T) {

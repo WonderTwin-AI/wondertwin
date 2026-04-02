@@ -95,6 +95,98 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/repos/{owner}/{repo}/releases/latest", h.GetLatestRelease)
 		r.Delete("/repos/{owner}/{repo}/releases/{release_id}", h.DeleteRelease)
 
+		// Milestones
+		r.Get("/repos/{owner}/{repo}/milestones", h.ListMilestones)
+		r.Post("/repos/{owner}/{repo}/milestones", h.CreateMilestone)
+		r.Get("/repos/{owner}/{repo}/milestones/{milestone_number}", h.GetMilestone)
+		r.Patch("/repos/{owner}/{repo}/milestones/{milestone_number}", h.UpdateMilestone)
+		r.Delete("/repos/{owner}/{repo}/milestones/{milestone_number}", h.DeleteMilestone)
+
+		// PR Reviews
+		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.ListPRReviews)
+		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.CreatePRReview)
+		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.GetPRReview)
+		r.Put("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", h.DismissPRReview)
+
+		// PR Review Comments
+		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/comments", h.ListPRReviewComments)
+		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/comments", h.CreatePRReviewComment)
+		r.Get("/repos/{owner}/{repo}/pulls/comments/{comment_id}", h.GetPRReviewComment)
+		r.Patch("/repos/{owner}/{repo}/pulls/comments/{comment_id}", h.UpdatePRReviewComment)
+		r.Delete("/repos/{owner}/{repo}/pulls/comments/{comment_id}", h.DeletePRReviewComment)
+
+		// Check Runs
+		r.Post("/repos/{owner}/{repo}/check-runs", h.CreateCheckRun)
+		r.Get("/repos/{owner}/{repo}/check-runs/{check_run_id}", h.GetCheckRun)
+		r.Patch("/repos/{owner}/{repo}/check-runs/{check_run_id}", h.UpdateCheckRun)
+		r.Get("/repos/{owner}/{repo}/commits/{ref}/check-runs", h.ListCheckRunsForRef)
+
+		// Check Suites
+		r.Post("/repos/{owner}/{repo}/check-suites", h.CreateCheckSuite)
+		r.Get("/repos/{owner}/{repo}/check-suites/{check_suite_id}", h.GetCheckSuite)
+		r.Get("/repos/{owner}/{repo}/commits/{ref}/check-suites", h.ListCheckSuitesForRef)
+
+		// Contents
+		r.Get("/repos/{owner}/{repo}/contents/*", h.GetContents)
+		r.Put("/repos/{owner}/{repo}/contents/*", h.CreateOrUpdateContents)
+		r.Delete("/repos/{owner}/{repo}/contents/*", h.DeleteContents)
+		r.Get("/repos/{owner}/{repo}/readme", h.GetReadme)
+
+		// Organizations
+		r.Get("/orgs/{org}", h.GetOrg)
+		r.Get("/orgs/{org}/members", h.ListOrgMembers)
+		r.Get("/orgs/{org}/repos", h.ListOrgRepos)
+
+		// Teams
+		r.Get("/orgs/{org}/teams", h.ListOrgTeams)
+		r.Post("/orgs/{org}/teams", h.CreateTeam)
+		r.Get("/orgs/{org}/teams/{team_slug}", h.GetTeam)
+		r.Patch("/orgs/{org}/teams/{team_slug}", h.UpdateTeam)
+		r.Delete("/orgs/{org}/teams/{team_slug}", h.DeleteTeam)
+
+		// Deploy Keys
+		r.Get("/repos/{owner}/{repo}/keys", h.ListDeployKeys)
+		r.Post("/repos/{owner}/{repo}/keys", h.CreateDeployKey)
+		r.Get("/repos/{owner}/{repo}/keys/{key_id}", h.GetDeployKey)
+		r.Delete("/repos/{owner}/{repo}/keys/{key_id}", h.DeleteDeployKey)
+
+		// Deployments
+		r.Get("/repos/{owner}/{repo}/deployments", h.ListDeployments)
+		r.Post("/repos/{owner}/{repo}/deployments", h.CreateDeployment)
+		r.Get("/repos/{owner}/{repo}/deployments/{deployment_id}", h.GetDeployment)
+		r.Get("/repos/{owner}/{repo}/deployments/{deployment_id}/statuses", h.ListDeploymentStatuses)
+		r.Post("/repos/{owner}/{repo}/deployments/{deployment_id}/statuses", h.CreateDeploymentStatus)
+
+		// Reactions
+		r.Get("/repos/{owner}/{repo}/issues/{issue_number}/reactions", h.ListIssueReactions)
+		r.Post("/repos/{owner}/{repo}/issues/{issue_number}/reactions", h.CreateIssueReaction)
+		r.Delete("/repos/{owner}/{repo}/issues/{issue_number}/reactions/{reaction_id}", h.DeleteIssueReaction)
+		r.Get("/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions", h.ListCommentReactions)
+		r.Post("/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions", h.CreateCommentReaction)
+		r.Delete("/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions/{reaction_id}", h.DeleteCommentReaction)
+
+		// Collaborators
+		r.Get("/repos/{owner}/{repo}/collaborators", h.ListCollaborators)
+		r.Put("/repos/{owner}/{repo}/collaborators/{username}", h.AddCollaborator)
+		r.Delete("/repos/{owner}/{repo}/collaborators/{username}", h.RemoveCollaborator)
+		r.Get("/repos/{owner}/{repo}/collaborators/{username}/permission", h.GetCollaboratorPermission)
+
+		// Topics
+		r.Get("/repos/{owner}/{repo}/topics", h.ListRepoTopics)
+		r.Put("/repos/{owner}/{repo}/topics", h.ReplaceRepoTopics)
+
+		// Forks
+		r.Post("/repos/{owner}/{repo}/forks", h.CreateFork)
+
+		// Release Assets
+		r.Get("/repos/{owner}/{repo}/releases/{release_id}/assets", h.ListReleaseAssets)
+		r.Post("/repos/{owner}/{repo}/releases/{release_id}/assets", h.UploadReleaseAsset)
+
+		// Search
+		r.Get("/search/issues", h.SearchIssues)
+		r.Get("/search/repositories", h.SearchRepos)
+		r.Get("/search/users", h.SearchUsers)
+
 		// Webhooks
 		r.Get("/repos/{owner}/{repo}/hooks", h.ListWebhooks)
 		r.Post("/repos/{owner}/{repo}/hooks", h.CreateWebhook)

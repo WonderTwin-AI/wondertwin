@@ -10,21 +10,32 @@ import (
 
 // MemoryStore holds all GitHub twin state in memory.
 type MemoryStore struct {
-	Repos        *pkgstate.Store[Repository]
-	Issues       *pkgstate.Store[Issue]
-	PullRequests *pkgstate.Store[PullRequest]
-	Comments     *pkgstate.Store[Comment]
-	Labels       *pkgstate.Store[Label]
-	Milestones   *pkgstate.Store[Milestone]
-	Users        *pkgstate.Store[User]
-	Webhooks     *pkgstate.Store[Webhook]
-	Statuses     *pkgstate.Store[CommitStatus]
-	Releases     *pkgstate.Store[Release]
-	Branches     *pkgstate.Store[Branch]
-	Reactions    *pkgstate.Store[Reaction]
-	Clock        *pkgstate.Clock
+	Repos            *pkgstate.Store[Repository]
+	Issues           *pkgstate.Store[Issue]
+	PullRequests     *pkgstate.Store[PullRequest]
+	Comments         *pkgstate.Store[Comment]
+	Labels           *pkgstate.Store[Label]
+	Milestones       *pkgstate.Store[Milestone]
+	Users            *pkgstate.Store[User]
+	Webhooks         *pkgstate.Store[Webhook]
+	Statuses         *pkgstate.Store[CommitStatus]
+	Releases         *pkgstate.Store[Release]
+	Branches         *pkgstate.Store[Branch]
+	Reactions        *pkgstate.Store[Reaction]
+	PRReviews        *pkgstate.Store[PRReview]
+	PRReviewComments *pkgstate.Store[PRReviewComment]
+	CheckRuns        *pkgstate.Store[CheckRun]
+	CheckSuites      *pkgstate.Store[CheckSuite]
+	Contents         *pkgstate.Store[Content]
+	Orgs             *pkgstate.Store[Organization]
+	Teams            *pkgstate.Store[Team]
+	DeployKeys       *pkgstate.Store[DeployKey]
+	Deployments      *pkgstate.Store[Deployment]
+	DeployStatuses   *pkgstate.Store[DeploymentStatus]
+	ReleaseAssets    *pkgstate.Store[ReleaseAsset]
+	Clock            *pkgstate.Clock
 
-	// Monotonic counters for issue/PR numbers per repo
+	// Monotonic counters
 	issueCounter atomic.Int64
 	idCounter    atomic.Int64
 }
@@ -32,19 +43,30 @@ type MemoryStore struct {
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Repos:        pkgstate.New[Repository]("repo"),
-		Issues:       pkgstate.New[Issue]("issue"),
-		PullRequests: pkgstate.New[PullRequest]("pr"),
-		Comments:     pkgstate.New[Comment]("comment"),
-		Labels:       pkgstate.New[Label]("label"),
-		Milestones:   pkgstate.New[Milestone]("milestone"),
-		Users:        pkgstate.New[User]("user"),
-		Webhooks:     pkgstate.New[Webhook]("hook"),
-		Statuses:     pkgstate.New[CommitStatus]("status"),
-		Releases:     pkgstate.New[Release]("release"),
-		Branches:     pkgstate.New[Branch]("branch"),
-		Reactions:    pkgstate.New[Reaction]("reaction"),
-		Clock:        pkgstate.NewClock(),
+		Repos:            pkgstate.New[Repository]("repo"),
+		Issues:           pkgstate.New[Issue]("issue"),
+		PullRequests:     pkgstate.New[PullRequest]("pr"),
+		Comments:         pkgstate.New[Comment]("comment"),
+		Labels:           pkgstate.New[Label]("label"),
+		Milestones:       pkgstate.New[Milestone]("milestone"),
+		Users:            pkgstate.New[User]("user"),
+		Webhooks:         pkgstate.New[Webhook]("hook"),
+		Statuses:         pkgstate.New[CommitStatus]("status"),
+		Releases:         pkgstate.New[Release]("release"),
+		Branches:         pkgstate.New[Branch]("branch"),
+		Reactions:        pkgstate.New[Reaction]("reaction"),
+		PRReviews:        pkgstate.New[PRReview]("review"),
+		PRReviewComments: pkgstate.New[PRReviewComment]("rc"),
+		CheckRuns:        pkgstate.New[CheckRun]("cr"),
+		CheckSuites:      pkgstate.New[CheckSuite]("cs"),
+		Contents:         pkgstate.New[Content]("content"),
+		Orgs:             pkgstate.New[Organization]("org"),
+		Teams:            pkgstate.New[Team]("team"),
+		DeployKeys:       pkgstate.New[DeployKey]("dk"),
+		Deployments:      pkgstate.New[Deployment]("deploy"),
+		DeployStatuses:   pkgstate.New[DeploymentStatus]("ds"),
+		ReleaseAssets:    pkgstate.New[ReleaseAsset]("asset"),
+		Clock:            pkgstate.NewClock(),
 	}
 }
 
@@ -269,6 +291,76 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	return nil
 }
 
+// ListPRReviews returns reviews for a pull request.
+func (s *MemoryStore) ListPRReviews(owner, repo string, prNumber int) []PRReview {
+	return s.PRReviews.Filter(func(_ string, r PRReview) bool {
+		return r.RepoOwner == owner && r.RepoName == repo && r.PRNumber == prNumber
+	})
+}
+
+// ListCheckRunsForRef returns check runs for a commit SHA.
+func (s *MemoryStore) ListCheckRunsForRef(owner, repo, sha string) []CheckRun {
+	return s.CheckRuns.Filter(func(_ string, cr CheckRun) bool {
+		return cr.RepoOwner == owner && cr.RepoName == repo && cr.HeadSHA == sha
+	})
+}
+
+// ListRepoContents returns contents at a path.
+func (s *MemoryStore) ListRepoContents(owner, repo, path string) []Content {
+	return s.Contents.Filter(func(_ string, c Content) bool {
+		return c.RepoOwner == owner && c.RepoName == repo && c.Path == path
+	})
+}
+
+// ListOrgTeams returns teams for an org.
+func (s *MemoryStore) ListOrgTeams(orgLogin string) []Team {
+	return s.Teams.Filter(func(_ string, t Team) bool {
+		return t.OrgLogin == orgLogin
+	})
+}
+
+// ListRepoDeployKeys returns deploy keys for a repo.
+func (s *MemoryStore) ListRepoDeployKeys(owner, repo string) []DeployKey {
+	return s.DeployKeys.Filter(func(_ string, dk DeployKey) bool {
+		return dk.RepoOwner == owner && dk.RepoName == repo
+	})
+}
+
+// ListRepoDeployments returns deployments for a repo.
+func (s *MemoryStore) ListRepoDeployments(owner, repo string) []Deployment {
+	return s.Deployments.Filter(func(_ string, d Deployment) bool {
+		return d.RepoOwner == owner && d.RepoName == repo
+	})
+}
+
+// ListDeploymentStatuses returns statuses for a deployment.
+func (s *MemoryStore) ListDeploymentStatuses(owner, repo string, deployID int64) []DeploymentStatus {
+	return s.DeployStatuses.Filter(func(_ string, ds DeploymentStatus) bool {
+		return ds.RepoOwner == owner && ds.RepoName == repo && ds.DeploymentID == deployID
+	})
+}
+
+// ListReleaseAssets returns assets for a release.
+func (s *MemoryStore) ListReleaseAssets(owner, repo string, releaseID int64) []ReleaseAsset {
+	return s.ReleaseAssets.Filter(func(_ string, a ReleaseAsset) bool {
+		return a.RepoOwner == owner && a.RepoName == repo && a.ReleaseID == releaseID
+	})
+}
+
+// ListRepoMilestones returns milestones for a repo.
+func (s *MemoryStore) ListRepoMilestones(owner, repo string) []Milestone {
+	return s.Milestones.Filter(func(_ string, m Milestone) bool {
+		return m.RepoOwner == owner && m.RepoName == repo
+	})
+}
+
+// ListSubjectReactions returns reactions for a subject key (e.g., "issue:3").
+func (s *MemoryStore) ListSubjectReactions(owner, repo, subject string) []Reaction {
+	return s.Reactions.Filter(func(_ string, r Reaction) bool {
+		return r.RepoOwner == owner && r.RepoName == repo && r.Subject == subject
+	})
+}
+
 func (s *MemoryStore) Reset() {
 	s.Repos.Reset()
 	s.Issues.Reset()
@@ -282,6 +374,17 @@ func (s *MemoryStore) Reset() {
 	s.Releases.Reset()
 	s.Branches.Reset()
 	s.Reactions.Reset()
+	s.PRReviews.Reset()
+	s.PRReviewComments.Reset()
+	s.CheckRuns.Reset()
+	s.CheckSuites.Reset()
+	s.Contents.Reset()
+	s.Orgs.Reset()
+	s.Teams.Reset()
+	s.DeployKeys.Reset()
+	s.Deployments.Reset()
+	s.DeployStatuses.Reset()
+	s.ReleaseAssets.Reset()
 	s.Clock.Reset()
 	s.issueCounter.Store(0)
 	s.idCounter.Store(0)

@@ -222,8 +222,198 @@ type BranchCommit struct {
 
 // Reaction represents a reaction on an issue/comment.
 type Reaction struct {
-	ID      int64  `json:"id"`
-	User    User   `json:"user"`
-	Content string `json:"content"` // "+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"
+	ID        int64  `json:"id"`
+	User      User   `json:"user"`
+	Content   string `json:"content"` // "+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes"
 	CreatedAt string `json:"created_at"`
+
+	// Internal: what this reaction is attached to
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+	Subject   string `json:"-"` // "issue:3", "comment:42", etc.
+}
+
+// PRReview represents a pull request review.
+type PRReview struct {
+	ID          int64  `json:"id"`
+	User        User   `json:"user"`
+	Body        string `json:"body"`
+	State       string `json:"state"` // "APPROVED", "CHANGES_REQUESTED", "COMMENTED", "PENDING", "DISMISSED"
+	HTMLURL     string `json:"html_url"`
+	CommitID    string `json:"commit_id"`
+	SubmittedAt string `json:"submitted_at"`
+
+	RepoOwner  string `json:"-"`
+	RepoName   string `json:"-"`
+	PRNumber   int    `json:"-"`
+}
+
+// PRReviewComment represents an inline/diff comment on a PR.
+type PRReviewComment struct {
+	ID                int64  `json:"id"`
+	Body              string `json:"body"`
+	Path              string `json:"path"`
+	Position          *int   `json:"position,omitempty"`
+	Line              *int   `json:"line,omitempty"`
+	Side              string `json:"side,omitempty"`
+	CommitID          string `json:"commit_id"`
+	OriginalCommitID  string `json:"original_commit_id"`
+	DiffHunk          string `json:"diff_hunk"`
+	User              User   `json:"user"`
+	HTMLURL           string `json:"html_url"`
+	CreatedAt         string `json:"created_at"`
+	UpdatedAt         string `json:"updated_at"`
+	InReplyToID       *int64 `json:"in_reply_to_id,omitempty"`
+
+	RepoOwner  string `json:"-"`
+	RepoName   string `json:"-"`
+	PRNumber   int    `json:"-"`
+	ReviewID   int64  `json:"-"`
+}
+
+// CheckRun represents a GitHub check run.
+type CheckRun struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	HeadSHA     string `json:"head_sha"`
+	Status      string `json:"status"` // "queued", "in_progress", "completed"
+	Conclusion  string `json:"conclusion,omitempty"` // "success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped"
+	StartedAt   string `json:"started_at,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
+	HTMLURL     string `json:"html_url"`
+	DetailsURL  string `json:"details_url,omitempty"`
+	ExternalID  string `json:"external_id,omitempty"`
+	Output      *CheckRunOutput `json:"output,omitempty"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// CheckRunOutput holds check run output details.
+type CheckRunOutput struct {
+	Title       string `json:"title"`
+	Summary     string `json:"summary"`
+	Text        string `json:"text,omitempty"`
+}
+
+// CheckSuite represents a GitHub check suite.
+type CheckSuite struct {
+	ID         int64  `json:"id"`
+	HeadSHA    string `json:"head_sha"`
+	HeadBranch string `json:"head_branch"`
+	Status     string `json:"status"` // "queued", "in_progress", "completed"
+	Conclusion string `json:"conclusion,omitempty"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// Content represents a file or directory in a repository.
+type Content struct {
+	Type        string `json:"type"` // "file", "dir", "symlink", "submodule"
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	SHA         string `json:"sha"`
+	Size        int    `json:"size"`
+	HTMLURL     string `json:"html_url"`
+	DownloadURL string `json:"download_url,omitempty"`
+	Content     string `json:"content,omitempty"` // base64-encoded for files
+	Encoding    string `json:"encoding,omitempty"` // "base64"
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// Organization represents a GitHub organization.
+type Organization struct {
+	ID          int64  `json:"id"`
+	Login       string `json:"login"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	HTMLURL     string `json:"html_url"`
+	AvatarURL   string `json:"avatar_url"`
+	Type        string `json:"type"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+// Team represents a GitHub team within an organization.
+type Team struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description,omitempty"`
+	Permission  string `json:"permission"` // "pull", "push", "admin"
+	Privacy     string `json:"privacy"` // "secret", "closed"
+	HTMLURL     string `json:"html_url"`
+
+	OrgLogin string   `json:"-"`
+	Members  []string `json:"-"` // user logins
+}
+
+// DeployKey represents a deploy key on a repository.
+type DeployKey struct {
+	ID        int64  `json:"id"`
+	Key       string `json:"key"`
+	Title     string `json:"title"`
+	ReadOnly  bool   `json:"read_only"`
+	CreatedAt string `json:"created_at"`
+	Verified  bool   `json:"verified"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// Deployment represents a GitHub deployment.
+type Deployment struct {
+	ID          int64  `json:"id"`
+	Ref         string `json:"ref"`
+	Task        string `json:"task"`
+	Environment string `json:"environment"`
+	Description string `json:"description,omitempty"`
+	Creator     User   `json:"creator"`
+	SHA         string `json:"sha"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// DeploymentStatus represents a status for a deployment.
+type DeploymentStatus struct {
+	ID            int64  `json:"id"`
+	State         string `json:"state"` // "error", "failure", "inactive", "in_progress", "queued", "pending", "success"
+	Description   string `json:"description,omitempty"`
+	Environment   string `json:"environment,omitempty"`
+	EnvironmentURL string `json:"environment_url,omitempty"`
+	LogURL        string `json:"log_url,omitempty"`
+	Creator       User   `json:"creator"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+
+	RepoOwner    string `json:"-"`
+	RepoName     string `json:"-"`
+	DeploymentID int64  `json:"-"`
+}
+
+// ReleaseAsset represents an asset attached to a release.
+type ReleaseAsset struct {
+	ID            int64  `json:"id"`
+	Name          string `json:"name"`
+	Label         string `json:"label,omitempty"`
+	ContentType   string `json:"content_type"`
+	Size          int    `json:"size"`
+	State         string `json:"state"` // "uploaded"
+	DownloadCount int    `json:"download_count"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+	Uploader      User   `json:"uploader"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+	ReleaseID int64  `json:"-"`
 }
