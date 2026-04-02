@@ -8,7 +8,8 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 )
 
-// SearchBrands handles GET /api/v1/search?q=query — searches seeded brands by name/domain/ticker.
+// SearchBrands handles GET /api/v1/search?q=query — searches seeded brands.
+// Supports strategy param: "typeahead" (default, prefix matching) or "match" (contains).
 func (h *Handler) SearchBrands(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
 	if q == "" {
@@ -19,14 +20,39 @@ func (h *Handler) SearchBrands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	strategy := r.URL.Query().Get("strategy")
+	if strategy == "" {
+		strategy = "typeahead"
+	}
+
 	brands := h.store.Brands.List()
 	var results []store.Brand
+
 	for _, b := range brands {
-		if strings.Contains(strings.ToLower(b.Name), q) ||
-			strings.Contains(strings.ToLower(b.Domain), q) ||
-			strings.Contains(strings.ToLower(b.Ticker), q) {
+		nameL := strings.ToLower(b.Name)
+		domainL := strings.ToLower(b.Domain)
+		tickerL := strings.ToLower(b.Ticker)
+
+		var matched bool
+		if strategy == "typeahead" {
+			matched = strings.HasPrefix(nameL, q) ||
+				strings.HasPrefix(domainL, q) ||
+				strings.HasPrefix(tickerL, q)
+		} else {
+			// "match" strategy — substring contains
+			matched = strings.Contains(nameL, q) ||
+				strings.Contains(domainL, q) ||
+				strings.Contains(tickerL, q)
+		}
+
+		if matched {
 			results = append(results, b)
 		}
+	}
+
+	// Logo.dev returns max 10 results
+	if len(results) > 10 {
+		results = results[:10]
 	}
 
 	twincore.JSON(w, http.StatusOK, results)

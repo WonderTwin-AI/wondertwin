@@ -7,7 +7,8 @@ import (
 )
 
 // generatePlaceholderSVG creates a colored square with domain initials.
-func generatePlaceholderSVG(domain string, size int, greyscale bool) string {
+// theme: "dark" inverts light logos (white bg → dark), "light" inverts dark logos.
+func generatePlaceholderSVG(domain string, size int, greyscale bool, theme string) string {
 	hash := md5.Sum([]byte(domain))
 	r, g, b := int(hash[0]), int(hash[1]), int(hash[2])
 
@@ -15,6 +16,12 @@ func generatePlaceholderSVG(domain string, size int, greyscale bool) string {
 		avg := (r + g + b) / 3
 		r, g, b = avg, avg, avg
 	}
+
+	// Theme support: invert colors for dark/light backgrounds
+	if theme == "dark" {
+		r, g, b = 255-r, 255-g, 255-b
+	}
+	// "light" theme keeps original colors (already suitable for light backgrounds)
 
 	parts := strings.Split(domain, ".")
 	name := parts[0]

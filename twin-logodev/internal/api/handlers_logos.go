@@ -10,20 +10,69 @@ import (
 )
 
 // GetLogo handles GET /{domain} — returns a deterministic SVG placeholder.
+// Supports Logo.dev query params: size, format, greyscale, retina, theme, fallback.
 func (h *Handler) GetLogo(w http.ResponseWriter, r *http.Request) {
 	domain := chi.URLParam(r, "domain")
+	h.serveLogo(w, r, domain)
+}
+
+// GetLogoByName handles GET /name/{name} — looks up brand by name and returns logo.
+func (h *Handler) GetLogoByName(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	nameL := strings.ToLower(name)
+
+	for _, b := range h.store.Brands.List() {
+		if strings.ToLower(b.Name) == nameL {
+			h.serveLogo(w, r, b.Domain)
+			return
+		}
+	}
+
+	// No brand found — use the name as a pseudo-domain
+	h.serveLogo(w, r, name+".com")
+}
+
+// GetLogoByTicker handles GET /ticker/{symbol} — looks up brand by stock ticker.
+func (h *Handler) GetLogoByTicker(w http.ResponseWriter, r *http.Request) {
+	symbol := strings.ToUpper(chi.URLParam(r, "symbol"))
+
+	for _, b := range h.store.Brands.List() {
+		if strings.ToUpper(b.Ticker) == symbol {
+			h.serveLogo(w, r, b.Domain)
+			return
+		}
+	}
+
+	// No ticker match — check fallback preference
+	if r.URL.Query().Get("fallback") == "404" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Default: monogram from ticker
+	h.serveLogo(w, r, symbol+".com")
+}
+
+// serveLogo is the shared handler logic for all logo retrieval endpoints.
+func (h *Handler) serveLogo(w http.ResponseWriter, r *http.Request, domain string) {
+	q := r.URL.Query()
 
 	size := 128
-	if s := r.URL.Query().Get("size"); s != "" {
-		if parsed, err := strconv.Atoi(s); err == nil && parsed > 0 && parsed <= 1024 {
+	if s := q.Get("size"); s != "" {
+		if parsed, err := strconv.Atoi(s); err == nil && parsed > 0 && parsed <= 800 {
 			size = parsed
 		}
 	}
 
-	format := r.URL.Query().Get("format")
-	greyscale := r.URL.Query().Get("greyscale") == "true"
+	// Retina doubles the source resolution
+	if q.Get("retina") == "true" {
+		size *= 2
+	}
 
-	// Record the request
+	greyscale := q.Get("greyscale") == "true"
+	theme := q.Get("theme") // "dark" or "light"
+	format := q.Get("format")
+
 	h.store.RecordRequest(domain, size, format, greyscale)
 
 	// Check for custom logo
@@ -35,8 +84,14 @@ func (h *Handler) GetLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check fallback=404 — no custom logo and no real logo to serve
+	if q.Get("fallback") == "404" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	// Generate deterministic placeholder SVG
-	svg := generatePlaceholderSVG(domain, size, greyscale)
+	svg := generatePlaceholderSVG(domain, size, greyscale, theme)
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.WriteHeader(http.StatusOK)
@@ -81,9 +136,9 @@ func (h *Handler) AdminGetLogo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"domain":      domain,
-		"requests":    matched,
-		"total":       len(matched),
-		"has_custom":  hasCustom,
+		"domain":     domain,
+		"requests":   matched,
+		"total":      len(matched),
+		"has_custom": hasCustom,
 	})
 }
