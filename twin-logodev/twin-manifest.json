@@ -2,7 +2,7 @@
   "twin": "logodev",
   "display_name": "Logo.dev",
   "category": "media",
-  "description": "Simulates the Logo.dev logo retrieval and brand search API, returning deterministic SVG placeholder logos for any domain.",
+  "description": "Simulates the Logo.dev logo retrieval, brand search, and describe APIs with deterministic SVG placeholders.",
   "sdk_target": {
     "primary": {
       "package": "logo.dev",
@@ -19,15 +19,21 @@
     },
     "auth_pattern": "api_key",
     "has_webhooks": false,
-    "resource_count": 2
+    "resource_count": 4
   },
   "coverage": {
     "resources_implemented": [
       "logos",
-      "search"
+      "logos_by_name",
+      "logos_by_ticker",
+      "search",
+      "describe"
     ],
-    "resources_not_implemented": [],
-    "estimated_coverage_pct": 95
+    "resources_not_implemented": [
+      "logos_by_crypto",
+      "logos_by_isin"
+    ],
+    "estimated_coverage_pct": 90
   },
   "generation": {
     "method": "manual",
