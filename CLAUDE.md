@@ -65,3 +65,47 @@ twin-{name}/
   twin-manifest.json                # coverage manifest
   provenance.json                   # build provenance
 ```
+
+## Twin Build Process
+
+This is the proven process for building a new twin from scratch. Follow it in order.
+
+### Phase 0: Research
+Before writing any code, research the full API surface of the target service. Use a dedicated research agent that returns a structured inventory of:
+- Every endpoint (method + path)
+- Authentication model
+- Request/response formats and standard envelopes
+- Error response shapes and codes
+- Webhooks (events, signing, delivery format)
+- Rate limits
+- SDK compatibility targets
+
+Save the research output. It is the source of truth for 100% parity.
+
+### Phase 1: Scaffold + Core
+1. Create directory structure following the standard layout
+2. Write store types for all known resource areas (even ones you won't implement until later phases)
+3. Write the memory store with snapshot/load/reset
+4. Write the router with auth middleware and response helpers matching the service's style
+5. Implement the highest-traffic endpoints first (the ones every integration test hits)
+6. Include all 3 schema files (`twin.json`, `twin-manifest.json`, `provenance.json`) from commit 1
+7. Write tests, run the pre-push checklist, PR
+
+### Phase 2+: Expand to 100%
+1. Work through remaining resource areas in logical batches
+2. One PR per logical batch (not one PR per endpoint)
+3. After each phase, update the manifest with current coverage %
+
+### Final Phase: Gap Audit
+Before declaring a twin complete:
+1. Run a gap audit — cross-reference every endpoint from the Phase 0 research against the router
+2. Implement every missing endpoint, no matter how niche
+3. Update manifest to `estimated_coverage_pct: 100` with empty `resources_not_implemented`
+4. Only then is the twin done
+
+### Process Retros
+When anything goes wrong (CI failure, missing file, wrong enum, broken test), immediately:
+1. Identify the root cause
+2. Determine what process change would have prevented it
+3. Codify that change in this file or in memory
+4. Do not just fix the symptom and move on
