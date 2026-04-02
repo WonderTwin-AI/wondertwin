@@ -11,6 +11,7 @@ import (
 // MemoryStore holds all logo twin state.
 type MemoryStore struct {
 	Requests    *pkgstate.Store[LogoRequest]
+	Brands      *pkgstate.Store[Brand]
 	CustomLogos map[string]CustomLogo
 	Clock       *pkgstate.Clock
 }
@@ -19,6 +20,7 @@ type MemoryStore struct {
 func New() *MemoryStore {
 	return &MemoryStore{
 		Requests:    pkgstate.New[LogoRequest]("logo"),
+		Brands:      pkgstate.New[Brand]("brand"),
 		CustomLogos: make(map[string]CustomLogo),
 		Clock:       pkgstate.NewClock(),
 	}
@@ -42,8 +44,9 @@ type logoSnapshot struct {
 }
 
 type stateSnapshot struct {
-	Requests    map[string]LogoRequest    `json:"requests"`
-	CustomLogos map[string]logoSnapshot   `json:"custom_logos,omitempty"`
+	Requests    map[string]LogoRequest  `json:"requests"`
+	Brands      map[string]Brand        `json:"brands,omitempty"`
+	CustomLogos map[string]logoSnapshot `json:"custom_logos,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -56,6 +59,7 @@ func (s *MemoryStore) Snapshot() any {
 	}
 	return stateSnapshot{
 		Requests:    s.Requests.Snapshot(),
+		Brands:      s.Brands.Snapshot(),
 		CustomLogos: logos,
 	}
 }
@@ -66,6 +70,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 		return err
 	}
 	s.Requests.LoadSnapshot(snap.Requests)
+	s.Brands.LoadSnapshot(snap.Brands)
 	for domain, logo := range snap.CustomLogos {
 		decoded, err := base64.StdEncoding.DecodeString(logo.Data)
 		if err != nil {
@@ -82,6 +87,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 
 func (s *MemoryStore) Reset() {
 	s.Requests.Reset()
+	s.Brands.Reset()
 	s.CustomLogos = make(map[string]CustomLogo)
 	s.Clock.Reset()
 }
