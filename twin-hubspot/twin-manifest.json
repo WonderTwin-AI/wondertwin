@@ -1,0 +1,59 @@
+{
+  "twin": "hubspot",
+  "display_name": "HubSpot",
+  "category": "workspace",
+  "description": "Simulates the HubSpot CRM v3 API: generic CRM objects (contacts, companies, deals, tickets, engagements), batch operations, search, associations v4, properties, pipelines, owners, lists, webhooks, forms, and OAuth.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/clarkmcc/go-hubspot",
+      "language": "go",
+      "version": "latest",
+      "repo_url": "https://github.com/clarkmcc/go-hubspot",
+      "docs_url": "https://developers.hubspot.com/docs/api"
+    },
+    "additional": [
+      {
+        "package": "@hubspot/api-client",
+        "language": "typescript",
+        "version": "latest",
+        "repo_url": "https://github.com/HubSpot/hubspot-api-nodejs"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 12
+  },
+  "coverage": {
+    "resources_implemented": [
+      "crm_objects",
+      "batch_operations",
+      "search",
+      "associations_v4",
+      "properties",
+      "property_groups",
+      "pipelines",
+      "pipeline_stages",
+      "owners",
+      "lists",
+      "webhooks",
+      "forms",
+      "oauth",
+      "gdpr"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 100
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

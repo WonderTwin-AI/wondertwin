@@ -1,0 +1,10 @@
+{
+  "name": "hubspot",
+  "description": "Simulates the HubSpot CRM v3 API including contacts, companies, deals, tickets, engagements, associations, properties, pipelines, search, owners, lists, webhooks, and forms.",
+  "category": "workspace",
+  "sdk": {
+    "package": "github.com/clarkmcc/go-hubspot",
+    "version": "latest"
+  },
+  "default_port": 4122
+}
