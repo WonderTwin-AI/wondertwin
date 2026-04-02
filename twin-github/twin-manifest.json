@@ -1,0 +1,76 @@
+{
+  "twin": "github",
+  "display_name": "GitHub",
+  "category": "workspace",
+  "description": "Simulates the GitHub REST API including repos, issues, pull requests, labels, comments, commit statuses, releases, branches, and webhooks.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/google/go-github",
+      "language": "go",
+      "version": "v60",
+      "repo_url": "https://github.com/google/go-github",
+      "docs_url": "https://docs.github.com/rest"
+    },
+    "additional": [
+      {
+        "package": "@octokit/rest",
+        "language": "typescript",
+        "version": "latest",
+        "repo_url": "https://github.com/octokit/rest.js"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "url": "https://github.com/github/rest-api-description"
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 12
+  },
+  "coverage": {
+    "resources_implemented": [
+      "repos",
+      "issues",
+      "issue_comments",
+      "labels",
+      "pull_requests",
+      "commit_statuses",
+      "releases",
+      "branches",
+      "webhooks",
+      "users"
+    ],
+    "resources_not_implemented": [
+      "milestones",
+      "pr_reviews",
+      "pr_review_comments",
+      "check_runs",
+      "check_suites",
+      "actions_workflows",
+      "actions_runs",
+      "actions_artifacts",
+      "actions_secrets",
+      "git_data",
+      "deploy_keys",
+      "deployments",
+      "reactions",
+      "search",
+      "organizations",
+      "teams",
+      "collaborators",
+      "contents",
+      "release_assets"
+    ],
+    "estimated_coverage_pct": 35
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}
