@@ -24,7 +24,7 @@
     "openapi_spec": {
       "available": false
     },
-    "auth_pattern": "bearer_token",
+    "auth_pattern": "oauth2",
     "has_webhooks": true,
     "resource_count": 15
   },
