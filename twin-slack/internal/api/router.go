@@ -49,6 +49,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/chat.deleteScheduledMessage", h.ChatDeleteScheduledMessage)
 		r.Post("/chat.scheduledMessages.list", h.ChatScheduledMessagesList)
 		r.Post("/chat.meMessage", h.ChatMeMessage)
+		r.Post("/chat.unfurl", h.ChatUnfurl)
 
 		// conversations.*
 		r.Post("/conversations.list", h.ConversationsList)
@@ -79,6 +80,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/users.profile.set", h.UsersProfileSet)
 		r.Post("/users.getPresence", h.UsersGetPresence)
 		r.Post("/users.setPresence", h.UsersSetPresence)
+		r.Post("/users.identity", h.UsersIdentity)
+		r.Post("/users.setPhoto", h.UsersSetPhoto)
+		r.Post("/users.deletePhoto", h.UsersDeletePhoto)
 
 		// reactions.*
 		r.Post("/reactions.add", h.ReactionsAdd)
@@ -97,6 +101,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/files.list", h.FilesList)
 		r.Post("/files.info", h.FilesInfo)
 		r.Post("/files.delete", h.FilesDelete)
+		r.Post("/files.sharedPublicURL", h.FilesSharedPublicURL)
+		r.Post("/files.revokePublicURL", h.FilesRevokePublicURL)
+		r.Post("/files.upload", h.FilesUploadLegacy)
 
 		// bookmarks.*
 		r.Post("/bookmarks.add", h.BookmarksAdd)
@@ -122,6 +129,10 @@ func (h *Handler) Routes(r chi.Router) {
 
 		// team.*
 		r.Post("/team.info", h.TeamInfo)
+		r.Post("/team.accessLogs", h.TeamAccessLogs)
+		r.Post("/team.billableInfo", h.TeamBillableInfo)
+		r.Post("/team.integrationLogs", h.TeamIntegrationLogs)
+		r.Post("/team.profile.get", h.TeamProfileGet)
 
 		// bots.*
 		r.Post("/bots.info", h.BotsInfo)
@@ -151,6 +162,12 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/stars.add", h.StarsAdd)
 		r.Post("/stars.remove", h.StarsRemove)
 		r.Post("/stars.list", h.StarsList)
+
+		// oauth.*
+		r.Post("/oauth.v2.access", h.OAuthV2Access)
+
+		// dialog.*
+		r.Post("/dialog.open", h.DialogOpen)
 	})
 
 	// Admin extras (no auth required)
