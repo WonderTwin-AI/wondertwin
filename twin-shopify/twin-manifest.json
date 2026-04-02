@@ -1,0 +1,76 @@
+{
+  "twin": "shopify",
+  "display_name": "Shopify",
+  "category": "workspace",
+  "description": "Simulates the Shopify Admin REST API: products, variants, images, orders, transactions, refunds, customers, addresses, inventory, fulfillments, collections, webhooks, metafields, themes, assets, pages, blogs, articles, price rules, discount codes, gift cards, draft orders, script tags, and redirects.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/bold-commerce/go-shopify",
+      "language": "go",
+      "version": "v3",
+      "repo_url": "https://github.com/bold-commerce/go-shopify",
+      "docs_url": "https://shopify.dev/docs/api/admin-rest"
+    },
+    "additional": [
+      {
+        "package": "@shopify/shopify-api",
+        "language": "typescript",
+        "version": "latest",
+        "repo_url": "https://github.com/Shopify/shopify-api-js"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "custom",
+    "has_webhooks": true,
+    "resource_count": 25
+  },
+  "coverage": {
+    "resources_implemented": [
+      "shop",
+      "products",
+      "variants",
+      "images",
+      "orders",
+      "transactions",
+      "refunds",
+      "customers",
+      "addresses",
+      "custom_collections",
+      "smart_collections",
+      "collects",
+      "inventory_items",
+      "inventory_levels",
+      "locations",
+      "fulfillments",
+      "fulfillment_orders",
+      "draft_orders",
+      "webhooks",
+      "metafields",
+      "themes",
+      "assets",
+      "pages",
+      "price_rules",
+      "discount_codes",
+      "gift_cards",
+      "blogs",
+      "articles",
+      "script_tags",
+      "redirects",
+      "access_scopes"
+    ],
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 100
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}
