@@ -28,15 +28,44 @@ func setupLogodev(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	return srv, tc
 }
 
+var logoHeaders = map[string]string{
+	"Authorization": "Bearer pk_test_123",
+}
+
+func logoGet(tc *testutil.TwinClient, path string) *testutil.Response {
+	return tc.DoWithHeaders("GET", path, nil, logoHeaders)
+}
+
+// --- Auth Tests ---
+
+func TestAuthTokenQueryParam(t *testing.T) {
+	_, tc := setupLogodev(t)
+	resp := tc.Get("/example.com?token=test_token_123")
+	resp.AssertStatus(200)
+}
+
+func TestAuthBearerHeader(t *testing.T) {
+	_, tc := setupLogodev(t)
+	resp := logoGet(tc, "/example.com")
+	resp.AssertStatus(200)
+}
+
+func TestAuthRequired(t *testing.T) {
+	_, tc := setupLogodev(t)
+	resp := tc.Get("/example.com")
+	resp.AssertStatus(401)
+	resp.AssertBodyContains("unauthorized")
+	resp.AssertBodyContains("API token required")
+}
+
 // --- Logo Tests ---
 
 func TestGetLogo(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	resp := tc.Get("/example.com?token=test_token_123")
+	resp := logoGet(tc, "/example.com")
 	resp.AssertStatus(200)
 
-	// Should return SVG
 	ct := resp.Headers.Get("Content-Type")
 	if ct != "image/svg+xml" {
 		t.Errorf("expected Content-Type=image/svg+xml, got %s", ct)
@@ -46,24 +75,15 @@ func TestGetLogo(t *testing.T) {
 	if !strings.Contains(body, "<svg") {
 		t.Error("expected SVG content in body")
 	}
-	// Should contain initials from "example"
 	if !strings.Contains(body, "EX") {
 		t.Error("expected initials 'EX' in SVG")
 	}
 }
 
-func TestGetLogoTokenRequired(t *testing.T) {
-	_, tc := setupLogodev(t)
-
-	resp := tc.Get("/example.com")
-	resp.AssertStatus(401)
-	resp.AssertBodyContains("token required")
-}
-
 func TestGetLogoCustomSize(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	resp := tc.Get("/stripe.com?token=test&size=64")
+	resp := logoGet(tc, "/stripe.com?size=64")
 	resp.AssertStatus(200)
 
 	body := string(resp.Body)
@@ -75,9 +95,8 @@ func TestGetLogoCustomSize(t *testing.T) {
 func TestGetLogoGreyscale(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	resp := tc.Get("/google.com?token=test&greyscale=true")
+	resp := logoGet(tc, "/google.com?greyscale=true")
 	resp.AssertStatus(200)
-	// Just verify it returns valid SVG (greyscale is visual)
 	if !strings.Contains(string(resp.Body), "<svg") {
 		t.Error("expected SVG content")
 	}
@@ -86,8 +105,8 @@ func TestGetLogoGreyscale(t *testing.T) {
 func TestGetLogoDeterministic(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	resp1 := tc.Get("/deterministic.com?token=test")
-	resp2 := tc.Get("/deterministic.com?token=test")
+	resp1 := logoGet(tc, "/deterministic.com")
+	resp2 := logoGet(tc, "/deterministic.com")
 
 	if string(resp1.Body) != string(resp2.Body) {
 		t.Error("expected same SVG for same domain")
@@ -97,12 +116,23 @@ func TestGetLogoDeterministic(t *testing.T) {
 func TestGetLogoDifferentDomains(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	resp1 := tc.Get("/alpha.com?token=test")
-	resp2 := tc.Get("/beta.com?token=test")
+	resp1 := logoGet(tc, "/alpha.com")
+	resp2 := logoGet(tc, "/beta.com")
 
-	// Different domains should produce different SVGs (different colors/initials)
 	if string(resp1.Body) == string(resp2.Body) {
 		t.Error("expected different SVGs for different domains")
+	}
+}
+
+func TestGetLogoCacheHeaders(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	resp := logoGet(tc, "/cached.com")
+	resp.AssertStatus(200)
+
+	cc := resp.Headers.Get("Cache-Control")
+	if !strings.Contains(cc, "max-age=86400") {
+		t.Errorf("expected Cache-Control with max-age=86400, got %s", cc)
 	}
 }
 
@@ -111,11 +141,10 @@ func TestGetLogoDifferentDomains(t *testing.T) {
 func TestGetCustomLogoSVG(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	// Load a custom SVG logo via seed data
 	seed := json.RawMessage(`{"custom_logos":{"acme.com":{"content_type":"image/svg+xml","data":"PHN2Zz5hY21lPC9zdmc+"}}}`)
 	tc.Post("/admin/state", seed).AssertStatus(200)
 
-	resp := tc.Get("/acme.com?token=test")
+	resp := logoGet(tc, "/acme.com")
 	resp.AssertStatus(200)
 
 	ct := resp.Headers.Get("Content-Type")
@@ -130,11 +159,10 @@ func TestGetCustomLogoSVG(t *testing.T) {
 func TestGetCustomLogoPNG(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	// Load a custom PNG logo (fake PNG data for test)
 	seed := json.RawMessage(`{"custom_logos":{"img.com":{"content_type":"image/png","data":"iVBORw0KGgo="}}}`)
 	tc.Post("/admin/state", seed).AssertStatus(200)
 
-	resp := tc.Get("/img.com?token=test")
+	resp := logoGet(tc, "/img.com")
 	resp.AssertStatus(200)
 
 	ct := resp.Headers.Get("Content-Type")
@@ -146,12 +174,10 @@ func TestGetCustomLogoPNG(t *testing.T) {
 func TestCustomLogoFallbackToPlaceholder(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	// Load custom logo for one domain
 	seed := json.RawMessage(`{"custom_logos":{"known.com":{"content_type":"image/svg+xml","data":"PHN2Zz48L3N2Zz4="}}}`)
 	tc.Post("/admin/state", seed).AssertStatus(200)
 
-	// Unknown domain should still get a placeholder
-	resp := tc.Get("/unknown.com?token=test")
+	resp := logoGet(tc, "/unknown.com")
 	resp.AssertStatus(200)
 	if !strings.Contains(string(resp.Body), "<svg") {
 		t.Error("expected placeholder SVG for unknown domain")
@@ -166,10 +192,8 @@ func TestCustomLogosResetOnReset(t *testing.T) {
 
 	tc.Post("/admin/reset", nil).AssertStatus(200)
 
-	// After reset, should get placeholder, not custom logo
-	resp := tc.Get("/reset-test.com?token=test")
+	resp := logoGet(tc, "/reset-test.com")
 	resp.AssertStatus(200)
-	// Placeholder SVGs contain initials — custom one was just "<svg></svg>"
 	if !strings.Contains(string(resp.Body), "RE") {
 		t.Error("expected placeholder SVG with initials after reset")
 	}
@@ -180,10 +204,9 @@ func TestCustomLogosResetOnReset(t *testing.T) {
 func TestAdminListLogos(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	// Make some logo requests
-	tc.Get("/stripe.com?token=test").AssertStatus(200)
-	tc.Get("/stripe.com?token=test").AssertStatus(200)
-	tc.Get("/google.com?token=test").AssertStatus(200)
+	logoGet(tc, "/stripe.com").AssertStatus(200)
+	logoGet(tc, "/stripe.com").AssertStatus(200)
+	logoGet(tc, "/google.com").AssertStatus(200)
 
 	resp := tc.Get("/admin/logos")
 	resp.AssertStatus(200)
@@ -206,10 +229,70 @@ func TestAdminListLogos(t *testing.T) {
 	}
 }
 
+func TestAdminListLogosFilterByDomain(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	logoGet(tc, "/stripe.com").AssertStatus(200)
+	logoGet(tc, "/google.com").AssertStatus(200)
+	logoGet(tc, "/github.com").AssertStatus(200)
+
+	resp := tc.Get("/admin/logos?domain=g")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+	domains := m["domains"].(map[string]any)
+
+	if _, ok := domains["stripe.com"]; ok {
+		t.Error("stripe.com should be filtered out")
+	}
+	if _, ok := domains["google.com"]; !ok {
+		t.Error("google.com should match filter")
+	}
+	if _, ok := domains["github.com"]; !ok {
+		t.Error("github.com should match filter")
+	}
+}
+
+func TestAdminGetLogo(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	logoGet(tc, "/test.com").AssertStatus(200)
+	logoGet(tc, "/test.com?size=64").AssertStatus(200)
+
+	resp := tc.Get("/admin/logos/test.com")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+
+	if m["domain"] != "test.com" {
+		t.Errorf("expected domain=test.com, got %v", m["domain"])
+	}
+	total, _ := m["total"].(float64)
+	if total != 2 {
+		t.Errorf("expected 2 requests, got %v", total)
+	}
+	if m["has_custom"] != false {
+		t.Error("expected has_custom=false")
+	}
+}
+
+func TestAdminGetLogoWithCustom(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	seed := json.RawMessage(`{"custom_logos":{"custom.com":{"content_type":"image/svg+xml","data":"PHN2Zz48L3N2Zz4="}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	resp := tc.Get("/admin/logos/custom.com")
+	resp.AssertStatus(200)
+	m := resp.JSONMap()
+
+	if m["has_custom"] != true {
+		t.Error("expected has_custom=true")
+	}
+}
+
 func TestAdminReset(t *testing.T) {
 	_, tc := setupLogodev(t)
 
-	tc.Get("/test.com?token=test").AssertStatus(200)
+	logoGet(tc, "/test.com").AssertStatus(200)
 
 	tc.Post("/admin/reset", nil).AssertStatus(200)
 
