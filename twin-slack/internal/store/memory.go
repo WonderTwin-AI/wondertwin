@@ -16,12 +16,18 @@ type MemoryStore struct {
 	Pins              *pkgstate.Store[Pin]
 	Files             *pkgstate.Store[File]
 	ScheduledMessages *pkgstate.Store[ScheduledMessage]
+	Bookmarks         *pkgstate.Store[Bookmark]
+	Reminders         *pkgstate.Store[Reminder]
+	Usergroups        *pkgstate.Store[Usergroup]
+	Stars             *pkgstate.Store[Star]
 	Clock             *pkgstate.Clock
 
 	// Team info (singleton)
 	Team Team
 
-	// Thread tracking: maps channel+thread_ts to reply count
+	// DND state per user
+	DndStatuses map[string]DndStatus
+
 	tsCounter atomic.Int64
 }
 
@@ -34,6 +40,11 @@ func New() *MemoryStore {
 		Pins:              pkgstate.New[Pin]("pin"),
 		Files:             pkgstate.New[File]("F"),
 		ScheduledMessages: pkgstate.New[ScheduledMessage]("Q"),
+		Bookmarks:         pkgstate.New[Bookmark]("BM"),
+		Reminders:         pkgstate.New[Reminder]("RM"),
+		Usergroups:        pkgstate.New[Usergroup]("UG"),
+		Stars:             pkgstate.New[Star]("ST"),
+		DndStatuses:       make(map[string]DndStatus),
 		Clock:             pkgstate.NewClock(),
 		Team: Team{
 			ID:     "T0001",
@@ -169,6 +180,11 @@ func (s *MemoryStore) Reset() {
 	s.Pins.Reset()
 	s.Files.Reset()
 	s.ScheduledMessages.Reset()
+	s.Bookmarks.Reset()
+	s.Reminders.Reset()
+	s.Usergroups.Reset()
+	s.Stars.Reset()
+	s.DndStatuses = make(map[string]DndStatus)
 	s.Clock.Reset()
 	s.tsCounter.Store(0)
 	s.Team = Team{ID: "T0001", Name: "WonderTwin", Domain: "wondertwin"}

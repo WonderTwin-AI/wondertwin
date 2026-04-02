@@ -46,17 +46,12 @@
       "usergroups",
       "dnd",
       "search",
-      "stars"
-    ],
-    "resources_not_implemented": [
-      "incoming_webhooks",
-      "events_api",
-      "slash_commands",
-      "interactive_payloads",
+      "stars",
       "oauth",
       "dialog"
     ],
-    "estimated_coverage_pct": 70
+    "resources_not_implemented": [],
+    "estimated_coverage_pct": 100
   },
   "generation": {
     "method": "manual",
