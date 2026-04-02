@@ -1,0 +1,69 @@
+{
+  "twin": "slack",
+  "display_name": "Slack",
+  "category": "workspace",
+  "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/slack-go/slack",
+      "language": "go",
+      "version": "latest",
+      "repo_url": "https://github.com/slack-go/slack",
+      "docs_url": "https://api.slack.com/methods"
+    },
+    "additional": [
+      {
+        "package": "@slack/web-api",
+        "language": "typescript",
+        "version": "latest",
+        "repo_url": "https://github.com/slackapi/node-slack-sdk"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": false
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 15
+  },
+  "coverage": {
+    "resources_implemented": [
+      "auth",
+      "chat",
+      "conversations",
+      "users",
+      "reactions",
+      "pins",
+      "files",
+      "bookmarks",
+      "reminders",
+      "views",
+      "emoji",
+      "team",
+      "bots",
+      "usergroups",
+      "dnd",
+      "search",
+      "stars"
+    ],
+    "resources_not_implemented": [
+      "incoming_webhooks",
+      "events_api",
+      "slash_commands",
+      "interactive_payloads",
+      "oauth",
+      "dialog"
+    ],
+    "estimated_coverage_pct": 70
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}
