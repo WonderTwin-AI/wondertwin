@@ -33,11 +33,22 @@ type MemoryStore struct {
 	Deployments      *pkgstate.Store[Deployment]
 	DeployStatuses   *pkgstate.Store[DeploymentStatus]
 	ReleaseAssets    *pkgstate.Store[ReleaseAsset]
+	Workflows        *pkgstate.Store[Workflow]
+	WorkflowRuns     *pkgstate.Store[WorkflowRun]
+	WorkflowJobs     *pkgstate.Store[WorkflowJob]
+	Artifacts        *pkgstate.Store[Artifact]
+	Secrets          *pkgstate.Store[Secret]
+	GitRefs          *pkgstate.Store[GitRef]
+	GitCommits       *pkgstate.Store[GitCommit]
+	GitTrees         *pkgstate.Store[GitTree]
+	GitBlobs         *pkgstate.Store[GitBlob]
+	GitTags          *pkgstate.Store[GitTag]
 	Clock            *pkgstate.Clock
 
 	// Monotonic counters
-	issueCounter atomic.Int64
-	idCounter    atomic.Int64
+	issueCounter  atomic.Int64
+	idCounter     atomic.Int64
+	runCounter    atomic.Int64
 }
 
 // New creates a new MemoryStore with empty state.
@@ -66,6 +77,16 @@ func New() *MemoryStore {
 		Deployments:      pkgstate.New[Deployment]("deploy"),
 		DeployStatuses:   pkgstate.New[DeploymentStatus]("ds"),
 		ReleaseAssets:    pkgstate.New[ReleaseAsset]("asset"),
+		Workflows:        pkgstate.New[Workflow]("wf"),
+		WorkflowRuns:     pkgstate.New[WorkflowRun]("run"),
+		WorkflowJobs:     pkgstate.New[WorkflowJob]("job"),
+		Artifacts:        pkgstate.New[Artifact]("art"),
+		Secrets:          pkgstate.New[Secret]("secret"),
+		GitRefs:          pkgstate.New[GitRef]("ref"),
+		GitCommits:       pkgstate.New[GitCommit]("gc"),
+		GitTrees:         pkgstate.New[GitTree]("gt"),
+		GitBlobs:         pkgstate.New[GitBlob]("gb"),
+		GitTags:          pkgstate.New[GitTag]("gtag"),
 		Clock:            pkgstate.NewClock(),
 	}
 }
@@ -385,7 +406,84 @@ func (s *MemoryStore) Reset() {
 	s.Deployments.Reset()
 	s.DeployStatuses.Reset()
 	s.ReleaseAssets.Reset()
+	s.Workflows.Reset()
+	s.WorkflowRuns.Reset()
+	s.WorkflowJobs.Reset()
+	s.Artifacts.Reset()
+	s.Secrets.Reset()
+	s.GitRefs.Reset()
+	s.GitCommits.Reset()
+	s.GitTrees.Reset()
+	s.GitBlobs.Reset()
+	s.GitTags.Reset()
 	s.Clock.Reset()
 	s.issueCounter.Store(0)
 	s.idCounter.Store(0)
+	s.runCounter.Store(0)
+}
+
+// NextRunNumber returns the next workflow run number.
+func (s *MemoryStore) NextRunNumber() int {
+	return int(s.runCounter.Add(1))
+}
+
+// ListRepoWorkflows returns workflows for a repo.
+func (s *MemoryStore) ListRepoWorkflows(owner, repo string) []Workflow {
+	return s.Workflows.Filter(func(_ string, w Workflow) bool {
+		return w.RepoOwner == owner && w.RepoName == repo
+	})
+}
+
+// ListWorkflowRuns returns runs for a repo, optionally filtered by workflow ID.
+func (s *MemoryStore) ListWorkflowRuns(owner, repo string, workflowID int64) []WorkflowRun {
+	return s.WorkflowRuns.Filter(func(_ string, r WorkflowRun) bool {
+		if r.RepoOwner != owner || r.RepoName != repo {
+			return false
+		}
+		if workflowID > 0 && r.WorkflowID != workflowID {
+			return false
+		}
+		return true
+	})
+}
+
+// ListRunJobs returns jobs for a workflow run.
+func (s *MemoryStore) ListRunJobs(owner, repo string, runID int64) []WorkflowJob {
+	return s.WorkflowJobs.Filter(func(_ string, j WorkflowJob) bool {
+		return j.RepoOwner == owner && j.RepoName == repo && j.RunID == runID
+	})
+}
+
+// ListRunArtifacts returns artifacts for a workflow run.
+func (s *MemoryStore) ListRunArtifacts(owner, repo string, runID int64) []Artifact {
+	return s.Artifacts.Filter(func(_ string, a Artifact) bool {
+		return a.RepoOwner == owner && a.RepoName == repo && a.RunID == runID
+	})
+}
+
+// ListRepoArtifacts returns all artifacts for a repo.
+func (s *MemoryStore) ListRepoArtifacts(owner, repo string) []Artifact {
+	return s.Artifacts.Filter(func(_ string, a Artifact) bool {
+		return a.RepoOwner == owner && a.RepoName == repo
+	})
+}
+
+// ListRepoSecrets returns secrets for a repo (metadata only).
+func (s *MemoryStore) ListRepoSecrets(owner, repo string) []Secret {
+	return s.Secrets.Filter(func(_ string, sec Secret) bool {
+		return sec.RepoOwner == owner && sec.RepoName == repo
+	})
+}
+
+// ListRepoGitRefs returns git refs for a repo.
+func (s *MemoryStore) ListRepoGitRefs(owner, repo, prefix string) []GitRef {
+	return s.GitRefs.Filter(func(_ string, r GitRef) bool {
+		if r.RepoOwner != owner || r.RepoName != repo {
+			return false
+		}
+		if prefix != "" {
+			return len(r.Ref) >= len(prefix) && r.Ref[:len(prefix)] == prefix
+		}
+		return true
+	})
 }

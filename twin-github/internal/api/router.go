@@ -182,6 +182,54 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/repos/{owner}/{repo}/releases/{release_id}/assets", h.ListReleaseAssets)
 		r.Post("/repos/{owner}/{repo}/releases/{release_id}/assets", h.UploadReleaseAsset)
 
+		// Actions — Workflows
+		r.Get("/repos/{owner}/{repo}/actions/workflows", h.ListWorkflows)
+		r.Get("/repos/{owner}/{repo}/actions/workflows/{workflow_id}", h.GetWorkflow)
+		r.Post("/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", h.TriggerWorkflow)
+
+		// Actions — Runs
+		r.Get("/repos/{owner}/{repo}/actions/runs", h.ListWorkflowRuns)
+		r.Get("/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs", h.ListWorkflowRunsForWorkflow)
+		r.Get("/repos/{owner}/{repo}/actions/runs/{run_id}", h.GetWorkflowRun)
+		r.Delete("/repos/{owner}/{repo}/actions/runs/{run_id}", h.DeleteWorkflowRun)
+		r.Post("/repos/{owner}/{repo}/actions/runs/{run_id}/cancel", h.CancelWorkflowRun)
+		r.Post("/repos/{owner}/{repo}/actions/runs/{run_id}/rerun", h.RerunWorkflow)
+		r.Post("/repos/{owner}/{repo}/actions/runs/{run_id}/rerun-failed-jobs", h.RerunFailedJobs)
+
+		// Actions — Jobs
+		r.Get("/repos/{owner}/{repo}/actions/runs/{run_id}/jobs", h.ListRunJobs)
+		r.Get("/repos/{owner}/{repo}/actions/jobs/{job_id}", h.GetJob)
+
+		// Actions — Artifacts
+		r.Get("/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts", h.ListRunArtifacts)
+		r.Get("/repos/{owner}/{repo}/actions/artifacts", h.ListRepoArtifacts)
+		r.Get("/repos/{owner}/{repo}/actions/artifacts/{artifact_id}", h.GetArtifact)
+		r.Delete("/repos/{owner}/{repo}/actions/artifacts/{artifact_id}", h.DeleteArtifact)
+
+		// Actions — Secrets
+		r.Get("/repos/{owner}/{repo}/actions/secrets", h.ListRepoSecrets)
+		r.Get("/repos/{owner}/{repo}/actions/secrets/public-key", h.GetRepoPublicKey)
+		r.Get("/repos/{owner}/{repo}/actions/secrets/{secret_name}", h.GetRepoSecret)
+		r.Put("/repos/{owner}/{repo}/actions/secrets/{secret_name}", h.CreateOrUpdateRepoSecret)
+		r.Delete("/repos/{owner}/{repo}/actions/secrets/{secret_name}", h.DeleteRepoSecret)
+
+		// Git Data — Refs
+		r.Get("/repos/{owner}/{repo}/git/ref/*", h.GetGitRef)
+		r.Get("/repos/{owner}/{repo}/git/matching-refs/*", h.ListMatchingRefs)
+		r.Post("/repos/{owner}/{repo}/git/refs", h.CreateGitRef)
+		r.Patch("/repos/{owner}/{repo}/git/refs/*", h.UpdateGitRef)
+		r.Delete("/repos/{owner}/{repo}/git/refs/*", h.DeleteGitRef)
+
+		// Git Data — Commits, Trees, Blobs, Tags
+		r.Get("/repos/{owner}/{repo}/git/commits/{commit_sha}", h.GetGitCommit)
+		r.Post("/repos/{owner}/{repo}/git/commits", h.CreateGitCommit)
+		r.Get("/repos/{owner}/{repo}/git/trees/{tree_sha}", h.GetGitTree)
+		r.Post("/repos/{owner}/{repo}/git/trees", h.CreateGitTree)
+		r.Get("/repos/{owner}/{repo}/git/blobs/{file_sha}", h.GetGitBlob)
+		r.Post("/repos/{owner}/{repo}/git/blobs", h.CreateGitBlob)
+		r.Get("/repos/{owner}/{repo}/git/tags/{tag_sha}", h.GetGitTag)
+		r.Post("/repos/{owner}/{repo}/git/tags", h.CreateGitTag)
+
 		// Search
 		r.Get("/search/issues", h.SearchIssues)
 		r.Get("/search/repositories", h.SearchRepos)

@@ -417,3 +417,185 @@ type ReleaseAsset struct {
 	RepoName  string `json:"-"`
 	ReleaseID int64  `json:"-"`
 }
+
+// --- Actions types ---
+
+// Workflow represents a GitHub Actions workflow definition.
+type Workflow struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	State     string `json:"state"` // "active", "disabled_manually"
+	HTMLURL   string `json:"html_url"`
+	BadgeURL  string `json:"badge_url"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// WorkflowRun represents a single execution of a workflow.
+type WorkflowRun struct {
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	WorkflowID   int64  `json:"workflow_id"`
+	HeadBranch   string `json:"head_branch"`
+	HeadSHA      string `json:"head_sha"`
+	Status       string `json:"status"` // "queued", "in_progress", "completed"
+	Conclusion   string `json:"conclusion,omitempty"` // "success", "failure", "cancelled", etc.
+	Event        string `json:"event"` // "push", "pull_request", "workflow_dispatch", etc.
+	RunNumber    int    `json:"run_number"`
+	RunAttempt   int    `json:"run_attempt"`
+	HTMLURL      string `json:"html_url"`
+	Actor        User   `json:"actor"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// WorkflowJob represents a job within a workflow run.
+type WorkflowJob struct {
+	ID          int64    `json:"id"`
+	RunID       int64    `json:"run_id"`
+	Name        string   `json:"name"`
+	Status      string   `json:"status"` // "queued", "in_progress", "completed"
+	Conclusion  string   `json:"conclusion,omitempty"`
+	StartedAt   string   `json:"started_at,omitempty"`
+	CompletedAt string   `json:"completed_at,omitempty"`
+	Steps       []JobStep `json:"steps,omitempty"`
+	HTMLURL     string   `json:"html_url"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// JobStep represents a step within a workflow job.
+type JobStep struct {
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	Conclusion  string `json:"conclusion,omitempty"`
+	Number      int    `json:"number"`
+	StartedAt   string `json:"started_at,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
+}
+
+// Artifact represents a GitHub Actions artifact.
+type Artifact struct {
+	ID                 int64  `json:"id"`
+	Name               string `json:"name"`
+	SizeInBytes        int64  `json:"size_in_bytes"`
+	ArchiveDownloadURL string `json:"archive_download_url"`
+	Expired            bool   `json:"expired"`
+	ExpiresAt          string `json:"expires_at,omitempty"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+	RunID     int64  `json:"-"`
+}
+
+// Secret represents a GitHub Actions secret (metadata only — value is write-only).
+type Secret struct {
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// --- Git Data types ---
+
+// GitRef represents a Git reference (branch/tag pointer).
+type GitRef struct {
+	Ref    string    `json:"ref"` // "refs/heads/main", "refs/tags/v1.0"
+	NodeID string    `json:"node_id"`
+	URL    string    `json:"url"`
+	Object GitObject `json:"object"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// GitObject represents the object a ref points to.
+type GitObject struct {
+	Type string `json:"type"` // "commit", "tag"
+	SHA  string `json:"sha"`
+	URL  string `json:"url"`
+}
+
+// GitCommit represents a Git commit object (low-level).
+type GitCommit struct {
+	SHA     string        `json:"sha"`
+	Message string        `json:"message"`
+	Tree    GitTreeRef    `json:"tree"`
+	Parents []GitTreeRef  `json:"parents,omitempty"`
+	Author  GitSignature  `json:"author"`
+	HTMLURL string        `json:"html_url"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// GitTreeRef is a reference to a tree or commit by SHA.
+type GitTreeRef struct {
+	SHA string `json:"sha"`
+	URL string `json:"url,omitempty"`
+}
+
+// GitSignature represents the author/committer of a git commit.
+type GitSignature struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Date  string `json:"date"`
+}
+
+// GitTree represents a Git tree object.
+type GitTree struct {
+	SHA       string        `json:"sha"`
+	Tree      []GitTreeEntry `json:"tree"`
+	Truncated bool          `json:"truncated"`
+	URL       string        `json:"url"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// GitTreeEntry is a single entry in a Git tree.
+type GitTreeEntry struct {
+	Path string `json:"path"`
+	Mode string `json:"mode"` // "100644", "100755", "040000", "120000", "160000"
+	Type string `json:"type"` // "blob", "tree", "commit"
+	Size int    `json:"size,omitempty"`
+	SHA  string `json:"sha"`
+	URL  string `json:"url,omitempty"`
+}
+
+// GitBlob represents a Git blob object.
+type GitBlob struct {
+	SHA      string `json:"sha"`
+	Size     int    `json:"size"`
+	Content  string `json:"content,omitempty"` // base64
+	Encoding string `json:"encoding,omitempty"`
+	URL      string `json:"url"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}
+
+// GitTag represents an annotated Git tag object.
+type GitTag struct {
+	Tag     string       `json:"tag"`
+	SHA     string       `json:"sha"`
+	Message string       `json:"message"`
+	Tagger  GitSignature `json:"tagger"`
+	Object  GitObject    `json:"object"`
+	URL     string       `json:"url"`
+
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+}

@@ -567,6 +567,151 @@ func TestCreateFork(t *testing.T) {
 	}
 }
 
+// --- Actions Workflow Tests ---
+
+func TestActionsWorkflowDispatch(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "actions-repo")
+
+	// Seed a workflow
+	tc.Post("/admin/state", json.RawMessage(`{"workflows":{"wf_001":{
+		"id":1,"name":"CI","path":".github/workflows/ci.yml","state":"active",
+		"repo_owner":"twin-bot","repo_name":"actions-repo"
+	}}}`)).AssertStatus(200)
+
+	// Trigger it
+	resp := ghPost(tc, "/repos/twin-bot/actions-repo/actions/workflows/1/dispatches", map[string]any{
+		"ref": "main",
+	})
+	resp.AssertStatus(204)
+
+	// List runs
+	resp = ghGet(tc, "/repos/twin-bot/actions-repo/actions/runs")
+	m := resp.JSONMap()
+	if m["total_count"].(float64) != 1 {
+		t.Errorf("expected 1 run, got %v", m["total_count"])
+	}
+}
+
+func TestActionsRunCancel(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "cancel-repo")
+
+	// Seed workflow + trigger
+	tc.Post("/admin/state", json.RawMessage(`{"workflows":{"wf_001":{
+		"id":1,"name":"CI","path":".github/workflows/ci.yml","state":"active",
+		"repo_owner":"twin-bot","repo_name":"cancel-repo"
+	}}}`)).AssertStatus(200)
+
+	ghPost(tc, "/repos/twin-bot/cancel-repo/actions/workflows/1/dispatches", map[string]any{"ref": "main"})
+
+	resp := ghGet(tc, "/repos/twin-bot/cancel-repo/actions/runs")
+	runs := resp.JSONMap()["workflow_runs"].([]any)
+	runID := int(runs[0].(map[string]any)["id"].(float64))
+
+	// Cancel
+	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/cancel-repo/actions/runs/%d/cancel", runID), nil)
+	resp.AssertStatus(202)
+
+	// Verify cancelled
+	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/cancel-repo/actions/runs/%d", runID))
+	if resp.JSONMap()["conclusion"] != "cancelled" {
+		t.Error("expected conclusion=cancelled")
+	}
+}
+
+func TestActionsSecrets(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "secret-repo")
+
+	// Create secret
+	ghPut(tc, "/repos/twin-bot/secret-repo/actions/secrets/MY_SECRET", map[string]any{
+		"encrypted_value": "xxx",
+		"key_id":          "012345678912345678",
+	}).AssertStatus(201)
+
+	// List
+	resp := ghGet(tc, "/repos/twin-bot/secret-repo/actions/secrets")
+	if resp.JSONMap()["total_count"].(float64) != 1 {
+		t.Error("expected 1 secret")
+	}
+
+	// Delete
+	ghDelete(tc, "/repos/twin-bot/secret-repo/actions/secrets/MY_SECRET").AssertStatus(204)
+}
+
+// --- Git Data Tests ---
+
+func TestGitRefs(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "git-repo")
+
+	// Create ref
+	resp := ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{
+		"ref": "refs/heads/feature",
+		"sha": "abc123",
+	})
+	resp.AssertStatus(201)
+	if resp.JSONMap()["ref"] != "refs/heads/feature" {
+		t.Error("expected ref=refs/heads/feature")
+	}
+
+	// Get ref
+	resp = ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature")
+	resp.AssertStatus(200)
+
+	// Delete ref
+	ghDelete(tc, "/repos/twin-bot/git-repo/git/refs/heads/feature").AssertStatus(204)
+}
+
+func TestGitCommitsAndTrees(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "gitdata-repo")
+
+	// Create blob
+	resp := ghPost(tc, "/repos/twin-bot/gitdata-repo/git/blobs", map[string]any{
+		"content":  "SGVsbG8=",
+		"encoding": "base64",
+	})
+	resp.AssertStatus(201)
+	blobSHA := resp.JSONMap()["sha"].(string)
+
+	// Create tree
+	resp = ghPost(tc, "/repos/twin-bot/gitdata-repo/git/trees", map[string]any{
+		"tree": []map[string]any{
+			{"path": "hello.txt", "mode": "100644", "type": "blob", "sha": blobSHA},
+		},
+	})
+	resp.AssertStatus(201)
+	treeSHA := resp.JSONMap()["sha"].(string)
+
+	// Create commit
+	resp = ghPost(tc, "/repos/twin-bot/gitdata-repo/git/commits", map[string]any{
+		"message": "initial commit",
+		"tree":    treeSHA,
+	})
+	resp.AssertStatus(201)
+	if resp.JSONMap()["message"] != "initial commit" {
+		t.Error("expected message=initial commit")
+	}
+}
+
+func TestGitTags(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "tag-repo")
+
+	resp := ghPost(tc, "/repos/twin-bot/tag-repo/git/tags", map[string]any{
+		"tag":     "v1.0.0",
+		"message": "Release v1.0.0",
+		"object":  "abc123",
+		"type":    "commit",
+	})
+	resp.AssertStatus(201)
+	if resp.JSONMap()["tag"] != "v1.0.0" {
+		t.Error("expected tag=v1.0.0")
+	}
+}
+
 // --- Admin Tests ---
 
 func TestAdminHealth(t *testing.T) {
