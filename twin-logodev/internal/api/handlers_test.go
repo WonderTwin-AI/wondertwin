@@ -39,9 +39,11 @@ func logoGet(tc *testutil.TwinClient, path string) *testutil.Response {
 func seedBrands(tc *testutil.TwinClient) {
 	seed := json.RawMessage(`{"brands":{
 		"brand_001":{"name":"Stripe","domain":"stripe.com","ticker":""},
-		"brand_002":{"name":"Google","domain":"google.com","ticker":"GOOG"},
-		"brand_003":{"name":"Apple","domain":"apple.com","ticker":"AAPL"},
-		"brand_004":{"name":"Stripe Atlas","domain":"atlas.stripe.com","ticker":""}
+		"brand_002":{"name":"Google","domain":"google.com","ticker":"GOOG","isin":"US02079K3059"},
+		"brand_003":{"name":"Apple","domain":"apple.com","ticker":"AAPL","isin":"US0378331005"},
+		"brand_004":{"name":"Stripe Atlas","domain":"atlas.stripe.com","ticker":""},
+		"brand_005":{"name":"Bitcoin","domain":"bitcoin.org","crypto":"BTC"},
+		"brand_006":{"name":"Ethereum","domain":"ethereum.org","crypto":"ETH"}
 	}}`)
 	tc.Post("/admin/state", seed).AssertStatus(200)
 }
@@ -210,6 +212,57 @@ func TestGetLogoByTickerNotFound404(t *testing.T) {
 	_, tc := setupLogodev(t)
 
 	resp := logoGet(tc, "/ticker/ZZZZ?fallback=404")
+	resp.AssertStatus(404)
+}
+
+// --- Crypto Lookup ---
+
+func TestGetLogoByCrypto(t *testing.T) {
+	_, tc := setupLogodev(t)
+	seedBrands(tc)
+
+	resp := logoGet(tc, "/crypto/BTC")
+	resp.AssertStatus(200)
+	if !strings.Contains(string(resp.Body), "<svg") {
+		t.Error("expected SVG content for BTC")
+	}
+}
+
+func TestGetLogoByCryptoNotFound(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	// No brands seeded — falls back to monogram
+	resp := logoGet(tc, "/crypto/DOGE")
+	resp.AssertStatus(200)
+	if !strings.Contains(string(resp.Body), "DO") {
+		t.Error("expected initials 'DO' for DOGE fallback")
+	}
+}
+
+func TestGetLogoByCryptoNotFound404(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	resp := logoGet(tc, "/crypto/DOGE?fallback=404")
+	resp.AssertStatus(404)
+}
+
+// --- ISIN Lookup ---
+
+func TestGetLogoByISIN(t *testing.T) {
+	_, tc := setupLogodev(t)
+	seedBrands(tc)
+
+	resp := logoGet(tc, "/isin/US0378331005")
+	resp.AssertStatus(200)
+	if !strings.Contains(string(resp.Body), "<svg") {
+		t.Error("expected SVG content for Apple ISIN")
+	}
+}
+
+func TestGetLogoByISINNotFound404(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	resp := logoGet(tc, "/isin/XX0000000000?fallback=404")
 	resp.AssertStatus(404)
 }
 

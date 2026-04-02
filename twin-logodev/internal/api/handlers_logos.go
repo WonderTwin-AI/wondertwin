@@ -43,14 +43,48 @@ func (h *Handler) GetLogoByTicker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// No ticker match — check fallback preference
 	if r.URL.Query().Get("fallback") == "404" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-
-	// Default: monogram from ticker
 	h.serveLogo(w, r, symbol+".com")
+}
+
+// GetLogoByCrypto handles GET /crypto/{symbol} — looks up brand by cryptocurrency symbol.
+func (h *Handler) GetLogoByCrypto(w http.ResponseWriter, r *http.Request) {
+	symbol := strings.ToUpper(chi.URLParam(r, "symbol"))
+
+	for _, b := range h.store.Brands.List() {
+		if strings.ToUpper(b.Crypto) == symbol {
+			h.serveLogo(w, r, b.Domain)
+			return
+		}
+	}
+
+	if r.URL.Query().Get("fallback") == "404" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	h.serveLogo(w, r, symbol+".com")
+}
+
+// GetLogoByISIN handles GET /isin/{code} — looks up brand by ISIN (International Securities Identification Number).
+func (h *Handler) GetLogoByISIN(w http.ResponseWriter, r *http.Request) {
+	code := strings.ToUpper(chi.URLParam(r, "code"))
+
+	for _, b := range h.store.Brands.List() {
+		if strings.ToUpper(b.ISIN) == code {
+			h.serveLogo(w, r, b.Domain)
+			return
+		}
+	}
+
+	if r.URL.Query().Get("fallback") == "404" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	// ISIN codes aren't meaningful as domains — monogram from code
+	h.serveLogo(w, r, code+".com")
 }
 
 // serveLogo is the shared handler logic for all logo retrieval endpoints.

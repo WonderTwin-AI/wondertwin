@@ -35,6 +35,8 @@ func (h *Handler) Routes(r chi.Router) {
 
 		r.Get("/name/{name}", h.GetLogoByName)
 		r.Get("/ticker/{symbol}", h.GetLogoByTicker)
+		r.Get("/crypto/{symbol}", h.GetLogoByCrypto)
+		r.Get("/isin/{code}", h.GetLogoByISIN)
 		r.Get("/{domain}", h.GetLogo)
 	})
 

@@ -17,10 +17,12 @@ type CustomLogo struct {
 	Data        []byte `json:"data"`
 }
 
-// Brand represents a company/brand entry for the search/ticker API.
+// Brand represents a company/brand entry for the search/ticker/crypto/ISIN API.
 type Brand struct {
-	Name   string `json:"name"`
-	Domain string `json:"domain"`
-	Ticker string `json:"ticker,omitempty"`
+	Name    string `json:"name"`
+	Domain  string `json:"domain"`
+	Ticker  string `json:"ticker,omitempty"`
+	Crypto  string `json:"crypto,omitempty"`
+	ISIN    string `json:"isin,omitempty"`
 	LogoURL string `json:"logo_url,omitempty"`
 }

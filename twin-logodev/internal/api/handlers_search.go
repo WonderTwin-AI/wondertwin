@@ -29,20 +29,24 @@ func (h *Handler) SearchBrands(w http.ResponseWriter, r *http.Request) {
 	var results []store.Brand
 
 	for _, b := range brands {
-		nameL := strings.ToLower(b.Name)
-		domainL := strings.ToLower(b.Domain)
-		tickerL := strings.ToLower(b.Ticker)
+		fields := []string{
+			strings.ToLower(b.Name),
+			strings.ToLower(b.Domain),
+			strings.ToLower(b.Ticker),
+			strings.ToLower(b.Crypto),
+			strings.ToLower(b.ISIN),
+		}
 
 		var matched bool
-		if strategy == "typeahead" {
-			matched = strings.HasPrefix(nameL, q) ||
-				strings.HasPrefix(domainL, q) ||
-				strings.HasPrefix(tickerL, q)
-		} else {
-			// "match" strategy — substring contains
-			matched = strings.Contains(nameL, q) ||
-				strings.Contains(domainL, q) ||
-				strings.Contains(tickerL, q)
+		for _, f := range fields {
+			if f == "" {
+				continue
+			}
+			if strategy == "typeahead" {
+				matched = matched || strings.HasPrefix(f, q)
+			} else {
+				matched = matched || strings.Contains(f, q)
+			}
 		}
 
 		if matched {
