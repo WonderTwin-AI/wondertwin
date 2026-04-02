@@ -33,6 +33,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(quirks.Middleware(h.quirks))
 		r.Use(telemetry.Middleware(h.emitter))
 
+		r.Get("/api/v1/search", h.SearchBrands)
 		r.Get("/{domain}", h.GetLogo)
 	})
 

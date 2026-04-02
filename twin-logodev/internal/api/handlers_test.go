@@ -289,6 +289,64 @@ func TestAdminGetLogoWithCustom(t *testing.T) {
 	}
 }
 
+// --- Search Tests ---
+
+func TestSearchBrands(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	seed := json.RawMessage(`{"brands":{"brand_001":{"name":"Stripe","domain":"stripe.com","ticker":""},"brand_002":{"name":"Google","domain":"google.com","ticker":"GOOG"},"brand_003":{"name":"Stripe Atlas","domain":"atlas.stripe.com","ticker":""}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	resp := logoGet(tc, "/api/v1/search?q=stripe")
+	resp.AssertStatus(200)
+
+	var results []map[string]any
+	json.Unmarshal(resp.Body, &results)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results for 'stripe', got %d", len(results))
+	}
+}
+
+func TestSearchBrandsByTicker(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	seed := json.RawMessage(`{"brands":{"brand_001":{"name":"Alphabet","domain":"google.com","ticker":"GOOG"},"brand_002":{"name":"Apple","domain":"apple.com","ticker":"AAPL"}}}`)
+	tc.Post("/admin/state", seed).AssertStatus(200)
+
+	resp := logoGet(tc, "/api/v1/search?q=goog")
+	resp.AssertStatus(200)
+
+	var results []map[string]any
+	json.Unmarshal(resp.Body, &results)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result for ticker 'goog', got %d", len(results))
+	}
+	if results[0]["name"] != "Alphabet" {
+		t.Errorf("expected Alphabet, got %v", results[0]["name"])
+	}
+}
+
+func TestSearchBrandsEmpty(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	resp := logoGet(tc, "/api/v1/search?q=nonexistent")
+	resp.AssertStatus(200)
+
+	var results []map[string]any
+	json.Unmarshal(resp.Body, &results)
+	if results != nil {
+		t.Errorf("expected null/empty results, got %v", results)
+	}
+}
+
+func TestSearchBrandsMissingQuery(t *testing.T) {
+	_, tc := setupLogodev(t)
+
+	resp := logoGet(tc, "/api/v1/search")
+	resp.AssertStatus(400)
+	resp.AssertBodyContains("bad_request")
+}
+
 func TestAdminReset(t *testing.T) {
 	_, tc := setupLogodev(t)
 
