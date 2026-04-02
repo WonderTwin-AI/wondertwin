@@ -1,6 +1,7 @@
 {
   "twin": "hubspot",
   "display_name": "HubSpot",
+  "tier": "free",
   "category": "workspace",
   "description": "Simulates the HubSpot CRM v3 API: generic CRM objects (contacts, companies, deals, tickets, engagements), batch operations, search, associations v4, properties, pipelines, owners, lists, webhooks, forms, and OAuth.",
   "sdk_target": {

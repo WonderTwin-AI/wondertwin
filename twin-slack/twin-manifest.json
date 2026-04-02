@@ -1,6 +1,7 @@
 {
   "twin": "slack",
   "display_name": "Slack",
+  "tier": "free",
   "category": "workspace",
   "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more.",
   "sdk_target": {
