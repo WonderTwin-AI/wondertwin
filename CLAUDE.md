@@ -50,8 +50,8 @@ Every new twin must include all of the following before pushing. Run these check
 ### Twin tier policy
 - **All new twins default to `"tier": "paid"`** in twin-manifest.json. Free tier is an explicit business decision, not a default.
 - The `"tier"` field must be set explicitly in every twin-manifest.json — do not rely on schema defaults.
-- Current free twins: stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot, algolia
-- Current paid twins: qbo, xero, smile, loyaltylion
+- Current free twins: stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot
+- Current paid twins: qbo, xero, smile, loyaltylion, algolia
 - When building a new twin, set `"tier": "paid"` unless explicitly told otherwise.
 
 ### Common pitfalls
