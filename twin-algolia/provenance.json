@@ -1,0 +1,20 @@
+{
+  "twin": "algolia",
+  "sdk_target": {
+    "package": "github.com/algolia/algoliasearch-client-go",
+    "language": "go",
+    "version": "v3"
+  },
+  "build": 1,
+  "generated_at": "2026-04-02T00:00:00Z",
+  "sources": {
+    "openapi": {
+      "origin": "none",
+      "url": ""
+    },
+    "sdk_analysis": {
+      "method": "manual",
+      "repo": "https://github.com/algolia/algoliasearch-client-go"
+    }
+  }
+}
