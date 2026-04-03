@@ -1,6 +1,7 @@
 {
   "twin": "shopify",
   "display_name": "Shopify",
+  "tier": "free",
   "category": "workspace",
   "description": "Simulates the Shopify Admin REST API: products, variants, images, orders, transactions, refunds, customers, addresses, inventory, fulfillments, collections, webhooks, metafields, themes, assets, pages, blogs, articles, price rules, discount codes, gift cards, draft orders, script tags, and redirects.",
   "sdk_target": {

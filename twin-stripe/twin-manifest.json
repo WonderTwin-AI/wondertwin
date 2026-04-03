@@ -1,6 +1,7 @@
 {
   "twin": "stripe",
   "display_name": "Stripe",
+  "tier": "free",
   "category": "payments",
   "description": "Simulates the Stripe API — Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs with webhook delivery.",
   "sdk_target": {

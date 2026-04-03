@@ -1,6 +1,7 @@
 {
   "twin": "qbo",
   "display_name": "QuickBooks Online",
+  "tier": "paid",
   "category": "accounting",
   "description": "Simulates the QuickBooks Online Accounting API v3 — chart of accounts, customers, vendors, invoices, bills, payments, journal entries, and financial reports with SQL-like query language.",
   "sdk_target": {

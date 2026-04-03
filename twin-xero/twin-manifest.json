@@ -1,6 +1,7 @@
 {
   "twin": "xero",
   "display_name": "Xero",
+  "tier": "paid",
   "category": "accounting",
   "description": "Simulates the Xero Accounting API — chart of accounts, invoices, bills, credit notes, payments, manual journals, and financial reports.",
   "sdk_target": {

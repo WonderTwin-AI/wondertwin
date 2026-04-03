@@ -47,6 +47,13 @@ Every new twin must include all of the following before pushing. Run these check
 3. **Full suite clean**: `go test ./... -short` — ensure no regressions in other twins
 4. **Binary compiles**: `go build -o /dev/null ./twin-{name}/cmd/twin-{name}/`
 
+### Twin tier policy
+- **All new twins default to `"tier": "paid"`** in twin-manifest.json. Free tier is an explicit business decision, not a default.
+- The `"tier"` field must be set explicitly in every twin-manifest.json — do not rely on schema defaults.
+- Current free twins: stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot, algolia
+- Current paid twins: qbo, xero, smile, loyaltylion
+- When building a new twin, set `"tier": "paid"` unless explicitly told otherwise.
+
 ### Common pitfalls
 - **`auth_pattern` enum**: must be one of `api_key`, `oauth2`, `basic`, `jwt`, `custom`, `none`. Do not invent values.
 - **Port collisions**: grep existing `cfg.Port` values before assigning a new one.
