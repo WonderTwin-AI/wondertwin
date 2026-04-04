@@ -1,6 +1,7 @@
 {
   "twin": "algolia",
   "display_name": "Algolia",
+  "tier": "paid",
   "category": "search",
   "description": "Simulates the Algolia Search REST API: search, multi-index search, facet search, browse, indexing (add/save/partial update/delete/batch/clear), index management (list/delete/copy/move/settings), synonyms, rules, API keys, and task status.",
   "sdk_target": {
