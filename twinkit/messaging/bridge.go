@@ -3,13 +3,13 @@ package messaging
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
+	"github.com/wondertwin-ai/wondertwin/twinkit/domainevents"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // WithTelemetry returns an Option that wraps the engine's hooks to automatically
 // emit DomainEvent telemetry when hooks fire.
-func WithTelemetry(emitter *telemetry.Emitter) Option {
+func WithTelemetry(emitter domainevents.Emitter) Option {
 	return func(e *Engine) {
 		inner := e.hooks
 		if inner == nil {
@@ -20,7 +20,7 @@ func WithTelemetry(emitter *telemetry.Emitter) Option {
 }
 
 type telemetryBridge struct {
-	emitter *telemetry.Emitter
+	emitter domainevents.Emitter
 	inner   MessagingHooks
 }
 
@@ -32,7 +32,7 @@ func (b *telemetryBridge) ValidateMessage(ctx context.Context, msg *Message) err
 	}
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "messaging",
 			Hook:       "ValidateMessage",
 			Resource:   "messages",
@@ -48,7 +48,7 @@ func (b *telemetryBridge) ValidateMessage(ctx context.Context, msg *Message) err
 func (b *telemetryBridge) OnMessageCreated(ctx context.Context, msg *Message) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "messaging",
 			Hook:       "OnMessageCreated",
 			Resource:   "messages",
@@ -64,7 +64,7 @@ func (b *telemetryBridge) OnMessageCreated(ctx context.Context, msg *Message) er
 func (b *telemetryBridge) OnStatusChange(ctx context.Context, msg *Message, from, to MessageStatus) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "messaging",
 			Hook:       "OnStatusChange",
 			Resource:   "messages",
