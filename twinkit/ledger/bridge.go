@@ -3,14 +3,14 @@ package ledger
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
+	"github.com/wondertwin-ai/wondertwin/twinkit/domainevents"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // WithTelemetry returns an Option that wraps the engine's hooks to automatically
 // emit DomainEvent telemetry when hooks fire. The twin's custom hooks are called
 // after telemetry emission. If no hooks are set, telemetry-only hooks are used.
-func WithTelemetry(emitter *telemetry.Emitter) Option {
+func WithTelemetry(emitter domainevents.Emitter) Option {
 	return func(e *Engine) {
 		inner := e.hooks
 		if inner == nil {
@@ -21,14 +21,14 @@ func WithTelemetry(emitter *telemetry.Emitter) Option {
 }
 
 type telemetryBridge struct {
-	emitter *telemetry.Emitter
+	emitter domainevents.Emitter
 	inner   AccountingHooks
 }
 
 func (b *telemetryBridge) OnDocumentStateTransition(ctx context.Context, doc *Document, from, to DocumentStatus) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "ledger",
 			Hook:       "OnDocumentStateTransition",
 			Resource:   docTypeToResource(doc.Type),
@@ -55,7 +55,7 @@ func (b *telemetryBridge) OnJournalEntryCreated(ctx context.Context, doc *Docume
 
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "ledger",
 			Hook:       "OnJournalEntryCreated",
 			Resource:   docTypeToResource(doc.Type),
@@ -74,7 +74,7 @@ func (b *telemetryBridge) OnPaymentApplied(ctx context.Context, payment *Payment
 
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "ledger",
 			Hook:       "OnPaymentApplied",
 			Resource:   "payments",

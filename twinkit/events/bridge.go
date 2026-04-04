@@ -3,13 +3,13 @@ package events
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
+	"github.com/wondertwin-ai/wondertwin/twinkit/domainevents"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // WithTelemetry returns an Option that wraps the engine's hooks to automatically
 // emit DomainEvent telemetry when hooks fire.
-func WithTelemetry(emitter *telemetry.Emitter) Option {
+func WithTelemetry(emitter domainevents.Emitter) Option {
 	return func(e *Engine) {
 		inner := e.hooks
 		if inner == nil {
@@ -20,7 +20,7 @@ func WithTelemetry(emitter *telemetry.Emitter) Option {
 }
 
 type telemetryBridge struct {
-	emitter *telemetry.Emitter
+	emitter domainevents.Emitter
 	inner   EventsHooks
 }
 
@@ -32,7 +32,7 @@ func (b *telemetryBridge) ValidateEvent(ctx context.Context, event *Event) error
 	}
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "events",
 			Hook:       "ValidateEvent",
 			Resource:   "events",
@@ -52,7 +52,7 @@ func (b *telemetryBridge) OnEventIngested(ctx context.Context, event *Event) err
 	}
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "events",
 			Hook:       "OnEventIngested",
 			Resource:   "events",
@@ -68,7 +68,7 @@ func (b *telemetryBridge) OnEventIngested(ctx context.Context, event *Event) err
 func (b *telemetryBridge) OnIdentify(ctx context.Context, profile *UserProfile) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "events",
 			Hook:       "OnIdentify",
 			Resource:   "profiles",
@@ -84,7 +84,7 @@ func (b *telemetryBridge) OnIdentify(ctx context.Context, profile *UserProfile) 
 func (b *telemetryBridge) OnMerge(ctx context.Context, profile *UserProfile, anonymousID string) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "events",
 			Hook:       "OnMerge",
 			Resource:   "profiles",
