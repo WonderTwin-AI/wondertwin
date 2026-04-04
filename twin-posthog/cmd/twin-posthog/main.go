@@ -12,8 +12,6 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
@@ -28,38 +26,18 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
-	// Telemetry emitter — always created, enabled via env var or admin config.
-	telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
-	emitter := telemetry.NewEmitter(telemetry.Config{
-		Enabled:      telemetryEnabled,
-		CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
-		IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
-		OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
-		TwinName:     "posthog",
-		TwinVersion:  "0.1.0",
-	})
-	if telemetryEnabled {
-		emitter.Start()
-		defer emitter.Stop()
-	}
-
-	// Events engine for event ingestion, identity resolution + telemetry bridge.
+	// Events engine for event ingestion and identity resolution.
 	eventsEngine := pkgevents.NewEngine(
 		pkgevents.WithClock(memStore.Clock),
-		pkgevents.WithTelemetry(emitter),
 	)
 
-	// Quirks engine — loaded at runtime from Content API intelligence.
-	quirksEngine := quirks.NewEngine()
-
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine, eventsEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), eventsEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
-	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided

@@ -1,5 +1,17 @@
 # CLAUDE.md — wondertwin
 
+## Repository Scope
+
+This is the **public, MIT-licensed** WonderTwin repository. It contains:
+- **twinkit** — the shared library for building API twins
+- **Community twins** — 10 open-source twins built with the community skill
+- **wt CLI** — the command-line tool for managing twins
+- **twin-researcher skill** — the research methodology (public process, private artifacts)
+
+**Pro twins** (with telemetry, quirks engine, and Content API connectivity) live in the separate `wondertwin-pro` repository under a Business Source License.
+
+Community twins do NOT use telemetry, quirks, or the Content API. They use twinkit core and domain engines only. Do not add telemetry or quirks imports to twins in this repo.
+
 ## Twin Coverage Policy
 
 The goal for all twins is **100% API parity** with the real service. Every endpoint, every parameter, every error shape.
@@ -34,7 +46,7 @@ Do not skip this process. Do not silently omit endpoints. If you're unsure wheth
 
 ## Twin Development Checklist
 
-Every new twin must include all of the following before pushing. Run these checks locally — CI will fail if any are missing.
+Every new community twin must include all of the following before pushing.
 
 ### Required files (3 schema files + manifest)
 - `twin-{name}/twin.json` — name, description, category, sdk, default_port
@@ -47,22 +59,19 @@ Every new twin must include all of the following before pushing. Run these check
 3. **Full suite clean**: `go test ./... -short` — ensure no regressions in other twins
 4. **Binary compiles**: `go build -o /dev/null ./twin-{name}/cmd/twin-{name}/`
 
-### Twin tier policy
-- **All new twins default to `"tier": "paid"`** in twin-manifest.json. Free tier is an explicit business decision, not a default.
-- The `"tier"` field must be set explicitly in every twin-manifest.json — do not rely on schema defaults.
-- Current free twins: stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot
-- Current paid twins: qbo, xero, smile, loyaltylion, algolia
-- When building a new twin, set `"tier": "paid"` unless explicitly told otherwise.
+### Community twins in this repo
+stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot
 
 ### Common pitfalls
 - **`auth_pattern` enum**: must be one of `api_key`, `oauth2`, `basic`, `jwt`, `custom`, `none`. Do not invent values.
 - **Port collisions**: grep existing `cfg.Port` values before assigning a new one.
 - **Nil slices in Go JSON**: `json.Marshal(nil slice)` produces `null`, not `[]`. Tests must handle both when asserting on empty lists.
+- **Do not import twinkit-pro packages.** Community twins must not import `quirks`, `telemetry`, or any package from `wondertwin-pro`.
 
 ### Standard structure
 ```
 twin-{name}/
-  cmd/twin-{name}/main.go          # entry point
+  cmd/twin-{name}/main.go          # entry point (no telemetry/quirks)
   internal/api/router.go            # routes + auth middleware
   internal/api/handlers_{area}.go   # one file per resource area
   internal/api/handlers_test.go     # tests
@@ -75,19 +84,10 @@ twin-{name}/
 
 ## Twin Build Process
 
-This is the proven process for building a new twin from scratch. Follow it in order.
+This is the proven process for building a new community twin from scratch. Follow it in order.
 
 ### Phase 0: Research
-Before writing any code, research the full API surface of the target service. Use a dedicated research agent that returns a structured inventory of:
-- Every endpoint (method + path)
-- Authentication model
-- Request/response formats and standard envelopes
-- Error response shapes and codes
-- Webhooks (events, signing, delivery format)
-- Rate limits
-- SDK compatibility targets
-
-Save the research output. It is the source of truth for 100% parity.
+Before writing any code, research the full API surface of the target service. Use the `twin-researcher` skill, which produces structured artifacts in `wondertwin-docs/research/`. The research output is the source of truth for 100% parity.
 
 ### Phase 1: Scaffold + Core
 1. Create directory structure following the standard layout

@@ -11,8 +11,6 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
@@ -30,28 +28,9 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
-	// Telemetry emitter — always created, enabled via env var or admin config.
-	telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
-	emitter := telemetry.NewEmitter(telemetry.Config{
-		Enabled:      telemetryEnabled,
-		CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
-		IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
-		OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
-		TwinName:     "stripe",
-		TwinVersion:  "0.5.0",
-	})
-	if telemetryEnabled {
-		emitter.Start()
-		defer emitter.Stop()
-	}
-
-	// Quirks engine — loaded at runtime from Content API intelligence.
-	quirksEngine := quirks.NewEngine()
-
-	// Workspace engine for invoice, subscription, and payment_intent lifecycle telemetry.
+	// Workspace engine for invoice, subscription, and payment_intent lifecycle.
 	wsEngine := workspace.NewEngine(
 		workspace.WithClock(memStore.Clock),
-		workspace.WithTelemetry(emitter),
 		workspace.WithWorkflow(workspace.WorkflowConfig{
 			EntityType:     "invoice",
 			InitialStatus:  "draft",
@@ -109,14 +88,13 @@ func main() {
 	dispatcher.SetEndpointProvider(memStore)
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), emitter, quirksEngine, wsEngine)
+	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), wsEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetFlusher(dispatcher)
 	adminHandler.SetConfigProvider(twin)
-	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided

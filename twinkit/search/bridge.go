@@ -3,13 +3,13 @@ package search
 import (
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
+	"github.com/wondertwin-ai/wondertwin/twinkit/domainevents"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // WithTelemetry returns an Option that wraps the engine's hooks to automatically
 // emit DomainEvent telemetry when hooks fire.
-func WithTelemetry(emitter *telemetry.Emitter) Option {
+func WithTelemetry(emitter domainevents.Emitter) Option {
 	return func(e *Engine) {
 		inner := e.hooks
 		if inner == nil {
@@ -20,7 +20,7 @@ func WithTelemetry(emitter *telemetry.Emitter) Option {
 }
 
 type telemetryBridge struct {
-	emitter *telemetry.Emitter
+	emitter domainevents.Emitter
 	inner   SearchHooks
 }
 
@@ -35,7 +35,7 @@ func (b *telemetryBridge) OnRecordSaved(ctx context.Context, indexName string, r
 	}
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "search",
 			Hook:       "OnRecordSaved",
 			Resource:   indexName,
@@ -51,7 +51,7 @@ func (b *telemetryBridge) OnRecordSaved(ctx context.Context, indexName string, r
 func (b *telemetryBridge) OnRecordDeleted(ctx context.Context, indexName, objectID string) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "search",
 			Hook:       "OnRecordDeleted",
 			Resource:   indexName,
@@ -67,7 +67,7 @@ func (b *telemetryBridge) OnRecordDeleted(ctx context.Context, indexName, object
 func (b *telemetryBridge) OnSearch(ctx context.Context, indexName string, params *SearchParams, result *SearchResult) error {
 	b.emitter.EmitDomainEvent(
 		twincore.CorrelationIDFromContext(ctx),
-		telemetry.DomainEvent{
+		domainevents.DomainEvent{
 			Engine:     "search",
 			Hook:       "OnSearch",
 			Resource:   indexName,
