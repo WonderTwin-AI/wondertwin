@@ -2,15 +2,10 @@ go 1.25.7
 
 use (
 	.
-	./cmd/content-api
 	./twin-logodev
-	./twin-loyaltylion
 	./twin-posthog
 	./twin-resend
-	./twin-smile
 	./twin-stripe
 	./twin-twilio
-	./twin-qbo
-	./twin-xero
 	./twinkit
 )
