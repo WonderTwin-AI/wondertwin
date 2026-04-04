@@ -1,0 +1,50 @@
+name: Pro Twin Announcement
+description: Announce a pro twin that's being built (internal use)
+title: "twin-{name}: {Service Name}"
+labels: ["pro-twin", "status/building"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Pro Twin
+
+        This twin is being built as a **Pro twin** with telemetry, quirks intelligence, and Content API connectivity. It will be available to Pro subscribers.
+
+        Community discussion is welcome — let us know which endpoints matter most to you, what pain points you have with this API's sandbox, or how you're using it in your stack.
+
+  - type: input
+    id: platform
+    attributes:
+      label: Service
+      description: The service being twinned
+    validations:
+      required: true
+
+  - type: input
+    id: category
+    attributes:
+      label: Category
+      placeholder: e.g., versioning, payments, messaging
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What this twin covers
+      description: Brief description of the API surface
+      placeholder: |
+        Simulates the {Service} REST API — repos, pull requests, branches, webhooks, and more.
+        SDK compatibility target: {package}
+    validations:
+      required: true
+
+  - type: textarea
+    id: discussion
+    attributes:
+      label: Community input
+      description: Tell us what you need from this twin
+      placeholder: |
+        Which endpoints do you use most?
+        What's painful about testing against this API today?
+        Any specific workflows you need covered?
