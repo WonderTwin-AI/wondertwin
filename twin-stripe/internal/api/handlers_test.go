@@ -18,7 +18,7 @@ func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
 	dispatcher := webhook.NewDispatcher(webhook.Config{})
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil, nil, nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)

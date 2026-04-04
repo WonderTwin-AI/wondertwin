@@ -6,8 +6,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 )
@@ -16,14 +14,12 @@ import (
 type Handler struct {
 	store     *store.MemoryStore
 	mw        *twincore.Middleware
-	emitter   *telemetry.Emitter
-	quirks    *quirks.Engine
 	msgEngine *messaging.Engine
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine, me *messaging.Engine) *Handler {
-	return &Handler{store: s, mw: mw, emitter: em, quirks: qe, msgEngine: me}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, me *messaging.Engine) *Handler {
+	return &Handler{store: s, mw: mw, msgEngine: me}
 }
 
 // Routes mounts the Twilio API routes and admin extras.
@@ -32,8 +28,6 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/2010-04-01/Accounts/{AccountSid}", func(r chi.Router) {
 		r.Use(h.basicAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-		r.Use(quirks.Middleware(h.quirks))
-		r.Use(telemetry.Middleware(h.emitter))
 
 		// Messages
 		r.Post("/Messages.json", h.CreateMessage)
@@ -45,8 +39,6 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v2/Services/{ServiceSid}", func(r chi.Router) {
 		r.Use(h.basicAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-		r.Use(quirks.Middleware(h.quirks))
-		r.Use(telemetry.Middleware(h.emitter))
 
 		r.Post("/Verifications", h.CreateVerification)
 		r.Get("/Verifications/{Sid}", h.GetVerification)

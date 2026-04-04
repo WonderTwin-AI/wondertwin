@@ -12,8 +12,6 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
@@ -28,25 +26,9 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
-	// Telemetry emitter — always created, enabled via env var or admin config.
-	telemetryEnabled := os.Getenv("WT_TELEMETRY_REQUIRED") == "true"
-	emitter := telemetry.NewEmitter(telemetry.Config{
-		Enabled:      telemetryEnabled,
-		CollectorURL: os.Getenv("WT_TELEMETRY_COLLECTOR_URL"),
-		IngestKey:    os.Getenv("WT_TELEMETRY_INGEST_KEY"),
-		OrgID:        os.Getenv("WT_TELEMETRY_ORG_ID"),
-		TwinName:     "twilio",
-		TwinVersion:  "0.1.0",
-	})
-	if telemetryEnabled {
-		emitter.Start()
-		defer emitter.Stop()
-	}
-
-	// Messaging engine for SMS lifecycle + telemetry bridge.
+	// Messaging engine for SMS lifecycle.
 	msgEngine := messaging.NewEngine(
 		messaging.WithClock(memStore.Clock),
-		messaging.WithTelemetry(emitter),
 		messaging.WithLifecycle(messaging.ChannelSMS, &messaging.Lifecycle{
 			InitialStatus: messaging.StatusQueued,
 			Transitions: map[messaging.MessageStatus][]messaging.MessageStatus{
@@ -64,17 +46,13 @@ func main() {
 		}),
 	)
 
-	// Quirks engine — loaded at runtime from Content API intelligence.
-	quirksEngine := quirks.NewEngine()
-
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), emitter, quirksEngine, msgEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware(), msgEngine)
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
-	adminHandler.SetQuirkStore(quirksEngine.AdminAdapter())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided
