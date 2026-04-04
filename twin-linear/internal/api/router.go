@@ -6,26 +6,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	gql "github.com/wondertwin-ai/wondertwin/twinkit/graphql"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-linear/internal/store"
 )
 
 // Handler holds Linear API state.
 type Handler struct {
-	store   *store.MemoryStore
-	mw      *twincore.Middleware
-	emitter *telemetry.Emitter
-	quirks  *quirks.Engine
-	schema  *gql.Schema
+	store  *store.MemoryStore
+	mw     *twincore.Middleware
+	schema *gql.Schema
 }
 
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 	schema := gql.NewSchema()
 	RegisterResolvers(schema, s)
 
-	return &Handler{store: s, mw: mw, emitter: em, quirks: qe, schema: schema}
+	return &Handler{store: s, mw: mw, schema: schema}
 }
 
 // Routes mounts the Linear GraphQL API endpoint and admin routes.
@@ -34,8 +30,6 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.linearAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-		r.Use(quirks.Middleware(h.quirks))
-		r.Use(telemetry.Middleware(h.emitter))
 		r.Use(h.rateLimitHeaders)
 
 		r.Post("/graphql", gql.Handler(h.schema))

@@ -5,23 +5,19 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/quirks"
-	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 )
 
 // Handler holds logo API state.
 type Handler struct {
-	store   *store.MemoryStore
-	mw      *twincore.Middleware
-	emitter *telemetry.Emitter
-	quirks  *quirks.Engine
+	store *store.MemoryStore
+	mw    *twincore.Middleware
 }
 
 // NewHandler creates a new logo API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, em *telemetry.Emitter, qe *quirks.Engine) *Handler {
-	return &Handler{store: s, mw: mw, emitter: em, quirks: qe}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
+	return &Handler{store: s, mw: mw}
 }
 
 // Routes mounts the Logo.dev-compatible routes.
@@ -30,8 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.tokenAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-		r.Use(quirks.Middleware(h.quirks))
-		r.Use(telemetry.Middleware(h.emitter))
+
 
 		r.Get("/name/{name}", h.GetLogoByName)
 		r.Get("/ticker/{symbol}", h.GetLogoByTicker)
@@ -44,8 +39,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(h.tokenAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-		r.Use(quirks.Middleware(h.quirks))
-		r.Use(telemetry.Middleware(h.emitter))
+
 
 		r.Get("/search", h.SearchBrands)
 		r.Get("/describe/{domain}", h.DescribeBrand)
