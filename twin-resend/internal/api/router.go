@@ -35,6 +35,58 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/batch", h.SendBatch)
 	})
 
+	// Domains
+	r.Route("/domains", func(r chi.Router) {
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListDomains)
+		r.Post("/", h.CreateDomain)
+		r.Get("/{id}", h.GetDomain)
+		r.Patch("/{id}", h.UpdateDomain)
+		r.Delete("/{id}", h.DeleteDomain)
+		r.Post("/{id}/verify", h.VerifyDomain)
+	})
+
+	// API Keys
+	r.Route("/api-keys", func(r chi.Router) {
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListAPIKeys)
+		r.Post("/", h.CreateAPIKey)
+		r.Delete("/{id}", h.DeleteAPIKey)
+	})
+
+	// Audiences + Contacts
+	r.Route("/audiences", func(r chi.Router) {
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListAudiences)
+		r.Post("/", h.CreateAudience)
+		r.Get("/{id}", h.GetAudience)
+		r.Delete("/{id}", h.DeleteAudience)
+
+		r.Get("/{audience_id}/contacts", h.ListContacts)
+		r.Post("/{audience_id}/contacts", h.CreateContact)
+		r.Get("/{audience_id}/contacts/{id}", h.GetContact)
+		r.Patch("/{audience_id}/contacts/{id}", h.UpdateContact)
+		r.Delete("/{audience_id}/contacts/{id}", h.DeleteContact)
+	})
+
+	// Broadcasts
+	r.Route("/broadcasts", func(r chi.Router) {
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListBroadcasts)
+		r.Post("/", h.CreateBroadcast)
+		r.Get("/{id}", h.GetBroadcast)
+		r.Post("/{id}/send", h.SendBroadcast)
+		r.Delete("/{id}", h.DeleteBroadcast)
+	})
+
 	// Admin extras (no auth required)
 	r.Get("/admin/emails", h.AdminListEmails)
 }
