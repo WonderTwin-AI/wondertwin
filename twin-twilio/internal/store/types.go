@@ -53,3 +53,19 @@ const (
 	VerificationStatusCanceled = "canceled"
 	VerificationStatusExpired  = "expired"
 )
+
+// VerifyService represents a Twilio Verify Service.
+type VerifyService struct {
+	SID                    string `json:"sid"`
+	AccountSID             string `json:"account_sid"`
+	FriendlyName           string `json:"friendly_name"`
+	CodeLength             int    `json:"code_length"`
+	LookupEnabled          bool   `json:"lookup_enabled"`
+	SkipSMSToLandlines     bool   `json:"skip_sms_to_landlines"`
+	DTMFInputRequired      bool   `json:"dtmf_input_required"`
+	TtsName                string `json:"tts_name,omitempty"`
+	DoNotShareWarningEnabled bool `json:"do_not_share_warning_enabled"`
+	DateCreated            string `json:"date_created"`
+	DateUpdated            string `json:"date_updated"`
+	URL                    string `json:"url"`
+}

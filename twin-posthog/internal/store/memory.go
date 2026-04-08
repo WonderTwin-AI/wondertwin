@@ -49,6 +49,13 @@ func (s *MemoryStore) SetFeatureFlag(flag FeatureFlag) {
 	s.FeatureFlags[flag.Key] = flag
 }
 
+// DeleteFeatureFlag removes a feature flag by key.
+func (s *MemoryStore) DeleteFeatureFlag(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.FeatureFlags, key)
+}
+
 // SetFeatureFlags replaces all feature flags.
 func (s *MemoryStore) SetFeatureFlags(flags []FeatureFlag) {
 	s.mu.Lock()

@@ -32,17 +32,37 @@ func (h *Handler) Routes(r chi.Router) {
 		// Messages
 		r.Post("/Messages.json", h.CreateMessage)
 		r.Get("/Messages/{MessageSid}.json", h.GetMessage)
+		r.Post("/Messages/{MessageSid}.json", h.UpdateMessage)
+		r.Delete("/Messages/{MessageSid}.json", h.DeleteMessage)
 		r.Get("/Messages.json", h.ListMessages)
+		r.Get("/Messages/{MessageSid}/Media.json", h.ListMessageMedia)
+		r.Post("/Messages/{MessageSid}/Feedback.json", h.CreateMessageFeedback)
 	})
 
-	// Twilio Verify API (Basic Auth required)
-	r.Route("/v2/Services/{ServiceSid}", func(r chi.Router) {
+	// Twilio Messaging Services API (Basic Auth required)
+	r.Route("/v1/Services", func(r chi.Router) {
 		r.Use(h.basicAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
 
-		r.Post("/Verifications", h.CreateVerification)
-		r.Get("/Verifications/{Sid}", h.GetVerification)
-		r.Post("/VerificationCheck", h.CheckVerification)
+		r.Get("/", h.ListMessagingServices)
+		r.Post("/", h.CreateMessagingService)
+	})
+
+	// Twilio Verify Services API (Basic Auth required)
+	r.Route("/v2/Services", func(r chi.Router) {
+		r.Use(h.basicAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListVerifyServices)
+		r.Post("/", h.CreateVerifyService)
+		r.Get("/{ServiceSid}", h.GetVerifyService)
+		r.Post("/{ServiceSid}", h.UpdateVerifyService)
+		r.Delete("/{ServiceSid}", h.DeleteVerifyService)
+
+		r.Post("/{ServiceSid}/Verifications", h.CreateVerification)
+		r.Get("/{ServiceSid}/Verifications/{Sid}", h.GetVerification)
+		r.Post("/{ServiceSid}/Verifications/{Sid}", h.UpdateVerification)
+		r.Post("/{ServiceSid}/VerificationCheck", h.CheckVerification)
 	})
 
 	// Admin extras (no auth required, same as other twins)

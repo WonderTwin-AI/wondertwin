@@ -8,19 +8,21 @@ import (
 
 // MemoryStore holds all Twilio twin state in memory.
 type MemoryStore struct {
-	Messages      *pkgstate.Store[Message]
-	Verifications *pkgstate.Store[Verification]
-	Clock         *pkgstate.Clock
-	OTPTTLSeconds int // verification code TTL, default 600 (10 min)
+	Messages       *pkgstate.Store[Message]
+	Verifications  *pkgstate.Store[Verification]
+	VerifyServices *pkgstate.Store[VerifyService]
+	Clock          *pkgstate.Clock
+	OTPTTLSeconds  int // verification code TTL, default 600 (10 min)
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Messages:      pkgstate.New[Message]("SM"),
-		Verifications: pkgstate.New[Verification]("VE"),
-		Clock:         pkgstate.NewClock(),
-		OTPTTLSeconds: 600,
+		Messages:       pkgstate.New[Message]("SM"),
+		Verifications:  pkgstate.New[Verification]("VE"),
+		VerifyServices: pkgstate.New[VerifyService]("VA"),
+		Clock:          pkgstate.NewClock(),
+		OTPTTLSeconds:  600,
 	}
 }
 
@@ -33,19 +35,22 @@ type stateSnapshot struct {
 // Snapshot returns the full state as a JSON-serializable value.
 func (s *MemoryStore) Snapshot() any {
 	return struct {
-		Messages      map[string]Message      `json:"messages"`
-		Verifications map[string]Verification `json:"verifications"`
+		Messages       map[string]Message       `json:"messages"`
+		Verifications  map[string]Verification  `json:"verifications"`
+		VerifyServices map[string]VerifyService `json:"verify_services,omitempty"`
 	}{
-		Messages:      s.Messages.Snapshot(),
-		Verifications: s.Verifications.Snapshot(),
+		Messages:       s.Messages.Snapshot(),
+		Verifications:  s.Verifications.Snapshot(),
+		VerifyServices: s.VerifyServices.Snapshot(),
 	}
 }
 
 // LoadState replaces the full state from a JSON body.
 func (s *MemoryStore) LoadState(data []byte) error {
 	var snap struct {
-		Messages      map[string]Message      `json:"messages"`
-		Verifications map[string]Verification `json:"verifications"`
+		Messages       map[string]Message       `json:"messages"`
+		Verifications  map[string]Verification  `json:"verifications"`
+		VerifyServices map[string]VerifyService `json:"verify_services"`
 	}
 	if err := json.Unmarshal(data, &snap); err != nil {
 		return err
@@ -56,6 +61,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Verifications != nil {
 		s.Verifications.LoadSnapshot(snap.Verifications)
 	}
+	if snap.VerifyServices != nil {
+		s.VerifyServices.LoadSnapshot(snap.VerifyServices)
+	}
 	return nil
 }
 
@@ -63,5 +71,6 @@ func (s *MemoryStore) LoadState(data []byte) error {
 func (s *MemoryStore) Reset() {
 	s.Messages.Reset()
 	s.Verifications.Reset()
+	s.VerifyServices.Reset()
 	s.Clock.Reset()
 }
