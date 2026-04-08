@@ -42,6 +42,24 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/api/feature_flag/local_evaluation/", h.LocalEvaluation)
 	})
 
+	// Feature Flag Management API
+	r.Route("/api/projects/{project_id}/feature_flags", func(r chi.Router) {
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListFeatureFlags)
+		r.Post("/", h.CreateFeatureFlag)
+		r.Get("/{flag_id}", h.GetFeatureFlag)
+		r.Get("/{flag_id}/", h.GetFeatureFlag)
+		r.Patch("/{flag_id}", h.UpdateFeatureFlag)
+		r.Patch("/{flag_id}/", h.UpdateFeatureFlag)
+		r.Delete("/{flag_id}", h.DeleteFeatureFlag)
+		r.Delete("/{flag_id}/", h.DeleteFeatureFlag)
+	})
+
+	// Early Access Features
+	r.Get("/api/early_access_features", h.ListEarlyAccessFeatures)
+	r.Get("/api/early_access_features/", h.ListEarlyAccessFeatures)
+
 	// Admin extras (no auth required)
 	r.Get("/admin/events", h.AdminListEvents)
 	r.Post("/admin/feature-flags", h.AdminSetFeatureFlags)
