@@ -67,7 +67,7 @@ wondertwin-docs/research/{platform}/
 ├── compatibility-path.md        # SDK landscape, spectrum position, build strategy
 ├── event-model.md               # Webhook/event classification and twin strategy
 ├── release-timeline.json        # Historical and projected releases, deprecation dates
-├── quirk-inventory.json         # Behavioral quirks with provenance
+├── observations.json            # Notable API behaviors with provenance
 ├── feature-gap-register.json    # What the twin does NOT cover, by domain
 ├── source-catalog.json          # Index of all discovered and archived sources
 ├── provenance-log.jsonl         # Append-only log of research activities
@@ -402,71 +402,6 @@ Using findings from Phases 1-7, assess the SDK compatibility path.
 ## Build Strategy
 {How to build the twin given the SDK landscape — test against SDK tests, build from OpenAPI, etc.}
 ```
-
----
-
-### Phase 8.5: SDK Behavioral Audit
-
-**Purpose:** Discover where the API deviates from its documentation by examining how SDKs actually interact with it. Official docs describe how things _should_ work. SDK source code and issue trackers reveal how things _actually_ work.
-
-**Reference:** See `wondertwin-docs/skills/behavioral-domains.md` for the full taxonomy.
-
-**For each behavioral domain relevant to the platform category**, investigate:
-
-1. **Read SDK source code** for how the SDK handles that domain. Look for:
-   - Workarounds, special-case logic, retry loops
-   - Multiple code paths for the same operation (fallback handling)
-   - Hard-coded values that should come from the API
-   - Comment blocks explaining "why" (these often describe undocumented behavior)
-
-2. **Search SDK issue trackers** for keywords: `unexpected`, `breaking`, `workaround`, `wrong`, `inconsistent`, `regression`, `differs from docs`, `bug`, `undocumented`
-
-3. **Search Stack Overflow** for `[{api-name}] {domain-keyword}` (e.g., `[gitlab-api] pagination`, `[bitbucket-api] authentication error`)
-
-4. **Search community forums and Reddit** for integration pain stories
-
-**Priority domains by platform category:**
-
-| Category | High priority | Medium priority | Lower priority |
-|----------|--------------|-----------------|----------------|
-| Code versioning | AUTH, IDENTITY, PAGINATION, LIFECYCLE, DELIVERY | ENVELOPE, THROTTLE | — |
-| Payments | AUTH, ENVELOPE, LIFECYCLE | PAGINATION, THROTTLE | IDENTITY, DELIVERY |
-| Messaging | LIFECYCLE, DELIVERY, AUTH | ENVELOPE | PAGINATION, THROTTLE, IDENTITY |
-| Analytics | PAGINATION, THROTTLE | ENVELOPE, AUTH | IDENTITY, LIFECYCLE, DELIVERY |
-| Accounting | AUTH, IDENTITY, ENVELOPE, LIFECYCLE | PAGINATION | DELIVERY, THROTTLE |
-
-**Output:** Write `quirk-hypotheses.json`:
-
-```json
-{
-  "platform": "{platform}",
-  "audited_at": "{ISO 8601}",
-  "sdks_audited": ["{sdk1}", "{sdk2}"],
-  "hypotheses": [
-    {
-      "hypothesis_id": "{PLATFORM}-QH-{NNN}",
-      "domain": "{auth|identity|envelope|pagination|lifecycle|delivery|throttle}",
-      "summary": "{one-line description}",
-      "description": "{detailed observation}",
-      "evidence": [
-        {
-          "source": "{sdk source|sdk issue|stackoverflow|community}",
-          "url": "{url}",
-          "observation": "{what was found}"
-        }
-      ],
-      "confidence": 0.0,
-      "verification_needed": "{how to confirm this against the real API}",
-      "impact": "{low|medium|high}",
-      "affects_phase": "{phase-1|phase-2|phase-3|all}"
-    }
-  ]
-}
-```
-
-**This phase is required for `build-ready` scope.** For `candidate` scope, it is optional but recommended for the AUTH and IDENTITY domains at minimum — auth quirks are feasibility-relevant.
-
-**Update `RESEARCH-STATUS.md`** with findings. Increase curiosity scores for domains where hypotheses were generated.
 
 ---
 
