@@ -8,9 +8,7 @@ This is the **public, MIT-licensed** WonderTwin repository. It contains:
 - **wt CLI** — the command-line tool for managing twins
 - **twin-researcher skill** — the research methodology (public process, private artifacts)
 
-**Pro twins** (with telemetry, quirks engine, and Content API connectivity) live in the separate `wondertwin-pro` repository under a Business Source License.
-
-Community twins do NOT use telemetry, quirks, or the Content API. They use twinkit core and domain engines only. Do not add telemetry or quirks imports to twins in this repo.
+Pro twins are available separately for commercial customers.
 
 ## Twin Coverage Policy
 
@@ -66,12 +64,12 @@ stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspo
 - **`auth_pattern` enum**: must be one of `api_key`, `oauth2`, `basic`, `jwt`, `custom`, `none`. Do not invent values.
 - **Port collisions**: grep existing `cfg.Port` values before assigning a new one.
 - **Nil slices in Go JSON**: `json.Marshal(nil slice)` produces `null`, not `[]`. Tests must handle both when asserting on empty lists.
-- **Do not import twinkit-pro packages.** Community twins must not import `quirks`, `telemetry`, or any package from `wondertwin-pro`.
+- **This repo contains community twins only.** Do not add dependencies on external private packages.
 
 ### Standard structure
 ```
 twin-{name}/
-  cmd/twin-{name}/main.go          # entry point (no telemetry/quirks)
+  cmd/twin-{name}/main.go          # entry point
   internal/api/router.go            # routes + auth middleware
   internal/api/handlers_{area}.go   # one file per resource area
   internal/api/handlers_test.go     # tests

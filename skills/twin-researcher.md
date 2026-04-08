@@ -67,7 +67,7 @@ wondertwin-docs/research/{platform}/
 ├── compatibility-path.md        # SDK landscape, spectrum position, build strategy
 ├── event-model.md               # Webhook/event classification and twin strategy
 ├── release-timeline.json        # Historical and projected releases, deprecation dates
-├── quirk-inventory.json         # Behavioral quirks with provenance
+├── observations.json            # Notable API behaviors with provenance
 ├── feature-gap-register.json    # What the twin does NOT cover, by domain
 ├── source-catalog.json          # Index of all discovered and archived sources
 ├── provenance-log.jsonl         # Append-only log of research activities

@@ -13,7 +13,7 @@ schemas:
 
 Generate a complete, MIT-licensed community twin from a third-party service's public SDK reference and/or API documentation. The output is a self-contained Go module that behaviorally clones the target service — maintaining state, implementing business logic, and targeting compatibility with the service's official SDK client libraries.
 
-Community twins provide 100% API surface coverage with correct behavior. They do NOT include telemetry, quirks, or Content API integration — those are pro-only features in the `wondertwin-pro` repository.
+Community twins provide 100% API surface coverage with correct behavior.
 
 ## Output Artifacts
 
@@ -27,19 +27,8 @@ Community twins provide 100% API surface coverage with correct behavior. They do
 1. The WonderTwin shared libraries via `github.com/wondertwin-ai/wondertwin/twinkit`:
    - Core: `twincore`, `state`, `admin`, `webhook`, `testutil`, `pagination`
    - Domain engines: `workspace`, `ledger`, `messaging`, `events`, `search`
-   - Domain event interface: `domainevents` (for engines, but community twins pass nil)
 2. The target service's public API documentation or SDK reference
 3. Optionally, the official SDK client library source code for compatibility verification
-
-## What Community Twins Do NOT Include
-
-- **No telemetry** — no `twinkit-pro/telemetry` imports, no emitter setup, no `telemetry.Middleware()`
-- **No quirks engine** — no `twinkit-pro/quirks` imports, no quirks middleware, no admin quirk endpoints
-- **No Content API client** — no runtime intelligence loading
-- **No `WT_TELEMETRY_*` environment variables**
-- **No domain engine telemetry bridges** — do NOT pass `WithTelemetry(emitter)` to domain engines
-
-If the twin needs behavioral fidelity beyond correct API behavior, it should be built as a pro twin in `wondertwin-pro` using the `twin-generator` skill.
 
 ---
 
@@ -144,7 +133,7 @@ Add the dispatcher between store creation and handler creation:
 
 ### With domain engine
 
-Add the engine after store creation. Do NOT pass `WithTelemetry`:
+Add the engine after store creation:
 
 ```go
     wsEngine := workspace.NewEngine(
@@ -168,7 +157,6 @@ type Handler struct {
     store *store.MemoryStore
     mw    *twincore.Middleware
     // Add domain engine fields as needed (ws, msgs, events, etc.)
-    // Do NOT add emitter or quirks fields
 }
 
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
@@ -183,7 +171,6 @@ func (h *Handler) Routes(r chi.Router) {
     r.Route("/v1", func(r chi.Router) {
         r.Use(h.authMiddleware)
         r.Use(h.mw.FaultInjection)
-        // NO quirks.Middleware or telemetry.Middleware
 
         r.Post("/{resources}", h.Create{Resource})
         r.Get("/{resources}/{id}", h.Get{Resource})
