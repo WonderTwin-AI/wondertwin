@@ -1,0 +1,42 @@
+{
+  "twin": "increase",
+  "version": "0.1.0",
+  "api_version": "2024-04-01",
+  "platform": "Increase",
+  "platform_url": "https://increase.com/documentation/api",
+  "category": "banking",
+  "research_archive": "wondertwin-docs/research/increase",
+  "research_completed": "2026-04-04T00:00:00Z",
+  "generated_at": "2026-04-10T00:00:00Z",
+  "sources": [
+    {
+      "type": "official_docs",
+      "url": "https://increase.com/documentation/api",
+      "accessed": "2026-04-04",
+      "archived_at": "wondertwin-docs/research/increase/archive/official-docs"
+    },
+    {
+      "type": "sdk",
+      "url": "https://github.com/Increase/increase-go",
+      "accessed": "2026-04-04",
+      "archived_at": "wondertwin-docs/research/increase/archive/sdks/increase-go.md"
+    }
+  ],
+  "fintech_primitives": ["ledger", "payment_rails", "card_issuance"],
+  "twinkit_packages": ["twincore", "admin", "store", "webhook"],
+  "sdk_target": {
+    "package": "github.com/Increase/increase-go",
+    "version": "v0.x",
+    "language": "go"
+  },
+  "scope": {
+    "implemented": [
+      "Phase 1: Core Banking - Accounts, ACH transfers, transactions, events"
+    ],
+    "not_implemented": [
+      "Phase 2: Wire + Real-Time Payments",
+      "Phase 3: Card Issuance + Processing",
+      "Phase 4: Compliance, Checks, and Platform"
+    ]
+  }
+}

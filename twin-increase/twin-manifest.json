@@ -1,0 +1,100 @@
+{
+  "twin": "increase",
+  "display_name": "Increase",
+  "tier": "free",
+  "category": "banking",
+  "description": "Simulates the Increase banking infrastructure API — Accounts, AccountNumbers, ExternalAccounts, ACHTransfers, InboundACHTransfers, WireTransfers, InboundWireTransfers, RealTimePaymentsTransfers, InboundRealTimePaymentsTransfers, FednowTransfers, InboundFednowTransfers, CheckTransfers, CheckDeposits, InboundCheckDeposits, Cards, PhysicalCards, CardPayments, Transactions, PendingTransactions, DeclinedTransactions, Events, EventSubscriptions, Entities, BeneficialOwners, BookkeepingAccounts, BookkeepingEntrySets, BookkeepingEntries, Programs, Groups, and simulation endpoints for testing banking workflows.",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/Increase/increase-go",
+      "language": "go",
+      "version": "v0.x",
+      "api_version": "2024-04-01",
+      "repo_url": "https://github.com/Increase/increase-go",
+      "docs_url": "https://increase.com/documentation/api"
+    },
+    "additional": []
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "sdk_derived",
+      "url": "https://github.com/Increase/increase-go/blob/main/api.md"
+    },
+    "auth_pattern": "api_key",
+    "has_webhooks": true,
+    "resource_count": 57
+  },
+  "coverage": {
+    "resources_implemented": [
+      "accounts",
+      "account_numbers",
+      "external_accounts",
+      "ach_transfers",
+      "inbound_ach_transfers",
+      "transactions",
+      "pending_transactions",
+      "events",
+      "event_subscriptions"
+    ],
+    "resources_not_implemented": [
+      "wire_transfers",
+      "inbound_wire_transfers",
+      "wire_drawdown_requests",
+      "inbound_wire_drawdown_requests",
+      "real_time_payments_transfers",
+      "inbound_real_time_payments_transfers",
+      "fednow_transfers",
+      "inbound_fednow_transfers",
+      "swift_transfers",
+      "check_transfers",
+      "check_deposits",
+      "inbound_check_deposits",
+      "lockboxes",
+      "inbound_mail_items",
+      "cards",
+      "physical_cards",
+      "card_payments",
+      "card_disputes",
+      "card_purchase_supplements",
+      "digital_card_profiles",
+      "physical_card_profiles",
+      "digital_wallet_tokens",
+      "card_tokens",
+      "card_push_transfers",
+      "card_validations",
+      "entities",
+      "beneficial_owners",
+      "supplemental_documents",
+      "bookkeeping_accounts",
+      "bookkeeping_entry_sets",
+      "bookkeeping_entries",
+      "intrafi_account_enrollments",
+      "intrafi_balances",
+      "intrafi_exclusions",
+      "oauth_applications",
+      "oauth_connections",
+      "oauth_tokens",
+      "routing_numbers",
+      "account_statements",
+      "files",
+      "file_links",
+      "exports",
+      "programs",
+      "groups",
+      "declined_transactions",
+      "ach_prenotifications",
+      "account_transfers",
+      "real_time_decisions"
+    ],
+    "estimated_coverage_pct": 15
+  },
+  "generation": {
+    "method": "manual",
+    "sources_used": {
+      "deepwiki": false,
+      "openapi": false,
+      "manual_docs": true
+    }
+  }
+}

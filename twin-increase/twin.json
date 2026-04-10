@@ -1,0 +1,10 @@
+{
+  "name": "increase",
+  "description": "Simulates the Increase banking infrastructure API, including accounts, ACH transfers, wire transfers, RTP, FedNow, card issuance, and webhooks.",
+  "category": "banking",
+  "sdk": {
+    "package": "github.com/Increase/increase-go",
+    "version": "v0.x"
+  },
+  "default_port": 4123
+}
