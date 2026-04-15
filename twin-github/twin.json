@@ -1,7 +1,7 @@
 {
   "name": "github",
   "description": "Simulates the GitHub REST API including repos, issues, pull requests, labels, comments, commit statuses, releases, branches, and webhooks.",
-  "category": "workspace",
+  "category": "vcs",
   "sdk": {
     "package": "github.com/google/go-github",
     "version": "v60"

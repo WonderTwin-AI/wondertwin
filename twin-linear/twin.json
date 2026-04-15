@@ -1,7 +1,7 @@
 {
   "name": "linear",
   "description": "Simulates the Linear GraphQL API including issues, teams, projects, cycles, workflow states, labels, comments, attachments, relations, documents, and webhooks.",
-  "category": "workspace",
+  "category": "project-management",
   "sdk": {
     "package": "@linear/sdk",
     "version": "latest"
