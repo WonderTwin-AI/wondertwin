@@ -1,7 +1,7 @@
 {
   "name": "slack",
   "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more.",
-  "category": "workspace",
+  "category": "collaboration",
   "sdk": {
     "package": "github.com/slack-go/slack",
     "version": "latest"
