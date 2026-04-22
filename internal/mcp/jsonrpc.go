@@ -14,7 +14,7 @@ type Request struct {
 
 // IsNotification returns true if this is a JSON-RPC notification (no id field).
 func (r *Request) IsNotification() bool {
-	return r.ID == nil || len(r.ID) == 0
+	return len(r.ID) == 0
 }
 
 // Response represents a JSON-RPC 2.0 response message.

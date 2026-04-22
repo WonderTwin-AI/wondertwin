@@ -1,0 +1,60 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1' # Weekly Monday 6am UTC
+
+jobs:
+  govulncheck:
+    name: Go vulnerability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+
+  osv-scanner:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
+        with:
+          scan-args: |-
+            --recursive
+            .
+
+  semgrep:
+    name: Static analysis (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: >-
+          semgrep scan --config auto --error
+          --exclude vendor --exclude node_modules
+          --exclude-rule go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
+          --exclude-rule go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
+          --exclude-rule problem-based-packs.insecure-transport.go-stdlib.http-customized-request.http-customized-request
+          --exclude-rule go.lang.security.audit.crypto.math_random.math-random-used
+          --exclude-rule go.lang.security.audit.net.use-tls.use-tls
+          --exclude-rule go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+          --exclude-rule go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
+          --exclude-rule go.lang.security.injection.open-redirect.open-redirect

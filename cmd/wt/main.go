@@ -624,7 +624,7 @@ func cmdTest(manifestPath string, args []string) error {
 
 	// Summary
 	fmt.Println()
-	fmt.Printf("Results: %d passed, %d failed, %d total\n", totalPassed, totalFailed, totalPassed+totalFailed)
+	fmt.Printf("Results: %d passed, %d failed, %d total steps\n", totalPassed, totalFailed, totalSteps)
 
 	if totalFailed > 0 {
 		os.Exit(1)
@@ -1134,7 +1134,7 @@ func cmdCI(manifestPath string) error {
 	}
 
 	if !lockfile.Exists(manifestDir) {
-		return fmt.Errorf("No %s found. Run 'wt install' first.", lockfile.Filename)
+		return fmt.Errorf("no %s found, run 'wt install' first", lockfile.Filename)
 	}
 
 	lf, err := lockfile.Load(manifestDir)

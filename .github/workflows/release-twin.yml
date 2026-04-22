@@ -33,17 +33,21 @@ jobs:
 
       - name: Create and push twin tag
         working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          TAG="twin-${{ inputs.twin }}-v${{ inputs.version }}"
+          TAG="twin-${TWIN}-v${VERSION}"
           git tag -f "$TAG"
           git push origin -f "$TAG"
 
       - name: Build binaries
         working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
         run: |
-          TWIN="${{ inputs.twin }}"
           mkdir -p dist
           for platform in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
             os="${platform%-*}"
@@ -60,9 +64,9 @@ jobs:
         working-directory: wondertwin
         env:
           GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
         run: |
-          TWIN="${{ inputs.twin }}"
-          VERSION="${{ inputs.version }}"
           gh release create "twin-${TWIN}-v${VERSION}" \
             dist/twin-${TWIN}-* dist/checksums.txt \
             --repo wondertwin-ai/registry \
@@ -78,15 +82,22 @@ jobs:
 
       - name: Update registry.json
         working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+          REGISTRY_FILE: ${{ github.workspace }}/registry/registry.json
         run: |
           go run ./cmd/gen-registry \
-            --twin "${{ inputs.twin }}" \
-            --version "${{ inputs.version }}" \
+            --twin "$TWIN" \
+            --version "$VERSION" \
             --checksums-file dist/checksums.txt \
-            --registry-file "${{ github.workspace }}/registry/registry.json"
+            --registry-file "$REGISTRY_FILE"
 
       - name: Push registry update
         working-directory: registry
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -94,7 +105,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "registry.json unchanged, skipping commit"
           else
-            git commit -m "Update registry: twin-${{ inputs.twin }} v${{ inputs.version }}"
+            git commit -m "Update registry: twin-${TWIN} v${VERSION}"
             git push
           fi
 
@@ -108,8 +119,13 @@ jobs:
 
       - name: Install the just-released twin
         working-directory: wondertwin
-        run: ./wt-test install ${{ inputs.twin }}@${{ inputs.version }}
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: ./wt-test install "${TWIN}@${VERSION}"
 
       - name: Run conformance on installed twin
         working-directory: wondertwin
-        run: ./wt-test conformance ~/.wondertwin/bin/twin-${{ inputs.twin }}
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: ./wt-test conformance ~/.wondertwin/bin/twin-"${TWIN}"

@@ -77,7 +77,7 @@ func (h *Handler) rateLimitHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// Admin handlers
+// AdminListIssues returns all issues for admin inspection.
 func (h *Handler) AdminListIssues(w http.ResponseWriter, r *http.Request) {
 	issues := h.store.Issues.List()
 	twincore.JSON(w, 200, map[string]any{"issues": issues, "total": len(issues)})
