@@ -25,7 +25,7 @@ func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request
 	ghJSON(w, 200, repos)
 }
 
-// ListOrgReposFromRepos handles POST /orgs/{org}/repos
+// CreateOrgRepo handles POST /orgs/{org}/repos
 func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 	org := chi.URLParam(r, "org")
 

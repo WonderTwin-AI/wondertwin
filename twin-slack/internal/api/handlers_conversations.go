@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -487,14 +486,3 @@ func splitParts(s string) []string {
 	return parts
 }
 
-// parseInt helper
-func parseInt(s string, defaultVal int) int {
-	if s == "" {
-		return defaultVal
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		return defaultVal
-	}
-	return v
-}

@@ -85,7 +85,7 @@ func CheckTierAccess(twinName, resolvedVersion string, ver Version, cfg *config.
 
 	if cfg == nil || !cfg.HasValidLicense() {
 		return fmt.Errorf(
-			"twin-%s v%s requires a %s license.\nRun `wt auth login` to activate, or use `wt install %s@latest` (free).",
+			"twin-%s v%s requires a %s license\nrun `wt auth login` to activate, or use `wt install %s@latest` (free)",
 			twinName, resolvedVersion, ver.Tier, twinName,
 		)
 	}

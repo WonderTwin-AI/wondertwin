@@ -1,0 +1,46 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - misspell
+    - gocritic
+    - gosec
+  settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF*"
+        - "-ST1000"
+    gocritic:
+      enabled-tags:
+        - diagnostic
+      disabled-checks:
+        - appendAssign
+        - exitAfterDefer
+        - ifElseChain
+        - sprintfQuotedString
+    gosec:
+      excludes:
+        - G101
+        - G104
+        - G112
+        - G118
+        - G304
+        - G706
+  exclusions:
+    paths:
+      - _test\.go
+      - third_party
+      - vendor
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 5

@@ -22,9 +22,7 @@ func jsonPathGet(doc any, path string) ([]any, error) {
 	}
 
 	// Strip leading dot
-	if strings.HasPrefix(rest, ".") {
-		rest = rest[1:]
-	}
+	rest = strings.TrimPrefix(rest, ".")
 
 	current := doc
 	segments := splitPathSegments(rest)

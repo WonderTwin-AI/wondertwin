@@ -16,14 +16,6 @@ func (h *Handler) ListAssociations(w http.ResponseWriter, r *http.Request) {
 
 	assocs := h.store.ListAssociations(fromType, objectID, toType)
 
-	type assocResult struct {
-		ToObjectID string `json:"toObjectId"`
-		Types      []struct {
-			AssociationCategory string `json:"associationCategory"`
-			AssociationTypeID   int    `json:"associationTypeId"`
-		} `json:"associationTypes"`
-	}
-
 	results := make([]map[string]any, 0, len(assocs))
 	for _, a := range assocs {
 		results = append(results, map[string]any{
