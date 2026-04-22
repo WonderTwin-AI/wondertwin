@@ -1,6 +1,6 @@
 module github.com/wondertwin-ai/wondertwin/twin-stripe
 
-go 1.25.9
+go 1.26.2
 
 replace github.com/wondertwin-ai/wondertwin/twinkit => ../twinkit
 
