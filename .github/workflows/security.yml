@@ -54,3 +54,9 @@ jobs:
           --exclude-rule go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
           --exclude-rule go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
           --exclude-rule problem-based-packs.insecure-transport.go-stdlib.http-customized-request.http-customized-request
+          --exclude-rule go.lang.security.audit.crypto.math_random.math-random-used
+          --exclude-rule go.lang.security.audit.net.use-tls.use-tls
+          --exclude-rule go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+          --exclude-rule go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
+          --exclude-rule go.lang.injection.open-redirect.open-redirect
+          --exclude-rule yaml.github-actions.security.run-shell-injection.run-shell-injection

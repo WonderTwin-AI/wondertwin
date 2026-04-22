@@ -9,4 +9,5 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /twin-stripe /usr/local/bin/twin-stripe
 EXPOSE 12111
+USER nobody
 ENTRYPOINT ["twin-stripe"]
