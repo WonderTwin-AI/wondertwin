@@ -1186,8 +1186,179 @@ func printOrgCatalogTable(twins []platform.OrgCatalogEntry) {
 }
 
 func cmdScan(args []string) error {
-	// Placeholder — implemented in issue #207.
-	return fmt.Errorf("wt scan: not yet implemented")
+	var projectPath string
+	var recommend bool
+
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--path" && i+1 < len(args):
+			projectPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--path="):
+			projectPath = strings.TrimPrefix(args[i], "--path=")
+		case args[i] == "--recommend":
+			recommend = true
+		}
+	}
+
+	if projectPath == "" {
+		projectPath = "."
+	}
+
+	if recommend {
+		fmt.Println("Recommendations coming soon (Phase 2).")
+	}
+
+	// Detect SDKs from project files.
+	detected := detectSDKs(projectPath)
+	if len(detected) == 0 {
+		fmt.Println("No SDK dependencies detected.")
+		return nil
+	}
+
+	// Fetch catalog to match against.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client := platform.New(platformBaseURL(), "")
+	catalog, err := client.ListTwins(ctx, "", "", "", "")
+	if err != nil {
+		return fmt.Errorf("fetching catalog: %w", err)
+	}
+
+	// Build SDK → twin lookup from catalog.
+	type twinMatch struct {
+		Name string
+		Tier string
+	}
+	sdkIndex := make(map[string]twinMatch)
+	for _, entry := range catalog {
+		if pkg := entry.SDKTargets.Primary.Package; pkg != "" {
+			sdkIndex[pkg] = twinMatch{Name: entry.Name, Tier: entry.Tier}
+		}
+		for _, a := range entry.SDKTargets.Additional {
+			if a.Package != "" {
+				sdkIndex[a.Package] = twinMatch{Name: entry.Name, Tier: entry.Tier}
+			}
+		}
+	}
+
+	// Match detected SDKs against catalog.
+	fmt.Printf("%-45s %-14s %-12s %-16s\n", "DETECTED SDK", "TWIN", "TIER", "ACTION")
+	for _, sdk := range detected {
+		match, found := sdkIndex[sdk.Package]
+		if !found {
+			// Check for prefix match (Go module versioning: github.com/stripe/stripe-go/v81).
+			for catalogPkg, m := range sdkIndex {
+				if strings.HasPrefix(sdk.Package, catalogPkg) || strings.HasPrefix(catalogPkg, sdk.Package) {
+					match = m
+					found = true
+					break
+				}
+			}
+		}
+
+		label := sdk.Package
+		if sdk.Version != "" {
+			label += " " + sdk.Version
+		}
+
+		if found {
+			action := "subscribe"
+			if match.Tier == "community" {
+				action = "install"
+			}
+			fmt.Printf("%-45s %-14s %-12s %-16s\n", label, match.Name, match.Tier, action)
+		} else {
+			fmt.Printf("%-45s %-14s %-12s %-16s\n", label, "—", "—", "no twin available")
+		}
+	}
+
+	return nil
+}
+
+type detectedSDK struct {
+	Package  string
+	Version  string
+	Language string
+}
+
+func detectSDKs(projectPath string) []detectedSDK {
+	var results []detectedSDK
+	results = append(results, detectGoSDKs(projectPath)...)
+	results = append(results, detectNodeSDKs(projectPath)...)
+	return results
+}
+
+func detectGoSDKs(projectPath string) []detectedSDK {
+	goModPath := filepath.Join(projectPath, "go.mod")
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return nil
+	}
+
+	var results []detectedSDK
+	inRequire := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "require (" {
+			inRequire = true
+			continue
+		}
+		if line == ")" {
+			inRequire = false
+			continue
+		}
+		if !inRequire {
+			continue
+		}
+		// Skip indirect deps.
+		if strings.Contains(line, "// indirect") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			results = append(results, detectedSDK{
+				Package:  parts[0],
+				Version:  parts[1],
+				Language: "go",
+			})
+		}
+	}
+	return results
+}
+
+func detectNodeSDKs(projectPath string) []detectedSDK {
+	pkgPath := filepath.Join(projectPath, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return nil
+	}
+
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil
+	}
+
+	var results []detectedSDK
+	for name, version := range pkg.Dependencies {
+		results = append(results, detectedSDK{
+			Package:  name,
+			Version:  version,
+			Language: "typescript",
+		})
+	}
+	for name, version := range pkg.DevDependencies {
+		results = append(results, detectedSDK{
+			Package:  name,
+			Version:  version,
+			Language: "typescript",
+		})
+	}
+	return results
 }
 
 func cmdAuth(args []string) error {
