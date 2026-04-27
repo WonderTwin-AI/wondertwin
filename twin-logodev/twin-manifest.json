@@ -1,7 +1,7 @@
 {
   "twin": "logodev",
   "display_name": "Logo.dev",
-  "tier": "free",
+  "tier": "community",
   "category": "media",
   "description": "Simulates the full Logo.dev API surface: logo retrieval by domain/name/ticker/crypto/ISIN, brand search, and describe.",
   "sdk_target": {

@@ -1,7 +1,7 @@
 {
   "twin": "github",
   "display_name": "GitHub",
-  "tier": "free",
+  "tier": "community",
   "category": "workspace",
   "description": "Simulates the GitHub REST API: repos, issues, PRs, reviews, checks, labels, milestones, contents, deployments, orgs, teams, reactions, search, webhooks, Actions, and Git data.",
   "sdk_target": {
