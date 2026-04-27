@@ -117,6 +117,10 @@ func main() {
 		err = cmdCI(manifestPath)
 	case "login":
 		err = cmdLogin(args)
+	case "catalog":
+		err = cmdCatalog(args)
+	case "scan":
+		err = cmdScan(args)
 	case "auth":
 		err = cmdAuth(args)
 	case "registry":
@@ -1032,6 +1036,158 @@ func cmdLogin(args []string) error {
 
 	fmt.Printf("Authenticated as org %q (ID: %s).\n", result.OrgSlug, result.OrgID[:8]+"...")
 	return nil
+}
+
+func cmdCatalog(args []string) error {
+	// Parse flags.
+	var category, tier, search string
+	var mine bool
+	var twinName string
+
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--category" && i+1 < len(args):
+			category = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--category="):
+			category = strings.TrimPrefix(args[i], "--category=")
+		case args[i] == "--tier" && i+1 < len(args):
+			tier = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--tier="):
+			tier = strings.TrimPrefix(args[i], "--tier=")
+		case args[i] == "--search" && i+1 < len(args):
+			search = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--search="):
+			search = strings.TrimPrefix(args[i], "--search=")
+		case args[i] == "--mine":
+			mine = true
+		case !strings.HasPrefix(args[i], "-"):
+			twinName = args[i]
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client := platform.New(platformBaseURL(), "")
+
+	// Detail view: wt catalog <name>
+	if twinName != "" {
+		return catalogDetail(ctx, client, twinName)
+	}
+
+	// --mine: org-scoped catalog.
+	if mine {
+		return catalogMine(ctx, category, search)
+	}
+
+	// Public catalog.
+	twins, err := client.ListTwins(ctx, category, tier, "", search)
+	if err != nil {
+		return fmt.Errorf("fetching catalog: %w", err)
+	}
+
+	if len(twins) == 0 {
+		fmt.Println("No twins found.")
+		return nil
+	}
+
+	printCatalogTable(twins)
+	return nil
+}
+
+func catalogDetail(ctx context.Context, client *platform.Client, name string) error {
+	twins, err := client.ListTwins(ctx, "", "", "", name)
+	if err != nil {
+		return fmt.Errorf("fetching twin detail: %w", err)
+	}
+
+	// Filter to exact match.
+	var matches []platform.CatalogEntry
+	for _, t := range twins {
+		if t.Name == name {
+			matches = append(matches, t)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("twin %q not found", name)
+	}
+
+	for i, t := range matches {
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Printf("Name:       %s\n", t.DisplayName)
+		fmt.Printf("Tier:       %s\n", t.Tier)
+		fmt.Printf("Category:   %s\n", t.Category)
+		fmt.Printf("Status:     %s\n", t.Status)
+		fmt.Printf("Coverage:   %d%%\n", t.Coverage.EstimatedPct)
+		fmt.Printf("Resources:  %d\n", t.Coverage.ResourceCount)
+		fmt.Printf("Auth:       %s\n", t.Coverage.AuthPattern)
+		fmt.Printf("Webhooks:   %v\n", t.Coverage.WebhookSupport)
+		if t.SDKTargets.Primary.Package != "" {
+			fmt.Printf("SDK:        %s (%s)\n", t.SDKTargets.Primary.Package, t.SDKTargets.Primary.Language)
+		}
+		if t.Description != "" {
+			fmt.Printf("Desc:       %s\n", t.Description)
+		}
+	}
+	return nil
+}
+
+func catalogMine(ctx context.Context, category, search string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if !cfg.HasOrgContext() {
+		fmt.Println("Not logged in. Run `wt login --org <slug>` or sign up at https://app.wondertwin.ai/signup")
+		return nil
+	}
+
+	client := platform.New(platformBaseURL(), cfg.APIKey)
+	twins, err := client.ListOrgCatalog(ctx, cfg.OrgID, category, search)
+	if err != nil {
+		return fmt.Errorf("fetching org catalog: %w", err)
+	}
+
+	if len(twins) == 0 {
+		fmt.Println("No twins found.")
+		return nil
+	}
+
+	printOrgCatalogTable(twins)
+	return nil
+}
+
+func printCatalogTable(twins []platform.CatalogEntry) {
+	fmt.Printf("%-20s %-16s %-12s %-8s\n", "NAME", "CATEGORY", "TIER", "STATUS")
+	for _, t := range twins {
+		cat := t.Category
+		if cat == "" {
+			cat = "—"
+		}
+		fmt.Printf("%-20s %-16s %-12s %-8s\n", t.Name, cat, t.Tier, t.Status)
+	}
+}
+
+func printOrgCatalogTable(twins []platform.OrgCatalogEntry) {
+	fmt.Printf("%-20s %-16s %-12s %-12s %-16s\n", "NAME", "CATEGORY", "TIER", "STATE", "ACTION")
+	for _, t := range twins {
+		cat := t.Category
+		if cat == "" {
+			cat = "—"
+		}
+		fmt.Printf("%-20s %-16s %-12s %-12s %-16s\n", t.Name, cat, t.Tier, t.EntitlementState, t.AvailableAction)
+	}
+}
+
+func cmdScan(args []string) error {
+	// Placeholder — implemented in issue #207.
+	return fmt.Errorf("wt scan: not yet implemented")
 }
 
 func cmdAuth(args []string) error {
