@@ -1,7 +1,7 @@
 {
   "twin": "posthog",
   "display_name": "PostHog",
-  "tier": "free",
+  "tier": "community",
   "category": "analytics",
   "description": "Simulates the PostHog event capture, feature flag evaluation, identify, alias, group identify, exception tracking, and local evaluation API surfaces for the PostHog Go SDK.",
   "sdk_target": {

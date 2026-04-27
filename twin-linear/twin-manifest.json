@@ -1,7 +1,7 @@
 {
   "twin": "linear",
   "display_name": "Linear",
-  "tier": "free",
+  "tier": "community",
   "category": "workspace",
   "description": "Simulates the Linear GraphQL API: issues, teams, projects, cycles, workflow states, labels, comments, attachments, relations, documents, project updates, webhooks, reactions, notifications, and favorites.",
   "sdk_target": {

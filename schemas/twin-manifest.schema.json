@@ -9,9 +9,8 @@
   "properties": {
     "tier": {
       "type": "string",
-      "description": "Distribution tier for the twin.",
-      "enum": ["free", "paid"],
-      "default": "free"
+      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pricing (included in Pro, add-on cost, enterprise-only) is a backend concern managed by the catalog service.",
+      "enum": ["community", "commercial"]
     },
     "twin": {
       "type": "string",
