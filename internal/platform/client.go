@@ -52,7 +52,7 @@ func (c *Client) ValidateKey(ctx context.Context, apiKey string) (*ValidateKeyRe
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -188,7 +188,7 @@ func (c *Client) ListOrgCatalog(ctx context.Context, orgID, category, search str
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
