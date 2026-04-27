@@ -36,6 +36,8 @@ import (
 	"syscall"
 	"time"
 
+	"context"
+
 	"github.com/wondertwin-ai/wondertwin/internal/auth"
 	"github.com/wondertwin-ai/wondertwin/internal/cache"
 	"github.com/wondertwin-ai/wondertwin/internal/client"
@@ -45,6 +47,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/lockfile"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
+	"github.com/wondertwin-ai/wondertwin/internal/platform"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
 	"github.com/wondertwin-ai/wondertwin/internal/registry"
 	"github.com/wondertwin-ai/wondertwin/internal/scenario/v2"
@@ -112,6 +115,8 @@ func main() {
 		err = cmdInstall(manifestPath, args)
 	case "ci":
 		err = cmdCI(manifestPath)
+	case "login":
+		err = cmdLogin(args)
 	case "auth":
 		err = cmdAuth(args)
 	case "registry":
@@ -963,6 +968,72 @@ func cmdRegistryList() error {
 // wt auth login|status|logout
 // ---------------------------------------------------------------------------
 
+// platformBaseURL returns the wondertwin-app API URL, using the WT_PLATFORM_URL
+// env var if set, otherwise the default.
+func platformBaseURL() string {
+	if u := os.Getenv("WT_PLATFORM_URL"); u != "" {
+		return u
+	}
+	return platform.DefaultBaseURL
+}
+
+func cmdLogin(args []string) error {
+	// Parse --org flag.
+	var orgSlug string
+	for i, a := range args {
+		if a == "--org" && i+1 < len(args) {
+			orgSlug = args[i+1]
+			break
+		}
+		if strings.HasPrefix(a, "--org=") {
+			orgSlug = strings.TrimPrefix(a, "--org=")
+			break
+		}
+	}
+
+	if orgSlug == "" {
+		return fmt.Errorf("usage: wt login --org <org-slug>")
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Logging into org %q.\n", orgSlug)
+	fmt.Print("Enter API key: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return fmt.Errorf("no input received")
+	}
+
+	apiKey := strings.TrimSpace(scanner.Text())
+	if apiKey == "" {
+		return fmt.Errorf("no API key provided")
+	}
+
+	// Validate the key against the platform.
+	client := platform.New(platformBaseURL(), "")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.ValidateKey(ctx, apiKey)
+	if err != nil {
+		return fmt.Errorf("API key validation failed: %w", err)
+	}
+
+	cfg.OrgSlug = result.OrgSlug
+	cfg.OrgID = result.OrgID
+	cfg.APIKey = apiKey
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("Authenticated as org %q (ID: %s).\n", result.OrgSlug, result.OrgID[:8]+"...")
+	return nil
+}
+
 func cmdAuth(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: wt auth <login|status|logout>")
@@ -1023,8 +1094,18 @@ func cmdAuthStatus() error {
 		return err
 	}
 
+	// Show org context if present.
+	if cfg.HasOrgContext() {
+		fmt.Printf("Org:     %s\n", cfg.OrgSlug)
+		fmt.Printf("Org ID:  %s\n", cfg.OrgID)
+		maskedKey := cfg.APIKey[:8] + "..." + cfg.APIKey[len(cfg.APIKey)-4:]
+		fmt.Printf("API Key: %s\n", maskedKey)
+		return nil
+	}
+
+	// Fall back to legacy license key display.
 	if cfg.LicenseKey == "" {
-		fmt.Println("Tier: free (no license key)")
+		fmt.Println("Not authenticated. Run `wt login --org <slug>` to connect.")
 		return nil
 	}
 
@@ -1050,17 +1131,22 @@ func cmdAuthLogout() error {
 		return err
 	}
 
-	if cfg.LicenseKey == "" {
-		fmt.Println("No license key configured.")
+	hadOrg := cfg.HasOrgContext()
+	hadLicense := cfg.LicenseKey != ""
+
+	if !hadOrg && !hadLicense {
+		fmt.Println("Not authenticated.")
 		return nil
 	}
 
+	cfg.ClearOrgContext()
 	cfg.LicenseKey = ""
+
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Println("License key removed.")
+	fmt.Println("Logged out.")
 	return nil
 }
 

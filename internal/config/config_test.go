@@ -149,6 +149,56 @@ func TestSaveWritesJSON(t *testing.T) {
 	_ = data // used above
 }
 
+func TestOrgContext(t *testing.T) {
+	cfg := &Config{}
+	if cfg.HasOrgContext() {
+		t.Error("empty config should not have org context")
+	}
+
+	cfg.OrgSlug = "acme"
+	cfg.OrgID = "org-123"
+	cfg.APIKey = "wt_live_abc123"
+	if !cfg.HasOrgContext() {
+		t.Error("expected org context after setting fields")
+	}
+
+	cfg.ClearOrgContext()
+	if cfg.HasOrgContext() {
+		t.Error("expected no org context after clear")
+	}
+	if cfg.OrgSlug != "" || cfg.OrgID != "" || cfg.APIKey != "" {
+		t.Error("expected all org fields cleared")
+	}
+}
+
+func TestOrgContextRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	content := `{
+  "license_key": "",
+  "org_slug": "acme",
+  "org_id": "org-123",
+  "api_key": "wt_live_abc123"
+}`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadFrom(path, true)
+	if err != nil {
+		t.Fatalf("LoadFrom: %v", err)
+	}
+	if cfg.OrgSlug != "acme" {
+		t.Errorf("org_slug: got %q, want acme", cfg.OrgSlug)
+	}
+	if cfg.OrgID != "org-123" {
+		t.Errorf("org_id: got %q, want org-123", cfg.OrgID)
+	}
+	if cfg.APIKey != "wt_live_abc123" {
+		t.Errorf("api_key: got %q, want wt_live_abc123", cfg.APIKey)
+	}
+}
+
 func TestParseLicenseKey(t *testing.T) {
 	// Compute a valid checksum for the key "wt_com_acme_abcdef"
 	// payload bytes sum = 1842, 1842 % 256 = 50 = 0x32
