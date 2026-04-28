@@ -2,6 +2,7 @@
 package platform
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -235,4 +236,162 @@ func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return result.Categories, nil
+}
+
+// SubscribeResponse is the unified response from the subscribe endpoint.
+type SubscribeResponse struct {
+	Action      string `json:"action"`
+	TwinName    string `json:"twin_name"`
+	TrialEndsAt string `json:"trial_ends_at,omitempty"`
+	CheckoutURL string `json:"checkout_url,omitempty"`
+	SignupURL   string `json:"signup_url,omitempty"`
+	RequestID   string `json:"request_id,omitempty"`
+	Message     string `json:"message,omitempty"`
+}
+
+// Subscribe calls the unified subscribe endpoint.
+func (c *Client) Subscribe(ctx context.Context, orgID, twinName string) (*SubscribeResponse, error) {
+	body, err := json.Marshal(map[string]string{"twin_name": twinName})
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("%s/v1/orgs/%s/subscribe", c.baseURL, orgID), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("subscribe: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result SubscribeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("subscribe: HTTP %d: %s", resp.StatusCode, respBody)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("subscribe: HTTP %d: %s", resp.StatusCode, result.Message)
+	}
+
+	return &result, nil
+}
+
+// TwinRequest represents a twin request in the system.
+type TwinRequest struct {
+	ID           string `json:"id"`
+	OrgID        string `json:"org_id"`
+	ServiceName  string `json:"service_name"`
+	ServiceURL   string `json:"service_url,omitempty"`
+	RequestType  string `json:"request_type"`
+	CategoryHint string `json:"category_hint,omitempty"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+// SubmitTwinRequest submits a structured twin request.
+func (c *Client) SubmitTwinRequest(ctx context.Context, orgID, serviceName, serviceURL, categoryHint string) (*TwinRequest, error) {
+	payload := map[string]string{"service_name": serviceName}
+	if serviceURL != "" {
+		payload["service_url"] = serviceURL
+	}
+	if categoryHint != "" {
+		payload["category_hint"] = categoryHint
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("%s/v1/orgs/%s/twin-requests", c.baseURL, orgID), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("submit twin request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("submit twin request: HTTP %d: %s", resp.StatusCode, respBody)
+	}
+
+	var result TwinRequest
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// ListTwinRequests returns all twin requests for an org.
+func (c *Client) ListTwinRequests(ctx context.Context, orgID string) ([]TwinRequest, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		fmt.Sprintf("%s/v1/orgs/%s/twin-requests", c.baseURL, orgID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list twin requests: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("list twin requests: HTTP %d: %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Requests []TwinRequest `json:"requests"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return result.Requests, nil
+}
+
+// GetTwinRequest returns a single twin request.
+func (c *Client) GetTwinRequest(ctx context.Context, orgID, requestID string) (*TwinRequest, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		fmt.Sprintf("%s/v1/orgs/%s/twin-requests/%s", c.baseURL, orgID, requestID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("get twin request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("request not found: %s", requestID)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get twin request: HTTP %d: %s", resp.StatusCode, body)
+	}
+
+	var result TwinRequest
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
 }
