@@ -193,11 +193,12 @@ func (t *Twin) Serve() error {
 	addr := fmt.Sprintf(":%d", t.Config.Port)
 
 	srv := &http.Server{
-		Addr:         addr,
-		Handler:      t.Router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:           addr,
+		Handler:        http.MaxBytesHandler(t.Router, 10<<20), // 10MB request body limit
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1MB max header
 	}
 
 	// Graceful shutdown

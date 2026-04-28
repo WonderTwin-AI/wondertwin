@@ -1,0 +1,9 @@
+.git
+.github
+.gitignore
+.env*
+node_modules
+*.md
+.DS_Store
+.vscode
+.claude
