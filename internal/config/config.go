@@ -31,6 +31,11 @@ type RegistryEntry struct {
 type Config struct {
 	LicenseKey string                   `yaml:"license_key" json:"license_key"`
 	Registries map[string]RegistryEntry `yaml:"registries" json:"registries"`
+
+	// Org context for authenticated API access.
+	OrgSlug string `yaml:"org_slug,omitempty" json:"org_slug,omitempty"`
+	OrgID   string `yaml:"org_id,omitempty" json:"org_id,omitempty"`
+	APIKey  string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
 // LicenseInfo holds parsed fields from a license key.
@@ -195,6 +200,18 @@ func ParseLicenseKey(key string) *LicenseInfo {
 // HasValidLicense returns true if the config has a parseable license key.
 func (c *Config) HasValidLicense() bool {
 	return ParseLicenseKey(c.LicenseKey) != nil
+}
+
+// HasOrgContext returns true if the config has stored org credentials.
+func (c *Config) HasOrgContext() bool {
+	return c.APIKey != "" && c.OrgID != ""
+}
+
+// ClearOrgContext removes all org-scoped credentials.
+func (c *Config) ClearOrgContext() {
+	c.OrgSlug = ""
+	c.OrgID = ""
+	c.APIKey = ""
 }
 
 // TierName returns a human-readable tier name from a license key tier code.

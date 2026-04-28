@@ -36,6 +36,8 @@ import (
 	"syscall"
 	"time"
 
+	"context"
+
 	"github.com/wondertwin-ai/wondertwin/internal/auth"
 	"github.com/wondertwin-ai/wondertwin/internal/cache"
 	"github.com/wondertwin-ai/wondertwin/internal/client"
@@ -45,6 +47,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/lockfile"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 	"github.com/wondertwin-ai/wondertwin/internal/mcp"
+	"github.com/wondertwin-ai/wondertwin/internal/platform"
 	"github.com/wondertwin-ai/wondertwin/internal/procmgr"
 	"github.com/wondertwin-ai/wondertwin/internal/registry"
 	"github.com/wondertwin-ai/wondertwin/internal/scenario/v2"
@@ -112,6 +115,12 @@ func main() {
 		err = cmdInstall(manifestPath, args)
 	case "ci":
 		err = cmdCI(manifestPath)
+	case "login":
+		err = cmdLogin(args)
+	case "catalog":
+		err = cmdCatalog(args)
+	case "scan":
+		err = cmdScan(args)
 	case "auth":
 		err = cmdAuth(args)
 	case "registry":
@@ -963,6 +972,395 @@ func cmdRegistryList() error {
 // wt auth login|status|logout
 // ---------------------------------------------------------------------------
 
+// platformBaseURL returns the wondertwin-app API URL, using the WT_PLATFORM_URL
+// env var if set, otherwise the default.
+func platformBaseURL() string {
+	if u := os.Getenv("WT_PLATFORM_URL"); u != "" {
+		return u
+	}
+	return platform.DefaultBaseURL
+}
+
+func cmdLogin(args []string) error {
+	// Parse --org flag.
+	var orgSlug string
+	for i, a := range args {
+		if a == "--org" && i+1 < len(args) {
+			orgSlug = args[i+1]
+			break
+		}
+		if strings.HasPrefix(a, "--org=") {
+			orgSlug = strings.TrimPrefix(a, "--org=")
+			break
+		}
+	}
+
+	if orgSlug == "" {
+		return fmt.Errorf("usage: wt login --org <org-slug>")
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Logging into org %q.\n", orgSlug)
+	fmt.Print("Enter API key: ")
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		return fmt.Errorf("no input received")
+	}
+
+	apiKey := strings.TrimSpace(scanner.Text())
+	if apiKey == "" {
+		return fmt.Errorf("no API key provided")
+	}
+
+	// Validate the key against the platform.
+	client := platform.New(platformBaseURL(), "")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := client.ValidateKey(ctx, apiKey)
+	if err != nil {
+		return fmt.Errorf("API key validation failed: %w", err)
+	}
+
+	cfg.OrgSlug = result.OrgSlug
+	cfg.OrgID = result.OrgID
+	cfg.APIKey = apiKey
+
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("Authenticated as org %q (ID: %s).\n", result.OrgSlug, result.OrgID[:8]+"...")
+	return nil
+}
+
+func cmdCatalog(args []string) error {
+	// Parse flags.
+	var category, tier, search string
+	var mine bool
+	var twinName string
+
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--category" && i+1 < len(args):
+			category = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--category="):
+			category = strings.TrimPrefix(args[i], "--category=")
+		case args[i] == "--tier" && i+1 < len(args):
+			tier = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--tier="):
+			tier = strings.TrimPrefix(args[i], "--tier=")
+		case args[i] == "--search" && i+1 < len(args):
+			search = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--search="):
+			search = strings.TrimPrefix(args[i], "--search=")
+		case args[i] == "--mine":
+			mine = true
+		case !strings.HasPrefix(args[i], "-"):
+			twinName = args[i]
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client := platform.New(platformBaseURL(), "")
+
+	// Detail view: wt catalog <name>
+	if twinName != "" {
+		return catalogDetail(ctx, client, twinName)
+	}
+
+	// --mine: org-scoped catalog.
+	if mine {
+		return catalogMine(ctx, category, search)
+	}
+
+	// Public catalog.
+	twins, err := client.ListTwins(ctx, category, tier, "", search)
+	if err != nil {
+		return fmt.Errorf("fetching catalog: %w", err)
+	}
+
+	if len(twins) == 0 {
+		fmt.Println("No twins found.")
+		return nil
+	}
+
+	printCatalogTable(twins)
+	return nil
+}
+
+func catalogDetail(ctx context.Context, client *platform.Client, name string) error {
+	twins, err := client.ListTwins(ctx, "", "", "", name)
+	if err != nil {
+		return fmt.Errorf("fetching twin detail: %w", err)
+	}
+
+	// Filter to exact match.
+	var matches []platform.CatalogEntry
+	for _, t := range twins {
+		if t.Name == name {
+			matches = append(matches, t)
+		}
+	}
+
+	if len(matches) == 0 {
+		return fmt.Errorf("twin %q not found", name)
+	}
+
+	for i, t := range matches {
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Printf("Name:       %s\n", t.DisplayName)
+		fmt.Printf("Tier:       %s\n", t.Tier)
+		fmt.Printf("Category:   %s\n", t.Category)
+		fmt.Printf("Status:     %s\n", t.Status)
+		fmt.Printf("Coverage:   %d%%\n", t.Coverage.EstimatedPct)
+		fmt.Printf("Resources:  %d\n", t.Coverage.ResourceCount)
+		fmt.Printf("Auth:       %s\n", t.Coverage.AuthPattern)
+		fmt.Printf("Webhooks:   %v\n", t.Coverage.WebhookSupport)
+		if t.SDKTargets.Primary.Package != "" {
+			fmt.Printf("SDK:        %s (%s)\n", t.SDKTargets.Primary.Package, t.SDKTargets.Primary.Language)
+		}
+		if t.Description != "" {
+			fmt.Printf("Desc:       %s\n", t.Description)
+		}
+	}
+	return nil
+}
+
+func catalogMine(ctx context.Context, category, search string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if !cfg.HasOrgContext() {
+		fmt.Println("Not logged in. Run `wt login --org <slug>` or sign up at https://app.wondertwin.ai/signup")
+		return nil
+	}
+
+	client := platform.New(platformBaseURL(), cfg.APIKey)
+	twins, err := client.ListOrgCatalog(ctx, cfg.OrgID, category, search)
+	if err != nil {
+		return fmt.Errorf("fetching org catalog: %w", err)
+	}
+
+	if len(twins) == 0 {
+		fmt.Println("No twins found.")
+		return nil
+	}
+
+	printOrgCatalogTable(twins)
+	return nil
+}
+
+func printCatalogTable(twins []platform.CatalogEntry) {
+	fmt.Printf("%-20s %-16s %-12s %-8s\n", "NAME", "CATEGORY", "TIER", "STATUS")
+	for _, t := range twins {
+		cat := t.Category
+		if cat == "" {
+			cat = "—"
+		}
+		fmt.Printf("%-20s %-16s %-12s %-8s\n", t.Name, cat, t.Tier, t.Status)
+	}
+}
+
+func printOrgCatalogTable(twins []platform.OrgCatalogEntry) {
+	fmt.Printf("%-20s %-16s %-12s %-12s %-16s\n", "NAME", "CATEGORY", "TIER", "STATE", "ACTION")
+	for _, t := range twins {
+		cat := t.Category
+		if cat == "" {
+			cat = "—"
+		}
+		fmt.Printf("%-20s %-16s %-12s %-12s %-16s\n", t.Name, cat, t.Tier, t.EntitlementState, t.AvailableAction)
+	}
+}
+
+func cmdScan(args []string) error {
+	var projectPath string
+	var recommend bool
+
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--path" && i+1 < len(args):
+			projectPath = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--path="):
+			projectPath = strings.TrimPrefix(args[i], "--path=")
+		case args[i] == "--recommend":
+			recommend = true
+		}
+	}
+
+	if projectPath == "" {
+		projectPath = "."
+	}
+
+	if recommend {
+		fmt.Println("Recommendations coming soon (Phase 2).")
+	}
+
+	// Detect SDKs from project files.
+	detected := detectSDKs(projectPath)
+	if len(detected) == 0 {
+		fmt.Println("No SDK dependencies detected.")
+		return nil
+	}
+
+	// Fetch catalog to match against.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client := platform.New(platformBaseURL(), "")
+	catalog, err := client.ListTwins(ctx, "", "", "", "")
+	if err != nil {
+		return fmt.Errorf("fetching catalog: %w", err)
+	}
+
+	// Build SDK → twin lookup from catalog.
+	type twinMatch struct {
+		Name string
+		Tier string
+	}
+	sdkIndex := make(map[string]twinMatch)
+	for _, entry := range catalog {
+		if pkg := entry.SDKTargets.Primary.Package; pkg != "" {
+			sdkIndex[pkg] = twinMatch{Name: entry.Name, Tier: entry.Tier}
+		}
+		for _, a := range entry.SDKTargets.Additional {
+			if a.Package != "" {
+				sdkIndex[a.Package] = twinMatch{Name: entry.Name, Tier: entry.Tier}
+			}
+		}
+	}
+
+	// Match detected SDKs against catalog.
+	fmt.Printf("%-45s %-14s %-12s %-16s\n", "DETECTED SDK", "TWIN", "TIER", "ACTION")
+	for _, sdk := range detected {
+		match, found := sdkIndex[sdk.Package]
+		if !found {
+			// Check for prefix match (Go module versioning: github.com/stripe/stripe-go/v81).
+			for catalogPkg, m := range sdkIndex {
+				if strings.HasPrefix(sdk.Package, catalogPkg) || strings.HasPrefix(catalogPkg, sdk.Package) {
+					match = m
+					found = true
+					break
+				}
+			}
+		}
+
+		label := sdk.Package
+		if sdk.Version != "" {
+			label += " " + sdk.Version
+		}
+
+		if found {
+			action := "subscribe"
+			if match.Tier == "community" {
+				action = "install"
+			}
+			fmt.Printf("%-45s %-14s %-12s %-16s\n", label, match.Name, match.Tier, action)
+		} else {
+			fmt.Printf("%-45s %-14s %-12s %-16s\n", label, "—", "—", "no twin available")
+		}
+	}
+
+	return nil
+}
+
+type detectedSDK struct {
+	Package  string
+	Version  string
+	Language string
+}
+
+func detectSDKs(projectPath string) []detectedSDK {
+	var results []detectedSDK
+	results = append(results, detectGoSDKs(projectPath)...)
+	results = append(results, detectNodeSDKs(projectPath)...)
+	return results
+}
+
+func detectGoSDKs(projectPath string) []detectedSDK {
+	goModPath := filepath.Join(projectPath, "go.mod")
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return nil
+	}
+
+	var results []detectedSDK
+	inRequire := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "require (" {
+			inRequire = true
+			continue
+		}
+		if line == ")" {
+			inRequire = false
+			continue
+		}
+		if !inRequire {
+			continue
+		}
+		// Skip indirect deps.
+		if strings.Contains(line, "// indirect") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			results = append(results, detectedSDK{
+				Package:  parts[0],
+				Version:  parts[1],
+				Language: "go",
+			})
+		}
+	}
+	return results
+}
+
+func detectNodeSDKs(projectPath string) []detectedSDK {
+	pkgPath := filepath.Join(projectPath, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return nil
+	}
+
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil
+	}
+
+	var results []detectedSDK
+	for name, version := range pkg.Dependencies {
+		results = append(results, detectedSDK{
+			Package:  name,
+			Version:  version,
+			Language: "typescript",
+		})
+	}
+	for name, version := range pkg.DevDependencies {
+		results = append(results, detectedSDK{
+			Package:  name,
+			Version:  version,
+			Language: "typescript",
+		})
+	}
+	return results
+}
+
 func cmdAuth(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: wt auth <login|status|logout>")
@@ -1023,8 +1421,18 @@ func cmdAuthStatus() error {
 		return err
 	}
 
+	// Show org context if present.
+	if cfg.HasOrgContext() {
+		fmt.Printf("Org:     %s\n", cfg.OrgSlug)
+		fmt.Printf("Org ID:  %s\n", cfg.OrgID)
+		maskedKey := cfg.APIKey[:8] + "..." + cfg.APIKey[len(cfg.APIKey)-4:]
+		fmt.Printf("API Key: %s\n", maskedKey)
+		return nil
+	}
+
+	// Fall back to legacy license key display.
 	if cfg.LicenseKey == "" {
-		fmt.Println("Tier: free (no license key)")
+		fmt.Println("Not authenticated. Run `wt login --org <slug>` to connect.")
 		return nil
 	}
 
@@ -1050,17 +1458,22 @@ func cmdAuthLogout() error {
 		return err
 	}
 
-	if cfg.LicenseKey == "" {
-		fmt.Println("No license key configured.")
+	hadOrg := cfg.HasOrgContext()
+	hadLicense := cfg.LicenseKey != ""
+
+	if !hadOrg && !hadLicense {
+		fmt.Println("Not authenticated.")
 		return nil
 	}
 
+	cfg.ClearOrgContext()
 	cfg.LicenseKey = ""
+
 	if err := config.Save(cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Println("License key removed.")
+	fmt.Println("Logged out.")
 	return nil
 }
 
