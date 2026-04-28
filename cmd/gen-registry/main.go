@@ -21,12 +21,14 @@ type Registry struct {
 
 // TwinEntry mirrors internal/registry.TwinEntry.
 type TwinEntry struct {
-	Description string             `json:"description"`
-	Repo        string             `json:"repo"`
-	Category    string             `json:"category"`
-	Author      string             `json:"author"`
-	Latest      string             `json:"latest"`
-	Versions    map[string]Version `json:"versions"`
+	Description  string             `json:"description"`
+	Repo         string             `json:"repo"`
+	Category     string             `json:"category"`
+	Author       string             `json:"author"`
+	Tier         string             `json:"tier"`
+	DownloadAuth string             `json:"download_auth,omitempty"`
+	Latest       string             `json:"latest"`
+	Versions     map[string]Version `json:"versions"`
 }
 
 // Version mirrors internal/registry.Version.
@@ -72,6 +74,8 @@ func run(args []string) error {
 	registryFile := fs.String("registry-file", "", "path to registry.json")
 	repo := fs.String("repo", "wondertwin-ai/registry", "GitHub repo for download URLs")
 	prerelease := fs.Bool("prerelease", false, "add version without updating latest")
+	tier := fs.String("tier", "community", "twin tier: community or commercial")
+	manifestFile := fs.String("manifest-file", "", "explicit path to twin-manifest.json (default: twin-<name>/twin-manifest.json)")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -81,8 +85,12 @@ func run(args []string) error {
 		return fmt.Errorf("--twin, --version, --checksums-file, and --registry-file are all required")
 	}
 
+	if *tier != "community" && *tier != "commercial" {
+		return fmt.Errorf("--tier must be 'community' or 'commercial', got %q", *tier)
+	}
+
 	// 1. Read twin manifest
-	manifest, err := readManifest(*twin)
+	manifest, err := readManifestFrom(*twin, *manifestFile)
 	if err != nil {
 		return fmt.Errorf("reading manifest: %w", err)
 	}
@@ -100,10 +108,10 @@ func run(args []string) error {
 	}
 
 	// 4. Build version entry
-	ver := buildVersion(*twin, *version, *repo, manifest, checksums)
+	ver := buildVersion(*twin, *version, *repo, *tier, manifest, checksums)
 
 	// 5. Upsert into registry
-	upsert(reg, *twin, *version, manifest, ver, *prerelease)
+	upsert(reg, *twin, *version, *tier, manifest, ver, *prerelease)
 
 	// 6. Write back
 	if err := writeRegistry(*registryFile, reg); err != nil {
@@ -114,8 +122,11 @@ func run(args []string) error {
 	return nil
 }
 
-func readManifest(twin string) (*TwinManifest, error) {
-	path := filepath.Join(fmt.Sprintf("twin-%s", twin), "twin-manifest.json")
+func readManifestFrom(twin, manifestFile string) (*TwinManifest, error) {
+	path := manifestFile
+	if path == "" {
+		path = filepath.Join(fmt.Sprintf("twin-%s", twin), "twin-manifest.json")
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -187,7 +198,7 @@ func loadRegistry(path string) (*Registry, error) {
 	return &reg, nil
 }
 
-func buildVersion(twin, version, repo string, manifest *TwinManifest, checksums map[string]string) Version {
+func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, checksums map[string]string) Version {
 	platforms := []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
 	binaryURLs := make(map[string]string, len(platforms))
 	for _, p := range platforms {
@@ -202,23 +213,33 @@ func buildVersion(twin, version, repo string, manifest *TwinManifest, checksums 
 		SDKPackage: manifest.SDKTarget.Primary.Package,
 		SDKVersion: manifest.SDKTarget.Primary.Version,
 		APIVersion: manifest.SDKTarget.Primary.APIVersion,
-		Tier:       "free",
+		Tier:       tier,
 		Checksums:  checksums,
 		BinaryURLs: binaryURLs,
 	}
 }
 
-func upsert(reg *Registry, twin, version string, manifest *TwinManifest, ver Version, prerelease bool) {
+func upsert(reg *Registry, twin, version, tier string, manifest *TwinManifest, ver Version, prerelease bool) {
 	entry, exists := reg.Twins[twin]
 	if !exists {
+		repo := "https://github.com/wondertwin-ai/wondertwin"
+		if tier == "commercial" {
+			repo = "https://github.com/wondertwin-ai/wondertwin-pro"
+		}
 		entry = TwinEntry{
 			Description: manifest.Description,
-			Repo:        "https://github.com/wondertwin-ai/wondertwin",
+			Repo:        repo,
 			Category:    manifest.Category,
 			Author:      "WonderTwin",
 			Versions:    make(map[string]Version),
 		}
 	}
+
+	entry.Tier = tier
+	if tier == "commercial" {
+		entry.DownloadAuth = "required"
+	}
+
 	// Update latest unless --prerelease is set.
 	// Exception: if there's no previous latest (first release), set it even for prereleases.
 	if !prerelease || entry.Latest == "" {

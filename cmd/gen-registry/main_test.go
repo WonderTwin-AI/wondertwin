@@ -125,8 +125,11 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 	if ver.SDKVersion != "v81" {
 		t.Errorf("sdk_version = %q", ver.SDKVersion)
 	}
-	if ver.Tier != "free" {
-		t.Errorf("tier = %q", ver.Tier)
+	if ver.Tier != "community" {
+		t.Errorf("tier = %q, want %q", ver.Tier, "community")
+	}
+	if entry.Tier != "community" {
+		t.Errorf("entry.tier = %q, want %q", entry.Tier, "community")
 	}
 }
 
@@ -574,6 +577,142 @@ func TestBackwardCompatibilityWithoutAPIVersion(t *testing.T) {
 		t.Errorf("api_version should be empty for old registry, got %q", ver.APIVersion)
 	}
 	if ver.SDKPackage != "github.com/stripe/stripe-go" {
+		t.Errorf("sdk_package = %q", ver.SDKPackage)
+	}
+}
+
+func TestCommercialTier(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	err := run([]string{
+		"--twin", "stripe",
+		"--version", "0.1.0",
+		"--checksums-file", checksumsPath,
+		"--registry-file", registryPath,
+		"--tier", "commercial",
+	})
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	if err := json.Unmarshal(data, &reg); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	entry := reg.Twins["stripe"]
+	if entry.Tier != "commercial" {
+		t.Errorf("entry.tier = %q, want %q", entry.Tier, "commercial")
+	}
+	if entry.DownloadAuth != "required" {
+		t.Errorf("download_auth = %q, want %q", entry.DownloadAuth, "required")
+	}
+	if entry.Repo != "https://github.com/wondertwin-ai/wondertwin-pro" {
+		t.Errorf("repo = %q, want wondertwin-pro URL", entry.Repo)
+	}
+
+	ver := entry.Versions["0.1.0"]
+	if ver.Tier != "commercial" {
+		t.Errorf("version tier = %q, want %q", ver.Tier, "commercial")
+	}
+}
+
+func TestInvalidTierRejected(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	err := run([]string{
+		"--twin", "stripe",
+		"--version", "0.1.0",
+		"--checksums-file", checksumsPath,
+		"--registry-file", registryPath,
+		"--tier", "pro",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid tier 'pro', got nil")
+	}
+}
+
+func TestManifestFileFlag(t *testing.T) {
+	dir := t.TempDir()
+
+	// Place manifest in a non-standard location (simulating cross-repo)
+	manifestPath := filepath.Join(dir, "external-manifest.json")
+	manifest := `{
+  "twin": "plaid",
+  "display_name": "Plaid",
+  "category": "fintech",
+  "description": "Plaid twin for testing",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/plaid/plaid-go",
+      "language": "go",
+      "version": "v14"
+    }
+  }
+}`
+	if err := os.WriteFile(manifestPath, []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	// Write checksums for plaid
+	content := `abc123def456  twin-plaid-darwin-amd64
+789ghi012jkl  twin-plaid-darwin-arm64
+mno345pqr678  twin-plaid-linux-amd64
+stu901vwx234  twin-plaid-linux-arm64
+`
+	checksumsPath := filepath.Join(dir, "checksums.txt")
+	os.WriteFile(checksumsPath, []byte(content), 0o644)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	// No twin-plaid/ directory exists — rely entirely on --manifest-file
+	err := run([]string{
+		"--twin", "plaid",
+		"--version", "0.1.0",
+		"--checksums-file", checksumsPath,
+		"--registry-file", registryPath,
+		"--manifest-file", manifestPath,
+		"--tier", "commercial",
+	})
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	entry := reg.Twins["plaid"]
+	if entry.Description != "Plaid twin for testing" {
+		t.Errorf("description = %q", entry.Description)
+	}
+	if entry.Category != "fintech" {
+		t.Errorf("category = %q", entry.Category)
+	}
+	if entry.Tier != "commercial" {
+		t.Errorf("tier = %q, want %q", entry.Tier, "commercial")
+	}
+
+	ver := entry.Versions["0.1.0"]
+	if ver.SDKPackage != "github.com/plaid/plaid-go" {
 		t.Errorf("sdk_package = %q", ver.SDKPackage)
 	}
 }
