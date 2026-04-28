@@ -21,13 +21,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout wondertwin
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           path: wondertwin
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: wondertwin/go.mod
           cache-dependency-path: "**/go.sum"
@@ -75,7 +75,7 @@ jobs:
             --notes "Twin release for ${TWIN} v${VERSION}"
 
       - name: Checkout registry
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: wondertwin-ai/registry
           token: ${{ secrets.WONDERTWIN_REGISTRY }}
@@ -110,7 +110,7 @@ jobs:
             git push
           fi
 
-      # ── Post-release validation ──────────────────────────────────
+      # -- Post-release validation ------------------------------------------
       - name: Build wt CLI from source
         working-directory: wondertwin
         run: go build -o ./wt-test ./cmd/wt/
