@@ -20,6 +20,12 @@
 //	wt registry remove <name>     Remove a named registry
 //	wt registry list              List configured registries
 //	wt conformance <binary>       Run conformance tests against a twin
+//	wt login --org <slug>         Authenticate with WonderTwin platform
+//	wt catalog                    Browse the full twin catalog
+//	wt scan                       Detect project dependencies, match against catalog
+//	wt subscribe <twin>           Subscribe to a twin (trial, paid, or entitled)
+//	wt request <service>          Request a twin that doesn't exist yet
+//	wt request --list             List your org's twin requests
 package main
 
 import (
@@ -121,6 +127,10 @@ func main() {
 		err = cmdCatalog(args)
 	case "scan":
 		err = cmdScan(args)
+	case "subscribe":
+		err = cmdSubscribe(args)
+	case "request":
+		err = cmdRequest(args)
 	case "auth":
 		err = cmdAuth(args)
 	case "registry":
@@ -1853,6 +1863,155 @@ func installFromLockFile(manifestDir string, m *manifest.Manifest) error {
 		if err := registry.InstallFromURL(name, locked.Version, locked.BinaryURL, locked.Checksum, binaryDir); err != nil {
 			return fmt.Errorf("twin %s: %w", name, err)
 		}
+	}
+
+	return nil
+}
+
+const signupBaseURL = "https://app.wondertwin.ai/signup"
+
+func cmdSubscribe(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: wt subscribe <twin-name>")
+	}
+
+	twinName := args[0]
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	// No-account path: surface signup URL.
+	if cfg.APIKey == "" {
+		fmt.Printf("%s requires a WonderTwin account.\n", twinName)
+		fmt.Printf("Sign up: %s?ref=cli&twin=%s\n", signupBaseURL, twinName)
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	client := platform.New(platformBaseURL(), cfg.APIKey)
+	resp, err := client.Subscribe(ctx, cfg.OrgID, twinName)
+	if err != nil {
+		return fmt.Errorf("subscribe: %w", err)
+	}
+
+	switch resp.Action {
+	case "already_entitled":
+		fmt.Printf("%s is already in your catalog. Run `wt install %s` to install.\n", twinName, twinName)
+	case "subscribed":
+		fmt.Printf("Subscribed to %s. Run `wt install %s` to install.\n", twinName, twinName)
+	case "trial_started":
+		fmt.Printf("Pro trial started (expires %s). %s is now available.\n", resp.TrialEndsAt, twinName)
+		fmt.Printf("Run `wt install %s` to install.\n", twinName)
+	case "upgrade_required":
+		fmt.Printf("%s requires WonderTwin Pro.\n", twinName)
+		if resp.CheckoutURL != "" {
+			fmt.Printf("Start your subscription: %s\n", resp.CheckoutURL)
+		} else {
+			fmt.Printf("Upgrade at: %s?ref=cli&twin=%s\n", signupBaseURL, twinName)
+		}
+	case "approval_requested":
+		fmt.Printf("Subscription request submitted to your org admin.")
+		if resp.RequestID != "" {
+			fmt.Printf(" (request %s)", resp.RequestID)
+		}
+		fmt.Println()
+	case "signup_required":
+		fmt.Printf("%s requires a WonderTwin account.\n", twinName)
+		if resp.SignupURL != "" {
+			fmt.Printf("Sign up: %s\n", resp.SignupURL)
+		} else {
+			fmt.Printf("Sign up: %s?ref=cli&twin=%s\n", signupBaseURL, twinName)
+		}
+	default:
+		fmt.Printf("Response: %s\n", resp.Action)
+		if resp.Message != "" {
+			fmt.Println(resp.Message)
+		}
+	}
+
+	return nil
+}
+
+func cmdRequest(args []string) error {
+	// Parse flags.
+	var listMode bool
+	var serviceName string
+
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--list":
+			listMode = true
+		case !strings.HasPrefix(args[i], "-"):
+			serviceName = args[i]
+		}
+	}
+
+	if !listMode && serviceName == "" {
+		return fmt.Errorf("usage: wt request <service-name>  or  wt request --list")
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// --list: show org's requests.
+	if listMode {
+		if cfg.APIKey == "" {
+			return fmt.Errorf("not logged in. Run `wt login --org <slug>` first")
+		}
+
+		client := platform.New(platformBaseURL(), cfg.APIKey)
+		reqs, err := client.ListTwinRequests(ctx, cfg.OrgID)
+		if err != nil {
+			return fmt.Errorf("list requests: %w", err)
+		}
+
+		if len(reqs) == 0 {
+			fmt.Println("No twin requests.")
+			return nil
+		}
+
+		fmt.Printf("%-36s  %-20s  %-12s  %s\n", "ID", "SERVICE", "STATUS", "CREATED")
+		fmt.Printf("%-36s  %-20s  %-12s  %s\n", strings.Repeat("-", 36), strings.Repeat("-", 20), strings.Repeat("-", 12), strings.Repeat("-", 19))
+		for _, r := range reqs {
+			created := r.CreatedAt
+			if len(created) > 19 {
+				created = created[:19]
+			}
+			fmt.Printf("%-36s  %-20s  %-12s  %s\n", r.ID, r.ServiceName, r.Status, created)
+		}
+		return nil
+	}
+
+	// No account: suggest GitHub issue.
+	if cfg.APIKey == "" {
+		fmt.Printf("No WonderTwin account. To request a twin for %s:\n", serviceName)
+		fmt.Printf("  Create an issue: https://github.com/wondertwin-ai/wondertwin/issues/new?title=Twin+Request:+%s&labels=twin-request\n", serviceName)
+		fmt.Printf("  Or sign up for Pro to get structured request tracking: %s?ref=cli\n", signupBaseURL)
+		return nil
+	}
+
+	// Pro path: submit structured request.
+	client := platform.New(platformBaseURL(), cfg.APIKey)
+	result, err := client.SubmitTwinRequest(ctx, cfg.OrgID, serviceName, "", "")
+	if err != nil {
+		return fmt.Errorf("submit request: %w", err)
+	}
+
+	if result.Status == "submitted" {
+		fmt.Printf("Twin request submitted for %s (request %s).\n", serviceName, result.ID)
+		fmt.Println("We'll research this and get back to you.")
+	} else {
+		// Dedup: existing request returned.
+		fmt.Printf("Existing request for %s (request %s, status: %s).\n", serviceName, result.ID, result.Status)
 	}
 
 	return nil
