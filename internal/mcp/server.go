@@ -8,7 +8,9 @@ import (
 	"os"
 
 	"github.com/wondertwin-ai/wondertwin/internal/client"
+	"github.com/wondertwin-ai/wondertwin/internal/config"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
+	"github.com/wondertwin-ai/wondertwin/internal/platform"
 )
 
 // Server is an MCP server that exposes twin management tools over JSON-RPC 2.0 on stdio.
@@ -22,10 +24,23 @@ type Server struct {
 
 // NewServer creates a new MCP server for the given manifest.
 func NewServer(m *manifest.Manifest) *Server {
+	tools := allTools()
+
+	// Add discovery tools if platform config is available.
+	cfg, err := config.Load()
+	if err == nil {
+		baseURL := platform.DefaultBaseURL
+		if u := os.Getenv("WT_PLATFORM_URL"); u != "" {
+			baseURL = u
+		}
+		pc := platform.New(baseURL, cfg.APIKey)
+		tools = append(tools, discoveryTools(pc, cfg)...)
+	}
+
 	return &Server{
 		manifest: m,
 		client:   client.New(),
-		tools:    allTools(),
+		tools:    tools,
 		stdin:    os.Stdin,
 		stdout:   os.Stdout,
 	}
