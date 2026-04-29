@@ -1,7 +1,9 @@
 package api_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -306,6 +308,159 @@ func TestCustomLogosResetOnReset(t *testing.T) {
 	if !strings.Contains(string(resp.Body), "RE") {
 		t.Error("expected placeholder SVG with initials after reset")
 	}
+}
+
+// --- Custom Logo Upload Tests ---
+
+// rawRequest issues an HTTP request with raw body bytes and a custom Content-Type.
+// Used for upload tests where TwinClient's JSON marshaling would corrupt binary data.
+func rawRequest(t *testing.T, srv *httptest.Server, method, path, contentType string, body []byte) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, srv.URL+path, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	return resp
+}
+
+func TestPutCustomLogoSVG(t *testing.T) {
+	srv, tc := setupLogodev(t)
+
+	body := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><text>real</text></svg>`)
+	resp := rawRequest(t, srv, "PUT", "/admin/logos/real.com", "image/svg+xml", body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("upload: got %d", resp.StatusCode)
+	}
+
+	got := logoGet(tc, "/real.com")
+	got.AssertStatus(200)
+	if string(got.Body) != string(body) {
+		t.Errorf("expected uploaded SVG, got %s", string(got.Body))
+	}
+	if got.Headers.Get("Content-Type") != "image/svg+xml" {
+		t.Errorf("expected image/svg+xml, got %s", got.Headers.Get("Content-Type"))
+	}
+}
+
+func TestPutCustomLogoPNG(t *testing.T) {
+	srv, tc := setupLogodev(t)
+
+	pngBytes := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02, 0x03}
+	resp := rawRequest(t, srv, "PUT", "/admin/logos/png.com", "image/png", pngBytes)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("upload: got %d", resp.StatusCode)
+	}
+
+	got := logoGet(tc, "/png.com")
+	got.AssertStatus(200)
+	if !bytes.Equal(got.Body, pngBytes) {
+		t.Errorf("expected exact PNG bytes back, got %d bytes", len(got.Body))
+	}
+	if got.Headers.Get("Content-Type") != "image/png" {
+		t.Errorf("expected image/png, got %s", got.Headers.Get("Content-Type"))
+	}
+}
+
+func TestPutCustomLogoFormats(t *testing.T) {
+	// The twin must accept any content type the source service does.
+	// Logo.dev returns SVG/PNG/JPG/WebP; we accept whatever the bridge sends.
+	cases := []struct {
+		name        string
+		contentType string
+		body        []byte
+	}{
+		{"webp", "image/webp", []byte{0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50}},
+		{"jpeg", "image/jpeg", []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}},
+		{"avif", "image/avif", []byte{0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66}},
+		{"gif", "image/gif", []byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61}},
+		{"ico", "image/x-icon", []byte{0x00, 0x00, 0x01, 0x00, 0x01, 0x00}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			srv, tc := setupLogodev(t)
+			domain := tt.name + ".com"
+			rawRequest(t, srv, "PUT", "/admin/logos/"+domain, tt.contentType, tt.body).Body.Close()
+
+			got := logoGet(tc, "/"+domain)
+			got.AssertStatus(200)
+			if got.Headers.Get("Content-Type") != tt.contentType {
+				t.Errorf("expected %s, got %s", tt.contentType, got.Headers.Get("Content-Type"))
+			}
+			if !bytes.Equal(got.Body, tt.body) {
+				t.Errorf("body round-trip mismatch")
+			}
+		})
+	}
+}
+
+func TestPutCustomLogoReplaces(t *testing.T) {
+	srv, tc := setupLogodev(t)
+
+	rawRequest(t, srv, "PUT", "/admin/logos/dup.com", "image/svg+xml", []byte("<svg>v1</svg>")).Body.Close()
+	rawRequest(t, srv, "PUT", "/admin/logos/dup.com", "image/svg+xml", []byte("<svg>v2</svg>")).Body.Close()
+
+	got := logoGet(tc, "/dup.com")
+	if string(got.Body) != "<svg>v2</svg>" {
+		t.Errorf("expected v2, got %s", string(got.Body))
+	}
+}
+
+func TestPutCustomLogoMissingContentType(t *testing.T) {
+	srv, _ := setupLogodev(t)
+	resp := rawRequest(t, srv, "PUT", "/admin/logos/x.com", "", []byte("body"))
+	resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestPutCustomLogoEmptyBody(t *testing.T) {
+	srv, _ := setupLogodev(t)
+	resp := rawRequest(t, srv, "PUT", "/admin/logos/x.com", "image/svg+xml", nil)
+	resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestPutCustomLogoTooLarge(t *testing.T) {
+	srv, _ := setupLogodev(t)
+	big := make([]byte, 5*1024*1024+1)
+	resp := rawRequest(t, srv, "PUT", "/admin/logos/big.com", "image/png", big)
+	resp.Body.Close()
+	if resp.StatusCode != 413 {
+		t.Errorf("expected 413, got %d", resp.StatusCode)
+	}
+}
+
+func TestDeleteCustomLogo(t *testing.T) {
+	srv, tc := setupLogodev(t)
+
+	rawRequest(t, srv, "PUT", "/admin/logos/del.com", "image/svg+xml", []byte("<svg>x</svg>")).Body.Close()
+	tc.Delete("/admin/logos/del.com").AssertStatus(204)
+
+	got := logoGet(tc, "/del.com")
+	got.AssertStatus(200)
+	if !strings.Contains(string(got.Body), "<svg") {
+		t.Error("expected fallback placeholder after delete")
+	}
+	if string(got.Body) == "<svg>x</svg>" {
+		t.Error("expected delete to remove custom logo")
+	}
+}
+
+func TestDeleteCustomLogoMissing(t *testing.T) {
+	_, tc := setupLogodev(t)
+	tc.Delete("/admin/logos/nonexistent.com").AssertStatus(204)
 }
 
 // --- Describe API Tests ---

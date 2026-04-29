@@ -1,13 +1,19 @@
 package api
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
+
+// maxCustomLogoBytes caps a single uploaded asset. SVG/PNG logos are typically <100KB;
+// 5MB leaves comfortable headroom without enabling the twin as a generic blob store.
+const maxCustomLogoBytes = 5 * 1024 * 1024
 
 // GetLogo handles GET /{domain} — returns a deterministic SVG placeholder.
 // Supports Logo.dev query params: size, format, greyscale, retina, theme, fallback.
@@ -130,6 +136,60 @@ func (h *Handler) serveLogo(w http.ResponseWriter, r *http.Request, domain strin
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(svg))
+}
+
+// PutCustomLogo handles PUT /admin/logos/{domain} — stores a logo asset for the domain.
+// Body is the raw image bytes; Content-Type header is preserved and used when serving.
+// Replaces any existing custom logo for that domain.
+func (h *Handler) PutCustomLogo(w http.ResponseWriter, r *http.Request) {
+	domain := chi.URLParam(r, "domain")
+	if domain == "" {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"error":   "invalid_request",
+			"message": "domain is required",
+		})
+		return
+	}
+
+	ct := r.Header.Get("Content-Type")
+	if ct == "" {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"error":   "invalid_request",
+			"message": "Content-Type header is required",
+		})
+		return
+	}
+
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxCustomLogoBytes))
+	if err != nil {
+		twincore.JSON(w, http.StatusRequestEntityTooLarge, map[string]any{
+			"error":   "payload_too_large",
+			"message": "logo body exceeds 5MB limit",
+		})
+		return
+	}
+	if len(body) == 0 {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"error":   "invalid_request",
+			"message": "empty body",
+		})
+		return
+	}
+
+	h.store.CustomLogos[domain] = store.CustomLogo{ContentType: ct, Data: body}
+
+	twincore.JSON(w, http.StatusOK, map[string]any{
+		"domain":       domain,
+		"content_type": ct,
+		"bytes":        len(body),
+	})
+}
+
+// DeleteCustomLogo handles DELETE /admin/logos/{domain} — removes a stored custom logo.
+func (h *Handler) DeleteCustomLogo(w http.ResponseWriter, r *http.Request) {
+	domain := chi.URLParam(r, "domain")
+	delete(h.store.CustomLogos, domain)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // AdminListLogos handles GET /admin/logos — returns all requested domains.

@@ -48,6 +48,8 @@ func (h *Handler) Routes(r chi.Router) {
 	// Admin extras (no auth required)
 	r.Get("/admin/logos", h.AdminListLogos)
 	r.Get("/admin/logos/{domain}", h.AdminGetLogo)
+	r.Put("/admin/logos/{domain}", h.PutCustomLogo)
+	r.Delete("/admin/logos/{domain}", h.DeleteCustomLogo)
 }
 
 // tokenAuthMiddleware validates Logo.dev-style API token auth.
