@@ -28,6 +28,12 @@ type Config struct {
 	SeedFile   string
 	Verbose    bool
 	Name       string // twin name for logging
+
+	// ObserverEndpoint, when Enabled, configures a local-only forwarder
+	// that mirrors recorded request/response entries to a process on
+	// the same host (typically a synthetic-data sidecar). The URL must
+	// be loopback; non-local URLs cause New to refuse to start.
+	ObserverEndpoint ObserverEndpoint
 }
 
 // ParseFlags parses common CLI flags and returns a Config.
@@ -59,6 +65,12 @@ type Twin struct {
 	Logger *slog.Logger
 	mw     *Middleware
 	mu     sync.RWMutex // protects Config fields during runtime updates
+
+	// configErr is set by New when an unrecoverable configuration
+	// problem is detected (e.g. a non-loopback ObserverEndpoint URL).
+	// Serve checks this field before binding so misconfigured twins
+	// fail fast at startup instead of silently ignoring the issue.
+	configErr error
 }
 
 // New creates a new Twin with the given config.
@@ -85,12 +97,19 @@ func New(cfg *Config) *Twin {
 	r.Use(mw.LatencyInjection)
 	r.Use(mw.RandomFailure)
 
-	return &Twin{
+	t := &Twin{
 		Config: cfg,
 		Router: r,
 		Logger: logger,
 		mw:     mw,
 	}
+
+	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {
+		logger.Error("invalid twin configuration", "err", err)
+		t.configErr = err
+	}
+
+	return t
 }
 
 // Middleware returns the middleware instance for external access (e.g., fault injection).
@@ -190,6 +209,9 @@ func (t *Twin) UpdateConfig(updates map[string]any) error {
 
 // Serve starts the HTTP server and blocks until shutdown signal.
 func (t *Twin) Serve() error {
+	if t.configErr != nil {
+		return t.configErr
+	}
 	addr := fmt.Sprintf(":%d", t.Config.Port)
 
 	srv := &http.Server{
