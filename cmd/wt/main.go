@@ -31,6 +31,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -143,6 +144,8 @@ func main() {
 		err = cmdReplay(args)
 	case "license":
 		err = cmdLicense(args)
+	case "runs":
+		err = cmdRuns(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -150,6 +153,14 @@ func main() {
 	}
 
 	if err != nil {
+		var ec ExitCodeError
+		if errors.As(err, &ec) {
+			// Child process surfaced its exit code via the typed
+			// error. Skip the "wt: ..." prefix — the child wrote its
+			// own output, the wrap path printed cleanup confirmation,
+			// and customers see the code via $?.
+			os.Exit(ec.Code())
+		}
 		fmt.Fprintf(os.Stderr, "wt: %v\n", err)
 		os.Exit(1)
 	}
@@ -212,6 +223,10 @@ Commands:
   license install <file>     Install a signed WonderTwin license file
   license status             Show the active license's status
   license inspect <file>     Show a license file without installing
+  runs start                 Start a run on a running twin (drives /admin/runs/start)
+  runs finish                Finish a run; optional --export to write JSONL
+  runs current               Show the active run on a running twin
+  runs wrap -- <cmd>         Start a run, exec <cmd>, finish on exit
   version                    Print the wt version
 
 Options:
