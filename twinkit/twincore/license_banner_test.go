@@ -2,12 +2,7 @@ package twincore
 
 import (
 	"bytes"
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/json"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -15,38 +10,20 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/cimode"
 )
 
-// captureBanner installs a buffered slog handler on the Twin so tests
-// can assert against the banner output. It is invoked after New() so
-// the constructor's Logger ends up replaced; the existing banner has
-// already been emitted to the original logger. To capture the banner,
-// callers should set the buffer first via newTwinForBannerTest.
+// newTwinForBannerTest builds a Twin, swaps in a captured logger, and
+// returns both. Callers re-invoke emitLicenseBanner explicitly after
+// mutating Twin.License / Twin.LicenseStatus so the banner reflects
+// the test-controlled state rather than whatever LoadLicense found on
+// disk.
 func newTwinForBannerTest(t *testing.T, name string, env map[string]string) (*Twin, *bytes.Buffer) {
 	t.Helper()
 	for k, v := range env {
 		t.Setenv(k, v)
 	}
-	buf := &bytes.Buffer{}
-	// Hook the logger by replacing os.Stdout temporarily? Simpler:
-	// build a Twin and then re-emit the banner against a captured
-	// logger — the banner is deterministic given Twin state.
 	tw := New(&Config{Name: name})
+	buf := &bytes.Buffer{}
 	tw.Logger = slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	tw.emitLicenseBanner()
 	return tw, buf
-}
-
-func writeSignedLicense(t *testing.T, dir string, lic cimode.License, priv ed25519.PrivateKey) {
-	t.Helper()
-	bytes, err := lic.SigningBytes()
-	if err != nil {
-		t.Fatalf("SigningBytes: %v", err)
-	}
-	sig := ed25519.Sign(priv, bytes)
-	lic.SetSignature(sig)
-	data, _ := json.Marshal(lic)
-	if err := os.WriteFile(filepath.Join(dir, cimode.DefaultLicenseFilename), data, 0o600); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestBannerSilentInLocalMode(t *testing.T) {
@@ -60,21 +37,23 @@ func TestBannerSilentInLocalMode(t *testing.T) {
 	if tw.Mode != cimode.ModeLocal {
 		t.Fatalf("Mode = %v, want local", tw.Mode)
 	}
+	tw.emitLicenseBanner()
 	if buf.Len() != 0 {
 		t.Errorf("local mode should emit no banner; got: %s", buf.String())
 	}
 }
 
 func TestBannerCIWithoutLicense(t *testing.T) {
-	dir := t.TempDir()
 	tw, buf := newTwinForBannerTest(t, "twin-test", map[string]string{
 		"CI":             "true",
 		"GITHUB_ACTIONS": "",
-		cimode.EnvHome:   dir,
 	})
 	if tw.Mode != cimode.ModeCI {
 		t.Fatalf("Mode = %v, want ci", tw.Mode)
 	}
+	tw.License = nil
+	tw.LicenseStatus = cimode.Status{Reason: cimode.ReasonNoLicense}
+	tw.emitLicenseBanner()
 	out := buf.String()
 	if !strings.Contains(out, "without valid license") {
 		t.Errorf("expected warn banner; got: %s", out)
@@ -88,57 +67,29 @@ func TestBannerCIWithoutLicense(t *testing.T) {
 }
 
 func TestBannerCIWithExpiredLicense(t *testing.T) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
-	dir := t.TempDir()
-	issued := time.Now().Add(-48 * time.Hour)
-	expired := time.Now().Add(-24 * time.Hour)
-	writeSignedLicense(t, dir, cimode.License{
-		Key: "lic", OrgID: "org", TwinScope: []string{"*"},
-		IssuedAt: issued, NotAfter: expired,
-	}, priv)
-
 	tw, buf := newTwinForBannerTest(t, "twin-test", map[string]string{
 		"CI":             "true",
 		"GITHUB_ACTIONS": "",
-		cimode.EnvHome:   dir,
 	})
 	if tw.Mode != cimode.ModeCI {
 		t.Fatalf("Mode = %v", tw.Mode)
 	}
+	tw.License = &cimode.License{Key: "lic", OrgID: "org"}
+	tw.LicenseStatus = cimode.Status{Reason: cimode.ReasonExpired, ExpiresIn: -time.Hour}
+	tw.emitLicenseBanner()
 	if !strings.Contains(buf.String(), cimode.ReasonExpired) {
 		t.Errorf("expected expired reason; got: %s", buf.String())
 	}
 }
 
 func TestBannerCIWithValidLicense(t *testing.T) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
-	dir := t.TempDir()
-	now := time.Now().UTC()
-	writeSignedLicense(t, dir, cimode.License{
-		Key: "lic", OrgID: "org_acme", TwinScope: []string{"*"},
-		IssuedAt: now, NotAfter: now.Add(30 * 24 * time.Hour),
-	}, priv)
-
 	tw, buf := newTwinForBannerTest(t, "twin-test", map[string]string{
 		"CI":             "true",
 		"GITHUB_ACTIONS": "",
-		cimode.EnvHome:   dir,
 	})
-	if !tw.LicenseStatus.Valid {
-		t.Fatalf("LicenseStatus = %+v", tw.LicenseStatus)
-	}
+	tw.License = &cimode.License{Key: "lic", OrgID: "org_acme"}
+	tw.LicenseStatus = cimode.Status{Valid: true, ExpiresIn: 24 * time.Hour}
+	tw.emitLicenseBanner()
 	out := buf.String()
 	if !strings.Contains(out, "license active") {
 		t.Errorf("expected info banner; got: %s", out)
