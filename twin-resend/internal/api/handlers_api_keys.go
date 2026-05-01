@@ -33,8 +33,8 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := resendID()
-	token := "re_" + resendID() + "_" + resendID()
+	id := h.resendID()
+	token := "re_" + h.resendID() + "_" + h.resendID()
 	key := store.APIKey{
 		ID:        id,
 		Name:      req.Name,

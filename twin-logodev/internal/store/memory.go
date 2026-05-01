@@ -3,7 +3,6 @@ package store
 import (
 	"encoding/base64"
 	"encoding/json"
-	"time"
 
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
@@ -34,7 +33,7 @@ func (s *MemoryStore) RecordRequest(domain string, size int, format string, grey
 		Size:      size,
 		Format:    format,
 		Greyscale: greyscale,
-		Timestamp: time.Now(),
+		Timestamp: s.Clock.Now(),
 	})
 }
 

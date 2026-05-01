@@ -53,7 +53,7 @@ func (h *Handler) CreateBroadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := resendID()
+	id := h.resendID()
 	bc := store.Broadcast{
 		ID:         id,
 		Object:     "broadcast",
