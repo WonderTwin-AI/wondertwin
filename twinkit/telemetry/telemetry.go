@@ -73,6 +73,7 @@ type Event struct {
 	RunID      string    `json:"run_id,omitempty"`
 	Seeded     bool      `json:"seeded,omitempty"`
 	SeedSource string    `json:"seed_source,omitempty"`
+	EntryCount int       `json:"entry_count,omitempty"`
 	Timestamp  time.Time `json:"timestamp,omitempty"`
 }
 

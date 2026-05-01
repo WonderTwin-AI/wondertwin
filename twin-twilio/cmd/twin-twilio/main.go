@@ -53,6 +53,7 @@ func main() {
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.WireFromTwin(twin)
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided
