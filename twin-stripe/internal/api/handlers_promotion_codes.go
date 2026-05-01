@@ -24,7 +24,7 @@ func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 
 	code := r.FormValue("code")
 	if code == "" {
-		code = strings.ToUpper(randomHex(4))
+		code = strings.ToUpper(h.randomHex(4))
 	}
 
 	id := h.store.PromotionCodes.NextID()
@@ -36,7 +36,7 @@ func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 		Active:   true,
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	if v := r.FormValue("max_redemptions"); v != "" {

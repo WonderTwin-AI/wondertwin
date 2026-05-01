@@ -35,7 +35,7 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 		Number:           "INV-" + id,
 		Livemode:         false,
 		Metadata:         parseMetadata(r),
-		Created:          store.Now(),
+		Created:          h.store.Now(),
 	}
 	if inv.Currency == "" {
 		inv.Currency = "usd"
@@ -264,9 +264,9 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 			Description:    "Invoice " + inv.Number,
 			Status:         "succeeded",
 			CaptureMethod:  "automatic",
-			ClientSecret:   piID + "_secret_" + randomHex(12),
+			ClientSecret:   piID + "_secret_" + h.randomHex(12),
 			Livemode:       false,
-			Created:        store.Now(),
+			Created:        h.store.Now(),
 		}
 		chargeID := h.createChargeForPI(&pi)
 		pi.LatestCharge = chargeID
@@ -366,7 +366,7 @@ func (h *Handler) CreateInvoiceItem(w http.ResponseWriter, r *http.Request) {
 		Quantity:    1,
 		Livemode:    false,
 		Metadata:    parseMetadata(r),
-		Created:     store.Now(),
+		Created:     h.store.Now(),
 	}
 	if ii.Currency == "" {
 		ii.Currency = "usd"

@@ -2,10 +2,11 @@ package store
 
 import (
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"sync"
-	"time"
 
+	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
@@ -64,6 +65,26 @@ type MemoryStore struct {
 	PlatformBalance  *AccountBalance
 
 	Clock            *pkgstate.Clock
+
+	// Rand is the deterministic random source used by handlers for
+	// token-shaped strings (whsec_, client_secret, etc.). Wired by
+	// the twin's main.go to twincore.Twin.Rand so /admin/runs/start's
+	// reseed propagates everywhere.
+	Rand *sim.Rand
+}
+
+// RandHex returns a deterministic hex string of n bytes (2n hex
+// chars) drawn from the store's Rand. Used by handlers in place of
+// crypto/rand to keep replay capture reproducible per seed.
+func (s *MemoryStore) RandHex(n int) string {
+	if s == nil || s.Rand == nil || n <= 0 {
+		return ""
+	}
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = byte(s.Rand.Intn(256))
+	}
+	return hex.EncodeToString(buf)
 }
 
 // New creates a new MemoryStore with empty state.
@@ -229,7 +250,7 @@ func (s *MemoryStore) RecordBalanceTransaction(txType, source, currency string, 
 		Status:   "available",
 		Type:     txType,
 		Source:   source,
-		Created:  time.Now().Unix(),
+		Created:  s.Now(),
 	}
 	s.BalanceTransactions.Set(id, bt)
 	return id

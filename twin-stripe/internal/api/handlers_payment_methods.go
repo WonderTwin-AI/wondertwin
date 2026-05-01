@@ -27,7 +27,7 @@ func (h *Handler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) {
 		Type:     pmType,
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	if pmType == "card" {

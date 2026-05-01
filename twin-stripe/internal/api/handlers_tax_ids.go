@@ -40,7 +40,7 @@ func (h *Handler) CreateTaxID(w http.ResponseWriter, r *http.Request) {
 			Status: "pending",
 		},
 		Livemode: false,
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	h.store.TaxIDs.Set(id, taxID)

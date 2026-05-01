@@ -73,7 +73,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 		Transfer:           transferID,
 		BalanceTransaction: btID,
 		Metadata:           parseMetadata(r),
-		Created:            store.Now(),
+		Created:            h.store.Now(),
 	}
 	h.store.TransferReversals.Set(id, reversal)
 
@@ -174,10 +174,10 @@ func (h *Handler) CreateAccountLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := store.Now()
+	now := h.store.Now()
 	link := store.AccountLink{
 		Object:    "account_link",
-		URL:       fmt.Sprintf("https://connect.stripe.com/setup/e/%s/%s", account, randomHex(16)),
+		URL:       fmt.Sprintf("https://connect.stripe.com/setup/e/%s/%s", account, h.randomHex(16)),
 		ExpiresAt: now + 300, // 5 minutes
 		Created:   now,
 	}
@@ -214,7 +214,7 @@ func (h *Handler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 		Phone:     r.FormValue("phone"),
 		Livemode:  false,
 		Metadata:  parseMetadata(r),
-		Created:   store.Now(),
+		Created:   h.store.Now(),
 	}
 
 	person.Relationship = parsePersonRelationship(r)
@@ -432,7 +432,7 @@ func (h *Handler) CreateTopUp(w http.ResponseWriter, r *http.Request) {
 		BalanceTransaction: btID,
 		Livemode:           false,
 		Metadata:           parseMetadata(r),
-		Created:            store.Now(),
+		Created:            h.store.Now(),
 	}
 	h.store.TopUps.Set(id, topup)
 

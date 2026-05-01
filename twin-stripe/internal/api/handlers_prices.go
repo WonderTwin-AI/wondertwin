@@ -34,7 +34,7 @@ func (h *Handler) CreatePrice(w http.ResponseWriter, r *http.Request) {
 		Nickname:      r.FormValue("nickname"),
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 
 	if v := r.FormValue("unit_amount"); v != "" {

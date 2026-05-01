@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -20,7 +19,7 @@ func (h *Handler) CreateQuote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := h.store.Quotes.NextID()
-	now := store.Now()
+	now := h.store.Now()
 
 	qt := store.Quote{
 		ID:          id,
@@ -110,7 +109,7 @@ func (h *Handler) FinalizeQuote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	qt.Status = "open"
-	qt.ExpiresAt = time.Now().AddDate(0, 0, 30).Unix()
+	qt.ExpiresAt = h.store.Clock.Now().AddDate(0, 0, 30).Unix()
 	h.store.Quotes.Set(id, qt)
 	h.emitEvent("quote.finalized", mapFromJSON(qt))
 	twincore.JSON(w, http.StatusOK, qt)
@@ -183,7 +182,7 @@ func (h *Handler) CreateBillingPortalSession(w http.ResponseWriter, r *http.Requ
 		URL:       fmt.Sprintf("https://billing.stripe.com/session/%s", id),
 		ReturnURL: r.FormValue("return_url"),
 		Livemode:  false,
-		Created:   store.Now(),
+		Created:   h.store.Now(),
 	}
 
 	h.store.BillingPortalSessions.Set(id, bps)

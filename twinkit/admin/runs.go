@@ -92,9 +92,19 @@ func (h *Handler) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	// Reseed the deterministic RNG when a seed is supplied. Zero is
 	// treated as "no seed change" — callers wanting an explicit zero
 	// seed should not send the field at all.
+	//
+	// Pinning the simulated clock to a seed-derived instant is the
+	// other half of the determinism contract: handlers reading
+	// store.Clock.Now() see the same wall-clock value across runs.
+	// The pin base (2026-01-01 UTC) plus the seed gives different
+	// seeds different captured `created` values without ever
+	// depending on real wall time.
 	seeded := req.Seed != 0
 	if seeded && h.rand != nil {
 		h.rand.Reseed(req.Seed)
+	}
+	if seeded && h.clock != nil {
+		h.clock.Pin(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(req.Seed) * time.Second))
 	}
 
 	// Apply fixtures via StateStore.LoadState. The blob is

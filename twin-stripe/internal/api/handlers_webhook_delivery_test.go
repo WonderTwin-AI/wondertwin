@@ -64,7 +64,7 @@ func setupStripeWithWebhooks(t *testing.T, receiver *webhookReceiver) (*httptest
 	dispatcher := webhook.NewDispatcher(webhook.Config{
 		URL:         whServer.URL,
 		Secret:      "whsec_test_secret",
-		Signer:      stripewh.NewStripeSigner(),
+		Signer:      stripewh.NewStripeSigner(memStore.Clock),
 		EventPrefix: "evt",
 		AutoDeliver: true,
 	})
@@ -92,7 +92,7 @@ func TestWebhookDeliveryToRegisteredEndpoint(t *testing.T) {
 	twin := twincore.New(cfg)
 	dispatcher := webhook.NewDispatcher(webhook.Config{
 		Secret:      "whsec_fallback",
-		Signer:      stripewh.NewStripeSigner(),
+		Signer:      stripewh.NewStripeSigner(memStore.Clock),
 		EventPrefix: "evt",
 		AutoDeliver: true,
 	})
@@ -153,7 +153,7 @@ func TestWebhookFilteringByEnabledEvents(t *testing.T) {
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
 	dispatcher := webhook.NewDispatcher(webhook.Config{
-		Signer:      stripewh.NewStripeSigner(),
+		Signer:      stripewh.NewStripeSigner(memStore.Clock),
 		EventPrefix: "evt",
 		AutoDeliver: true,
 	})
@@ -217,7 +217,7 @@ func TestWebhookWildcardEnabledEvents(t *testing.T) {
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
 	dispatcher := webhook.NewDispatcher(webhook.Config{
-		Signer:      stripewh.NewStripeSigner(),
+		Signer:      stripewh.NewStripeSigner(memStore.Clock),
 		EventPrefix: "evt",
 		AutoDeliver: true,
 	})

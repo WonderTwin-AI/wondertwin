@@ -221,7 +221,7 @@ func (h *Handler) AdminCreateDispute(w http.ResponseWriter, r *http.Request) {
 		Status:        "needs_response",
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 
 	// Mark charge as disputed.

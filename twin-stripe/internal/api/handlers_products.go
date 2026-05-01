@@ -29,8 +29,8 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		Description: r.FormValue("description"),
 		Livemode:    false,
 		Metadata:    parseMetadata(r),
-		Created:     store.Now(),
-		Updated:     store.Now(),
+		Created:     h.store.Now(),
+		Updated:     h.store.Now(),
 	}
 
 	h.store.Products.Set(id, prod)
@@ -74,7 +74,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	if meta := parseMetadata(r); len(meta) > 0 {
 		prod.Metadata = meta
 	}
-	prod.Updated = store.Now()
+	prod.Updated = h.store.Now()
 
 	h.store.Products.Set(id, prod)
 	h.emitEvent("product.updated", mapFromJSON(prod))

@@ -36,7 +36,7 @@ func (h *Handler) CreateCoupon(w http.ResponseWriter, r *http.Request) {
 		Valid:    true,
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 	if v := r.FormValue("amount_off"); v != "" {
 		coup.AmountOff, _ = strconv.ParseInt(v, 10, 64)
@@ -100,11 +100,11 @@ func (h *Handler) CreateSetupIntent(w http.ResponseWriter, r *http.Request) {
 		Object:        "setup_intent",
 		Customer:      r.FormValue("customer"),
 		Status:        "requires_payment_method",
-		ClientSecret:  id + "_secret_" + randomHex(12),
+		ClientSecret:  id + "_secret_" + h.randomHex(12),
 		Usage:         "off_session",
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 	if u := r.FormValue("usage"); u != "" {
 		si.Usage = u
@@ -204,7 +204,7 @@ func (h *Handler) CreateTaxRate(w http.ResponseWriter, r *http.Request) {
 		Jurisdiction: r.FormValue("jurisdiction"),
 		Livemode:     false,
 		Metadata:     parseMetadata(r),
-		Created:      store.Now(),
+		Created:      h.store.Now(),
 	}
 
 	h.store.TaxRates.Set(id, tr)
