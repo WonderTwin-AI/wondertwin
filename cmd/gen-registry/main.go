@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/internal/registry"
 )
 
 // Registry mirrors internal/registry.Registry for JSON serialisation.
@@ -31,18 +33,36 @@ type TwinEntry struct {
 	Versions     map[string]Version `json:"versions"`
 }
 
-// Version mirrors internal/registry.Version.
+// Version mirrors internal/registry.Version, including schema-v2
+// lifecycle fields. All lifecycle fields are omitempty so emitted
+// entries remain compatible with v1 consumers.
 type Version struct {
-	Released   string            `json:"released"`
-	SDKPackage string            `json:"sdk_package"`
-	SDKVersion string            `json:"sdk_version"`
-	APIVersion string            `json:"api_version,omitempty"`
-	Tier       string            `json:"tier"`
-	Checksums  map[string]string `json:"checksums"`
-	BinaryURLs map[string]string `json:"binary_urls"`
+	Released          string            `json:"released"`
+	SDKPackage        string            `json:"sdk_package"`
+	SDKVersion        string            `json:"sdk_version"`
+	APIVersion        string            `json:"api_version,omitempty"`
+	Tier              string            `json:"tier"`
+	Checksums         map[string]string `json:"checksums"`
+	BinaryURLs        map[string]string `json:"binary_urls"`
+	ReleaseType       string            `json:"release_type,omitempty"`
+	MaintenanceStatus string            `json:"maintenance_status,omitempty"`
+	MaintenanceUntil  string            `json:"maintenance_until,omitempty"`
+	BSLExpiryDate     string            `json:"bsl_expiry_date,omitempty"`
+	Changelog         string            `json:"changelog,omitempty"`
+	BreakingChanges   []string          `json:"breaking_changes,omitempty"`
 }
 
+// stringSliceFlag accumulates repeated --breaking-change values.
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string     { return strings.Join(*s, ",") }
+func (s *stringSliceFlag) Set(v string) error { *s = append(*s, v); return nil }
+
 // TwinManifest represents the relevant fields from twin-manifest.json.
+//
+// The Lifecycle block is optional; when present its values seed the
+// emitted Version's lifecycle metadata. CLI flags override anything
+// supplied here.
 type TwinManifest struct {
 	Twin        string `json:"twin"`
 	Description string `json:"description"`
@@ -54,6 +74,25 @@ type TwinManifest struct {
 			APIVersion string `json:"api_version"`
 		} `json:"primary"`
 	} `json:"sdk_target"`
+	Lifecycle *struct {
+		ReleaseType       string   `json:"release_type"`
+		MaintenanceStatus string   `json:"maintenance_status"`
+		MaintenanceUntil  string   `json:"maintenance_until"`
+		BSLExpiryDate     string   `json:"bsl_expiry_date"`
+		Changelog         string   `json:"changelog"`
+		BreakingChanges   []string `json:"breaking_changes"`
+	} `json:"lifecycle,omitempty"`
+}
+
+// lifecycleInputs aggregates resolved lifecycle metadata from manifest
+// + CLI flags after validation.
+type lifecycleInputs struct {
+	releaseType       string
+	maintenanceStatus string
+	maintenanceUntil  string
+	bslExpiryDate     string
+	changelog         string
+	breakingChanges   []string
 }
 
 // nowFunc is overridden in tests to produce deterministic dates.
@@ -76,6 +115,14 @@ func run(args []string) error {
 	prerelease := fs.Bool("prerelease", false, "add version without updating latest")
 	tier := fs.String("tier", "community", "twin tier: community or commercial")
 	manifestFile := fs.String("manifest-file", "", "explicit path to twin-manifest.json (default: twin-<name>/twin-manifest.json)")
+
+	releaseType := fs.String("release-type", "", "release stream: stable, beta, or rc (overrides manifest)")
+	maintenanceStatus := fs.String("maintenance-status", "", "maintenance status: active, security_only, or eol (overrides manifest)")
+	maintenanceUntil := fs.String("maintenance-until", "", "maintenance end date in ISO 8601 (YYYY-MM-DD) (overrides manifest)")
+	bslExpiryDate := fs.String("bsl-expiry-date", "", "BSL expiry date in ISO 8601 (commercial tier only) (overrides manifest)")
+	changelogFlag := fs.String("changelog", "", "changelog text or @path/to/file (overrides manifest)")
+	var breakingChanges stringSliceFlag
+	fs.Var(&breakingChanges, "breaking-change", "breaking change description; may be repeated (overrides manifest)")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -107,10 +154,23 @@ func run(args []string) error {
 		return fmt.Errorf("loading registry: %w", err)
 	}
 
-	// 4. Build version entry
-	ver := buildVersion(*twin, *version, *repo, *tier, manifest, checksums)
+	// 4. Resolve lifecycle metadata from manifest + flag overrides.
+	lc, err := resolveLifecycle(manifest, *tier, lifecycleFlags{
+		releaseType:       *releaseType,
+		maintenanceStatus: *maintenanceStatus,
+		maintenanceUntil:  *maintenanceUntil,
+		bslExpiryDate:     *bslExpiryDate,
+		changelog:         *changelogFlag,
+		breakingChanges:   []string(breakingChanges),
+	})
+	if err != nil {
+		return fmt.Errorf("invalid lifecycle metadata: %w", err)
+	}
 
-	// 5. Upsert into registry
+	// 5. Build version entry
+	ver := buildVersion(*twin, *version, *repo, *tier, manifest, checksums, lc)
+
+	// 6. Upsert into registry
 	upsert(reg, *twin, *version, *tier, manifest, ver, *prerelease)
 
 	// 6. Write back
@@ -198,7 +258,7 @@ func loadRegistry(path string) (*Registry, error) {
 	return &reg, nil
 }
 
-func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, checksums map[string]string) Version {
+func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, checksums map[string]string, lc lifecycleInputs) Version {
 	platforms := []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
 	binaryURLs := make(map[string]string, len(platforms))
 	for _, p := range platforms {
@@ -209,14 +269,120 @@ func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, chec
 	}
 
 	return Version{
-		Released:   nowFunc().UTC().Format("2006-01-02"),
-		SDKPackage: manifest.SDKTarget.Primary.Package,
-		SDKVersion: manifest.SDKTarget.Primary.Version,
-		APIVersion: manifest.SDKTarget.Primary.APIVersion,
-		Tier:       tier,
-		Checksums:  checksums,
-		BinaryURLs: binaryURLs,
+		Released:          nowFunc().UTC().Format("2006-01-02"),
+		SDKPackage:        manifest.SDKTarget.Primary.Package,
+		SDKVersion:        manifest.SDKTarget.Primary.Version,
+		APIVersion:        manifest.SDKTarget.Primary.APIVersion,
+		Tier:              tier,
+		Checksums:         checksums,
+		BinaryURLs:        binaryURLs,
+		ReleaseType:       lc.releaseType,
+		MaintenanceStatus: lc.maintenanceStatus,
+		MaintenanceUntil:  lc.maintenanceUntil,
+		BSLExpiryDate:     lc.bslExpiryDate,
+		Changelog:         lc.changelog,
+		BreakingChanges:   lc.breakingChanges,
 	}
+}
+
+// lifecycleFlags carries CLI-supplied lifecycle overrides into
+// resolveLifecycle.
+type lifecycleFlags struct {
+	releaseType       string
+	maintenanceStatus string
+	maintenanceUntil  string
+	bslExpiryDate     string
+	changelog         string
+	breakingChanges   []string
+}
+
+// resolveLifecycle reconciles manifest-supplied lifecycle metadata with
+// CLI overrides and validates the result. Manifest values are used
+// where flags are absent; flag values override manifest values when
+// non-empty.
+func resolveLifecycle(manifest *TwinManifest, tier string, flags lifecycleFlags) (lifecycleInputs, error) {
+	var lc lifecycleInputs
+	if manifest != nil && manifest.Lifecycle != nil {
+		lc.releaseType = manifest.Lifecycle.ReleaseType
+		lc.maintenanceStatus = manifest.Lifecycle.MaintenanceStatus
+		lc.maintenanceUntil = manifest.Lifecycle.MaintenanceUntil
+		lc.bslExpiryDate = manifest.Lifecycle.BSLExpiryDate
+		lc.changelog = manifest.Lifecycle.Changelog
+		lc.breakingChanges = append([]string(nil), manifest.Lifecycle.BreakingChanges...)
+	}
+	if flags.releaseType != "" {
+		lc.releaseType = flags.releaseType
+	}
+	if flags.maintenanceStatus != "" {
+		lc.maintenanceStatus = flags.maintenanceStatus
+	}
+	if flags.maintenanceUntil != "" {
+		lc.maintenanceUntil = flags.maintenanceUntil
+	}
+	if flags.bslExpiryDate != "" {
+		lc.bslExpiryDate = flags.bslExpiryDate
+	}
+	if flags.changelog != "" {
+		resolved, err := loadChangelog(flags.changelog)
+		if err != nil {
+			return lifecycleInputs{}, err
+		}
+		lc.changelog = resolved
+	}
+	if len(flags.breakingChanges) > 0 {
+		lc.breakingChanges = append([]string(nil), flags.breakingChanges...)
+	}
+
+	if err := validateLifecycle(lc, tier); err != nil {
+		return lifecycleInputs{}, err
+	}
+	return lc, nil
+}
+
+func validateLifecycle(lc lifecycleInputs, tier string) error {
+	switch lc.releaseType {
+	case "", registry.ReleaseTypeStable, registry.ReleaseTypeBeta, registry.ReleaseTypeRC:
+	default:
+		return fmt.Errorf("release_type %q must be one of stable, beta, rc", lc.releaseType)
+	}
+	switch lc.maintenanceStatus {
+	case "", registry.MaintenanceActive, registry.MaintenanceSecurityOnly, registry.MaintenanceEOL:
+	default:
+		return fmt.Errorf("maintenance_status %q must be one of active, security_only, eol", lc.maintenanceStatus)
+	}
+	if lc.maintenanceUntil != "" {
+		if _, err := time.Parse("2006-01-02", lc.maintenanceUntil); err != nil {
+			return fmt.Errorf("maintenance_until %q is not ISO 8601 (YYYY-MM-DD)", lc.maintenanceUntil)
+		}
+	}
+	if lc.bslExpiryDate != "" {
+		if _, err := time.Parse("2006-01-02", lc.bslExpiryDate); err != nil {
+			return fmt.Errorf("bsl_expiry_date %q is not ISO 8601 (YYYY-MM-DD)", lc.bslExpiryDate)
+		}
+		if tier != "commercial" {
+			return fmt.Errorf("bsl_expiry_date is only meaningful for commercial-tier twins (got tier=%q)", tier)
+		}
+	}
+	for i, bc := range lc.breakingChanges {
+		if strings.TrimSpace(bc) == "" {
+			return fmt.Errorf("breaking_changes[%d] is empty", i)
+		}
+	}
+	return nil
+}
+
+// loadChangelog reads a changelog string. A leading "@" treats the rest
+// of the value as a path to read from.
+func loadChangelog(s string) (string, error) {
+	if !strings.HasPrefix(s, "@") {
+		return s, nil
+	}
+	path := strings.TrimPrefix(s, "@")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading changelog file: %w", err)
+	}
+	return string(data), nil
 }
 
 func upsert(reg *Registry, twin, version, tier string, manifest *TwinManifest, ver Version, prerelease bool) {
@@ -250,6 +416,7 @@ func upsert(reg *Registry, twin, version, tier string, manifest *TwinManifest, v
 }
 
 func writeRegistry(path string, reg *Registry) error {
+	reg.SchemaVersion = registry.CurrentSchemaVersion
 	data, err := json.MarshalIndent(reg, "", "  ")
 	if err != nil {
 		return err

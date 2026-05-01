@@ -17,6 +17,12 @@ import (
 // FetchRegistry will try the JSON variant first and fall back to YAML.
 const DefaultRegistryURL = "https://raw.githubusercontent.com/wondertwin-ai/registry/main/registry.yaml"
 
+// CurrentSchemaVersion is the schema version emitted by gen-registry
+// going forward. Parsers accept any schema_version <= CurrentSchemaVersion.
+// Schema v1 entries continue to parse cleanly because all v2 fields are
+// declared with `omitempty`.
+const CurrentSchemaVersion = 2
+
 // Registry represents the top-level registry manifest.
 type Registry struct {
 	SchemaVersion int                  `yaml:"schema_version" json:"schema_version"`
@@ -33,7 +39,32 @@ type TwinEntry struct {
 	Versions    map[string]Version `yaml:"versions" json:"versions"`
 }
 
+// Release-type constants. ReleaseType on a Version is one of these or
+// empty; consumers should prefer Version.EffectiveReleaseType, which
+// treats an empty value as ReleaseTypeStable.
+const (
+	ReleaseTypeStable = "stable"
+	ReleaseTypeBeta   = "beta"
+	ReleaseTypeRC     = "rc"
+)
+
+// Maintenance-status constants. MaintenanceStatus on a Version is one
+// of these or empty; consumers should prefer
+// Version.EffectiveMaintenanceStatus, which treats an empty value as
+// MaintenanceActive.
+const (
+	MaintenanceActive       = "active"
+	MaintenanceSecurityOnly = "security_only"
+	MaintenanceEOL          = "eol"
+)
+
 // Version describes a specific release of a twin.
+//
+// The lifecycle fields (ReleaseType, MaintenanceStatus, MaintenanceUntil,
+// BSLExpiryDate, Changelog, BreakingChanges) are optional schema-v2
+// additions. Use the EffectiveX accessors to read them: a v1 entry with
+// no lifecycle fields is interpreted as an active stable release with
+// no expiry.
 type Version struct {
 	Released   string            `yaml:"released" json:"released"`
 	SDKPackage string            `yaml:"sdk_package" json:"sdk_package"`
@@ -42,6 +73,90 @@ type Version struct {
 	Tier       string            `yaml:"tier" json:"tier"`
 	Checksums  map[string]string `yaml:"checksums" json:"checksums"`
 	BinaryURLs map[string]string `yaml:"binary_urls" json:"binary_urls"`
+
+	// ReleaseType identifies the release stream: stable, beta, or rc.
+	// Empty values default to stable via EffectiveReleaseType.
+	ReleaseType string `yaml:"release_type,omitempty" json:"release_type,omitempty"`
+
+	// MaintenanceStatus is the current maintenance commitment: active,
+	// security_only, or eol. Empty values default to active via
+	// EffectiveMaintenanceStatus.
+	MaintenanceStatus string `yaml:"maintenance_status,omitempty" json:"maintenance_status,omitempty"`
+
+	// MaintenanceUntil is an ISO 8601 date marking when maintenance
+	// ends. Parse via MaintenanceUntilTime.
+	MaintenanceUntil string `yaml:"maintenance_until,omitempty" json:"maintenance_until,omitempty"`
+
+	// BSLExpiryDate is the ISO 8601 date a BSL-licensed pro twin
+	// converts to MIT. Only meaningful for commercial-tier versions.
+	// Parse via BSLExpiryTime.
+	BSLExpiryDate string `yaml:"bsl_expiry_date,omitempty" json:"bsl_expiry_date,omitempty"`
+
+	// Changelog is human-readable release notes for this version,
+	// typically markdown. Optional.
+	Changelog string `yaml:"changelog,omitempty" json:"changelog,omitempty"`
+
+	// BreakingChanges enumerates breaking changes introduced in this
+	// version. Each entry should be a complete, non-empty sentence.
+	BreakingChanges []string `yaml:"breaking_changes,omitempty" json:"breaking_changes,omitempty"`
+}
+
+// EffectiveReleaseType returns ReleaseType when set, else
+// ReleaseTypeStable. Use this in consumer code so v1 entries (which
+// lack the field) are treated as stable releases.
+func (v Version) EffectiveReleaseType() string {
+	if v.ReleaseType == "" {
+		return ReleaseTypeStable
+	}
+	return v.ReleaseType
+}
+
+// EffectiveMaintenanceStatus returns MaintenanceStatus when set, else
+// MaintenanceActive. A v1 registry entry with no lifecycle fields is
+// treated as an active release.
+func (v Version) EffectiveMaintenanceStatus() string {
+	if v.MaintenanceStatus == "" {
+		return MaintenanceActive
+	}
+	return v.MaintenanceStatus
+}
+
+// IsActive reports whether the version is currently maintained — that
+// is, its EffectiveMaintenanceStatus is active or security_only.
+func (v Version) IsActive() bool {
+	switch v.EffectiveMaintenanceStatus() {
+	case MaintenanceActive, MaintenanceSecurityOnly:
+		return true
+	}
+	return false
+}
+
+// IsEOL reports whether the version has reached end-of-life.
+func (v Version) IsEOL() bool {
+	return v.EffectiveMaintenanceStatus() == MaintenanceEOL
+}
+
+// MaintenanceUntilTime parses MaintenanceUntil into a time.Time.
+// Returns ok=false when the field is empty or unparseable.
+func (v Version) MaintenanceUntilTime() (time.Time, bool) {
+	return parseISODate(v.MaintenanceUntil)
+}
+
+// BSLExpiryTime parses BSLExpiryDate into a time.Time. Returns
+// ok=false when the field is empty or unparseable.
+func (v Version) BSLExpiryTime() (time.Time, bool) {
+	return parseISODate(v.BSLExpiryDate)
+}
+
+func parseISODate(s string) (time.Time, bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
 }
 
 // FetchRegistry downloads and parses the registry from the given URL.
@@ -131,6 +246,10 @@ func fetchAndParse(url, token string) (*Registry, error) {
 		if err := yaml.Unmarshal(body, &reg); err != nil {
 			return nil, fmt.Errorf("parsing registry YAML: %w", err)
 		}
+	}
+
+	if reg.SchemaVersion > CurrentSchemaVersion {
+		return nil, fmt.Errorf("registry schema version %d not supported (max %d)", reg.SchemaVersion, CurrentSchemaVersion)
 	}
 
 	if reg.Twins == nil {

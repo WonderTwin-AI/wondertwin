@@ -49,13 +49,28 @@ type twinEntry struct {
 }
 
 type versionDef struct {
-	Released   string            `json:"released"`
-	SDKPackage string            `json:"sdk_package"`
-	SDKVersion string            `json:"sdk_version"`
-	Tier       string            `json:"tier"`
-	Checksums  map[string]string `json:"checksums"`
-	BinaryURLs map[string]string `json:"binary_urls"`
+	Released          string            `json:"released"`
+	SDKPackage        string            `json:"sdk_package"`
+	SDKVersion        string            `json:"sdk_version"`
+	Tier              string            `json:"tier"`
+	Checksums         map[string]string `json:"checksums"`
+	BinaryURLs        map[string]string `json:"binary_urls"`
+	ReleaseType       string            `json:"release_type,omitempty"`
+	MaintenanceStatus string            `json:"maintenance_status,omitempty"`
+	MaintenanceUntil  string            `json:"maintenance_until,omitempty"`
+	BSLExpiryDate     string            `json:"bsl_expiry_date,omitempty"`
+	Changelog         string            `json:"changelog,omitempty"`
+	BreakingChanges   []string          `json:"breaking_changes,omitempty"`
 }
+
+var (
+	validReleaseTypes = map[string]struct{}{
+		"stable": {}, "beta": {}, "rc": {},
+	}
+	validMaintenanceStatuses = map[string]struct{}{
+		"active": {}, "security_only": {}, "eol": {},
+	}
+)
 
 // checkResult stores the outcome of a single check.
 type checkResult struct {
@@ -99,6 +114,8 @@ func run(registryURL string) []checkResult {
 	// 3. Schema version
 	if reg.SchemaVersion < 1 {
 		results = append(results, checkResult{"Schema version", false, fmt.Sprintf("got %d, expected >= 1", reg.SchemaVersion)})
+	} else if reg.SchemaVersion > 2 {
+		results = append(results, checkResult{"Schema version", false, fmt.Sprintf("got %d, max supported 2", reg.SchemaVersion)})
 	} else {
 		results = append(results, checkResult{"Schema version", true, fmt.Sprintf("%d", reg.SchemaVersion)})
 	}
@@ -156,6 +173,56 @@ func validateVersion(name, ver string, vd versionDef) []checkResult {
 	for platform, url := range vd.BinaryURLs {
 		ok, detail := headCheck(url)
 		results = append(results, checkResult{fmt.Sprintf("%s reachable %s", prefix, platform), ok, detail})
+	}
+
+	// Lifecycle metadata (schema v2). Absent fields are valid; only
+	// malformed values are flagged.
+	results = append(results, validateLifecycle(prefix, vd)...)
+
+	return results
+}
+
+func validateLifecycle(prefix string, vd versionDef) []checkResult {
+	var results []checkResult
+
+	if vd.ReleaseType != "" {
+		if _, ok := validReleaseTypes[vd.ReleaseType]; !ok {
+			results = append(results, checkResult{prefix + " release_type", false, fmt.Sprintf("invalid value %q (want stable, beta, or rc)", vd.ReleaseType)})
+		} else {
+			results = append(results, checkResult{prefix + " release_type", true, vd.ReleaseType})
+		}
+	}
+
+	if vd.MaintenanceStatus != "" {
+		if _, ok := validMaintenanceStatuses[vd.MaintenanceStatus]; !ok {
+			results = append(results, checkResult{prefix + " maintenance_status", false, fmt.Sprintf("invalid value %q (want active, security_only, or eol)", vd.MaintenanceStatus)})
+		} else {
+			results = append(results, checkResult{prefix + " maintenance_status", true, vd.MaintenanceStatus})
+		}
+	}
+
+	if vd.MaintenanceUntil != "" {
+		if _, err := time.Parse("2006-01-02", vd.MaintenanceUntil); err != nil {
+			results = append(results, checkResult{prefix + " maintenance_until", false, fmt.Sprintf("not ISO 8601 date: %q", vd.MaintenanceUntil)})
+		} else {
+			results = append(results, checkResult{prefix + " maintenance_until", true, vd.MaintenanceUntil})
+		}
+	}
+
+	if vd.BSLExpiryDate != "" {
+		if _, err := time.Parse("2006-01-02", vd.BSLExpiryDate); err != nil {
+			results = append(results, checkResult{prefix + " bsl_expiry_date", false, fmt.Sprintf("not ISO 8601 date: %q", vd.BSLExpiryDate)})
+		} else if vd.Tier == "free" || vd.Tier == "community" {
+			results = append(results, checkResult{prefix + " bsl_expiry_date", false, fmt.Sprintf("set on free-tier version (tier=%q)", vd.Tier)})
+		} else {
+			results = append(results, checkResult{prefix + " bsl_expiry_date", true, vd.BSLExpiryDate})
+		}
+	}
+
+	for i, bc := range vd.BreakingChanges {
+		if strings.TrimSpace(bc) == "" {
+			results = append(results, checkResult{fmt.Sprintf("%s breaking_changes[%d]", prefix, i), false, "empty entry"})
+		}
 	}
 
 	return results
