@@ -75,6 +75,19 @@ func TestReplayExportFetches(t *testing.T) {
 	}
 }
 
+func TestReplayViewGoldenSample(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := cmdReplayView([]string{"../../twinkit/replay/testdata/sample-run.jsonl"}); err != nil {
+			t.Fatalf("cmdReplayView error: %v", err)
+		}
+	})
+	for _, want := range []string{"twin-stripe", "run-2026-05-01-001", "/v1/customers", "/v1/payment_intents", "404", "201"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected golden output to contain %q; output:\n%s", want, out)
+		}
+	}
+}
+
 func TestReplayExportGzip(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.Copy(w, strings.NewReader(sampleBundle))
