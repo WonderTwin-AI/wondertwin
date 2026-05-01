@@ -143,6 +143,7 @@ type testServerOpts struct {
 	flusher WebhookFlusher
 	config  ConfigProvider
 	quirks  QuirkStore
+	runIDs  RunIDSetter
 }
 
 func setupTestServer(state StateStore, clock *pkgstate.Clock, flusher WebhookFlusher) *httptest.Server {
@@ -165,6 +166,9 @@ func setupTestServerFull(opts testServerOpts) *httptest.Server {
 	}
 	if opts.quirks != nil {
 		h.SetQuirkStore(opts.quirks)
+	}
+	if opts.runIDs != nil {
+		h.SetRunIDSetter(opts.runIDs)
 	}
 
 	r := chi.NewRouter()
@@ -220,6 +224,53 @@ func TestHandleReset(t *testing.T) {
 	}
 	if clk.Offset() != 0 {
 		t.Errorf("expected clock offset to be reset, got %v", clk.Offset())
+	}
+}
+
+type mockRunIDSetter struct {
+	runID string
+}
+
+func (m *mockRunIDSetter) SetRunID(id string) { m.runID = id }
+
+func TestHandleResetWithRunID(t *testing.T) {
+	state := newMockState()
+	runIDs := &mockRunIDSetter{}
+	srv := setupTestServerFull(testServerOpts{state: state, clock: pkgstate.NewClock(), runIDs: runIDs})
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/admin/reset?run_id=run-42", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if runIDs.runID != "run-42" {
+		t.Errorf("SetRunID called with %q, want run-42", runIDs.runID)
+	}
+	var body map[string]string
+	json.NewDecoder(resp.Body).Decode(&body)
+	if body["run_id"] != "run-42" {
+		t.Errorf("response run_id = %q, want run-42", body["run_id"])
+	}
+}
+
+func TestHandleResetWithRunIDNoSetter(t *testing.T) {
+	// run_id is accepted even without a RunIDSetter wired (graceful no-op).
+	srv := setupTestServer(newMockState(), pkgstate.NewClock(), nil)
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/admin/reset?run_id=run-1", "application/json", nil)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
 }
 

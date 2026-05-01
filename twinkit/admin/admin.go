@@ -34,6 +34,13 @@ type ConfigProvider interface {
 	UpdateConfig(updates map[string]any) error
 }
 
+// RunIDSetter is implemented by twins that can record an active run id.
+// When set on a Handler, POST /admin/reset?run_id=<id> forwards the id
+// before clearing transient state.
+type RunIDSetter interface {
+	SetRunID(runID string)
+}
+
 // QuirkStore manages behavioral quirks that can be toggled at runtime.
 type QuirkStore interface {
 	ListQuirks() []QuirkStatus
@@ -59,6 +66,7 @@ type Handler struct {
 	clock   *state.Clock
 	config  ConfigProvider
 	quirks  QuirkStore
+	runIDs  RunIDSetter
 }
 
 // NewHandler creates a new admin handler.
@@ -83,6 +91,12 @@ func (h *Handler) SetConfigProvider(cp ConfigProvider) {
 // SetQuirkStore sets the quirk store (optional).
 func (h *Handler) SetQuirkStore(qs QuirkStore) {
 	h.quirks = qs
+}
+
+// SetRunIDSetter wires a RunIDSetter (typically the Twin) so
+// POST /admin/reset?run_id=<id> can forward the run identifier.
+func (h *Handler) SetRunIDSetter(s RunIDSetter) {
+	h.runIDs = s
 }
 
 // Routes mounts the admin endpoints on the given router.
@@ -115,7 +129,14 @@ func (h *Handler) handleReset(w http.ResponseWriter, r *http.Request) {
 	if h.clock != nil {
 		h.clock.Reset()
 	}
-	twincore.JSON(w, http.StatusOK, map[string]string{"status": "reset"})
+	resp := map[string]string{"status": "reset"}
+	if runID := r.URL.Query().Get("run_id"); runID != "" {
+		if h.runIDs != nil {
+			h.runIDs.SetRunID(runID)
+		}
+		resp["run_id"] = runID
+	}
+	twincore.JSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) handleGetState(w http.ResponseWriter, r *http.Request) {
