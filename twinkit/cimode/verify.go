@@ -32,14 +32,6 @@ func setVerificationKey(pk ed25519.PublicKey) (restore func()) {
 	}
 }
 
-// SetVerificationKeyForTest is exposed only for use by tests in
-// dependent packages (e.g. twinkit/twincore's license-banner tests
-// that must mint a synthetic license without the production private
-// key). It MUST NOT be called by production code.
-func SetVerificationKeyForTest(pk ed25519.PublicKey) (restore func()) {
-	return setVerificationKey(pk)
-}
-
 // verifySignature returns true when lic.Signature is a valid ed25519
 // signature over lic.SigningBytes() under the active verification
 // key. Any error in deriving the signing bytes or decoding the

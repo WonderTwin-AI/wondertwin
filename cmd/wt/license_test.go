@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -13,70 +11,28 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/cimode"
 )
 
-func writeLicenseFile(t *testing.T, path string, lic cimode.License, priv ed25519.PrivateKey) {
+// writeUnverifiableLicense writes a syntactically well-formed but
+// signature-invalid license file. It exercises the parse → validate
+// → reject path of the wt CLI without minting a synthetic valid
+// signature: the verifier here is the production embedded public
+// key, which has no test override anymore.
+func writeUnverifiableLicense(t *testing.T, path string, lic cimode.License) {
 	t.Helper()
-	bytes, err := lic.SigningBytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if priv != nil {
-		sig := ed25519.Sign(priv, bytes)
-		lic.SetSignature(sig)
-	}
+	lic.SetSignature([]byte("not-a-real-signature"))
 	data, _ := json.Marshal(lic)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestLicenseInstallValid(t *testing.T) {
-	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
+func TestLicenseInstallRefusesUnsignedLicense(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "input.json")
 	now := time.Now().UTC()
-	writeLicenseFile(t, src, cimode.License{
+	writeUnverifiableLicense(t, src, cimode.License{
 		Key: "lic", OrgID: "org", TwinScope: []string{"*"},
 		IssuedAt: now, NotAfter: now.Add(24 * time.Hour),
-	}, priv)
-
-	home := t.TempDir()
-	t.Setenv(cimode.EnvHome, home)
-	t.Setenv(cimode.EnvLicenseFile, "")
-
-	out := captureStdout(t, func() {
-		if err := cmdLicenseInstall([]string{src}); err != nil {
-			t.Fatalf("install: %v", err)
-		}
 	})
-	if !strings.Contains(out, "valid") {
-		t.Errorf("expected 'valid' in output; got: %s", out)
-	}
-	dst := filepath.Join(home, cimode.DefaultLicenseFilename)
-	if _, err := os.Stat(dst); err != nil {
-		t.Errorf("expected license at %s; %v", dst, err)
-	}
-}
-
-func TestLicenseInstallRejectsTampered(t *testing.T) {
-	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
-	dir := t.TempDir()
-	src := filepath.Join(dir, "input.json")
-	now := time.Now().UTC()
-	lic := cimode.License{
-		Key: "lic", OrgID: "org", TwinScope: []string{"*"},
-		IssuedAt: now, NotAfter: now.Add(24 * time.Hour),
-	}
-	writeLicenseFile(t, src, lic, priv)
-	// Tamper the file: read, mutate OrgID, write back.
-	raw, _ := os.ReadFile(src)
-	tampered := strings.Replace(string(raw), `"org_id":"org"`, `"org_id":"evil"`, 1)
-	os.WriteFile(src, []byte(tampered), 0o600)
 
 	home := t.TempDir()
 	t.Setenv(cimode.EnvHome, home)
@@ -84,10 +40,10 @@ func TestLicenseInstallRejectsTampered(t *testing.T) {
 
 	err := cmdLicenseInstall([]string{src})
 	if err == nil {
-		t.Fatal("expected install to refuse tampered license")
+		t.Fatal("expected install to refuse license without valid signature")
 	}
 	if !strings.Contains(err.Error(), cimode.ReasonInvalidSig) {
-		t.Errorf("error = %v, want invalid signature", err)
+		t.Errorf("error = %v, want %q", err, cimode.ReasonInvalidSig)
 	}
 	dst := filepath.Join(home, cimode.DefaultLicenseFilename)
 	if _, err := os.Stat(dst); !os.IsNotExist(err) {
@@ -95,66 +51,67 @@ func TestLicenseInstallRejectsTampered(t *testing.T) {
 	}
 }
 
-func TestLicenseInspectDoesNotInstall(t *testing.T) {
-	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
+func TestLicenseInstallRefusesMalformedJSON(t *testing.T) {
 	dir := t.TempDir()
-	src := filepath.Join(dir, "input.json")
-	now := time.Now().UTC()
-	writeLicenseFile(t, src, cimode.License{
-		Key: "lic", OrgID: "org", TwinScope: []string{"*"},
-		IssuedAt: now, NotAfter: now.Add(24 * time.Hour),
-	}, priv)
-
+	src := filepath.Join(dir, "garbage.json")
+	if err := os.WriteFile(src, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	home := t.TempDir()
 	t.Setenv(cimode.EnvHome, home)
 	t.Setenv(cimode.EnvLicenseFile, "")
-
-	out := captureStdout(t, func() {
-		if err := cmdLicenseInspect([]string{src}); err != nil {
-			t.Fatalf("inspect: %v", err)
-		}
-	})
-	if !strings.Contains(out, "valid") {
-		t.Errorf("expected valid output; got: %s", out)
-	}
-	if _, err := os.Stat(filepath.Join(home, cimode.DefaultLicenseFilename)); !os.IsNotExist(err) {
-		t.Errorf("inspect should not install; stat err = %v", err)
+	if err := cmdLicenseInstall([]string{src}); err == nil {
+		t.Fatal("expected install to fail on malformed JSON")
 	}
 }
 
-func TestLicenseInstallJSON(t *testing.T) {
-	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
-	restore := cimode.SetVerificationKeyForTest(pub)
-	defer restore()
-
+func TestLicenseInspectReportsInvalidWithoutInstall(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "input.json")
 	now := time.Now().UTC()
-	writeLicenseFile(t, src, cimode.License{
-		Key: "lic", OrgID: "org_acme", TwinScope: []string{"*"},
+	writeUnverifiableLicense(t, src, cimode.License{
+		Key: "lic", OrgID: "org", TwinScope: []string{"*"},
 		IssuedAt: now, NotAfter: now.Add(24 * time.Hour),
-	}, priv)
+	})
 
 	home := t.TempDir()
 	t.Setenv(cimode.EnvHome, home)
 	t.Setenv(cimode.EnvLicenseFile, "")
 
 	out := captureStdout(t, func() {
-		if err := cmdLicenseInstall([]string{"--json", src}); err != nil {
-			t.Fatalf("install --json: %v", err)
-		}
+		_ = cmdLicenseInspect([]string{src})
+	})
+	if !strings.Contains(out, cimode.ReasonInvalidSig) {
+		t.Errorf("expected reason in output; got: %s", out)
+	}
+	if _, err := os.Stat(filepath.Join(home, cimode.DefaultLicenseFilename)); !os.IsNotExist(err) {
+		t.Errorf("inspect must not install; stat err = %v", err)
+	}
+}
+
+func TestLicenseInstallJSONOnInvalidEmitsParseable(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "input.json")
+	now := time.Now().UTC()
+	writeUnverifiableLicense(t, src, cimode.License{
+		Key: "lic", OrgID: "org_acme", TwinScope: []string{"*"},
+		IssuedAt: now, NotAfter: now.Add(24 * time.Hour),
+	})
+	home := t.TempDir()
+	t.Setenv(cimode.EnvHome, home)
+	t.Setenv(cimode.EnvLicenseFile, "")
+
+	out := captureStdout(t, func() {
+		_ = cmdLicenseInstall([]string{"--json", src})
 	})
 	var r licenseReport
 	if err := json.Unmarshal([]byte(out), &r); err != nil {
 		t.Fatalf("not valid JSON: %v\n%s", err, out)
 	}
-	if !r.Valid || !r.Installed {
-		t.Errorf("report = %+v", r)
+	if r.Valid || r.Installed {
+		t.Errorf("expected invalid+not-installed; report = %+v", r)
 	}
-	if r.License == nil || r.License.OrgID != "org_acme" {
-		t.Errorf("license missing or wrong org: %+v", r.License)
+	if r.Reason != cimode.ReasonInvalidSig {
+		t.Errorf("Reason = %q, want %q", r.Reason, cimode.ReasonInvalidSig)
 	}
 }

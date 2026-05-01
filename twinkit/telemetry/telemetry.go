@@ -215,7 +215,19 @@ func (r *Reporter) Flush(ctx context.Context) error {
 }
 
 // Close signals the goroutine to stop. It performs a best-effort
-// drain bounded by closeFlushDeadline. Idempotent.
+// drain bounded by closeFlushDeadline (1 second). Idempotent.
+//
+// Shutdown ordering matters for callers wiring Close into a process
+// signal path: events recorded just before SIGTERM may be in-flight
+// in the bounded channel or in a half-built batch. Close has up to
+// closeFlushDeadline to deliver them. Process supervisors that send
+// SIGTERM and then SIGKILL with no grace (or with a grace shorter
+// than closeFlushDeadline) will lose tail events.
+//
+// CI integrations should grant the twin process at least 2 seconds
+// post-SIGTERM before forcing termination so the telemetry path can
+// complete one final batch POST: closeFlushDeadline (1s) plus
+// headroom for ticker quiescence and a single HTTP round-trip.
 func (r *Reporter) Close() {
 	if r == nil {
 		return
