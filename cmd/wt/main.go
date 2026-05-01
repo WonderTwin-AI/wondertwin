@@ -141,6 +141,8 @@ func main() {
 		err = cmdConformance(args)
 	case "replay":
 		err = cmdReplay(args)
+	case "license":
+		err = cmdLicense(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -207,6 +209,9 @@ Commands:
   conformance <binary>       Run conformance tests against a twin binary
   replay export              Fetch /admin/replay JSONL bundle from a running twin
   replay view <path>         Pretty-print a JSONL replay bundle
+  license install <file>     Install a signed WonderTwin license file
+  license status             Show the active license's status
+  license inspect <file>     Show a license file without installing
   version                    Print the wt version
 
 Options:
