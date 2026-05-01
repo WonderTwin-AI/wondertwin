@@ -63,6 +63,36 @@ func TestMiddlewareCapturesRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestMiddlewareDoesNotTruncateRequestBodySeenByHandler(t *testing.T) {
+	t.Parallel()
+	// Recorder caps capture at 16 bytes; the handler must still see
+	// the full 1024-byte body. Regression: earlier implementation
+	// drained the remainder after capture, breaking handlers that
+	// relied on reading the original body length.
+	r := NewRecorder(Config{CaptureBodies: true, MaxBodyBytes: 16})
+	defer r.Close()
+
+	body := strings.Repeat("a", 1024)
+	var seenLen int
+	handler := r.Middleware()(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		buf, _ := io.ReadAll(req.Body)
+		seenLen = len(buf)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	if seenLen != 1024 {
+		t.Errorf("handler saw %d bytes, want 1024 (replay middleware must not truncate)", seenLen)
+	}
+	e := r.Entries()[0]
+	if !e.ReqBodyTruncated {
+		t.Error("ReqBodyTruncated should be true")
+	}
+	if len(e.ReqBody) != 16 {
+		t.Errorf("captured ReqBody = %d bytes, want 16", len(e.ReqBody))
+	}
+}
+
 func TestMiddlewareTruncatesLargeBodies(t *testing.T) {
 	t.Parallel()
 	r := NewRecorder(Config{CaptureBodies: true, MaxBodyBytes: 16})

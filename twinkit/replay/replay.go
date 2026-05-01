@@ -377,9 +377,17 @@ func (r *Recorder) Middleware() func(http.Handler) http.Handler {
 			var reqBody []byte
 			var reqTrunc bool
 			if r.cfg.CaptureBodies && req.Body != nil {
-				reqBody, reqTrunc = readCapped(req.Body, r.cfg.MaxBodyBytes)
-				_ = req.Body.Close()
-				req.Body = io.NopCloser(bytes.NewReader(reqBody))
+				// Capture a bounded prefix without destroying the
+				// remainder: re-emit the body as the buffered prefix
+				// followed by whatever bytes remain in the original
+				// reader. Handlers downstream see the full body; the
+				// recorded entry retains only the prefix.
+				origBody := req.Body
+				prefix, leftover, more := readPrefix(origBody, r.cfg.MaxBodyBytes)
+				reqBody = prefix
+				reqTrunc = more
+				combined := io.MultiReader(bytes.NewReader(prefix), bytes.NewReader(leftover), origBody)
+				req.Body = &readerWithCloser{Reader: combined, Closer: origBody}
 			}
 
 			rec := newCaptureWriter(w, r.cfg.MaxBodyBytes, r.cfg.CaptureBodies)
@@ -435,39 +443,43 @@ func (r *Recorder) Middleware() func(http.Handler) http.Handler {
 	}
 }
 
-// readCapped reads up to max bytes from r and returns the bytes plus a
-// truncated flag. Any error other than io.EOF causes the read to stop;
-// already-read bytes are still returned.
-func readCapped(r io.Reader, max int) ([]byte, bool) {
+// readPrefix reads up to max bytes from r. It returns:
+//
+//   - prefix: the captured bytes, length 0..max.
+//   - leftover: any bytes consumed from r beyond the prefix (used to
+//     probe whether more data exists). Callers must stitch leftover
+//     back onto the front of the original reader so downstream
+//     consumers see the full stream.
+//   - more: true when the underlying stream still has additional bytes
+//     beyond the prefix. The Entry's *Truncated flag mirrors this.
+func readPrefix(r io.Reader, max int) (prefix, leftover []byte, more bool) {
 	if max <= 0 {
-		return nil, false
+		return nil, nil, false
 	}
-	buf := make([]byte, 0, 4096)
-	tmp := make([]byte, 4096)
-	truncated := false
-	for {
-		n, err := r.Read(tmp)
-		if n > 0 {
-			remaining := max - len(buf)
-			if remaining <= 0 {
-				truncated = true
-				// drain remainder so downstream reads complete cleanly
-				_, _ = io.Copy(io.Discard, r)
-				break
-			}
-			if n > remaining {
-				buf = append(buf, tmp[:remaining]...)
-				truncated = true
-				_, _ = io.Copy(io.Discard, r)
-				break
-			}
-			buf = append(buf, tmp[:n]...)
-		}
-		if err != nil {
-			break
-		}
+	buf := make([]byte, max)
+	n, err := io.ReadFull(r, buf)
+	prefix = buf[:n]
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return prefix, nil, false
 	}
-	return buf, truncated
+	if err != nil {
+		return prefix, nil, false
+	}
+	// Filled exactly; probe one byte to determine truncation.
+	var probe [1]byte
+	pn, _ := r.Read(probe[:])
+	if pn == 0 {
+		return prefix, nil, false
+	}
+	return prefix, append([]byte(nil), probe[:pn]...), true
+}
+
+// readerWithCloser pairs an io.Reader (typically io.MultiReader) with
+// the Closer of the original request body so http.Request.Body remains
+// closeable as expected.
+type readerWithCloser struct {
+	io.Reader
+	io.Closer
 }
 
 func flattenHeaders(h http.Header, scrubbers *scrub.ScrubberSet) map[string]string {
