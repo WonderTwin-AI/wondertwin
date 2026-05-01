@@ -60,6 +60,7 @@ func TestAddObserverAcceptsMultiple(t *testing.T) {
 func TestStartFinishRun(t *testing.T) {
 	t.Parallel()
 	r := NewRecorder(Config{})
+	defer r.Close()
 	r.StartRun("run-1")
 	m := r.FinishRun()
 	if m.RunID != "run-1" {
@@ -68,20 +69,21 @@ func TestStartFinishRun(t *testing.T) {
 	if m.StartedAt.IsZero() || m.FinishedAt.IsZero() {
 		t.Error("Manifest timestamps must be set")
 	}
-	if got := r.FinishRun(); got.RunID != "" {
-		t.Errorf("second FinishRun should be zero, got %+v", got)
+	if m.SchemaVersion != SchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", m.SchemaVersion, SchemaVersion)
 	}
 }
 
-func TestExportAndEntriesAreEmpty(t *testing.T) {
+func TestExportEmptyWritesManifestOnly(t *testing.T) {
 	t.Parallel()
 	r := NewRecorder(Config{})
+	defer r.Close()
 	var buf bytes.Buffer
 	if err := r.Export(&buf); err != nil {
 		t.Fatalf("Export() error = %v", err)
 	}
-	if buf.Len() != 0 {
-		t.Errorf("Export wrote %d bytes, want 0", buf.Len())
+	if buf.Len() == 0 {
+		t.Error("Export should write at least the manifest line")
 	}
 	if got := r.Entries(); len(got) != 0 {
 		t.Errorf("Entries() = %d, want 0", len(got))
