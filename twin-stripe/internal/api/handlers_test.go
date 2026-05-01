@@ -21,6 +21,7 @@ func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler.WireFromTwin(twin)
 	adminHandler.Routes(twin.Router)
 	srv := httptest.NewServer(twin.Router)
 	t.Cleanup(srv.Close)
