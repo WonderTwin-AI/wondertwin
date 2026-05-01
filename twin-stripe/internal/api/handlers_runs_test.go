@@ -50,8 +50,11 @@ func captureRunBundle(t *testing.T) string {
 
 // stripTimestampsAndDurations rewrites each JSONL line to drop fields
 // that are intrinsically non-deterministic: timestamp, duration_ns,
-// started_at, finished_at. The remaining shape is what determinism
-// asserts on.
+// started_at, finished_at. /admin/* entries are filtered entirely —
+// admin requests are control-plane operations whose response bodies
+// embed timestamps (e.g. /admin/runs/start returns started_at), which
+// would defeat the determinism comparison even though the twin's
+// underlying state is reproducible.
 func stripTimestampsAndDurations(jsonl string) string {
 	var out bytes.Buffer
 	for _, line := range strings.Split(strings.TrimRight(jsonl, "\n"), "\n") {
@@ -64,11 +67,12 @@ func stripTimestampsAndDurations(jsonl string) string {
 			out.WriteByte('\n')
 			continue
 		}
+		if path, ok := raw["path"].(string); ok && strings.HasPrefix(path, "/admin/") {
+			continue
+		}
 		for _, k := range []string{"timestamp", "duration_ns", "started_at", "finished_at", "sim_time"} {
 			delete(raw, k)
 		}
-		// Normalize header maps that include nondeterministic
-		// per-request values (RequestID/CORS).
 		for _, key := range []string{"req_headers", "res_headers"} {
 			if h, ok := raw[key].(map[string]any); ok {
 				for hk := range h {
