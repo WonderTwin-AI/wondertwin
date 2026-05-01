@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/replay"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
@@ -60,13 +61,14 @@ type QuirkStatus struct {
 
 // Handler provides the shared admin endpoints.
 type Handler struct {
-	state   StateStore
-	flusher WebhookFlusher
-	mw      *twincore.Middleware
-	clock   *state.Clock
-	config  ConfigProvider
-	quirks  QuirkStore
-	runIDs  RunIDSetter
+	state    StateStore
+	flusher  WebhookFlusher
+	mw       *twincore.Middleware
+	clock    *state.Clock
+	config   ConfigProvider
+	quirks   QuirkStore
+	runIDs   RunIDSetter
+	recorder *replay.Recorder
 }
 
 // NewHandler creates a new admin handler.
@@ -99,6 +101,15 @@ func (h *Handler) SetRunIDSetter(s RunIDSetter) {
 	h.runIDs = s
 }
 
+// SetReplayRecorder wires a replay.Recorder so the /admin/replay
+// endpoints can serve recorded traffic. Optional; the endpoints return
+// 404 if the recorder is unset (with the exception of GET /admin/replay,
+// which returns 200 + an empty manifest, mirroring the list-endpoint
+// convention used by /admin/quirks).
+func (h *Handler) SetReplayRecorder(r *replay.Recorder) {
+	h.recorder = r
+}
+
 // Routes mounts the admin endpoints on the given router.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/admin", func(r chi.Router) {
@@ -118,7 +129,64 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/quirks", h.handleListQuirks)
 		r.Put("/quirks/{quirk_id}", h.handleEnableQuirk)
 		r.Delete("/quirks/{quirk_id}", h.handleDisableQuirk)
+		r.Get("/replay", h.handleReplayGet)
+		r.Post("/replay/start", h.handleReplayStart)
+		r.Post("/replay/finish", h.handleReplayFinish)
 	})
+}
+
+// handleReplayGet serves the active recorder's bundle. With no query
+// param, the JSONL bundle (manifest line + entries) is returned.
+// `?format=manifest` returns just the manifest as JSON.
+//
+// When the recorder is unset, the endpoint returns 200 + an empty
+// manifest, matching the list-endpoint convention. The
+// /admin/replay/{start,finish} endpoints are stopgaps; full
+// /admin/runs/* lifecycle lands in a follow-up.
+func (h *Handler) handleReplayGet(w http.ResponseWriter, r *http.Request) {
+	if h.recorder == nil {
+		twincore.JSON(w, http.StatusOK, replay.Manifest{SchemaVersion: replay.SchemaVersion})
+		return
+	}
+	if r.URL.Query().Get("format") == "manifest" {
+		twincore.JSON(w, http.StatusOK, h.recorder.CurrentManifest())
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	if err := h.recorder.Export(w); err != nil {
+		twincore.Error(w, http.StatusInternalServerError, "export failed: "+err.Error())
+		return
+	}
+}
+
+func (h *Handler) handleReplayStart(w http.ResponseWriter, r *http.Request) {
+	if h.recorder == nil {
+		twincore.Error(w, http.StatusNotFound, "replay recorder not configured")
+		return
+	}
+	runID := r.URL.Query().Get("run_id")
+	if runID == "" {
+		var body struct {
+			RunID string `json:"run_id"`
+		}
+		if r.Body != nil {
+			_ = json.NewDecoder(r.Body).Decode(&body)
+		}
+		runID = body.RunID
+	}
+	h.recorder.StartRun(runID)
+	if h.runIDs != nil && runID != "" {
+		h.runIDs.SetRunID(runID)
+	}
+	twincore.JSON(w, http.StatusOK, map[string]string{"status": "started", "run_id": runID})
+}
+
+func (h *Handler) handleReplayFinish(w http.ResponseWriter, r *http.Request) {
+	if h.recorder == nil {
+		twincore.Error(w, http.StatusNotFound, "replay recorder not configured")
+		return
+	}
+	twincore.JSON(w, http.StatusOK, h.recorder.FinishRun())
 }
 
 func (h *Handler) handleReset(w http.ResponseWriter, r *http.Request) {
