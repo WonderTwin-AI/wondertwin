@@ -31,6 +31,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -152,6 +153,14 @@ func main() {
 	}
 
 	if err != nil {
+		var ec ExitCodeError
+		if errors.As(err, &ec) {
+			// Child process surfaced its exit code via the typed
+			// error. Skip the "wt: ..." prefix — the child wrote its
+			// own output, the wrap path printed cleanup confirmation,
+			// and customers see the code via $?.
+			os.Exit(ec.Code())
+		}
 		fmt.Fprintf(os.Stderr, "wt: %v\n", err)
 		os.Exit(1)
 	}

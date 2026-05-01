@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -13,6 +14,16 @@ import (
 	"strings"
 	"time"
 )
+
+// ExitCodeError carries a child exit code up through the normal Go
+// error-return path so deferred cleanup in cmdRunsWrap runs before
+// the process exits. main.go inspects for this error and calls
+// os.Exit with the embedded code without printing the generic
+// "wt: ..." prefix.
+type ExitCodeError int
+
+func (e ExitCodeError) Error() string { return fmt.Sprintf("child exited with code %d", int(e)) }
+func (e ExitCodeError) Code() int     { return int(e) }
 
 // runsHelp is printed when the user runs `wt runs` with no verb or
 // asks for `--help`. The examples are intentionally copy-pasteable.
@@ -285,24 +296,16 @@ func cmdRunsWrap(args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "WT_RUN_ID="+id, "WT_TWIN_URL="+url)
-	err = cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		var ee *exec.ExitError
-		if asExitErr(&ee, err) {
-			os.Exit(ee.ExitCode())
+		if errors.As(err, &ee) {
+			// Returning the typed error lets the deferred finish +
+			// export run before main.go translates it into os.Exit.
+			return ExitCodeError(ee.ExitCode())
 		}
 		return fmt.Errorf("exec: %w", err)
 	}
 	return nil
-}
-
-// asExitErr is a tiny helper to avoid importing errors just for As.
-func asExitErr(target **exec.ExitError, err error) bool {
-	if e, ok := err.(*exec.ExitError); ok {
-		*target = e
-		return true
-	}
-	return false
 }
 
 // postJSON wraps postJSONStatus and treats non-2xx as an error.

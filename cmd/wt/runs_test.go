@@ -3,6 +3,7 @@ package main
 import (
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -294,6 +295,37 @@ func TestRunsWrapHappyPathAndCleanup(t *testing.T) {
 	}
 	if s.finishes.Load() < 1 {
 		t.Errorf("expected finish call after wrap")
+	}
+}
+
+func TestRunsWrapFinishesOnChildNonZeroExit(t *testing.T) {
+	// The headline failure case: a child that exits non-zero. The
+	// deferred finish + export must run before the typed error
+	// propagates up to main, otherwise CI workflows lose the replay
+	// artifact at exactly the moment they need it most.
+	s := newStubTwin(t)
+	dir := t.TempDir()
+	bundle := filepath.Join(dir, "wrap-fail.jsonl")
+
+	err := cmdRunsWrap([]string{
+		"--twin", s.URL,
+		"--run-id", "wrap-fail-7",
+		"--export", bundle,
+		"--",
+		"sh", "-c", "exit 7",
+	})
+	var ec ExitCodeError
+	if !errors.As(err, &ec) {
+		t.Fatalf("expected ExitCodeError, got %T: %v", err, err)
+	}
+	if ec.Code() != 7 {
+		t.Errorf("exit code = %d, want 7", ec.Code())
+	}
+	if s.finishes.Load() < 1 {
+		t.Errorf("finish must fire even when child exits non-zero")
+	}
+	if _, statErr := os.Stat(bundle); statErr != nil {
+		t.Errorf("export not written on non-zero exit; stat err = %v", statErr)
 	}
 }
 
