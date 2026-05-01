@@ -30,6 +30,7 @@ func main() {
 
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.WireFromTwin(twin)
 	adminHandler.Routes(twin.Router)
 
 	if cfg.SeedFile != "" {

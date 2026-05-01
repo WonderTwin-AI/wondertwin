@@ -184,7 +184,6 @@ func New(cfg *Config) *Twin {
 	t.loadLicense()
 	t.emitLicenseBanner()
 	t.startTelemetry()
-	t.mountReplayRoutes()
 
 	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {
 		logger.Error("invalid twin configuration", "err", err)

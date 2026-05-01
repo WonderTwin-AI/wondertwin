@@ -95,6 +95,7 @@ func main() {
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetFlusher(dispatcher)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.WireFromTwin(twin)
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided

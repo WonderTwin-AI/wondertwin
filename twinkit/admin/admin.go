@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twinkit/replay"
 	"github.com/wondertwin-ai/wondertwin/twinkit/state"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -41,6 +44,39 @@ type RunIDSetter interface {
 	SetRunID(runID string)
 }
 
+// Reseeder is implemented by twins whose deterministic random source
+// supports re-seeding. POST /admin/runs/start invokes this when a
+// `seed` is supplied in the request body.
+type Reseeder interface {
+	Reseed(seed int64)
+}
+
+// telemetryEmitter is the package-private contract h.tel satisfies;
+// it lets admin tests stub the reporter without depending on
+// telemetry.Reporter directly. Callers wire the production reporter
+// via SetTelemetry which accepts the concrete *telemetry.Reporter.
+type telemetryEmitter interface {
+	Record(ev telemetry.Event)
+}
+
+// RunAttribution is implemented by callers that can supply telemetry
+// attribution fields for run lifecycle events. The admin handler is
+// pure plumbing — twin metadata flows through this interface so
+// admin tests can stub it.
+//
+// ModeString returns "ci" or "local"; the method is named to avoid
+// colliding with Twin.Mode (a cimode.Mode field).
+type RunAttribution interface {
+	TwinName() string
+	TwinVersion() string
+	ModeString() string
+	Platform() string
+	OrgHash() string
+	LicenseID() string
+	LicenseOK() bool
+	LicenseReason() string
+}
+
 // QuirkStore manages behavioral quirks that can be toggled at runtime.
 type QuirkStore interface {
 	ListQuirks() []QuirkStatus
@@ -60,13 +96,23 @@ type QuirkStatus struct {
 
 // Handler provides the shared admin endpoints.
 type Handler struct {
-	state   StateStore
-	flusher WebhookFlusher
-	mw      *twincore.Middleware
-	clock   *state.Clock
-	config  ConfigProvider
-	quirks  QuirkStore
-	runIDs  RunIDSetter
+	state    StateStore
+	flusher  WebhookFlusher
+	mw       *twincore.Middleware
+	clock    *state.Clock
+	config   ConfigProvider
+	quirks   QuirkStore
+	runIDs   RunIDSetter
+	recorder *replay.Recorder
+	rand     Reseeder
+	tel      telemetryEmitter
+	attr     RunAttribution
+
+	runMu        sync.Mutex
+	currentRun   string
+	startedAt    time.Time
+	currentSeed  int64
+	currentSeedSrc string
 }
 
 // NewHandler creates a new admin handler.
@@ -99,6 +145,69 @@ func (h *Handler) SetRunIDSetter(s RunIDSetter) {
 	h.runIDs = s
 }
 
+// SetReplayRecorder wires a replay.Recorder so the /admin/replay
+// (GET) and /admin/runs/* (POST/GET) endpoints can serve recorded
+// traffic and drive the run lifecycle. Optional; routes return 404
+// when unset.
+func (h *Handler) SetReplayRecorder(r *replay.Recorder) {
+	h.recorder = r
+}
+
+// SetReseeder wires a deterministic random source (typically Twin.Rand)
+// so POST /admin/runs/start can apply the supplied seed.
+func (h *Handler) SetReseeder(r Reseeder) {
+	h.rand = r
+}
+
+// SetTelemetry wires a telemetry reporter so the admin handler can
+// record run_start / run_finish events. Optional.
+func (h *Handler) SetTelemetry(r *telemetry.Reporter) {
+	if r == nil {
+		h.tel = nil
+		return
+	}
+	h.tel = r
+}
+
+// SetTelemetryEmitter wires a custom telemetry emitter (used by
+// tests). Production callers should prefer SetTelemetry which accepts
+// the concrete *telemetry.Reporter.
+func (h *Handler) SetTelemetryEmitter(e interface{ Record(telemetry.Event) }) {
+	h.tel = e
+}
+
+// SetRunAttribution wires the source of run-event attribution fields
+// (twin name/version/mode/platform/org/license).
+func (h *Handler) SetRunAttribution(a RunAttribution) {
+	h.attr = a
+}
+
+// TwinSubject aggregates the interfaces a Twin satisfies for admin
+// wiring. WireFromTwin uses this so each twin's main.go can call a
+// single helper instead of invoking the full setter list.
+type TwinSubject interface {
+	RunIDSetter
+	RunAttribution
+	Reseeder
+	ReplayRecorder() *replay.Recorder
+	TelemetryReporter() *telemetry.Reporter
+}
+
+// WireFromTwin connects every optional run-lifecycle dependency from
+// a Twin-shaped object. Twins call this once after admin.NewHandler
+// instead of invoking each setter individually.
+func (h *Handler) WireFromTwin(t TwinSubject) {
+	h.SetRunIDSetter(t)
+	h.SetRunAttribution(t)
+	h.SetReseeder(t)
+	if rec := t.ReplayRecorder(); rec != nil {
+		h.SetReplayRecorder(rec)
+	}
+	if rep := t.TelemetryReporter(); rep != nil {
+		h.SetTelemetry(rep)
+	}
+}
+
 
 // Routes mounts the admin endpoints on the given router.
 func (h *Handler) Routes(r chi.Router) {
@@ -119,6 +228,10 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/quirks", h.handleListQuirks)
 		r.Put("/quirks/{quirk_id}", h.handleEnableQuirk)
 		r.Delete("/quirks/{quirk_id}", h.handleDisableQuirk)
+		r.Get("/replay", h.handleReplayGet)
+		r.Post("/runs/start", h.handleRunStart)
+		r.Post("/runs/finish", h.handleRunFinish)
+		r.Get("/runs/current", h.handleRunCurrent)
 	})
 }
 
