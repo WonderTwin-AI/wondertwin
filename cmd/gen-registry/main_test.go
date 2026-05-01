@@ -92,8 +92,8 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	if reg.SchemaVersion != 1 {
-		t.Errorf("schema_version = %d, want 1", reg.SchemaVersion)
+	if reg.SchemaVersion != 2 {
+		t.Errorf("schema_version = %d, want 2", reg.SchemaVersion)
 	}
 	entry, ok := reg.Twins["stripe"]
 	if !ok {
