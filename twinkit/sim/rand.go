@@ -24,6 +24,18 @@ func DefaultRand() *Rand {
 	return NewRand(42)
 }
 
+// Reseed replaces the underlying random source with a new one seeded
+// at the given value. Reseeding while requests are in flight is
+// undefined behavior — reseed only at run boundaries (e.g. on
+// POST /admin/runs/start). The lock guarantees the swap itself is
+// safe; it does not provide consistency for concurrent readers
+// observing values mid-reseed.
+func (r *Rand) Reseed(seed int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.rng = rand.New(rand.NewSource(seed))
+}
+
 // Float64 returns a random float64 in [0, 1).
 func (r *Rand) Float64() float64 {
 	r.mu.Lock()
