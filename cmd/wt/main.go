@@ -143,6 +143,8 @@ func main() {
 		err = cmdReplay(args)
 	case "license":
 		err = cmdLicense(args)
+	case "runs":
+		err = cmdRuns(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -212,6 +214,10 @@ Commands:
   license install <file>     Install a signed WonderTwin license file
   license status             Show the active license's status
   license inspect <file>     Show a license file without installing
+  runs start                 Start a run on a running twin (drives /admin/runs/start)
+  runs finish                Finish a run; optional --export to write JSONL
+  runs current               Show the active run on a running twin
+  runs wrap -- <cmd>         Start a run, exec <cmd>, finish on exit
   version                    Print the wt version
 
 Options:
