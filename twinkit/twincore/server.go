@@ -22,6 +22,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/cimode"
 	"github.com/wondertwin-ai/wondertwin/twinkit/replay"
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
+	"github.com/wondertwin-ai/wondertwin/twinkit/telemetry"
 )
 
 // envSeed is the environment variable that overrides the default RNG
@@ -35,6 +36,12 @@ const (
 	envReplayMaxEntries    = "WONDERTWIN_REPLAY_MAX_ENTRIES"
 	envReplayMaxBodyBytes  = "WONDERTWIN_REPLAY_MAX_BODY_BYTES"
 	envReplayCaptureBodies = "WONDERTWIN_REPLAY_CAPTURE_BODIES"
+)
+
+// Telemetry environment overrides.
+const (
+	envTelemetry         = "WONDERTWIN_TELEMETRY"
+	envTelemetryEndpoint = "WONDERTWIN_TELEMETRY_ENDPOINT"
 )
 
 // Config holds the common configuration for all twins, parsed from CLI flags.
@@ -121,6 +128,12 @@ type Twin struct {
 	// the Reason enum.
 	LicenseStatus cimode.Status
 
+	// Telemetry is the per-twin event reporter. Always instantiated by
+	// New; opt out via WONDERTWIN_TELEMETRY=off (also 0/false/no/
+	// disabled). The reporter ships endpoint_hit events for every
+	// non-admin request plus startup events.
+	Telemetry *telemetry.Reporter
+
 	// configErr is set by New when an unrecoverable configuration
 	// problem is detected (e.g. a non-loopback ObserverEndpoint URL).
 	// Serve checks this field before binding so misconfigured twins
@@ -170,6 +183,7 @@ func New(cfg *Config) *Twin {
 	}
 	t.loadLicense()
 	t.emitLicenseBanner()
+	t.startTelemetry()
 	t.mountReplayRoutes()
 
 	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {
@@ -369,6 +383,7 @@ func (t *Twin) Serve() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	defer t.Close()
 	return srv.Shutdown(ctx)
 }
 
