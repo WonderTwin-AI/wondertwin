@@ -139,6 +139,8 @@ func main() {
 		err = cmdCache(manifestPath, args)
 	case "conformance":
 		err = cmdConformance(args)
+	case "replay":
+		err = cmdReplay(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -203,6 +205,8 @@ Commands:
   cache warm [twin...]       Fetch and cache content for manifest twins
   cache clear [twin...]      Remove cached content
   conformance <binary>       Run conformance tests against a twin binary
+  replay export              Fetch /admin/replay JSONL bundle from a running twin
+  replay view <path>         Pretty-print a JSONL replay bundle
   version                    Print the wt version
 
 Options:

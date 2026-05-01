@@ -65,6 +65,41 @@ func TestScrubberSetBodyChaining(t *testing.T) {
 	}
 }
 
+func TestDefaultBodyScrubsJSONFields(t *testing.T) {
+	t.Parallel()
+	s := Default()
+	body := []byte(`{"username":"alice","password":"hunter2","items":[{"number":"4242424242424242","cvc":"111"}]}`)
+	out := s.ScrubBody("application/json", body)
+	got := string(out)
+	for _, k := range []string{`"password":"REDACTED"`, `"number":"REDACTED"`, `"cvc":"REDACTED"`} {
+		if !contains(got, k) {
+			t.Errorf("expected %q in scrubbed body, got %s", k, got)
+		}
+	}
+	if !contains(got, `"username":"alice"`) {
+		t.Errorf("non-sensitive field should remain; got %s", got)
+	}
+}
+
+func TestDefaultBodyLeavesNonJSONAlone(t *testing.T) {
+	t.Parallel()
+	s := Default()
+	body := []byte("password=hunter2&user=alice")
+	out := s.ScrubBody("application/x-www-form-urlencoded", body)
+	if string(out) != string(body) {
+		t.Errorf("non-JSON body should be unchanged; got %q", out)
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
 func TestScrubberSetIgnoresNil(t *testing.T) {
 	t.Parallel()
 	s := NewSet()

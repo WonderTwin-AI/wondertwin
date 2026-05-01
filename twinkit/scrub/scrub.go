@@ -10,6 +10,7 @@ package scrub
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 )
 
@@ -83,7 +84,96 @@ func Default() *ScrubberSet {
 	s := NewSet()
 	s.AddHeader(redactSensitiveHeaders)
 	s.AddBody(redactCookieAttributes)
+	s.AddBody(redactSensitiveJSONFields)
 	return s
+}
+
+// SensitiveJSONKeys is the conservative set of JSON object keys whose
+// values are redacted by the default body scrubber. Matching is
+// case-sensitive on the exact key. Nested objects are walked, so
+// `{"customer": {"card": {"number": "..."}}}` redacts "number".
+var SensitiveJSONKeys = map[string]struct{}{
+	"password":      {},
+	"client_secret": {},
+	"api_key":       {},
+	"secret_key":    {},
+	"card[number]":  {},
+	"card[cvc]":     {},
+	"cvc":           {},
+	"number":        {},
+}
+
+// redactSensitiveJSONFields walks JSON request and response bodies and
+// replaces values for any key in SensitiveJSONKeys with the literal
+// string "REDACTED". Non-JSON payloads pass through unchanged. The
+// implementation is best-effort: malformed JSON is returned untouched.
+func redactSensitiveJSONFields(contentType string, body []byte) []byte {
+	if len(body) == 0 {
+		return body
+	}
+	if !looksLikeJSON(contentType, body) {
+		return body
+	}
+	var v any
+	if err := json.Unmarshal(body, &v); err != nil {
+		return body
+	}
+	redacted, changed := walkJSON(v)
+	if !changed {
+		return body
+	}
+	out, err := json.Marshal(redacted)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+func looksLikeJSON(contentType string, body []byte) bool {
+	if strings.Contains(strings.ToLower(contentType), "json") {
+		return true
+	}
+	for _, b := range body {
+		switch b {
+		case ' ', '\t', '\n', '\r':
+			continue
+		case '{', '[':
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func walkJSON(v any) (any, bool) {
+	switch t := v.(type) {
+	case map[string]any:
+		var changed bool
+		for k, child := range t {
+			if _, ok := SensitiveJSONKeys[k]; ok {
+				t[k] = "REDACTED"
+				changed = true
+				continue
+			}
+			if nv, c := walkJSON(child); c {
+				t[k] = nv
+				changed = true
+			}
+		}
+		return t, changed
+	case []any:
+		var changed bool
+		for i, child := range t {
+			if nv, c := walkJSON(child); c {
+				t[i] = nv
+				changed = true
+			}
+		}
+		return t, changed
+	default:
+		return v, false
+	}
 }
 
 var sensitiveHeaderNames = map[string]struct{}{

@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/wondertwin-ai/wondertwin/twinkit/cimode"
+	"github.com/wondertwin-ai/wondertwin/twinkit/replay"
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 )
 
@@ -25,6 +28,14 @@ import (
 // seed. Twins inherit it via twincore.New so deterministic runs share a
 // single source of truth.
 const envSeed = "WONDERTWIN_SEED"
+
+// Replay environment overrides. All are optional; absent values keep
+// the mode-based defaults (CI captures bodies, local skips them).
+const (
+	envReplayMaxEntries    = "WONDERTWIN_REPLAY_MAX_ENTRIES"
+	envReplayMaxBodyBytes  = "WONDERTWIN_REPLAY_MAX_BODY_BYTES"
+	envReplayCaptureBodies = "WONDERTWIN_REPLAY_CAPTURE_BODIES"
+)
 
 // Config holds the common configuration for all twins, parsed from CLI flags.
 type Config struct {
@@ -94,6 +105,11 @@ type Twin struct {
 	// emission, separately from Mode for clarity.
 	Detection cimode.Detection
 
+	// Replay is the per-twin request/response recorder. Always
+	// instantiated by New; CI mode captures bodies by default, local
+	// mode does not. Override via WONDERTWIN_REPLAY_* env vars.
+	Replay *replay.Recorder
+
 	// configErr is set by New when an unrecoverable configuration
 	// problem is detected (e.g. a non-loopback ObserverEndpoint URL).
 	// Serve checks this field before binding so misconfigured twins
@@ -127,6 +143,9 @@ func New(cfg *Config) *Twin {
 
 	detection := cimode.Detect()
 	rng := seedFromEnv()
+	rec := replay.NewRecorder(replayConfigFromEnv(cfg, detection.Mode, rng))
+	r.Use(rec.Middleware())
+
 	t := &Twin{
 		Config:    cfg,
 		Router:    r,
@@ -136,7 +155,9 @@ func New(cfg *Config) *Twin {
 		Detection: detection,
 		Rand:      rng,
 		IDs:       sim.NewIDGenerator(rng),
+		Replay:    rec,
 	}
+	t.mountReplayRoutes()
 
 	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {
 		logger.Error("invalid twin configuration", "err", err)
@@ -157,6 +178,45 @@ func (t *Twin) SetRunID(runID string) {
 	t.mu.Lock()
 	t.RunID = runID
 	t.mu.Unlock()
+}
+
+// replayConfigFromEnv composes a replay.Config from twin metadata,
+// detected mode, and env-var overrides.
+//
+//   - CI mode defaults to body capture; local mode defaults to
+//     headers-only to keep the laptop footprint light.
+//   - WONDERTWIN_REPLAY_CAPTURE_BODIES=1|true|yes forces body capture
+//     on; "0|false|no" forces it off.
+//   - WONDERTWIN_REPLAY_MAX_ENTRIES and _MAX_BODY_BYTES override the
+//     ring-buffer size and per-body cap when set to positive integers.
+func replayConfigFromEnv(cfg *Config, mode cimode.Mode, rng *sim.Rand) replay.Config {
+	rc := replay.Config{
+		CaptureBodies: mode == cimode.ModeCI,
+		TwinName:      cfg.Name,
+	}
+	if rng != nil {
+		// Seed value is opaque to twincore; treat zero as "unknown".
+		rc.Seed = 0
+	}
+	if v := os.Getenv(envReplayCaptureBodies); v != "" {
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "1", "true", "yes":
+			rc.CaptureBodies = true
+		case "0", "false", "no":
+			rc.CaptureBodies = false
+		}
+	}
+	if v := os.Getenv(envReplayMaxEntries); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			rc.MaxEntries = n
+		}
+	}
+	if v := os.Getenv(envReplayMaxBodyBytes); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			rc.MaxBodyBytes = n
+		}
+	}
+	return rc
 }
 
 // seedFromEnv reads WONDERTWIN_SEED and returns a *sim.Rand. An unset
