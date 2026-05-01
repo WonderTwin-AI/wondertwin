@@ -1,8 +1,6 @@
 package api
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -47,7 +45,7 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		req.Region = "us-east-1"
 	}
 
-	id := resendID()
+	id := h.resendID()
 	domain := store.Domain{
 		ID:     id,
 		Object: "domain",
@@ -115,10 +113,11 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
 }
 
-func resendID() string {
-	b := make([]byte, 12)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+// resendID generates a 24-char hex identifier from the deterministic
+// per-twin RNG. Routing through store.RandHex (rather than
+// crypto/rand) keeps replay capture reproducible per seed.
+func (h *Handler) resendID() string {
+	return h.store.RandHex(12)
 }
 
 func intPtr(i int) *int {
