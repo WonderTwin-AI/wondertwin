@@ -17,7 +17,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/wondertwin-ai/wondertwin/twinkit/cimode"
+	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 )
+
+// envSeed is the environment variable that overrides the default RNG
+// seed. Twins inherit it via twincore.New so deterministic runs share a
+// single source of truth.
+const envSeed = "WONDERTWIN_SEED"
 
 // Config holds the common configuration for all twins, parsed from CLI flags.
 type Config struct {
@@ -28,6 +35,12 @@ type Config struct {
 	SeedFile   string
 	Verbose    bool
 	Name       string // twin name for logging
+
+	// ObserverEndpoint, when Enabled, configures a local-only forwarder
+	// that mirrors recorded request/response entries to a process on
+	// the same host (typically a synthetic-data sidecar). The URL must
+	// be loopback; non-local URLs cause New to refuse to start.
+	ObserverEndpoint ObserverEndpoint
 }
 
 // ParseFlags parses common CLI flags and returns a Config.
@@ -59,6 +72,33 @@ type Twin struct {
 	Logger *slog.Logger
 	mw     *Middleware
 	mu     sync.RWMutex // protects Config fields during runtime updates
+
+	// Mode is the detected execution environment (local vs. CI).
+	// Populated by New from the process environment; intended for
+	// downstream telemetry and replay components.
+	Mode cimode.Mode
+
+	// RunID is the active run identifier set by /admin/reset?run_id=...
+	// or by the run-lifecycle endpoints. Empty when no run is active.
+	RunID string
+
+	// Rand is the deterministic random source used by twins. Seeded
+	// from WONDERTWIN_SEED when set, otherwise sim.DefaultRand.
+	Rand *sim.Rand
+
+	// IDs is the deterministic ID generator backed by Rand.
+	IDs *sim.IDGenerator
+
+	// Detection captures the platform-specific signals (run id, org
+	// hint) gathered at startup. Stashed for use by future telemetry
+	// emission, separately from Mode for clarity.
+	Detection cimode.Detection
+
+	// configErr is set by New when an unrecoverable configuration
+	// problem is detected (e.g. a non-loopback ObserverEndpoint URL).
+	// Serve checks this field before binding so misconfigured twins
+	// fail fast at startup instead of silently ignoring the issue.
+	configErr error
 }
 
 // New creates a new Twin with the given config.
@@ -85,17 +125,52 @@ func New(cfg *Config) *Twin {
 	r.Use(mw.LatencyInjection)
 	r.Use(mw.RandomFailure)
 
-	return &Twin{
-		Config: cfg,
-		Router: r,
-		Logger: logger,
-		mw:     mw,
+	detection := cimode.Detect()
+	rng := seedFromEnv()
+	t := &Twin{
+		Config:    cfg,
+		Router:    r,
+		Logger:    logger,
+		mw:        mw,
+		Mode:      detection.Mode,
+		Detection: detection,
+		Rand:      rng,
+		IDs:       sim.NewIDGenerator(rng),
 	}
+
+	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {
+		logger.Error("invalid twin configuration", "err", err)
+		t.configErr = err
+	}
+
+	return t
 }
 
 // Middleware returns the middleware instance for external access (e.g., fault injection).
 func (t *Twin) Middleware() *Middleware {
 	return t.mw
+}
+
+// SetRunID sets the active run identifier. Safe for concurrent use.
+// Passing an empty string clears the run.
+func (t *Twin) SetRunID(runID string) {
+	t.mu.Lock()
+	t.RunID = runID
+	t.mu.Unlock()
+}
+
+// seedFromEnv reads WONDERTWIN_SEED and returns a *sim.Rand. An unset
+// or unparsable value falls back to sim.DefaultRand.
+func seedFromEnv() *sim.Rand {
+	raw := os.Getenv(envSeed)
+	if raw == "" {
+		return sim.DefaultRand()
+	}
+	var seed int64
+	if _, err := fmt.Sscanf(raw, "%d", &seed); err != nil {
+		return sim.DefaultRand()
+	}
+	return sim.NewRand(seed)
 }
 
 // GetConfig returns the current runtime configuration as a map.
@@ -190,6 +265,9 @@ func (t *Twin) UpdateConfig(updates map[string]any) error {
 
 // Serve starts the HTTP server and blocks until shutdown signal.
 func (t *Twin) Serve() error {
+	if t.configErr != nil {
+		return t.configErr
+	}
 	addr := fmt.Sprintf(":%d", t.Config.Port)
 
 	srv := &http.Server{
