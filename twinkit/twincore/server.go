@@ -351,6 +351,13 @@ func (t *Twin) UpdateConfig(updates map[string]any) error {
 }
 
 // Serve starts the HTTP server and blocks until shutdown signal.
+//
+// On SIGTERM/SIGINT, Serve drains the HTTP server (10s budget) and
+// then calls Twin.Close to flush per-twin resources — most notably
+// the telemetry reporter. Process supervisors should grant at least
+// 2 seconds post-SIGTERM before forcing termination so the
+// telemetry path can complete one final batch POST; see
+// telemetry.Reporter.Close for details.
 func (t *Twin) Serve() error {
 	if t.configErr != nil {
 		return t.configErr
