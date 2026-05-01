@@ -110,6 +110,17 @@ type Twin struct {
 	// mode does not. Override via WONDERTWIN_REPLAY_* env vars.
 	Replay *replay.Recorder
 
+	// License is the loaded WonderTwin license, or nil when no
+	// license file is present. Populated by New from cimode.LoadLicense.
+	// Consumers (e.g. telemetry) should treat nil as the soft-gate
+	// path — twins continue to serve traffic regardless.
+	License *cimode.License
+
+	// LicenseStatus is the result of validating License against the
+	// twin's name at startup. Always populated; see cimode.Status for
+	// the Reason enum.
+	LicenseStatus cimode.Status
+
 	// configErr is set by New when an unrecoverable configuration
 	// problem is detected (e.g. a non-loopback ObserverEndpoint URL).
 	// Serve checks this field before binding so misconfigured twins
@@ -157,6 +168,8 @@ func New(cfg *Config) *Twin {
 		IDs:       sim.NewIDGenerator(rng),
 		Replay:    rec,
 	}
+	t.loadLicense()
+	t.emitLicenseBanner()
 	t.mountReplayRoutes()
 
 	if err := ValidateObserverEndpoint(cfg.ObserverEndpoint); err != nil {

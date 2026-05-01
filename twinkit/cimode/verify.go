@@ -19,9 +19,7 @@ func verifyKey() ed25519.PublicKey {
 }
 
 // setVerificationKey replaces the active verification key with pk and
-// returns a closure that restores the previous value. It is exported
-// only to tests in this package; callers outside cimode use the
-// embedded key.
+// returns a closure that restores the previous value.
 func setVerificationKey(pk ed25519.PublicKey) (restore func()) {
 	verifyMu.Lock()
 	prev := activeVerify
@@ -32,6 +30,14 @@ func setVerificationKey(pk ed25519.PublicKey) (restore func()) {
 		activeVerify = prev
 		verifyMu.Unlock()
 	}
+}
+
+// SetVerificationKeyForTest is exposed only for use by tests in
+// dependent packages (e.g. twinkit/twincore's license-banner tests
+// that must mint a synthetic license without the production private
+// key). It MUST NOT be called by production code.
+func SetVerificationKeyForTest(pk ed25519.PublicKey) (restore func()) {
+	return setVerificationKey(pk)
 }
 
 // verifySignature returns true when lic.Signature is a valid ed25519
