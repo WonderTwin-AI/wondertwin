@@ -97,7 +97,9 @@ func captureBundle(
 	tc, ac, cleanup := newClient(seed)
 	defer cleanup()
 
-	_ = WithRun(t, ac, WithSeed(seed))
+	// Drive the lifecycle inline rather than via WithRun's t.Cleanup
+	// so the run is finished while the test server is still alive.
+	started := ac.StartRun(WithSeed(seed))
 
 	for _, r := range requests {
 		hdrs := r.Headers
@@ -115,8 +117,10 @@ func captureBundle(
 	if err != nil {
 		t.Fatalf("fetch replay bundle: %v", err)
 	}
-	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	ac.FinishRun(started.RunID)
 	return string(raw)
 }
 
