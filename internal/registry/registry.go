@@ -17,6 +17,12 @@ import (
 // FetchRegistry will try the JSON variant first and fall back to YAML.
 const DefaultRegistryURL = "https://raw.githubusercontent.com/wondertwin-ai/registry/main/registry.yaml"
 
+// CurrentSchemaVersion is the schema version emitted by gen-registry
+// going forward. Parsers accept any schema_version <= CurrentSchemaVersion.
+// Schema v1 entries continue to parse cleanly because all v2 fields are
+// declared with `omitempty`.
+const CurrentSchemaVersion = 2
+
 // Registry represents the top-level registry manifest.
 type Registry struct {
 	SchemaVersion int                  `yaml:"schema_version" json:"schema_version"`
@@ -240,6 +246,10 @@ func fetchAndParse(url, token string) (*Registry, error) {
 		if err := yaml.Unmarshal(body, &reg); err != nil {
 			return nil, fmt.Errorf("parsing registry YAML: %w", err)
 		}
+	}
+
+	if reg.SchemaVersion > CurrentSchemaVersion {
+		return nil, fmt.Errorf("registry schema version %d not supported (max %d)", reg.SchemaVersion, CurrentSchemaVersion)
 	}
 
 	if reg.Twins == nil {
