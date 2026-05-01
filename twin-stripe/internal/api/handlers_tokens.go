@@ -60,7 +60,7 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		Card:     card,
 		Used:     false,
 		Livemode: false,
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	h.store.Tokens.Set(id, tok)
@@ -117,7 +117,7 @@ func (h *Handler) CreateSource(w http.ResponseWriter, r *http.Request) {
 		Flow:     flow,
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	h.store.Sources.Set(id, src)

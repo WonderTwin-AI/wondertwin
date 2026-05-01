@@ -1,7 +1,6 @@
 // Package store defines the Stripe twin's state types and in-memory store.
 package store
 
-import "time"
 
 // Account represents a Stripe Connect account.
 type Account struct {
@@ -858,7 +857,12 @@ type TopUp struct {
 	Created            int64             `json:"created"`
 }
 
-// Default timestamps for testing.
-func Now() int64 {
-	return time.Now().Unix()
+// Now returns the simulated Unix timestamp from the store's clock.
+// Handlers should use s.store.Now() rather than time.Now().Unix() so
+// captured replay JSONL is reproducible per seed.
+func (s *MemoryStore) Now() int64 {
+	if s == nil || s.Clock == nil {
+		return 0
+	}
+	return s.Clock.Now().Unix()
 }

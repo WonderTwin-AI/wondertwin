@@ -64,7 +64,7 @@ func (h *Handler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 		SourceTransaction: r.FormValue("source_transaction"),
 		Metadata:          extractMetadata(r),
 		Livemode:          false,
-		Created:           store.Now(),
+		Created:           h.store.Now(),
 	}
 
 	h.store.Transfers.Set(id, transfer)

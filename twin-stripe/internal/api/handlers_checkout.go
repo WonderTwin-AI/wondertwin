@@ -19,7 +19,7 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	}
 
 	id := h.store.CheckoutSessions.NextID()
-	now := store.Now()
+	now := h.store.Now()
 
 	mode := r.FormValue("mode")
 	if mode == "" {
@@ -168,9 +168,9 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 			Customer:       cs.Customer,
 			Status:         "succeeded",
 			CaptureMethod:  "automatic",
-			ClientSecret:   piID + "_secret_" + randomHex(12),
+			ClientSecret:   piID + "_secret_" + h.randomHex(12),
 			Livemode:       false,
-			Created:        store.Now(),
+			Created:        h.store.Now(),
 		}
 		chargeID := h.createChargeForPI(&pi)
 		pi.LatestCharge = chargeID
@@ -187,7 +187,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 		if len(cs.LineItems) > 0 {
 			subID := h.store.Subscriptions.NextID()
 			var items []store.SubscriptionItem
-			now := store.Now()
+			now := h.store.Now()
 			for i, li := range cs.LineItems {
 				price, ok := h.store.Prices.Get(li.Price)
 				if !ok {
@@ -243,7 +243,7 @@ func (h *Handler) CreatePaymentLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := h.store.PaymentLinks.NextID()
-	now := store.Now()
+	now := h.store.Now()
 
 	pl := store.PaymentLink{
 		ID:       id,

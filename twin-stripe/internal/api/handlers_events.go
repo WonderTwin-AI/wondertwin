@@ -18,7 +18,7 @@ func (h *Handler) emitEvent(eventType string, objectData map[string]any) {
 		Type:            eventType,
 		Data:            store.EventData{Object: objectData},
 		APIVersion:      "2024-04-10",
-		Created:         store.Now(),
+		Created:         h.store.Now(),
 		Livemode:        false,
 		PendingWebhooks: 1,
 	}

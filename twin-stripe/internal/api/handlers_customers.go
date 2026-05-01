@@ -25,7 +25,7 @@ func (h *Handler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		Phone:       r.FormValue("phone"),
 		Description: r.FormValue("description"),
 		Livemode:    false,
-		Created:     store.Now(),
+		Created:     h.store.Now(),
 	}
 	cus.Metadata = parseMetadata(r)
 
@@ -90,7 +90,7 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 	})
 	for _, sub := range subs {
 		sub.Status = "canceled"
-		sub.CanceledAt = store.Now()
+		sub.CanceledAt = h.store.Now()
 		h.store.Subscriptions.Set(sub.ID, sub)
 		h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
 	}

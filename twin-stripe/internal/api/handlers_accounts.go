@@ -20,7 +20,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := h.store.Accounts.NextID()
-	now := store.Now()
+	now := h.store.Now()
 
 	acctType := r.FormValue("type")
 	if acctType == "" {
@@ -242,7 +242,7 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	acct.Updated = store.Now()
+	acct.Updated = h.store.Now()
 	h.store.Accounts.Set(id, acct)
 
 	// Emit account.updated event

@@ -57,7 +57,7 @@ func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 		Type:     fileType,
 		URL:      "https://files.stripe.com/v1/files/" + id,
 		Livemode: false,
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	h.store.Files.Set(id, f)
@@ -106,7 +106,7 @@ func (h *Handler) CreateFileLink(w http.ResponseWriter, r *http.Request) {
 		Expired:  false,
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 	if v := r.FormValue("expires_at"); v != "" {
 		fl.ExpiresAt, _ = strconv.ParseInt(v, 10, 64)

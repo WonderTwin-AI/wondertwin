@@ -49,7 +49,7 @@ func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 		Quantity:     qty,
 		Subscription: subID,
 		Metadata:     parseMetadata(r),
-		Created:      store.Now(),
+		Created:      h.store.Now(),
 	}
 
 	h.store.SubItems.Set(id, si)
