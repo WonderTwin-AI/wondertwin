@@ -25,6 +25,7 @@ func main() {
 
 	twin := twincore.New(cfg)
 	memStore := store.New()
+	memStore.Rand = twin.Rand
 
 	// Messaging engine for SMS lifecycle.
 	msgEngine := messaging.NewEngine(

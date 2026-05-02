@@ -13,9 +13,10 @@ import (
 
 func setupResend(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	t.Helper()
-	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-resend-test"}
 	twin := twincore.New(cfg)
+	memStore := store.New()
+	memStore.Rand = twin.Rand
 	handler := api.NewHandler(memStore, twin.Middleware(), nil)
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)

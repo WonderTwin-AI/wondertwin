@@ -122,7 +122,7 @@ func (h *Handler) CreateMessagingService(w http.ResponseWriter, r *http.Request)
 	}
 
 	now := h.store.Clock.Now()
-	sid := fmt.Sprintf("MG%s", generateCode(32))
+	sid := fmt.Sprintf("MG%s", h.generateCode(32))
 
 	twincore.JSON(w, http.StatusCreated, map[string]any{
 		"sid":           sid,

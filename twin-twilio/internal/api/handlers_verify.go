@@ -1,10 +1,8 @@
 package api
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net/http"
 	"time"
 
@@ -35,7 +33,7 @@ func (h *Handler) CreateVerification(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Clock.Now()
 	sid := h.store.Verifications.NextID()
-	code := generateCode(6)
+	code := h.generateCode(6)
 	ttl := time.Duration(h.store.OTPTTLSeconds) * time.Second
 
 	v := store.Verification{
@@ -227,12 +225,14 @@ func twilioError(w http.ResponseWriter, status int, code int, message string) {
 	w.Write(data)
 }
 
-// generateCode generates a random numeric code of the given length.
-func generateCode(length int) string {
+// generateCode generates a deterministic numeric code of the given
+// length using the store's RNG. Routing through store.RandDigit
+// (rather than crypto/rand) keeps OTP output reproducible per seed:
+// two seeded runs get the same OTP.
+func (h *Handler) generateCode(length int) string {
 	code := ""
 	for i := 0; i < length; i++ {
-		n, _ := rand.Int(rand.Reader, big.NewInt(10))
-		code += fmt.Sprintf("%d", n.Int64())
+		code += fmt.Sprintf("%d", h.store.RandDigit())
 	}
 	return code
 }

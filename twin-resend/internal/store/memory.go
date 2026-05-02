@@ -1,8 +1,10 @@
 package store
 
 import (
+	"encoding/hex"
 	"encoding/json"
 
+	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
 )
 
@@ -15,6 +17,25 @@ type MemoryStore struct {
 	Contacts   *pkgstate.Store[Contact]
 	Broadcasts *pkgstate.Store[Broadcast]
 	Clock      *pkgstate.Clock
+
+	// Rand is the deterministic per-twin random source. Wired by
+	// main.go (and test setups) to twin.Rand so handler-level
+	// randomness shares the simulator's seed.
+	Rand *sim.Rand
+}
+
+// RandHex returns a deterministic hex string of n bytes drawn from
+// the store's Rand. Handlers use it in place of crypto/rand so
+// token-shaped output is reproducible per seed.
+func (s *MemoryStore) RandHex(n int) string {
+	if s == nil || s.Rand == nil || n <= 0 {
+		return ""
+	}
+	buf := make([]byte, n)
+	for i := range buf {
+		buf[i] = byte(s.Rand.Intn(256))
+	}
+	return hex.EncodeToString(buf)
 }
 
 // New creates a new MemoryStore with empty state.

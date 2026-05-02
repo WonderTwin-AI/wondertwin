@@ -17,9 +17,9 @@ import (
 
 func setupLogodev(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	t.Helper()
-	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-logodev-test"}
 	twin := twincore.New(cfg)
+	memStore := store.New()
 	handler := api.NewHandler(memStore, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)

@@ -42,7 +42,7 @@ func (h *Handler) CreateAudience(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := resendID()
+	id := h.resendID()
 	audience := store.Audience{
 		ID:        id,
 		Object:    "audience",
@@ -128,7 +128,7 @@ func (h *Handler) CreateContact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := resendID()
+	id := h.resendID()
 	contact := store.Contact{
 		ID:           id,
 		Object:       "contact",
