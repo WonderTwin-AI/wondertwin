@@ -14,9 +14,13 @@ import (
 
 func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	t.Helper()
-	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
+	memStore := store.New()
+	// Wire deterministic RNG end-to-end so handlers' RandHex
+	// callers (whsec_, client_secret, promo codes) produce stable
+	// output across runs.
+	memStore.Rand = twin.Rand
 	dispatcher := webhook.NewDispatcher(webhook.Config{})
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
 	handler.Routes(twin.Router)

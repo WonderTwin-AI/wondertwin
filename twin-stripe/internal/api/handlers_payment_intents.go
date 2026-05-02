@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -47,10 +45,10 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		Status:             "requires_payment_method",
 		CaptureMethod:      captureMethod,
 		ConfirmationMethod: confirmMethod,
-		ClientSecret:       id + "_secret_" + randomHex(12),
+		ClientSecret:       id + "_secret_" + h.randomHex(12),
 		Livemode:           false,
 		Metadata:           parseMetadata(r),
-		Created:            store.Now(),
+		Created:            h.store.Now(),
 	}
 
 	// If payment_method provided and confirm=true, auto-succeed.
@@ -293,7 +291,7 @@ func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pi.Status = "canceled"
-	pi.CanceledAt = store.Now()
+	pi.CanceledAt = h.store.Now()
 	if err := parseFormOrJSON(r); err == nil {
 		if reason := r.FormValue("cancellation_reason"); reason != "" {
 			pi.CancellationReason = reason
@@ -336,15 +334,18 @@ func (h *Handler) createChargeForPI(pi *store.PaymentIntent) string {
 		Paid:          true,
 		Livemode:      false,
 		Metadata:      pi.Metadata,
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 	h.store.Charges.Set(id, ch)
 	h.emitEvent("charge.succeeded", mapFromJSON(ch))
 	return id
 }
 
-func randomHex(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)
+// randomHex draws n random bytes from the deterministic per-twin
+// Rand and returns them as a 2n-char hex string. Routing through
+// store.RandHex (rather than crypto/rand) is the determinism
+// contract: two seeded runs produce identical client_secret /
+// webhook secret values.
+func (h *Handler) randomHex(n int) string {
+	return h.store.RandHex(n)
 }

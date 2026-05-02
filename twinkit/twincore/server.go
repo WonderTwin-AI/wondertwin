@@ -17,6 +17,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+
+	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 )
 
 // Config holds the common configuration for all twins, parsed from CLI flags.
@@ -57,8 +59,12 @@ type Twin struct {
 	Config *Config
 	Router *chi.Mux
 	Logger *slog.Logger
-	mw     *Middleware
-	mu     sync.RWMutex // protects Config fields during runtime updates
+	// Rand is a deterministic random source twins can wire into
+	// stateful subsystems (handlers, stores) so randomness is seeded
+	// rather than drawn from crypto/rand. Defaults to sim.DefaultRand.
+	Rand *sim.Rand
+	mw   *Middleware
+	mu   sync.RWMutex // protects Config fields during runtime updates
 }
 
 // New creates a new Twin with the given config.
@@ -89,6 +95,7 @@ func New(cfg *Config) *Twin {
 		Config: cfg,
 		Router: r,
 		Logger: logger,
+		Rand:   sim.DefaultRand(),
 		mw:     mw,
 	}
 }

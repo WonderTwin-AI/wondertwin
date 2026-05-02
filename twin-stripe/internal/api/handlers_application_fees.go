@@ -89,7 +89,7 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 		Currency: fee.Currency,
 		Fee:      feeID,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 	h.store.ApplicationFeeRefunds.Set(id, refund)
 

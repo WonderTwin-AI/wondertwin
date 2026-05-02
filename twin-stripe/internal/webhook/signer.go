@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+// ClockSource provides the timestamp used in signatures. Tests inject
+// a deterministic clock; production code wires the twin's simulated
+// clock so signature timestamps are reproducible per seed.
+type ClockSource interface {
+	Now() time.Time
+}
+
 // StripeSigner implements the Stripe v1 webhook signature scheme.
 // This is HMAC-SHA256 with a timestamp, compatible with webhook.ConstructEvent().
 //
@@ -19,17 +26,27 @@ import (
 //	Stripe-Signature: t={timestamp},v1={signature}
 //
 // Where signature = HMAC-SHA256(secret, "{timestamp}.{payload}")
-type StripeSigner struct{}
+type StripeSigner struct {
+	clock ClockSource
+}
 
-// NewStripeSigner creates a new Stripe webhook signer.
-func NewStripeSigner() *StripeSigner {
-	return &StripeSigner{}
+// NewStripeSigner creates a Stripe webhook signer that reads its
+// timestamp from clock. A nil clock falls back to time.Now() so
+// existing call sites continue to compile; determinism-sensitive
+// callers must inject the twin's simulated clock explicitly.
+func NewStripeSigner(clock ClockSource) *StripeSigner {
+	return &StripeSigner{clock: clock}
 }
 
 // Sign produces the Stripe-Signature header value.
 // Implements pkg/webhook.Signer interface.
 func (s *StripeSigner) Sign(payload []byte, secret string) map[string]string {
-	timestamp := time.Now().Unix()
+	var timestamp int64
+	if s.clock != nil {
+		timestamp = s.clock.Now().Unix()
+	} else {
+		timestamp = time.Now().Unix()
+	}
 	return s.SignWithTimestamp(payload, secret, timestamp)
 }
 

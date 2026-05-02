@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -28,7 +27,7 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
+	now := h.store.Clock.Now()
 	id := h.store.Subscriptions.NextID()
 
 	sub := store.Subscription{
@@ -232,7 +231,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 			Object:   "subscription_item",
 			Price:    price,
 			Quantity: qty,
-			Created:  store.Now(),
+			Created:  h.store.Now(),
 		})
 	}
 
@@ -311,7 +310,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 				Number:           "INV-" + invID,
 				Description:      "Proration",
 				Livemode:         false,
-				Created:          store.Now(),
+				Created:          h.store.Now(),
 			}
 			h.store.Invoices.Set(invID, inv)
 			sub.LatestInvoice = invID
@@ -352,7 +351,7 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sub.Status = "canceled"
-	sub.CanceledAt = store.Now()
+	sub.CanceledAt = h.store.Now()
 	h.store.Subscriptions.Set(id, sub)
 	h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
 	if h.wsEngine != nil {
@@ -468,7 +467,7 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		PeriodStart: sub.CurrentPeriodStart,
 		PeriodEnd:   sub.CurrentPeriodEnd,
 		Livemode:    false,
-		Created:     store.Now(),
+		Created:     h.store.Now(),
 	}
 
 	if discountAmount > 0 {

@@ -27,12 +27,12 @@ func (h *Handler) CreateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 		URL:           url,
 		Status:        "enabled",
 		EnabledEvents: r.Form["enabled_events[]"],
-		Secret:        "whsec_" + randomHex(16),
+		Secret:        "whsec_" + h.randomHex(16),
 		APIVersion:    r.FormValue("api_version"),
 		Description:   r.FormValue("description"),
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 	if we.EnabledEvents == nil {
 		we.EnabledEvents = []string{}

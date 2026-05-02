@@ -65,7 +65,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 		Reason:        r.FormValue("reason"),
 		Status:        "succeeded",
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 
 	// Update charge refund tracking.

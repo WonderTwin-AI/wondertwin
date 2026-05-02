@@ -46,10 +46,10 @@ func (h *Handler) CreateCreditNote(w http.ResponseWriter, r *http.Request) {
 		Status:   "issued",
 		Type:     cnType,
 		Memo:     r.FormValue("memo"),
-		Number:   "CN-" + strings.ToUpper(randomHex(4)),
+		Number:   "CN-" + strings.ToUpper(h.randomHex(4)),
 		Livemode: false,
 		Metadata: parseMetadata(r),
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	h.store.CreditNotes.Set(id, cn)
@@ -123,7 +123,7 @@ func (h *Handler) PreviewCreditNote(w http.ResponseWriter, r *http.Request) {
 		Type:     cnType,
 		Memo:     r.URL.Query().Get("memo"),
 		Livemode: false,
-		Created:  store.Now(),
+		Created:  h.store.Now(),
 	}
 
 	twincore.JSON(w, http.StatusOK, cn)

@@ -30,7 +30,7 @@ func (h *Handler) CreateShippingRate(w http.ResponseWriter, r *http.Request) {
 		Type:        "fixed_amount",
 		Livemode:    false,
 		Metadata:    parseMetadata(r),
-		Created:     store.Now(),
+		Created:     h.store.Now(),
 	}
 
 	if amtStr := r.FormValue("fixed_amount[amount]"); amtStr != "" {

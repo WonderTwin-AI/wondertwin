@@ -27,6 +27,7 @@ func main() {
 
 	twin := twincore.New(cfg)
 	memStore := store.New()
+	memStore.Rand = twin.Rand
 
 	// Workspace engine for invoice, subscription, and payment_intent lifecycle.
 	wsEngine := workspace.NewEngine(
@@ -78,7 +79,7 @@ func main() {
 	dispatcher := pkgwebhook.NewDispatcher(pkgwebhook.Config{
 		URL:         cfg.WebhookURL,
 		Secret:      webhookSecret,
-		Signer:      stripewh.NewStripeSigner(),
+		Signer:      stripewh.NewStripeSigner(memStore.Clock),
 		Logger:      twin.Logger,
 		EventPrefix: "evt",
 		AutoDeliver: cfg.WebhookURL != "",

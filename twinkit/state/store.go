@@ -231,9 +231,16 @@ func (s *Store[T]) UnmarshalJSON(data []byte) error {
 }
 
 // Clock provides a simulated clock for time-dependent twin behavior.
+//
+// In its default mode the clock is a relative offset from the real
+// wall clock: Now() returns time.Now().Add(offset). Callers needing
+// reproducible time can switch to "pinned" mode via Pin, after which
+// Now() returns pinnedAt + offset and is independent of the real
+// wall clock. Advance and Reset behave consistently in both modes.
 type Clock struct {
-	mu     sync.RWMutex
-	offset time.Duration
+	mu       sync.RWMutex
+	offset   time.Duration
+	pinnedAt time.Time
 }
 
 // NewClock creates a new simulated clock with no offset.
@@ -245,6 +252,9 @@ func NewClock() *Clock {
 func (c *Clock) Now() time.Time {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	if !c.pinnedAt.IsZero() {
+		return c.pinnedAt.Add(c.offset)
+	}
 	return time.Now().Add(c.offset)
 }
 
@@ -255,11 +265,12 @@ func (c *Clock) Advance(d time.Duration) {
 	c.offset += d
 }
 
-// Reset resets the clock offset to zero.
+// Reset returns the clock to its default mode: zero offset, no pin.
 func (c *Clock) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.offset = 0
+	c.pinnedAt = time.Time{}
 }
 
 // Offset returns the current clock offset.
@@ -267,4 +278,22 @@ func (c *Clock) Offset() time.Duration {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.offset
+}
+
+// Pin switches the clock to absolute mode at the given instant.
+// Subsequent Now() calls return pinnedAt + offset, which lets
+// callers fix the clock at a known instant and produce time-
+// dependent output that is reproducible across machines.
+func (c *Clock) Pin(t time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pinnedAt = t
+	c.offset = 0
+}
+
+// Pinned reports whether the clock is in absolute (pinned) mode.
+func (c *Clock) Pinned() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return !c.pinnedAt.IsZero()
 }

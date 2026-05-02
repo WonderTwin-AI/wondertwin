@@ -46,7 +46,7 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 		Paid:          true,
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
-		Created:       store.Now(),
+		Created:       h.store.Now(),
 	}
 
 	h.store.Charges.Set(id, ch)
