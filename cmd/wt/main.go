@@ -20,6 +20,7 @@
 //	wt registry remove <name>     Remove a named registry
 //	wt registry list              List configured registries
 //	wt conformance <binary>       Run conformance tests against a twin
+//	wt replay show <path>         Pretty-print a replay artifact (JSONL v1)
 //	wt login --org <slug>         Authenticate with WonderTwin platform
 //	wt catalog                    Browse the full twin catalog
 //	wt scan                       Detect project dependencies, match against catalog
@@ -139,6 +140,8 @@ func main() {
 		err = cmdCache(manifestPath, args)
 	case "conformance":
 		err = cmdConformance(args)
+	case "replay":
+		err = cmdReplay(args)
 	default:
 		fmt.Fprintf(os.Stderr, "wt: unknown command %q\n\n", cmd)
 		printUsage()
@@ -203,6 +206,7 @@ Commands:
   cache warm [twin...]       Fetch and cache content for manifest twins
   cache clear [twin...]      Remove cached content
   conformance <binary>       Run conformance tests against a twin binary
+  replay show <path>         Pretty-print a replay artifact (JSONL, format v1)
   version                    Print the wt version
 
 Options:
