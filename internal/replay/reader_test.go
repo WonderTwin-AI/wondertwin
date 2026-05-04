@@ -9,10 +9,18 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/replay"
 )
 
-const validArtifact = `{"format_version":"1","twin_name":"stripe","twin_version":"0.5.0","run_id":"run-1","started_at":"2026-05-04T12:00:00Z"}
-{"timestamp":"2026-05-04T12:00:01Z","method":"POST","path":"/v1/charges","status_code":200,"duration_ms":12000000,"seq":1,"run_id":"run-1","request_summary":{"amount":"number"},"response_summary":{"id":"string"}}
-{"timestamp":"2026-05-04T12:00:01.5Z","method":"GET","path":"/v1/charges/{id}","status_code":200,"duration_ms":3000000,"seq":2,"run_id":"run-1"}
+const validArtifact = `{"format_version":"2","twin_name":"stripe","twin_version":"0.5.0","run_id":"run-1","started_at":"2026-05-04T12:00:00Z"}
+{"timestamp":"2026-05-04T12:00:01Z","method":"POST","path":"/v1/charges","status_code":200,"duration_ns":12000000,"seq":1,"run_id":"run-1","request_summary":{"amount":"number"},"response_summary":{"id":"string"}}
+{"timestamp":"2026-05-04T12:00:01.5Z","method":"GET","path":"/v1/charges/{id}","status_code":200,"duration_ns":3000000,"seq":2,"run_id":"run-1"}
 {"ended_at":"2026-05-04T12:00:02Z","entry_count":2}
+`
+
+// v1Artifact is a sample of the deprecated format-v1 wire shape
+// (duration_ms tag carrying nanosecond values). The reader rejects
+// it with a v1-specific error message per WonderTwin-AI/wondertwin#240.
+const v1Artifact = `{"format_version":"1","twin_name":"stripe","started_at":"2026-05-04T12:00:00Z"}
+{"timestamp":"2026-05-04T12:00:01Z","method":"GET","path":"/","status_code":200,"duration_ms":1000000,"seq":1}
+{"ended_at":"2026-05-04T12:00:02Z","entry_count":1}
 `
 
 func TestReadValidArtifact(t *testing.T) {
@@ -42,14 +50,24 @@ func TestReadRejectsCountMismatch(t *testing.T) {
 }
 
 func TestReadRejectsUnsupportedVersion(t *testing.T) {
-	bad := strings.Replace(validArtifact, `"format_version":"1"`, `"format_version":"99"`, 1)
+	bad := strings.Replace(validArtifact, `"format_version":"2"`, `"format_version":"99"`, 1)
 	if _, err := replay.Read(strings.NewReader(bad)); !errors.Is(err, replay.ErrUnsupportedFormat) {
 		t.Errorf("err=%v, want ErrUnsupportedFormat", err)
 	}
 }
 
+func TestReadRejectsV1WithIssueLink(t *testing.T) {
+	_, err := replay.Read(strings.NewReader(v1Artifact))
+	if !errors.Is(err, replay.ErrUnsupportedFormat) {
+		t.Fatalf("err=%v, want ErrUnsupportedFormat", err)
+	}
+	if !strings.Contains(err.Error(), "#240") {
+		t.Errorf("v1 rejection should cite issue 240; got %v", err)
+	}
+}
+
 func TestReadRejectsMissingHeader(t *testing.T) {
-	noHeader := `{"timestamp":"2026-05-04T12:00:01Z","method":"GET","path":"/","status_code":200,"duration_ms":1000000,"seq":1}` + "\n" +
+	noHeader := `{"timestamp":"2026-05-04T12:00:01Z","method":"GET","path":"/","status_code":200,"duration_ns":1000000,"seq":1}` + "\n" +
 		`{"ended_at":"2026-05-04T12:00:02Z","entry_count":1}` + "\n"
 	if _, err := replay.Read(strings.NewReader(noHeader)); !errors.Is(err, replay.ErrInvalidArtifact) {
 		t.Errorf("err=%v, want ErrInvalidArtifact", err)
@@ -57,8 +75,8 @@ func TestReadRejectsMissingHeader(t *testing.T) {
 }
 
 func TestReadRejectsMissingTrailer(t *testing.T) {
-	noTrailer := `{"format_version":"1","twin_name":"stripe","started_at":"2026-05-04T12:00:00Z"}` + "\n" +
-		`{"timestamp":"2026-05-04T12:00:01Z","method":"GET","path":"/","status_code":200,"duration_ms":1000000,"seq":1}` + "\n"
+	noTrailer := `{"format_version":"2","twin_name":"stripe","started_at":"2026-05-04T12:00:00Z"}` + "\n" +
+		`{"timestamp":"2026-05-04T12:00:01Z","method":"GET","path":"/","status_code":200,"duration_ns":1000000,"seq":1}` + "\n"
 	if _, err := replay.Read(strings.NewReader(noTrailer)); !errors.Is(err, replay.ErrInvalidArtifact) {
 		t.Errorf("err=%v, want ErrInvalidArtifact", err)
 	}
@@ -74,7 +92,7 @@ func TestShowIncludesEntriesAndManifest(t *testing.T) {
 		t.Fatalf("Show: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"format_version=1", "stripe", "run-1", "POST", "/v1/charges", "GET", "/v1/charges/{id}", "12.0ms"} {
+	for _, want := range []string{"format_version=2", "stripe", "run-1", "POST", "/v1/charges", "GET", "/v1/charges/{id}", "12.0ms"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Show output missing %q\nfull output:\n%s", want, out)
 		}
