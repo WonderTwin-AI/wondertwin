@@ -16,7 +16,7 @@ type RequestLogEntry struct {
 	Path       string            `json:"path"`
 	Headers    map[string]string `json:"headers,omitempty"`
 	StatusCode int               `json:"status_code"`
-	Duration   time.Duration     `json:"duration_ms"`
+	Duration   time.Duration     `json:"duration_ns"`
 	RequestID  string            `json:"request_id,omitempty"`
 }
 
