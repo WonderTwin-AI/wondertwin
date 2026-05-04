@@ -18,7 +18,13 @@ import (
 // FormatVersionSupported is the highest format_version this reader
 // understands. Producers shipping a higher version surface a clear
 // error so operators can pin tooling.
-const FormatVersionSupported = "1"
+//
+// v2 (current) — duration tagged duration_ns (matches the marshalled
+// nanosecond value).
+// v1 — same wire shape but duration field was misnamed duration_ms
+// while still containing nanoseconds. v1 artifacts are rejected on
+// read; see WonderTwin-AI/wondertwin#240.
+const FormatVersionSupported = "2"
 
 // Manifest mirrors the producer's Manifest. Header lines populate
 // FormatVersion; trailer lines populate EntryCount/EndedAt.
@@ -45,7 +51,7 @@ type Entry struct {
 	Path            string            `json:"path"`
 	Headers         map[string]string `json:"headers,omitempty"`
 	StatusCode      int               `json:"status_code"`
-	Duration        time.Duration     `json:"duration_ms"` // ns on the wire; field tag is inherited drift
+	Duration        time.Duration     `json:"duration_ns"` // canonical twincore.RequestLogEntry shape (v2)
 	RequestID       string            `json:"request_id,omitempty"`
 	Seq             int64             `json:"seq"`
 	RunID           string            `json:"run_id,omitempty"`
@@ -124,6 +130,9 @@ func Read(r io.Reader) (Artifact, error) {
 		return Artifact{}, fmt.Errorf("%w: missing manifest header", ErrInvalidArtifact)
 	}
 	if art.Header.FormatVersion != FormatVersionSupported {
+		if art.Header.FormatVersion == "1" {
+			return Artifact{}, fmt.Errorf("%w: format_version=1 contained a duration_ms tag carrying nanosecond values (see WonderTwin-AI/wondertwin#240); regenerate the artifact with current twins", ErrUnsupportedFormat)
+		}
 		return Artifact{}, fmt.Errorf("%w: artifact is format_version=%q, reader supports %q", ErrUnsupportedFormat, art.Header.FormatVersion, FormatVersionSupported)
 	}
 	if !gotTrl {
