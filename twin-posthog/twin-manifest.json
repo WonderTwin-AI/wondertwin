@@ -1,5 +1,4 @@
 {
-  "twin": "posthog",
   "display_name": "PostHog",
   "vendor_domain": "posthog.com",
   "tier": "community",
@@ -53,5 +52,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "posthog",
+  "twin_id": "twin-posthog",
+  "vendor_certification": {
+    "status": "none"
   }
 }

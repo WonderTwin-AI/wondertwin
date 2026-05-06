@@ -1,5 +1,4 @@
 {
-  "twin": "github",
   "display_name": "GitHub",
   "vendor_domain": "github.com",
   "tier": "community",
@@ -81,5 +80,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "github",
+  "twin_id": "twin-github",
+  "vendor_certification": {
+    "status": "none"
   }
 }

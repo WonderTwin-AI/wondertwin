@@ -1,5 +1,4 @@
 {
-  "twin": "linear",
   "display_name": "Linear",
   "vendor_domain": "linear.app",
   "tier": "community",
@@ -54,5 +53,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "linear",
+  "twin_id": "twin-linear",
+  "vendor_certification": {
+    "status": "none"
   }
 }

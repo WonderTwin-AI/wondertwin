@@ -1,5 +1,4 @@
 {
-  "twin": "stripe",
   "display_name": "Stripe",
   "vendor_domain": "stripe.com",
   "tier": "community",
@@ -118,5 +117,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "stripe",
+  "twin_id": "twin-stripe",
+  "vendor_certification": {
+    "status": "none"
   }
 }

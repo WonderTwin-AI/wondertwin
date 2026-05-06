@@ -1,5 +1,4 @@
 {
-  "twin": "hubspot",
   "display_name": "HubSpot",
   "vendor_domain": "hubspot.com",
   "tier": "community",
@@ -57,5 +56,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "hubspot",
+  "twin_id": "twin-hubspot",
+  "vendor_certification": {
+    "status": "none"
   }
 }

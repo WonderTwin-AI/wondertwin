@@ -1,5 +1,4 @@
 {
-  "twin": "twilio",
   "display_name": "Twilio",
   "vendor_domain": "twilio.com",
   "tier": "community",
@@ -48,5 +47,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "twilio",
+  "twin_id": "twin-twilio",
+  "vendor_certification": {
+    "status": "none"
   }
 }
