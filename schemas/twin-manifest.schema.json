@@ -5,17 +5,27 @@
   "title": "Twin Contribution Manifest",
   "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
   "type": "object",
-  "required": ["twin", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation"],
+  "required": ["tier", "publisher", "vendor", "twin_id", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation", "vendor_certification"],
   "properties": {
     "tier": {
       "type": "string",
-      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pricing (included in Pro, add-on cost, enterprise-only) is a backend concern managed by the catalog service.",
-      "enum": ["community", "commercial"]
+      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pattern is permissive for forward-compat with future tiers (enterprise, hosted) per twin-naming-design §3.3.",
+      "pattern": "^[a-z]+$"
     },
-    "twin": {
+    "publisher": {
       "type": "string",
-      "description": "Machine-readable twin identifier.",
+      "description": "Identity that authored and ships the twin. 'wondertwin' is reserved for first-party WonderTwin-published twins; third-party publishers use their own kebab-case identifier.",
       "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "vendor": {
+      "type": "string",
+      "description": "Vendor's identity in the world (e.g. 'stripe', 'modern-treasury'). Lowercase, no prefix, kebab-case for multi-word vendors. Renamed from the previous 'twin' field per twin-naming-design.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "twin_id": {
+      "type": "string",
+      "description": "Directory/binary identity within a tier+publisher scope. MUST equal 'twin-' + vendor.",
+      "pattern": "^twin-[a-z][a-z0-9-]*$"
     },
     "display_name": {
       "type": "string",
@@ -25,6 +35,54 @@
       "type": "string",
       "description": "Canonical brand domain for the vendor (e.g., \"stripe.com\", \"linear.app\"). Used by downstream tooling for logo rendering and brand identity. Pick the canonical brand site, not the corporate parent.",
       "pattern": "^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$"
+    },
+    "version": {
+      "type": "string",
+      "description": "Twin's own semver version. Source of truth for the binary's Version (embedded via go:embed per twin-versioning-design §3.1).",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"
+    },
+    "compatible_versions": {
+      "type": "array",
+      "description": "Semver ranges this twin self-declares as wire-compatible across releases of itself. Consumed by `wt install` and license entitlement matching (twin-versioning-design §3.2).",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "vendor_api_version": {
+      "type": ["string", "null"],
+      "description": "Vendor API surface this twin claims to faithfully simulate (e.g. \"2024-10-15\" for Stripe). Vendor-specific format. Null if the vendor doesn't version its API or the twin tracks latest. Per twin-versioning-design §3.2."
+    },
+    "vendor_certification": {
+      "type": "object",
+      "description": "Whether the vendor has officially certified the twin. Required on every manifest; may be {\"status\": \"none\"}. Per twin-versioning-design §3.2.",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["certified", "pending", "none"]
+        },
+        "certified_by": {"type": "string"},
+        "certified_at": {"type": "string", "format": "date-time"},
+        "certificate_url": {"type": "string", "format": "uri"},
+        "valid_until": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "certified"}}, "required": ["status"]},
+          "then": {"required": ["status", "certified_by", "certified_at", "certificate_url", "valid_until"]}
+        },
+        {
+          "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
+          "then": {"required": ["status", "certified_by", "certified_at"]}
+        }
+      ],
+      "additionalProperties": false
+    },
+    "released_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp this twin version was released."
     },
     "category": {
       "type": "string",

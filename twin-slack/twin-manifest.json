@@ -1,5 +1,4 @@
 {
-  "twin": "slack",
   "display_name": "Slack",
   "vendor_domain": "slack.com",
   "tier": "community",
@@ -62,5 +61,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "slack",
+  "twin_id": "twin-slack",
+  "vendor_certification": {
+    "status": "none"
   }
 }

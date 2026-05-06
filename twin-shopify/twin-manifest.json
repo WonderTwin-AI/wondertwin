@@ -1,5 +1,4 @@
 {
-  "twin": "shopify",
   "display_name": "Shopify",
   "vendor_domain": "shopify.com",
   "tier": "community",
@@ -74,5 +73,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "shopify",
+  "twin_id": "twin-shopify",
+  "vendor_certification": {
+    "status": "none"
   }
 }

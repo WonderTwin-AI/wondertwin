@@ -1,5 +1,4 @@
 {
-  "twin": "resend",
   "display_name": "Resend",
   "vendor_domain": "resend.com",
   "tier": "community",
@@ -43,5 +42,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "resend",
+  "twin_id": "twin-resend",
+  "vendor_certification": {
+    "status": "none"
   }
 }

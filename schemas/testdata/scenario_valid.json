@@ -1,0 +1,13 @@
+{
+  "tier": "commercial",
+  "publisher": "wondertwin",
+  "twin_id": "twin-stripe",
+  "name": "create-customer",
+  "steps": [
+    {
+      "name": "create",
+      "request": {"method": "POST", "url": "http://localhost:4111/v1/customers"},
+      "assert": {"status": 200}
+    }
+  ]
+}

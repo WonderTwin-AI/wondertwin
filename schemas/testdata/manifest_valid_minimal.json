@@ -1,0 +1,32 @@
+{
+  "tier": "commercial",
+  "publisher": "wondertwin",
+  "vendor": "stripe",
+  "twin_id": "twin-stripe",
+  "display_name": "Stripe",
+  "vendor_domain": "stripe.com",
+  "category": "payments",
+  "version": "1.4.2",
+  "compatible_versions": [">=1.4 <1.5"],
+  "vendor_api_version": "2024-10-15",
+  "vendor_certification": {"status": "none"},
+  "sdk_target": {
+    "primary": {
+      "package": "stripe-go",
+      "language": "go",
+      "version": "76.0.0",
+      "repo_url": "https://github.com/stripe/stripe-go"
+    }
+  },
+  "service_surface": {
+    "auth_pattern": "api_key",
+    "has_webhooks": true,
+    "resource_count": 50
+  },
+  "coverage": {
+    "resources_implemented": ["customers", "charges"]
+  },
+  "generation": {
+    "method": "manual"
+  }
+}

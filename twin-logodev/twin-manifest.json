@@ -1,5 +1,4 @@
 {
-  "twin": "logodev",
   "display_name": "Logo.dev",
   "vendor_domain": "logo.dev",
   "tier": "community",
@@ -43,5 +42,11 @@
       "openapi": false,
       "manual_docs": true
     }
+  },
+  "publisher": "wondertwin",
+  "vendor": "logodev",
+  "twin_id": "twin-logodev",
+  "vendor_certification": {
+    "status": "none"
   }
 }

@@ -5,8 +5,23 @@
   "title": "Test Scenario",
   "description": "Schema for defining test scenarios that validate twin behavior.",
   "type": "object",
-  "required": ["name", "steps"],
+  "required": ["tier", "publisher", "twin_id", "name", "steps"],
   "properties": {
+    "tier": {
+      "type": "string",
+      "description": "Tier of the twin this scenario targets. Permissive pattern for forward-compat per twin-naming-design §3.3.",
+      "pattern": "^[a-z]+$"
+    },
+    "publisher": {
+      "type": "string",
+      "description": "Publisher of the twin this scenario targets.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "twin_id": {
+      "type": "string",
+      "description": "TwinID of the twin this scenario targets. Always 'twin-' + vendor.",
+      "pattern": "^twin-[a-z][a-z0-9-]*$"
+    },
     "name": {
       "type": "string",
       "description": "Name of the test scenario."

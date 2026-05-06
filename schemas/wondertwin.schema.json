@@ -8,7 +8,10 @@
   "properties": {
     "twins": {
       "type": "object",
-      "description": "Map of twin names to their configuration.",
+      "description": "Map of qualified twin identifiers (tier:publisher/vendor) to their configuration. Bare names are no longer accepted; per twin-naming-design §3.3 keys MUST match the qualified form.",
+      "propertyNames": {
+        "pattern": "^[a-z]+:[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
+      },
       "additionalProperties": {
         "type": "object",
         "properties": {
