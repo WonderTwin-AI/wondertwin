@@ -21,6 +21,11 @@
       "type": "string",
       "description": "Human-readable display name for the twin."
     },
+    "vendor_domain": {
+      "type": "string",
+      "description": "Canonical brand domain for the vendor (e.g., \"stripe.com\", \"linear.app\"). Used by downstream tooling for logo rendering and brand identity. Pick the canonical brand site, not the corporate parent.",
+      "pattern": "^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$"
+    },
     "category": {
       "type": "string",
       "description": "Category of the service the twin emulates."
