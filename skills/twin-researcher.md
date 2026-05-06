@@ -115,15 +115,59 @@ mkdir -p "${base}/archive/"{official-docs,schemas,sdks,release-notes,community,o
 
 `RESEARCH-STATUS.md` — see template below ("RESEARCH-STATUS template").
 
-**3. Discover official sources:**
+**3. Check for vendor-shipped LLM discovery surfaces (do this first):**
+
+Modern vendors increasingly ship machine-readable surfaces designed for
+LLM/agent consumption *before* (or instead of) traditional doc portals.
+Check for these before any behavioral observation; when present, they
+collapse most of Phase 0–3 into a single fetch.
+
+Probe these paths against the platform's primary domain and any documented
+API domain (e.g. `api.{vendor}.com`, `developer.{vendor}.com`):
+
+- **MCP (Model Context Protocol):**
+  - `/.well-known/mcp`
+  - `/.well-known/mcp.json`
+  - Vendor announcement of an MCP server URL (search `"{vendor}" MCP server`)
+  - GitHub: search for `{vendor}-mcp`, `mcp-{vendor}`, or org-owned MCP repos
+- **OpenAPI / Swagger:**
+  - `/openapi.json`, `/openapi.yaml`
+  - `/api-docs`, `/api-docs.json`
+  - `/swagger.json`, `/swagger/v1/swagger.json`
+  - Versioned variants: `/v1/openapi.json`, `/v2/openapi.json`, `/api/v1/openapi.json`
+  - Documentation domain: `https://docs.{vendor}.com/openapi.json` and the Readme.io UUID-based pattern (see "SPA Documentation Extraction Playbook" below)
+- **`llms.txt` / `llms-full.txt`:**
+  - `/llms.txt` (curated index for LLM consumption)
+  - `/llms-full.txt` (expanded variant)
+  - Documentation domain variants: `https://docs.{vendor}.com/llms.txt`
+- **GitHub presence for SDK/spec repos:**
+  - `https://github.com/{vendor}` org page — look for `*-openapi`, `*-spec`, `*-sdk-*`, `*-mcp` repos
+  - Public spec repositories often house the canonical OpenAPI definition that the vendor's docs portal renders
+
+**For each surface found:**
+- Archive a copy under `archive/schemas/` (specs) or `archive/official-docs/` (`llms.txt`-style indexes)
+- Catalog in `source-catalog.json` with `reliability: high` (these are vendor-canonical by definition)
+- Record the discovery date in `provenance-log.jsonl`
+
+**For each surface checked but absent:**
+- Record the negative result in `source-catalog.json` with `access: unavailable` and a note
+- A documented absence is a finding: vendors without `/openapi.json` typically require deeper Phase 2 work
+
+**Why this is Phase 0 step 3, not later:** these surfaces, when present,
+short-circuit the SDK landscape survey, the doc tree crawl, and most of
+the data-model investigation. Discovering an `/openapi.json` after a week
+of behavior observation is the kind of waste this checklist exists to
+prevent.
+
+**4. Discover official sources:**
 
 - Search for the platform's developer documentation portal
 - Identify the documentation structure (REST reference, guides, tutorials, changelog)
-- Search for OpenAPI/Swagger specs at `{api-domain}/openapi.json`, GitHub repos, doc pages
+- Search for OpenAPI/Swagger specs at `{api-domain}/openapi.json`, GitHub repos, doc pages (if not already discovered in step 3)
 - Search for WSDL, GraphQL schema, or other machine-readable definitions
 - Fetch and archive everything found to `archive/{schemas|official-docs}/`
 
-**4. Search for deprecation and lifecycle information:**
+**5. Search for deprecation and lifecycle information:**
 
 This is critical and easily missed. Always search for:
 
@@ -138,7 +182,7 @@ This is critical and easily missed. Always search for:
 **Why:** choosing a deprecated API wastes effort. Deprecation timelines
 validate API target choice and inform migration planning.
 
-**5. Survey the SDK landscape:**
+**6. Survey the SDK landscape:**
 
 Search major package registries:
 - Go: `pkg.go.dev` search
@@ -151,13 +195,13 @@ last updated, stars/downloads. Assess the SDK spectrum position (multiple
 canonical, single canonical, canonical + community, community only, API docs +
 schema, API docs only, restricted access).
 
-**6. Identify community sources:**
+**7. Identify community sources:**
 
 - Platform's developer forum, Slack/Discord, Stack Overflow tag
 - iPaaS connector documentation (Workato, Celigo, Tray.io) — often documents auth quirks
 - GitHub for existing mocks/simulators of this platform (prior art)
 
-**7. Catalog every source:**
+**8. Catalog every source:**
 
 For each, append to `source-catalog.json` sources array:
 
