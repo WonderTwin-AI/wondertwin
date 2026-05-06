@@ -1,0 +1,16 @@
+{
+  "tier": "commercial",
+  "vendor": "stripe",
+  "twin_id": "twin-stripe",
+  "display_name": "Stripe",
+  "category": "payments",
+  "version": "1.0.0",
+  "compatible_versions": [">=1.0 <2.0"],
+  "vendor_certification": {"status": "none"},
+  "sdk_target": {
+    "primary": {"package": "x", "language": "go", "version": "1", "repo_url": "https://x"}
+  },
+  "service_surface": {},
+  "coverage": {"resources_implemented": []},
+  "generation": {"method": "manual"}
+}

@@ -1,0 +1,6 @@
+{
+  "twins": {
+    "commercial:wondertwin/stripe": {"port": 4111},
+    "community:wondertwin/twilio": {"port": 4112}
+  }
+}

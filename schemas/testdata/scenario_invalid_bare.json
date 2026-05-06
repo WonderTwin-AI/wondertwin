@@ -1,0 +1,9 @@
+{
+  "name": "create-customer",
+  "steps": [
+    {
+      "name": "create",
+      "request": {"method": "POST", "url": "http://localhost:4111/v1/customers"}
+    }
+  ]
+}

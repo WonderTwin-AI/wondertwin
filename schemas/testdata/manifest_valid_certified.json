@@ -1,0 +1,38 @@
+{
+  "tier": "commercial",
+  "publisher": "wondertwin",
+  "vendor": "modern-treasury",
+  "twin_id": "twin-modern-treasury",
+  "display_name": "Modern Treasury",
+  "vendor_domain": "moderntreasury.com",
+  "category": "payments",
+  "version": "2.0.0",
+  "compatible_versions": [">=2.0 <3.0"],
+  "vendor_api_version": null,
+  "vendor_certification": {
+    "status": "certified",
+    "certified_by": "Modern Treasury Inc.",
+    "certified_at": "2026-04-15T00:00:00Z",
+    "certificate_url": "https://example.com/cert/mt",
+    "valid_until": "2027-04-15T00:00:00Z"
+  },
+  "sdk_target": {
+    "primary": {
+      "package": "modern-treasury-go",
+      "language": "go",
+      "version": "1.0.0",
+      "repo_url": "https://github.com/Modern-Treasury/modern-treasury-go"
+    }
+  },
+  "service_surface": {
+    "auth_pattern": "basic",
+    "has_webhooks": true,
+    "resource_count": 30
+  },
+  "coverage": {
+    "resources_implemented": ["counterparties", "payment_orders"]
+  },
+  "generation": {
+    "method": "wondertwin_skill"
+  }
+}
