@@ -1,6 +1,7 @@
 {
   "twin": "your-service",
   "display_name": "Your Service",
+  "vendor_domain": "your-service.example",
   "category": "your-category",
   "description": "Simulates the Your Service API, covering the core resource operations.",
   "sdk_target": {

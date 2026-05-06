@@ -1,6 +1,7 @@
 {
   "twin": "stripe",
   "display_name": "Stripe",
+  "vendor_domain": "stripe.com",
   "category": "payments",
   "description": "Stripe twin for contract testing",
   "sdk_target": {

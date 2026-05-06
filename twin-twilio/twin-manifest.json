@@ -1,6 +1,7 @@
 {
   "twin": "twilio",
   "display_name": "Twilio",
+  "vendor_domain": "twilio.com",
   "tier": "community",
   "category": "communications",
   "description": "Simulates the Twilio Messaging and Verify API surfaces, including SMS message send/retrieve and phone number verification workflows.",
