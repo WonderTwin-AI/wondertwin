@@ -353,6 +353,9 @@ func (e *Engine) Decline(ctx context.Context, id, partyID, reason string) (*Cont
 	if err := e.store.Save(c); err != nil {
 		return nil, fmt.Errorf("save: %w", err)
 	}
+	if err := e.hooks.OnDeclined(ctx, c, partyID, reason); err != nil {
+		return c, fmt.Errorf("hook OnDeclined: %w", err)
+	}
 	return c, nil
 }
 
@@ -378,6 +381,9 @@ func (e *Engine) Void(ctx context.Context, id, reason string) (*Contract, error)
 	if err := e.store.Save(c); err != nil {
 		return nil, fmt.Errorf("save: %w", err)
 	}
+	if err := e.hooks.OnVoided(ctx, c, reason); err != nil {
+		return c, fmt.Errorf("hook OnVoided: %w", err)
+	}
 	return c, nil
 }
 
@@ -402,6 +408,9 @@ func (e *Engine) Expire(ctx context.Context, id string) (*Contract, error) {
 	if err := e.store.Save(c); err != nil {
 		return nil, fmt.Errorf("save: %w", err)
 	}
+	if err := e.hooks.OnExpired(ctx, c); err != nil {
+		return c, fmt.Errorf("hook OnExpired: %w", err)
+	}
 	return c, nil
 }
 
@@ -417,13 +426,19 @@ func (e *Engine) List(_ context.Context) ([]*Contract, error) {
 
 // -- internal -------------------------------------------------------------
 
-// transition records a state change and invokes OnStateTransition. The
-// caller updates timestamps before this is called. Audit entry is
-// emitted; hook errors are non-fatal but surfaced.
+// transition records a state change and invokes OnStateTransition for
+// non-terminal targets. Terminal targets (EXECUTED, DECLINED, VOIDED,
+// EXPIRED) route to their dedicated terminal hook fired by the caller —
+// OnStateTransition is intentionally suppressed so consumers don't have
+// to special-case terminal statuses inside a generic transition
+// handler. The caller updates timestamps before this is called.
 func (e *Engine) transition(ctx context.Context, c *Contract, to Status, evt AuditEventType, partyID, msg string) error {
 	from := c.Status
 	c.Status = to
 	e.appendAudit(c, evt, partyID, from, to, msg, nil)
+	if isTerminal(to) {
+		return nil
+	}
 	if err := e.hooks.OnStateTransition(ctx, c, from, to); err != nil {
 		return fmt.Errorf("hook OnStateTransition %s→%s: %w", from, to, err)
 	}
