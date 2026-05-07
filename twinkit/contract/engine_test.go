@@ -340,6 +340,9 @@ type recordingHooks struct {
 	executed       int
 	sigRecorded    int
 	transitions    []string // "FROM->TO"
+	declined       int
+	voided         int
+	expired        int
 	executeErr     error
 	validateErr    error
 }
@@ -359,6 +362,18 @@ func (r *recordingHooks) OnStateTransition(_ context.Context, _ *Contract, from,
 	r.transitions = append(r.transitions, string(from)+"->"+string(to))
 	return nil
 }
+func (r *recordingHooks) OnDeclined(_ context.Context, _ *Contract, _, _ string) error {
+	r.declined++
+	return nil
+}
+func (r *recordingHooks) OnVoided(_ context.Context, _ *Contract, _ string) error {
+	r.voided++
+	return nil
+}
+func (r *recordingHooks) OnExpired(_ context.Context, _ *Contract) error {
+	r.expired++
+	return nil
+}
 
 func TestHooks_OnExecutedFires(t *testing.T) {
 	clk := state.NewClock()
@@ -375,7 +390,8 @@ func TestHooks_OnExecutedFires(t *testing.T) {
 	if h.sigRecorded != 2 {
 		t.Errorf("OnSignatureRecorded called %d times, want 2", h.sigRecorded)
 	}
-	wantTransitions := []string{"DRAFT->SENT", "SENT->PARTIALLY_SIGNED", "PARTIALLY_SIGNED->SIGNED", "SIGNED->EXECUTED"}
+	// SIGNED->EXECUTED routes to OnExecuted, not OnStateTransition.
+	wantTransitions := []string{"DRAFT->SENT", "SENT->PARTIALLY_SIGNED", "PARTIALLY_SIGNED->SIGNED"}
 	if got := h.transitions; !equalStrings(got, wantTransitions) {
 		t.Errorf("transitions = %v, want %v", got, wantTransitions)
 	}
@@ -407,6 +423,71 @@ func TestHooks_OnExecutedErrorHaltsAtSigned(t *testing.T) {
 	if got2.Status != StatusExecuted {
 		t.Errorf("status after recovery = %s, want EXECUTED", got2.Status)
 	}
+}
+
+// TestHooks_TerminalRouting verifies that transitions into terminal
+// states route to dedicated terminal hooks (OnExecuted, OnDeclined,
+// OnVoided, OnExpired) and do NOT also fire OnStateTransition. This is
+// the contract surfaced in Hooks doc and reproduced from issue #249.
+func TestHooks_TerminalRouting(t *testing.T) {
+	t.Run("decline", func(t *testing.T) {
+		clk := state.NewClock()
+		clk.Pin(time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC))
+		h := &recordingHooks{}
+		eng := NewEngine(WithStore(NewMemoryStore()), WithClock(clk), WithHooks(h))
+		c, _ := eng.Create(context.Background(), twoSignerInput())
+		_, _ = eng.Send(context.Background(), c.ID)
+		if _, err := eng.Decline(context.Background(), c.ID, "p1", "nope"); err != nil {
+			t.Fatalf("Decline: %v", err)
+		}
+		if h.declined != 1 {
+			t.Errorf("OnDeclined called %d times, want 1", h.declined)
+		}
+		for _, tr := range h.transitions {
+			if tr == "SENT->DECLINED" || tr == "PARTIALLY_SIGNED->DECLINED" {
+				t.Errorf("OnStateTransition fired for terminal: %s", tr)
+			}
+		}
+	})
+
+	t.Run("void", func(t *testing.T) {
+		clk := state.NewClock()
+		clk.Pin(time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC))
+		h := &recordingHooks{}
+		eng := NewEngine(WithStore(NewMemoryStore()), WithClock(clk), WithHooks(h))
+		c, _ := eng.Create(context.Background(), twoSignerInput())
+		if _, err := eng.Void(context.Background(), c.ID, "rescinded"); err != nil {
+			t.Fatalf("Void: %v", err)
+		}
+		if h.voided != 1 {
+			t.Errorf("OnVoided called %d times, want 1", h.voided)
+		}
+		for _, tr := range h.transitions {
+			if tr == "DRAFT->VOIDED" {
+				t.Errorf("OnStateTransition fired for terminal: %s", tr)
+			}
+		}
+	})
+
+	t.Run("expire", func(t *testing.T) {
+		clk := state.NewClock()
+		clk.Pin(time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC))
+		h := &recordingHooks{}
+		eng := NewEngine(WithStore(NewMemoryStore()), WithClock(clk), WithHooks(h))
+		c, _ := eng.Create(context.Background(), twoSignerInput())
+		_, _ = eng.Send(context.Background(), c.ID)
+		if _, err := eng.Expire(context.Background(), c.ID); err != nil {
+			t.Fatalf("Expire: %v", err)
+		}
+		if h.expired != 1 {
+			t.Errorf("OnExpired called %d times, want 1", h.expired)
+		}
+		for _, tr := range h.transitions {
+			if tr == "SENT->EXPIRED" {
+				t.Errorf("OnStateTransition fired for terminal: %s", tr)
+			}
+		}
+	})
 }
 
 func TestHooks_ValidateCreateBlocksPersist(t *testing.T) {
