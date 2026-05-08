@@ -99,9 +99,11 @@ jobs:
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
         run: |
+          # The SBOM (twin-<name>-<version>.cdx.json) is already matched
+          # by the dist/twin-${TWIN}-* glob; do not list it explicitly or
+          # gh will try to upload it twice and 422 on the second attempt.
           gh release create "twin-${TWIN}-v${VERSION}" \
             dist/twin-${TWIN}-* dist/checksums.txt \
-            "dist/twin-${TWIN}-${VERSION}.cdx.json" \
             --repo wondertwin-ai/registry \
             --title "twin-${TWIN} v${VERSION}" \
             --notes "Twin release for ${TWIN} v${VERSION}. SBOM: twin-${TWIN}-${VERSION}.cdx.json (CycloneDX JSON)."
