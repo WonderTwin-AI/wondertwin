@@ -32,6 +32,12 @@ jobs:
           go-version-file: wondertwin/go.mod
           cache-dependency-path: "**/go.sum"
 
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.44.0/install.sh | \
+            sh -s -- -b /usr/local/bin v1.44.0
+          syft version
+
       - name: Create and push twin tag
         working-directory: wondertwin
         env:
@@ -61,6 +67,31 @@ jobs:
           done
           cd dist && shasum -a 256 twin-${TWIN}-* > checksums.txt
 
+      - name: Generate SBOM
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Single canonical SBOM from linux-amd64. See
+          # wondertwin-docs/security/policy/maintenance.md for SBOM policy.
+          SBOM="dist/twin-${TWIN}-${VERSION}.cdx.json"
+          syft "dist/twin-${TWIN}-linux-amd64" \
+            -o cyclonedx-json="$SBOM" --quiet
+          cd dist && shasum -a 256 "twin-${TWIN}-${VERSION}.cdx.json" >> checksums.txt
+          echo "SBOM generated: $SBOM"
+
+      - name: Verify SBOM is OSV-clean
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # Final release gate: a release with known stdlib/dep CVEs in
+          # its SBOM fails here, forcing an explicit fix-or-allowlist.
+          go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
+          osv-scanner sbom "dist/twin-${TWIN}-${VERSION}.cdx.json"
+
       - name: Create release
         working-directory: wondertwin
         env:
@@ -70,9 +101,10 @@ jobs:
         run: |
           gh release create "twin-${TWIN}-v${VERSION}" \
             dist/twin-${TWIN}-* dist/checksums.txt \
+            "dist/twin-${TWIN}-${VERSION}.cdx.json" \
             --repo wondertwin-ai/registry \
             --title "twin-${TWIN} v${VERSION}" \
-            --notes "Twin release for ${TWIN} v${VERSION}"
+            --notes "Twin release for ${TWIN} v${VERSION}. SBOM: twin-${TWIN}-${VERSION}.cdx.json (CycloneDX JSON)."
 
       - name: Checkout registry
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -107,6 +139,35 @@ jobs:
             echo "registry.json unchanged, skipping commit"
           else
             git commit -m "Update registry: twin-${TWIN} v${VERSION}"
+            git push
+          fi
+
+      - name: Mirror SBOM to wondertwin-docs
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+          DOCS_TOKEN: ${{ secrets.WONDERTWIN_DOCS_TOKEN }}
+        run: |
+          if [ -z "$DOCS_TOKEN" ]; then
+            echo "::warning::WONDERTWIN_DOCS_TOKEN not set; skipping docs mirror"
+            exit 0
+          fi
+          git clone --depth 1 \
+            "https://x-access-token:${DOCS_TOKEN}@github.com/WonderTwin-AI/wondertwin-docs.git" \
+            docs-mirror
+          cd docs-mirror
+          mkdir -p "security/sboms/twin-${TWIN}"
+          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${VERSION}.cdx.json" \
+             "security/sboms/twin-${TWIN}/${VERSION}.cdx.json"
+          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${VERSION}.cdx.json" \
+             "security/sboms/twin-${TWIN}/latest.cdx.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "security/sboms/twin-${TWIN}/"
+          if git diff --cached --quiet; then
+            echo "no SBOM changes, skipping commit"
+          else
+            git commit -m "sbom: twin-${TWIN} v${VERSION} (community)"
             git push
           fi
 
