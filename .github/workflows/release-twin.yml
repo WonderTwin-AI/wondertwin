@@ -90,7 +90,7 @@ jobs:
           # Final release gate: a release with known stdlib/dep CVEs in
           # its SBOM fails here, forcing an explicit fix-or-allowlist.
           go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
-          osv-scanner sbom "dist/twin-${TWIN}-${VERSION}.cdx.json"
+          osv-scanner --sbom="dist/twin-${TWIN}-${VERSION}.cdx.json"
 
       - name: Create release
         working-directory: wondertwin
