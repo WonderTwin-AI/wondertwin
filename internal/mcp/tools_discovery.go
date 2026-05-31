@@ -31,6 +31,7 @@ func errorResult(msg string) ToolResult {
 // discoveryTools returns MCP tool entries for catalog, scan, subscribe, and request.
 func discoveryTools(pc *platform.Client, cfg *config.Config) []toolEntry {
 	return []toolEntry{
+		installTool(pc, cfg),
 		{
 			Tool: Tool{
 				Name:        "wt_catalog",
