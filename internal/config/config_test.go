@@ -3,11 +3,17 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestLoadFromYAML(t *testing.T) {
 	dir := t.TempDir()
+	// t.TempDir() returns a 0755 dir on most platforms; tighten so
+	// the per-load perm-check passes for valid-shape tests.
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(dir, "config.yaml")
 	content := `
 license_key: "wt_com_acme_abcdef_7b"
@@ -15,7 +21,7 @@ registries:
   public:
     url: https://example.com/registry.yaml
 `
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -33,6 +39,9 @@ registries:
 
 func TestLoadFromJSON(t *testing.T) {
 	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(dir, "config.json")
 	content := `{
   "license_key": "wt_com_acme_abcdef_7b",
@@ -42,7 +51,7 @@ func TestLoadFromJSON(t *testing.T) {
     }
   }
 }`
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,16 +85,19 @@ func TestLoadPrefersJSONOverYAML(t *testing.T) {
 	// and using LoadFrom to test each format. The preference logic is in
 	// resolveConfigPath which we test indirectly.
 	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 
 	yamlPath := filepath.Join(dir, "config.yaml")
 	yamlContent := `license_key: "yaml-key"`
-	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o644); err != nil {
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	jsonPath := filepath.Join(dir, "config.json")
 	jsonContent := `{"license_key": "json-key"}`
-	if err := os.WriteFile(jsonPath, []byte(jsonContent), 0o644); err != nil {
+	if err := os.WriteFile(jsonPath, []byte(jsonContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,6 +185,9 @@ func TestOrgContext(t *testing.T) {
 
 func TestOrgContextRoundTrip(t *testing.T) {
 	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(dir, "config.json")
 	content := `{
   "license_key": "",
@@ -180,7 +195,7 @@ func TestOrgContextRoundTrip(t *testing.T) {
   "org_id": "org-123",
   "api_key": "wt_live_abc123"
 }`
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -211,5 +226,89 @@ func TestParseLicenseKey(t *testing.T) {
 	}
 	if info.Org != "acme" {
 		t.Errorf("expected org acme, got %q", info.Org)
+	}
+}
+
+// TestLoadFrom_RejectsWorldReadableFile pins the Stream-E-cli
+// guarantee: a credentials file whose mode permits group/world reads
+// is refused with a clear chmod hint, not silently loaded.
+func TestLoadFrom_RejectsWorldReadableFile(t *testing.T) {
+	if runtimeIsWindows() {
+		t.Skip("Unix mode bits don't apply on Windows")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"license_key":"x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadFrom(path, true)
+	if err == nil {
+		t.Fatal("expected LoadFrom to refuse 0644 config file")
+	}
+	if !strings.Contains(err.Error(), "chmod 600") {
+		t.Fatalf("expected chmod hint, got %v", err)
+	}
+}
+
+// TestLoadFrom_RejectsWorldReadableDir checks the directory mode
+// independently — a 0600 file inside a 0755 directory still leaks
+// the file's existence (and is suspect).
+func TestLoadFrom_RejectsWorldReadableDir(t *testing.T) {
+	if runtimeIsWindows() {
+		t.Skip("Unix mode bits don't apply on Windows")
+	}
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(path, []byte(`{"license_key":"x"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadFrom(path, true)
+	if err == nil {
+		t.Fatal("expected LoadFrom to refuse 0755 config dir")
+	}
+	if !strings.Contains(err.Error(), "chmod 700") {
+		t.Fatalf("expected chmod hint, got %v", err)
+	}
+}
+
+// TestSave_TightensExistingDirPerms covers the upgrade path: a prior
+// CLI version created ~/.wondertwin with 0755; Save must tighten it
+// to 0700 in place so the next Load passes its perm check.
+func TestSave_TightensExistingDirPerms(t *testing.T) {
+	if runtimeIsWindows() {
+		t.Skip("Unix mode bits don't apply on Windows")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir := filepath.Join(home, DefaultConfigDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &Config{LicenseKey: "test"}
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o700 {
+		t.Fatalf("expected dir mode 0700 after Save, got %#o", mode)
+	}
+
+	fileInfo, err := os.Stat(filepath.Join(dir, DefaultConfigFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := fileInfo.Mode().Perm(); mode != 0o600 {
+		t.Fatalf("expected file mode 0600 after Save, got %#o", mode)
 	}
 }
