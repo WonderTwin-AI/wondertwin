@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+func runtimeIsWindows() bool { return runtime.GOOS == "windows" }
 
 // DefaultConfigDir is the directory under the user's home for CLI state.
 const DefaultConfigDir = ".wondertwin"
@@ -86,7 +89,27 @@ func Load() (*Config, error) {
 
 // LoadFrom reads and parses a config from the given path.
 // If isJSON is true, the file is parsed as JSON; otherwise as YAML.
+//
+// LoadFrom refuses to read a config file whose Unix permissions are
+// world- or group-readable (anything beyond 0600). The file holds an
+// API key and the license; a misconfigured umask or a recursive chmod
+// can leak credentials to any other user on the box. The CLI fails
+// loud with a chmod hint rather than silently loading.
+//
+// Per-platform note: Windows does not honor Unix mode bits in any
+// meaningful way; the check is skipped there.
 func LoadFrom(path string, isJSON bool) (*Config, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return defaultConfig(), nil
+		}
+		return nil, fmt.Errorf("stat config %s: %w", path, err)
+	}
+	if err := checkConfigPerms(path, info); err != nil {
+		return nil, err
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -119,15 +142,27 @@ func LoadFrom(path string, isJSON bool) (*Config, error) {
 	return &cfg, nil
 }
 
-// Save writes the config to ~/.wondertwin/config.json.
+// Save writes the config to ~/.wondertwin/config.json with 0600
+// permissions inside a 0700 directory. If the directory already
+// exists with looser permissions (e.g., a prior CLI version wrote it
+// 0755), Save tightens it. Symmetric with LoadFrom's perm-check —
+// the two together close the credential-leak window.
 func Save(cfg *Config) error {
 	dir, err := configDir()
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
+	}
+	// MkdirAll respects existing permissions; explicitly drop them
+	// to 0700 in case a prior version of the CLI created the dir
+	// with 0755. Skipped on Windows where Unix mode bits are inert.
+	if !runtimeIsWindows() {
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return fmt.Errorf("tightening config dir perms: %w", err)
+		}
 	}
 
 	path := filepath.Join(dir, DefaultConfigFile)
@@ -138,7 +173,17 @@ func Save(cfg *Config) error {
 	}
 	data = append(data, '\n')
 
-	return os.WriteFile(path, data, 0o600)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	// Likewise, tighten the file in case it pre-existed with a
+	// looser mode that WriteFile preserved.
+	if !runtimeIsWindows() {
+		if err := os.Chmod(path, 0o600); err != nil {
+			return fmt.Errorf("tightening config file perms: %w", err)
+		}
+	}
+	return nil
 }
 
 // ParseLicenseKey parses a license key of the format wt_{tier}_{org}_{random}_{check}.
@@ -224,6 +269,43 @@ func TierName(tier string) string {
 	default:
 		return "free"
 	}
+}
+
+// checkConfigPerms returns an error if the config file or its parent
+// directory permit access outside the owner. The directory check
+// catches the "world-readable ~/.wondertwin" footgun even when the
+// file itself is 0600 (since a path-traversal-via-readable-dir is
+// the same disclosure).
+//
+// On Windows we skip — `runtime.GOOS == "windows"` doesn't expose
+// meaningful Unix mode bits and the check is noise there.
+func checkConfigPerms(path string, info os.FileInfo) error {
+	if runtimeIsWindows() {
+		return nil
+	}
+	mode := info.Mode().Perm()
+	if mode&0o077 != 0 {
+		return fmt.Errorf(
+			"config file %s has insecure permissions %#o; run `chmod 600 %s` and retry",
+			path, mode, path,
+		)
+	}
+
+	dir := filepath.Dir(path)
+	dirInfo, err := os.Stat(dir)
+	if err != nil {
+		// If the directory is unreadable we can't continue anyway —
+		// the file read would already have failed before this point.
+		return nil
+	}
+	dirMode := dirInfo.Mode().Perm()
+	if dirMode&0o077 != 0 {
+		return fmt.Errorf(
+			"config directory %s has insecure permissions %#o; run `chmod 700 %s` and retry",
+			dir, dirMode, dir,
+		)
+	}
+	return nil
 }
 
 func defaultConfig() *Config {

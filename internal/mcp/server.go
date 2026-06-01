@@ -14,6 +14,19 @@ import (
 )
 
 // Server is an MCP server that exposes twin management tools over JSON-RPC 2.0 on stdio.
+//
+// Security model: this server runs as a local stdio subprocess
+// launched by the agent client (Claude Code, Cursor, etc.). It is
+// single-tenant and single-process; there is no network surface and
+// the agent client cannot inject credentials. Upstream calls to
+// wondertwin-app authenticate using cfg.APIKey loaded from
+// ~/.wondertwin/config.json (whose permissions are enforced by the
+// config package's perm-check at load time). No request from the
+// agent is ever interpreted as an auth claim — the agent supplies
+// tool-call arguments, never authentication context.
+//
+// This invariant is verified by `grep -r 'Authorization\|Bearer\|
+// Cookie' internal/mcp/` returning no matches (see issue #259).
 type Server struct {
 	manifest *manifest.Manifest
 	client   *client.AdminClient
