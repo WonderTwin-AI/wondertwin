@@ -118,47 +118,8 @@ func discoveryTools(pc *platform.Client, cfg *config.Config) []toolEntry {
 				return errorResult(fmt.Sprintf("twin %q not found", p.TwinName))
 			},
 		},
-		{
-			Tool: Tool{
-				Name:        "wt_subscribe",
-				Description: "Subscribe to a twin. The backend determines the outcome: already entitled, subscribed, trial started, or upgrade required. Returns structured JSON.",
-				InputSchema: json.RawMessage(`{
-					"type": "object",
-					"properties": {
-						"twin_name": {"type": "string", "description": "Name of the twin to subscribe to"}
-					},
-					"required": ["twin_name"]
-				}`),
-			},
-			Handler: func(_ *manifest.Manifest, _ *client.AdminClient, params json.RawMessage) ToolResult {
-				var p struct {
-					TwinName string `json:"twin_name"`
-				}
-				if len(params) > 0 {
-					json.Unmarshal(params, &p)
-				}
-				if p.TwinName == "" {
-					return errorResult("twin_name is required")
-				}
-
-				if cfg.APIKey == "" || cfg.OrgID == "" {
-					return jsonResult(map[string]any{
-						"action":     "signup_required",
-						"signup_url": fmt.Sprintf("https://app.wondertwin.ai/signup?ref=mcp&twin=%s", p.TwinName),
-						"message":    "Not authenticated. Sign up or run wt login --org.",
-					})
-				}
-
-				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-				defer cancel()
-
-				resp, err := pc.Subscribe(ctx, cfg.OrgID, p.TwinName)
-				if err != nil {
-					return errorResult(fmt.Sprintf("subscribe failed: %v", err))
-				}
-				return jsonResult(resp)
-			},
-		},
+		trialTool(pc, cfg),
+		subscribeTool(pc, cfg),
 		{
 			Tool: Tool{
 				Name:        "wt_request",
