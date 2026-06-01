@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/client"
@@ -125,6 +126,15 @@ func installTool(pc *platform.Client, cfg *config.Config) toolEntry {
 					})
 				}
 			}
+
+			// Refresh-on-MCP-call hygiene per adr-license-delivery-via-mcp §3.
+			// For install responses the local license is already up-to-date
+			// after commitBundleIfPresent so this is normally a no-op, but
+			// it exercises the same path that future non-install MCP tools
+			// (subscribe-status polling, etc.) will use. Best-effort: any
+			// failure is logged, not surfaced — the original install's
+			// outcome stands.
+			refreshLicenseIfStale(ctx, pc, cfg, env, slog.Default())
 
 			return jsonResult(env)
 		},
