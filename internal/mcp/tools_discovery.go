@@ -32,6 +32,7 @@ func errorResult(msg string) ToolResult {
 func discoveryTools(pc *platform.Client, cfg *config.Config) []toolEntry {
 	return []toolEntry{
 		installTool(pc, cfg),
+		licenseRefreshTool(pc, cfg),
 		{
 			Tool: Tool{
 				Name:        "wt_catalog",
