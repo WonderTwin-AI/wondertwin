@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -35,8 +36,16 @@ type decideRequest struct {
 
 // CaptureEvent handles POST /capture, POST /e
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
+	body, err := readCaptureBody(r)
+	if err != nil {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"status": 0,
+			"error":  "Invalid request body: " + err.Error(),
+		})
+		return
+	}
 	var req captureRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&req); err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
@@ -73,8 +82,16 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 
 // BatchCapture handles POST /batch
 func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
+	body, err := readCaptureBody(r)
+	if err != nil {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"status": 0,
+			"error":  "Invalid request body: " + err.Error(),
+		})
+		return
+	}
 	var req batchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&req); err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
