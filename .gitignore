@@ -3,7 +3,7 @@ bin/
 .wt/
 dist/
 wondertwin.json
-wt
+/wt
 .claude/
 twin-posthog/seed.json
 twin-posthog/demo.sh
