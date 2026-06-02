@@ -13,6 +13,7 @@
 //	wt install                    Install all twins from wondertwin.yaml
 //	wt install <twin>@<version>   Install a specific twin at a version
 //	wt ci                         Install twins from lock file (frozen)
+//	wt verify                     Assert lockfile twins are covered by org entitlements
 //	wt auth login                 Activate a license key
 //	wt auth status                Show current license tier
 //	wt auth logout                Clear license key
@@ -122,6 +123,8 @@ func main() {
 		err = cmdInstall(manifestPath, args)
 	case "ci":
 		err = cmdCI(manifestPath)
+	case "verify":
+		err = cmdVerify(args)
 	case "login":
 		err = cmdLogin(args)
 	case "catalog":
@@ -197,6 +200,7 @@ Commands:
   install                    Install all twins from manifest
   install <twin>@<version>   Install a specific twin at a version
   ci                         Install twins from lock file (frozen, reproducible)
+  verify                     Assert lockfile twins are covered by org entitlements (CI gate)
   auth login                 Activate a license key
   auth status                Show current license tier and org
   auth logout                Clear license key
@@ -1441,6 +1445,7 @@ func cmdAuthStatus() error {
 		fmt.Printf("Org ID:  %s\n", cfg.OrgID)
 		maskedKey := cfg.APIKey[:8] + "..." + cfg.APIKey[len(cfg.APIKey)-4:]
 		fmt.Printf("API Key: %s\n", maskedKey)
+		printProjectMismatchWarning(cfg.OrgID)
 		return nil
 	}
 
