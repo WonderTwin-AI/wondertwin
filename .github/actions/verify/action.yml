@@ -1,0 +1,149 @@
+name: WonderTwin Verify
+description: >-
+  Assert every twin in wondertwin-lock.json is covered by the asserted
+  org's WonderTwin entitlements. Fails CI on missing coverage —
+  the conversion signal from adr-ci-twin-verification.
+author: WonderTwin
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  api-key:
+    description: >-
+      WonderTwin API key (a wt_* token from `wt login` or the platform
+      console). Pass via secret; never hard-code.
+    required: true
+  account-id:
+    description: >-
+      Override the account_id used for the coverage check. Defaults
+      to whatever .wondertwin/project.json#account_id resolves to.
+      Useful for monorepos that verify against multiple accounts.
+    required: false
+    default: ""
+  working-directory:
+    description: >-
+      Directory containing wondertwin-lock.json (and optionally
+      .wondertwin/project.json). Defaults to the workflow's working
+      directory.
+    required: false
+    default: "."
+  wt-version:
+    description: >-
+      Version of the wt CLI to download. Use a specific tag (e.g.
+      v0.42.0) for reproducible CI; "latest" pulls the most recent
+      release.
+    required: false
+    default: latest
+  base-url:
+    description: >-
+      Override the WonderTwin platform base URL. Only set this for
+      staging / self-hosted deployments.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve wt binary
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "${RUNNER_OS}" in
+          Linux)  os=linux ;;
+          macOS)  os=darwin ;;
+          *)
+            echo "::error::wondertwin-ai/verify: ${RUNNER_OS} runners are not supported yet (linux + macos only in v1)."
+            exit 2
+            ;;
+        esac
+
+        case "${RUNNER_ARCH}" in
+          X64)   arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *)
+            echo "::error::wondertwin-ai/verify: unsupported runner arch ${RUNNER_ARCH}."
+            exit 2
+            ;;
+        esac
+
+        version="${WT_VERSION_INPUT}"
+        if [ "${version}" = "latest" ]; then
+          # Resolve "latest" to a concrete tag so the download URL is
+          # deterministic and the checksum line is reachable.
+          version="$(curl -fsSL \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/wondertwin-ai/wondertwin/releases/latest" \
+            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | head -n1)"
+          if [ -z "${version}" ]; then
+            echo "::error::could not resolve latest wt release"
+            exit 2
+          fi
+        fi
+
+        echo "os=${os}"     >> "${GITHUB_OUTPUT}"
+        echo "arch=${arch}" >> "${GITHUB_OUTPUT}"
+        echo "version=${version}" >> "${GITHUB_OUTPUT}"
+      env:
+        WT_VERSION_INPUT: ${{ inputs.wt-version }}
+
+    - name: Download wt binary
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        base="https://github.com/wondertwin-ai/wondertwin/releases/download/${WT_VERSION}"
+        bin_name="wt-${WT_OS}-${WT_ARCH}"
+        bin_url="${base}/${bin_name}"
+        sums_url="${base}/checksums.txt"
+
+        tmp="$(mktemp -d)"
+        echo "Downloading ${bin_url}"
+        curl -fsSL --retry 3 -o "${tmp}/${bin_name}" "${bin_url}"
+
+        # Verify checksum if the release publishes one. We don't fail
+        # the build if checksums.txt is absent for a given release —
+        # only if it's present and doesn't match.
+        if curl -fsSL --retry 3 -o "${tmp}/checksums.txt" "${sums_url}"; then
+          expected="$(grep "  ${bin_name}$" "${tmp}/checksums.txt" | awk '{print $1}' || true)"
+          if [ -n "${expected}" ]; then
+            actual="$(shasum -a 256 "${tmp}/${bin_name}" | awk '{print $1}')"
+            if [ "${expected}" != "${actual}" ]; then
+              echo "::error::checksum mismatch for ${bin_name}: expected ${expected}, got ${actual}"
+              exit 2
+            fi
+            echo "Checksum verified."
+          else
+            echo "::warning::no checksum entry for ${bin_name}; proceeding without verification."
+          fi
+        else
+          echo "::warning::no checksums.txt for ${WT_VERSION}; proceeding without verification."
+        fi
+
+        install_dir="${RUNNER_TEMP}/wondertwin-bin"
+        mkdir -p "${install_dir}"
+        mv "${tmp}/${bin_name}" "${install_dir}/wt"
+        chmod +x "${install_dir}/wt"
+        echo "${install_dir}" >> "${GITHUB_PATH}"
+      env:
+        WT_OS:      ${{ steps.resolve.outputs.os }}
+        WT_ARCH:    ${{ steps.resolve.outputs.arch }}
+        WT_VERSION: ${{ steps.resolve.outputs.version }}
+
+    - name: Run wt verify
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        args=()
+        if [ -n "${ACCOUNT_ID_INPUT}" ]; then
+          args+=(--org "${ACCOUNT_ID_INPUT}")
+        fi
+        wt verify "${args[@]}"
+      env:
+        WONDERTWIN_API_KEY: ${{ inputs.api-key }}
+        WT_PLATFORM_URL:    ${{ inputs.base-url }}
+        ACCOUNT_ID_INPUT:   ${{ inputs.account-id }}
