@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 )
 
 // TestIntegrationInstallFromURL verifies the full install flow using a local
@@ -169,14 +171,14 @@ func TestIntegrationFetchRegistryFromServer(t *testing.T) {
 }
 
 // TestInstallFromURL_RejectsOversizedBody asserts that a server streaming a
-// body larger than maxTwinBinarySize is rejected without OOMing the process.
+// body larger than httpio.MaxResponseBytes is rejected without OOMing the process.
 // Regression test for F-008: bound network downloads with io.LimitReader.
 // Removing the LimitReader wrapper and size check in installer.go would cause
 // this test to allocate >256 MiB and silently succeed instead of erroring.
 func TestInstallFromURL_RejectsOversizedBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
-		src := io.LimitReader(zeroReader{}, maxTwinBinarySize+1)
+		src := io.LimitReader(zeroReader{}, httpio.MaxResponseBytes+1)
 		if _, err := io.Copy(w, src); err != nil {
 			t.Logf("server copy: %v", err)
 		}

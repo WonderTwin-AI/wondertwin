@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"net/url"
 	"time"
@@ -65,7 +67,7 @@ func (c *Client) ValidateKey(ctx context.Context, apiKey string) (*ValidateKeyRe
 		return nil, fmt.Errorf("invalid API key")
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("validate key: HTTP %d: %s", resp.StatusCode, body)
 	}
 
@@ -156,7 +158,7 @@ func (c *Client) ListTwins(ctx context.Context, category, tier, sdkLanguage, sea
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("list twins: HTTP %d: %s", resp.StatusCode, body)
 	}
 
@@ -198,7 +200,7 @@ func (c *Client) ListOrgCatalog(ctx context.Context, orgID, category, search str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("list org catalog: HTTP %d: %s", resp.StatusCode, body)
 	}
 
@@ -225,7 +227,7 @@ func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("list categories: HTTP %d: %s", resp.StatusCode, body)
 	}
 
@@ -272,7 +274,7 @@ func (c *Client) Subscribe(ctx context.Context, orgID, twinName string) (*Subscr
 
 	var result SubscribeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("subscribe: HTTP %d: %s", resp.StatusCode, respBody)
 	}
 
@@ -326,7 +328,7 @@ func (c *Client) SubmitTwinRequest(ctx context.Context, orgID, serviceName, serv
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("submit twin request: HTTP %d: %s", resp.StatusCode, respBody)
 	}
 
@@ -353,7 +355,7 @@ func (c *Client) ListTwinRequests(ctx context.Context, orgID string) ([]TwinRequ
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("list twin requests: HTTP %d: %s", resp.StatusCode, body)
 	}
 
@@ -385,7 +387,7 @@ func (c *Client) GetTwinRequest(ctx context.Context, orgID, requestID string) (*
 		return nil, fmt.Errorf("request not found: %s", requestID)
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("get twin request: HTTP %d: %s", resp.StatusCode, body)
 	}
 

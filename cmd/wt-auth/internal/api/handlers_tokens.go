@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -52,8 +53,10 @@ func (h *Handler) handleIssueToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check the full license key matches.
-	if lic.ID != req.LicenseKey {
+	// Check the full license key matches. ConstantTimeCompare avoids
+	// the timing oracle that `lic.ID != req.LicenseKey` would create
+	// on the byte-by-byte equality check. Audit 2026-06-04, section 3.
+	if subtle.ConstantTimeCompare([]byte(lic.ID), []byte(req.LicenseKey)) != 1 {
 		writeError(w, http.StatusUnauthorized, "invalid_license")
 		return
 	}

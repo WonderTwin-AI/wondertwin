@@ -12,15 +12,8 @@ import (
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/config"
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 )
-
-// maxTwinBinarySize bounds in-memory reads of twin binaries during install.
-// 256 MiB is well above any plausible twin (current binaries are <30 MiB)
-// and well below memory-exhaustion territory on developer machines. A
-// malicious or misconfigured registry that streams past this cap is
-// treated as a download failure rather than allowed to OOM the CLI before
-// checksum verification runs.
-const maxTwinBinarySize = 256 << 20 // 256 MiB
 
 // Install downloads a twin binary for the current platform, verifies its
 // checksum, and saves it to binaryDir. It also writes a .version sidecar file.
@@ -54,13 +47,16 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	}
 
 	// Read entire binary into memory for checksum verification, bounded
-	// by maxTwinBinarySize so a runaway server cannot OOM the CLI.
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxTwinBinarySize+1))
+	// by httpio.MaxResponseBytes. Reading cap+1 and rejecting on overflow
+	// fails loud — a plain truncate would write a corrupt binary when no
+	// checksum is present, which the regression test in
+	// install_integration_test.go exercises.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
 	}
-	if int64(len(data)) > maxTwinBinarySize {
-		return fmt.Errorf("binary exceeds maximum size of %d bytes", maxTwinBinarySize)
+	if int64(len(data)) > httpio.MaxResponseBytes {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
 	// Verify checksum
@@ -143,13 +139,13 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	// Bounded read — see Install() for rationale.
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxTwinBinarySize+1))
+	// Bounded read with overflow detection — see Install() for rationale.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
 	}
-	if int64(len(data)) > maxTwinBinarySize {
-		return fmt.Errorf("binary exceeds maximum size of %d bytes", maxTwinBinarySize)
+	if int64(len(data)) > httpio.MaxResponseBytes {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
 	// Verify checksum if provided
