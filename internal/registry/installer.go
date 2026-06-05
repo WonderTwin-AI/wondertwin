@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-
-	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/config"
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 )
 
 // Install downloads a twin binary for the current platform, verifies its
@@ -47,10 +46,17 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	// Read entire binary into memory for checksum verification
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
+	// Read entire binary into memory for checksum verification, bounded
+	// by httpio.MaxResponseBytes. Reading cap+1 and rejecting on overflow
+	// fails loud — a plain truncate would write a corrupt binary when no
+	// checksum is present, which the regression test in
+	// install_integration_test.go exercises.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
+	}
+	if int64(len(data)) > httpio.MaxResponseBytes {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
 	// Verify checksum
@@ -133,9 +139,13 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
+	// Bounded read with overflow detection — see Install() for rationale.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
+	}
+	if int64(len(data)) > httpio.MaxResponseBytes {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
 	// Verify checksum if provided
