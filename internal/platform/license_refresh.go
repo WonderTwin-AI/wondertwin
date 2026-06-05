@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 )
 
@@ -67,7 +69,7 @@ func (c *Client) LicenseRefresh(ctx context.Context, accountID string) (*Install
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("license-refresh: HTTP %d: %s", resp.StatusCode, respBody)
 	}
 

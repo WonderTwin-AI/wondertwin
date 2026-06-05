@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -46,7 +48,7 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	}
 
 	// Read entire binary into memory for checksum verification
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
 	}
@@ -131,7 +133,7 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
 	}

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"strings"
 	"time"
@@ -232,7 +234,7 @@ func fetchAndParse(url, token string) (*Registry, error) {
 		return nil, &httpError{statusCode: resp.StatusCode}
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if err != nil {
 		return nil, fmt.Errorf("reading registry response: %w", err)
 	}

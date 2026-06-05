@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 )
 
@@ -54,7 +56,7 @@ func (c *Client) Install(ctx context.Context, accountID string, req InstallReque
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		return nil, fmt.Errorf("install: HTTP %d: %s", resp.StatusCode, respBody)
 	}
 
