@@ -3,10 +3,12 @@ package registry
 import (
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -164,4 +166,40 @@ func TestIntegrationFetchRegistryFromServer(t *testing.T) {
 	if ver.APIVersion != "2024-12-18" {
 		t.Errorf("api_version = %q, want %q", ver.APIVersion, "2024-12-18")
 	}
+}
+
+// TestInstallFromURL_RejectsOversizedBody asserts that a server streaming a
+// body larger than maxTwinBinarySize is rejected without OOMing the process.
+// Regression test for F-008: bound network downloads with io.LimitReader.
+// Removing the LimitReader wrapper and size check in installer.go would cause
+// this test to allocate >256 MiB and silently succeed instead of erroring.
+func TestInstallFromURL_RejectsOversizedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		src := io.LimitReader(zeroReader{}, maxTwinBinarySize+1)
+		if _, err := io.Copy(w, src); err != nil {
+			t.Logf("server copy: %v", err)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	err := InstallFromURL("oversized", "0.0.1", srv.URL+"/twin-oversized", "", dir)
+	if err == nil {
+		t.Fatal("InstallFromURL accepted an oversized body; expected error")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum size") {
+		t.Fatalf("expected size-exceeded error, got: %v", err)
+	}
+}
+
+// zeroReader emits an unbounded stream of zero bytes. Used only by the
+// oversized-body regression test.
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
 }

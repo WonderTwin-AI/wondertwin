@@ -14,6 +14,14 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/config"
 )
 
+// maxTwinBinarySize bounds in-memory reads of twin binaries during install.
+// 256 MiB is well above any plausible twin (current binaries are <30 MiB)
+// and well below memory-exhaustion territory on developer machines. A
+// malicious or misconfigured registry that streams past this cap is
+// treated as a download failure rather than allowed to OOM the CLI before
+// checksum verification runs.
+const maxTwinBinarySize = 256 << 20 // 256 MiB
+
 // Install downloads a twin binary for the current platform, verifies its
 // checksum, and saves it to binaryDir. It also writes a .version sidecar file.
 func Install(twinName string, resolvedVersion string, ver Version, binaryDir string) error {
@@ -45,10 +53,14 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	// Read entire binary into memory for checksum verification
-	data, err := io.ReadAll(resp.Body)
+	// Read entire binary into memory for checksum verification, bounded
+	// by maxTwinBinarySize so a runaway server cannot OOM the CLI.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxTwinBinarySize+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
+	}
+	if int64(len(data)) > maxTwinBinarySize {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", maxTwinBinarySize)
 	}
 
 	// Verify checksum
@@ -131,9 +143,13 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	// Bounded read — see Install() for rationale.
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxTwinBinarySize+1))
 	if err != nil {
 		return fmt.Errorf("reading binary data: %w", err)
+	}
+	if int64(len(data)) > maxTwinBinarySize {
+		return fmt.Errorf("binary exceeds maximum size of %d bytes", maxTwinBinarySize)
 	}
 
 	// Verify checksum if provided
