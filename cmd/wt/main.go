@@ -46,7 +46,6 @@ import (
 
 	"context"
 
-	"github.com/wondertwin-ai/wondertwin/internal/auth"
 	"github.com/wondertwin-ai/wondertwin/internal/cache"
 	"github.com/wondertwin-ai/wondertwin/internal/client"
 	"github.com/wondertwin-ai/wondertwin/internal/config"
@@ -1631,20 +1630,14 @@ func cacheDir() string {
 	return filepath.Join(home, ".wondertwin", "cache")
 }
 
-// authURL returns the wt-auth service URL, checking env override first.
-func authURL() string {
-	if u := os.Getenv("WT_AUTH_URL"); u != "" {
-		return u
-	}
-	return ""
-}
-
 // resolveContent fetches and caches content for all twins in the manifest
 // that have a version set. Returns nil if no license is configured.
 //
-// When wt-auth is configured (WT_AUTH_URL set), this function requests a JIT
-// token for each twin before fetching content. Auth failures are FATAL — the
-// twin does not start. No graceful degradation, no stale cache fallback.
+// The cfg.LicenseKey is used directly as the Content API bearer token.
+// This is the production flow today; the deferred wt-auth JIT-token path
+// (per adr-v1-ungated-commercial-twins) is not in scope. Content fetch
+// failures degrade to stale cache where possible — operators see a warn
+// line and the twin continues to run against the prior fetch.
 func resolveContent(m *manifest.Manifest) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -1655,14 +1648,6 @@ func resolveContent(m *manifest.Manifest) error {
 	}
 
 	cacheStore := cache.NewStore(cacheDir(), cfg.LicenseKey)
-
-	// If wt-auth is configured, use JIT tokens. Otherwise fall back to
-	// direct license key auth (development mode).
-	authEndpoint := authURL()
-	var ac *auth.Client
-	if authEndpoint != "" {
-		ac = auth.NewClient(authEndpoint)
-	}
 
 	for _, name := range m.TwinNames() {
 		twin := m.Twins[name]
@@ -1675,30 +1660,10 @@ func resolveContent(m *manifest.Manifest) error {
 			continue
 		}
 
-		// Determine the bearer token for the Content API.
-		bearerToken := cfg.LicenseKey // development mode fallback
-		if ac != nil {
-			// Production mode: request JIT token from wt-auth.
-			tokenResp, err := ac.RequestToken(cfg.LicenseKey, name)
-			if err != nil {
-				// Auth failures are fatal for licensed twins.
-				// No graceful degradation. No stale cache. Twin does not start.
-				if authErr, ok := err.(*auth.AuthError); ok {
-					return fmt.Errorf("authorization failed for %s: %s", name, authErr.Error())
-				}
-				return fmt.Errorf("authorization failed for %s: %v", name, err)
-			}
-			bearerToken = tokenResp.Token
-		}
-
-		cc := content.NewClient(contentURL(), bearerToken)
+		cc := content.NewClient(contentURL(), cfg.LicenseKey)
 		raw, _, err := cc.FetchContent(name, version)
 		if err != nil {
-			if ac != nil {
-				// With auth configured, content fetch failures are also fatal.
-				return fmt.Errorf("content fetch failed for %s@%s: %v", name, version, err)
-			}
-			// Development mode: graceful degradation with stale cache.
+			// Graceful degradation with stale cache.
 			_, meta, cacheErr := cacheStore.Get(name, version)
 			if cacheErr == nil && meta != nil {
 				fmt.Printf("  warn: content fetch failed for %s@%s, using stale cache: %v\n", name, version, err)
