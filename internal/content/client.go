@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"time"
 )
@@ -43,7 +45,7 @@ func (c *Client) FetchContent(twin, version string) ([]byte, *ContentPayload, er
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading content response: %w", err)
 	}

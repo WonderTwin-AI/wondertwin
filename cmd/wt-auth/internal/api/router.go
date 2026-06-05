@@ -27,7 +27,13 @@ func NewHandler(licenses *store.LicenseStore, tokens *store.TokenStore, signer *
 
 // Routes mounts all API routes.
 func (h *Handler) Routes(r chi.Router) {
+	// RequestID injects an X-Request-ID header on every request so a
+	// customer report ("twin install failed at timestamp X") maps to
+	// exactly one log line. Logger appends it to every request log.
+	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
+	// Recoverer turns a handler panic into a 500 with a logged stack
+	// trace instead of taking down the whole process.
 	r.Use(middleware.Recoverer)
 
 	// Health (public).

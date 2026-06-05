@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"time"
 )
@@ -60,7 +62,7 @@ func (c *Client) RequestToken(licenseKey, twinName string) (*TokenResponse, erro
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 
 	if resp.StatusCode != http.StatusOK {
 		var errResp ErrorResponse

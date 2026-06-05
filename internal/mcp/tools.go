@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"strings"
 	"time"
@@ -328,7 +330,7 @@ func handleInspect(m *manifest.Manifest, _ *client.AdminClient, params json.RawM
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if resp.StatusCode != http.StatusOK {
 		return textResult(fmt.Sprintf("Error inspecting %s: status %d: %s", p.Twin, resp.StatusCode, body))
 	}
@@ -372,7 +374,7 @@ func handleConfig(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 		}
 		defer resp.Body.Close()
 
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		if resp.StatusCode != http.StatusOK {
 			return textResult(fmt.Sprintf("Error updating config for %s: status %d: %s", p.Twin, resp.StatusCode, respBody))
 		}
@@ -386,7 +388,7 @@ func handleConfig(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if resp.StatusCode != http.StatusOK {
 		return textResult(fmt.Sprintf("Error fetching config for %s: status %d: %s", p.Twin, resp.StatusCode, body))
 	}
@@ -440,7 +442,7 @@ func handleQuirks(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 		}
 		defer resp.Body.Close()
 
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 		if resp.StatusCode != http.StatusOK {
 			return textResult(fmt.Sprintf("Error toggling quirk for %s: status %d: %s", p.Twin, resp.StatusCode, body))
 		}
@@ -454,7 +456,7 @@ func handleQuirks(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, httpio.MaxResponseBytes))
 	if resp.StatusCode != http.StatusOK {
 		return textResult(fmt.Sprintf("Error fetching quirks for %s: status %d: %s", p.Twin, resp.StatusCode, body))
 	}
