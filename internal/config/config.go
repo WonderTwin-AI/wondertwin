@@ -41,7 +41,22 @@ type Config struct {
 	APIKey  string `yaml:"api_key,omitempty" json:"api_key,omitempty"`
 }
 
-// LicenseInfo holds parsed fields from a license key.
+// LicenseInfo holds parsed fields from a license key in the
+// wt_{tier}_{org}_{random}_{check} format.
+//
+// IMPORTANT: this type and ParseLicenseKey predate the current production
+// auth model. The real production flow uses org-context login
+// (cfg.OrgSlug + cfg.OrgID + cfg.APIKey via `wt login --org <slug>`),
+// and pro-twin licensing is the ed25519-signed JSON at
+// ~/.wondertwin/license.json validated by twinkit-pro/license at
+// runtime. This type is retained because cfg.LicenseKey is still used as
+// the Content API bearer token in the legacy login path; do not invent
+// new uses. The wt_<...> format has no production generator.
+//
+// Background: the wt-auth JIT-token service that consumed this format is
+// explicitly deferred per adr-v1-ungated-commercial-twins; see
+// architecture/auth-and-license-landscape.md for the current map of
+// what's live, what's deferred, and what's deprecated.
 type LicenseInfo struct {
 	Tier string // "com" or "ent"
 	Org  string // org slug
