@@ -170,6 +170,100 @@ func TestIntegrationFetchRegistryFromServer(t *testing.T) {
 	}
 }
 
+// TestInstallFromURL_SoftWarnsWhenChecksumMissing is F-007 Phase A
+// regression coverage for the WARN tripwire. Default behaviour without
+// the strict-checksum opt-in: install proceeds (no break for users
+// pre-flip) but writes a loud WARN line to stderr so the publisher
+// surfaces a missing checksum during the rollout release.
+//
+// Removing the warnMissingChecksum call would let an unchecksummed
+// install slip through silently — exactly the F-007 bug.
+func TestInstallFromURL_SoftWarnsWhenChecksumMissing(t *testing.T) {
+	t.Setenv("WT_STRICT_CHECKSUMS", "")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("twin binary"))
+	}))
+	defer srv.Close()
+
+	stderr := captureStderr(t, func() {
+		dir := t.TempDir()
+		if err := InstallFromURL("warntest", "0.1.0", srv.URL+"/twin-warntest", "", dir); err != nil {
+			t.Fatalf("InstallFromURL: %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "WARN") || !strings.Contains(stderr, "no checksum") || !strings.Contains(stderr, "F-007") {
+		t.Errorf("expected WARN about missing checksum + F-007 reference; got: %q", stderr)
+	}
+}
+
+// TestInstallFromURL_StrictModeRejectsMissingChecksum is the Phase B
+// preview: when the operator opts in to strict mode now, missing
+// checksums hard-fail. This proves the next-release flip is a config
+// change, not a code change.
+func TestInstallFromURL_StrictModeRejectsMissingChecksum(t *testing.T) {
+	t.Setenv("WT_STRICT_CHECKSUMS", "1")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("twin binary"))
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	err := InstallFromURL("stricttest", "0.1.0", srv.URL+"/twin-stricttest", "", dir)
+	if err == nil {
+		t.Fatal("expected install to be rejected under strict checksum mode")
+	}
+	if !strings.Contains(err.Error(), "strict-checksum") || !strings.Contains(err.Error(), "no checksum") {
+		t.Errorf("expected error mentioning strict-checksum + missing checksum; got: %v", err)
+	}
+}
+
+// TestInstallFromURL_StrictModeWithChecksumStillVerifies guards the
+// "happy path still works" case under strict mode — checksum present
+// and valid → install proceeds.
+func TestInstallFromURL_StrictModeWithChecksumStillVerifies(t *testing.T) {
+	t.Setenv("WT_STRICT_CHECKSUMS", "1")
+
+	content := []byte("twin binary with valid checksum")
+	checksum := fmt.Sprintf("sha256:%x", sha256.Sum256(content))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(content)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	if err := InstallFromURL("happytest", "0.1.0", srv.URL+"/twin-happytest", checksum, dir); err != nil {
+		t.Fatalf("install with valid checksum under strict mode should succeed: %v", err)
+	}
+}
+
+// captureStderr runs fn with os.Stderr redirected to a pipe and returns
+// what was written. Used by the F-007 WARN-emission test.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = orig })
+
+	done := make(chan string, 1)
+	go func() {
+		var buf [4096]byte
+		n, _ := r.Read(buf[:])
+		done <- string(buf[:n])
+	}()
+
+	fn()
+	w.Close()
+	return <-done
+}
+
 // TestInstallFromURL_RejectsOversizedBody asserts that a server streaming a
 // body larger than httpio.MaxResponseBytes is rejected without OOMing the process.
 // Regression test for F-008: bound network downloads with io.LimitReader.
