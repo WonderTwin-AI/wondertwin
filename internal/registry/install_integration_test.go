@@ -106,28 +106,29 @@ func TestIntegrationInstallFromURLHTTPError(t *testing.T) {
 	}
 }
 
-// TestIntegrationInstallNoChecksum verifies install works without a checksum.
+// TestIntegrationInstallNoChecksum verifies the Phase B strict-by-default
+// behavior: with no checksum and no opt-out, the install is rejected.
+// Pre-Phase B this test asserted the install succeeded; flipped per F-007.
 func TestIntegrationInstallNoChecksum(t *testing.T) {
-	binaryContent := []byte("twin binary no checksum")
+	t.Setenv("WT_STRICT_CHECKSUMS", "")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(binaryContent)
+		w.Write([]byte("twin binary no checksum"))
 	}))
 	defer srv.Close()
 
 	dir := t.TempDir()
 
 	err := InstallFromURL("test", "0.1.0", srv.URL+"/twin-test", "", dir)
-	if err != nil {
-		t.Fatalf("InstallFromURL without checksum: %v", err)
+	if err == nil {
+		t.Fatal("expected install to be rejected under strict-by-default mode")
+	}
+	if !strings.Contains(err.Error(), "sunsets in v0.3") || !strings.Contains(err.Error(), "no expected_sha256") {
+		t.Errorf("expected error mentioning sunset + missing expected_sha256; got: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "twin-test"))
-	if err != nil {
-		t.Fatalf("reading binary: %v", err)
-	}
-	if string(data) != string(binaryContent) {
-		t.Error("binary content mismatch")
+	if _, statErr := os.Stat(filepath.Join(dir, "twin-test")); statErr == nil {
+		t.Error("binary should not exist after strict-checksum rejection")
 	}
 }
 
@@ -170,16 +171,17 @@ func TestIntegrationFetchRegistryFromServer(t *testing.T) {
 	}
 }
 
-// TestInstallFromURL_SoftWarnsWhenChecksumMissing is F-007 Phase A
-// regression coverage for the WARN tripwire. Default behaviour without
-// the strict-checksum opt-in: install proceeds (no break for users
-// pre-flip) but writes a loud WARN line to stderr so the publisher
-// surfaces a missing checksum during the rollout release.
+// TestInstallFromURL_SoftWarnsWhenOptOut is F-007 Phase B coverage for
+// the WARN tripwire on the temporary opt-out path. With
+// WT_STRICT_CHECKSUMS=0 the install proceeds but writes a loud WARN line
+// to stderr referencing the v0.3 sunset, so operators relying on the
+// opt-out get a steady reminder it's going away.
 //
-// Removing the warnMissingChecksum call would let an unchecksummed
-// install slip through silently — exactly the F-007 bug.
-func TestInstallFromURL_SoftWarnsWhenChecksumMissing(t *testing.T) {
-	t.Setenv("WT_STRICT_CHECKSUMS", "")
+// Removing the warnMissingChecksum call on the opt-out branch would let
+// an unchecksummed install slip through silently — exactly the F-007 bug
+// that Phase B exists to retire.
+func TestInstallFromURL_SoftWarnsWhenOptOut(t *testing.T) {
+	t.Setenv("WT_STRICT_CHECKSUMS", "0")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("twin binary"))
@@ -189,19 +191,22 @@ func TestInstallFromURL_SoftWarnsWhenChecksumMissing(t *testing.T) {
 	stderr := captureStderr(t, func() {
 		dir := t.TempDir()
 		if err := InstallFromURL("warntest", "0.1.0", srv.URL+"/twin-warntest", "", dir); err != nil {
-			t.Fatalf("InstallFromURL: %v", err)
+			t.Fatalf("InstallFromURL with opt-out: %v", err)
 		}
 	})
 
 	if !strings.Contains(stderr, "WARN") || !strings.Contains(stderr, "no checksum") || !strings.Contains(stderr, "F-007") {
 		t.Errorf("expected WARN about missing checksum + F-007 reference; got: %q", stderr)
 	}
+	if !strings.Contains(stderr, "v0.3") {
+		t.Errorf("expected WARN to mention v0.3 sunset; got: %q", stderr)
+	}
 }
 
-// TestInstallFromURL_StrictModeRejectsMissingChecksum is the Phase B
-// preview: when the operator opts in to strict mode now, missing
-// checksums hard-fail. This proves the next-release flip is a config
-// change, not a code change.
+// TestInstallFromURL_StrictModeRejectsMissingChecksum verifies that
+// the explicit strict signal (WT_STRICT_CHECKSUMS=1) keeps rejecting
+// missing checksums under the Phase B regime — anything in the env that
+// is not literal "0" must land in the strict bucket.
 func TestInstallFromURL_StrictModeRejectsMissingChecksum(t *testing.T) {
 	t.Setenv("WT_STRICT_CHECKSUMS", "1")
 
@@ -215,8 +220,8 @@ func TestInstallFromURL_StrictModeRejectsMissingChecksum(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected install to be rejected under strict checksum mode")
 	}
-	if !strings.Contains(err.Error(), "strict-checksum") || !strings.Contains(err.Error(), "no checksum") {
-		t.Errorf("expected error mentioning strict-checksum + missing checksum; got: %v", err)
+	if !strings.Contains(err.Error(), "no expected_sha256") || !strings.Contains(err.Error(), "sunsets in v0.3") {
+		t.Errorf("expected error mentioning missing expected_sha256 + v0.3 sunset; got: %v", err)
 	}
 }
 

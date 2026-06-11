@@ -64,7 +64,13 @@ func TestInstallFromURLChecksumMismatch(t *testing.T) {
 	}
 }
 
+// TestInstallFromURLNoChecksum asserts the Phase B strict-by-default
+// behavior: with WT_STRICT_CHECKSUMS unset, a missing checksum hard-fails
+// and no binary is written. The pre-Phase-B version of this test asserted
+// the opposite (install succeeds) — flipped here per F-007 closure.
 func TestInstallFromURLNoChecksum(t *testing.T) {
+	t.Setenv("WT_STRICT_CHECKSUMS", "")
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("binary content"))
 	}))
@@ -72,13 +78,13 @@ func TestInstallFromURLNoChecksum(t *testing.T) {
 
 	dir := t.TempDir()
 	err := InstallFromURL("stripe", "0.1.0", srv.URL+"/twin-stripe", "", dir)
-	if err != nil {
-		t.Fatalf("InstallFromURL without checksum: %v", err)
+	if err == nil {
+		t.Fatal("expected install to be rejected under strict-by-default mode")
 	}
 
 	binaryPath := filepath.Join(dir, "twin-stripe")
-	if _, err := os.Stat(binaryPath); err != nil {
-		t.Fatalf("binary not found: %v", err)
+	if _, statErr := os.Stat(binaryPath); statErr == nil {
+		t.Error("binary should not exist after strict-checksum rejection")
 	}
 }
 
