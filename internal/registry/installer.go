@@ -15,28 +15,29 @@ import (
 	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 )
 
-// strictChecksumsEnvVar opts a CLI into Phase B behavior: reject installs
-// without a checksum, instead of the Phase A default (soft-WARN to stderr,
-// install proceeds). The next release flips the default to strict and
-// removes this opt-in. F-007 in wondertwin-docs/security/known-findings.yaml;
-// design in wondertwin-docs/adr/adr-twin-binary-trust-model.md.
+// strictChecksumsEnvVar is the F-007 Phase B escape hatch: setting it to
+// "0" opts a CLI OUT of the new strict default (which rejects installs
+// when the registry entry has no expected_sha256). Any other value, or
+// unset, keeps the strict default. The opt-out sunsets in v0.3.
+// F-007 in wondertwin-docs/security/known-findings.yaml; design in
+// wondertwin-docs/adr/adr-twin-binary-trust-model.md.
 const strictChecksumsEnvVar = "WT_STRICT_CHECKSUMS"
 
-// requireChecksum returns true when the operator has opted into hard-fail
-// on missing checksums via the strictChecksumsEnvVar. Phase A default is
-// false (soft-WARN). The next release cycle flips the default.
+// requireChecksum returns true when missing checksums must hard-fail.
+// Phase B default is strict; only the literal "0" opts out into legacy
+// soft-WARN behavior. The opt-out sunsets in v0.3.
 func requireChecksum() bool {
-	v := os.Getenv(strictChecksumsEnvVar)
-	return v == "1" || strings.EqualFold(v, "true")
+	return os.Getenv(strictChecksumsEnvVar) != "0"
 }
 
-// warnMissingChecksum writes the loud-WARN line for Phase A's soft-WARN
-// path. Centralised so the message stays consistent across Install() and
-// InstallFromURL() and so a single test can assert the tripwire fired.
+// warnMissingChecksum writes the loud-WARN line for the opt-out path
+// (WT_STRICT_CHECKSUMS=0). Centralised so the message stays consistent
+// across Install() and InstallFromURL() and so a single test can assert
+// the tripwire fired.
 func warnMissingChecksum(twinName, version, source string) {
 	fmt.Fprintf(os.Stderr,
-		"  WARN: no checksum for twin-%s v%s from %s; install will be rejected once strict-checksum default ships (F-007). "+
-			"Verify the registry/lockfile has a sha256 entry for this platform.\n",
+		"  WARN: no checksum for twin-%s v%s from %s; WT_STRICT_CHECKSUMS=0 opt-out is deprecated and sunsets in v0.3 (F-007). "+
+			"Re-publish the registry/lockfile with a sha256 entry for this platform.\n",
 		twinName, version, source,
 	)
 }
@@ -85,12 +86,12 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
-	// Verify checksum. Phase A of F-007 closure: when no checksum is
-	// provided we either soft-WARN (default) or hard-fail (operator opts
-	// in via WT_STRICT_CHECKSUMS). The registry-side validator
-	// (cmd/verify-registry) already enforces that every published version
-	// carries checksums for every platform; this is the CLI tripwire
-	// against a malformed registry slipping through.
+	// Verify checksum. Phase B of F-007 closure: strict-by-default. When
+	// no checksum is provided we hard-fail unless the operator has opted
+	// out via WT_STRICT_CHECKSUMS=0 (sunsets in v0.3). The registry-side
+	// validator (cmd/verify-registry) already enforces that every
+	// published version carries checksums for every platform; this is
+	// the CLI tripwire against a malformed registry slipping through.
 	if hasChecksum {
 		fmt.Printf("  Verifying checksum...\n")
 		actual := fmt.Sprintf("sha256:%x", sha256.Sum256(data))
@@ -98,8 +99,8 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 			return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actual)
 		}
 	} else if requireChecksum() {
-		return fmt.Errorf("install rejected: no checksum for twin-%s v%s (%s); "+
-			"strict-checksum mode is enabled via %s. Re-publish the registry entry with sha256 checksums",
+		return fmt.Errorf("install rejected: no expected_sha256 in registry entry for twin-%s v%s (%s); "+
+			"set %s=0 to bypass for now (escape hatch sunsets in v0.3 — re-publish the registry entry with a SHA256 before then)",
 			twinName, resolvedVersion, platform, strictChecksumsEnvVar)
 	} else {
 		warnMissingChecksum(twinName, resolvedVersion, "registry")
@@ -185,7 +186,7 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("binary exceeds maximum size of %d bytes", httpio.MaxResponseBytes)
 	}
 
-	// Verify checksum. F-007 Phase A — see Install() for full rationale.
+	// Verify checksum. F-007 Phase B — see Install() for full rationale.
 	// InstallFromURL is the lockfile path; missing checksums here mean
 	// the lockfile was generated against an unchecksummed registry entry,
 	// which the registry-side validator should not allow but the CLI
@@ -196,8 +197,8 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 			return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actual)
 		}
 	} else if requireChecksum() {
-		return fmt.Errorf("install rejected: no checksum for twin-%s v%s; "+
-			"strict-checksum mode is enabled via %s. Re-generate the lockfile against a registry with checksums",
+		return fmt.Errorf("install rejected: no expected_sha256 in lockfile entry for twin-%s v%s; "+
+			"set %s=0 to bypass for now (escape hatch sunsets in v0.3 — re-generate the lockfile against a registry with a SHA256 before then)",
 			twinName, version, strictChecksumsEnvVar)
 	} else {
 		warnMissingChecksum(twinName, version, "lockfile")
