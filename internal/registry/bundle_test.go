@@ -12,6 +12,15 @@ import (
 	"testing"
 )
 
+// TestMain bypasses the BinaryURL allowlist for the integration tests
+// below — httptest.Server serves http://127.0.0.1:PORT, which by design
+// fails the production https + host-allowlist check. The validator
+// itself is covered directly by TestValidateBinaryURL.
+func TestMain(m *testing.M) {
+	testSkipBinaryURLValidation = true
+	os.Exit(m.Run())
+}
+
 // serveBinary returns an httptest server that returns the given bytes
 // at every request — useful for the bundle commit tests.
 func serveBinary(t *testing.T, body []byte) *httptest.Server {
@@ -188,6 +197,35 @@ func TestCommitInstallBundle_RejectsMissingFields(t *testing.T) {
 				filepath.Join(dir, "bin"), filepath.Join(dir, "license.json"))
 			if err == nil {
 				t.Errorf("want error for %s, got nil", tc.name)
+			}
+		})
+	}
+}
+
+func TestValidateBinaryURL(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{"allowed-releases", "https://releases.wondertwin.ai/v0.1.0/wt", false},
+		{"allowed-github", "https://github.com/wondertwin-ai/wt/releases/v0.1.0/wt", false},
+		{"allowed-raw-githubusercontent", "https://raw.githubusercontent.com/wondertwin-ai/wt/main/wt", false},
+		{"reject-http", "http://releases.wondertwin.ai/v0.1.0/wt", true},
+		{"reject-file", "file:///etc/passwd", true},
+		{"reject-non-allowed-host", "https://evil.com/payload", true},
+		{"reject-empty-host", "https:///just-a-path", true},
+		{"reject-malformed", "ht!tps://broken", true},
+		{"reject-empty", "", true},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := validateBinaryURL(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateBinaryURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
 			}
 		})
 	}

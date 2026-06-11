@@ -3,9 +3,52 @@ package registry
 import (
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 )
+
+// allowedBinaryURLHosts is the closed set of hosts CommitInstallBundle
+// will fetch a twin binary from. BinaryURL is server-supplied (the MCP
+// registry returns it in the install envelope), so a compromised or
+// misconfigured registry could otherwise hand the installer a
+// file:///etc/passwd or http://evil.com URL that http.Client.Get would
+// happily honor. The 2026-06-04 audit (F-007-adjacent) flagged this.
+// Extending the list is a deliberate follow-up PR, not a config knob.
+var allowedBinaryURLHosts = map[string]struct{}{
+	"releases.wondertwin.ai":    {},
+	"github.com":                {},
+	"raw.githubusercontent.com": {},
+}
+
+// testSkipBinaryURLValidation, when true, bypasses validateBinaryURL.
+// Set ONLY by TestMain in this package because the integration tests
+// drive the installer via httptest.Server (http loopback), which by
+// design fails the production allowlist + https check. Never reference
+// this from non-test code; there is no production escape hatch.
+var testSkipBinaryURLValidation bool
+
+// validateBinaryURL parses rawURL, requires the https scheme, and
+// confirms the host is in allowedBinaryURLHosts. The returned *url.URL
+// is currently unused by callers — a later refactor could thread it
+// into InstallFromURL to avoid the re-parse, but that's out of scope.
+func validateBinaryURL(rawURL string) (*url.URL, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse binary URL: %w", err)
+	}
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("binary URL scheme must be https, got %q", u.Scheme)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return nil, fmt.Errorf("binary URL must have a host")
+	}
+	if _, ok := allowedBinaryURLHosts[host]; !ok {
+		return nil, fmt.Errorf("binary URL host %q not in allowlist (releases.wondertwin.ai, github.com, raw.githubusercontent.com)", host)
+	}
+	return u, nil
+}
 
 // InstallBundle is the local view of the wire-shape install bundle
 // the MCP server returns. The exact wire shape lives in
@@ -51,6 +94,11 @@ func CommitInstallBundle(twinName string, bundle InstallBundle, binaryDir, licen
 	}
 	if bundle.LicenseFileB64 == "" {
 		return fmt.Errorf("install bundle: license_file is required")
+	}
+	if !testSkipBinaryURLValidation {
+		if _, err := validateBinaryURL(bundle.BinaryURL); err != nil {
+			return fmt.Errorf("install bundle binary URL invalid: %w", err)
+		}
 	}
 
 	licenseBytes, err := base64.StdEncoding.DecodeString(bundle.LicenseFileB64)
