@@ -44,7 +44,7 @@ type Config struct {
 // LicenseInfo holds parsed fields from a license key in the
 // wt_{tier}_{org}_{random}_{check} format.
 //
-// IMPORTANT: this type and ParseLicenseKey predate the current production
+// IMPORTANT: this type and ValidateChecksum predate the current production
 // auth model. The real production flow uses org-context login
 // (cfg.OrgSlug + cfg.OrgID + cfg.APIKey via `wt login --org <slug>`),
 // and pro-twin licensing is the ed25519-signed JSON at
@@ -201,9 +201,9 @@ func Save(cfg *Config) error {
 	return nil
 }
 
-// ParseLicenseKey parses a license key of the format wt_{tier}_{org}_{random}_{check}.
+// ValidateChecksum parses a license key of the format wt_{tier}_{org}_{random}_{check}.
 // Returns nil if the key is empty or invalid.
-func ParseLicenseKey(key string) *LicenseInfo {
+func ValidateChecksum(key string) *LicenseInfo {
 	if key == "" {
 		return nil
 	}
@@ -259,7 +259,7 @@ func ParseLicenseKey(key string) *LicenseInfo {
 
 // HasValidLicense returns true if the config has a parseable license key.
 func (c *Config) HasValidLicense() bool {
-	return ParseLicenseKey(c.LicenseKey) != nil
+	return ValidateChecksum(c.LicenseKey) != nil
 }
 
 // HasOrgContext returns true if the config has stored org credentials.
