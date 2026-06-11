@@ -2,7 +2,6 @@ package api
 
 import (
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/wondertwin-ai/wondertwin/cmd/wt-collector/internal/store"
 )
 
@@ -17,11 +16,10 @@ func NewHandler(events *store.EventStore, ingestKey string) *Handler {
 	return &Handler{events: events, ingestKey: ingestKey}
 }
 
-// Routes mounts all API routes.
+// Routes mounts all API routes. RequestID + Recoverer are applied by
+// main; this keeps the router pure-routing and lets tests exercise the
+// handlers without the slog-flavoured middleware stack.
 func (h *Handler) Routes(r chi.Router) {
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
 	r.Get("/health", h.handleHealth)
 
 	r.Route("/telemetry", func(r chi.Router) {

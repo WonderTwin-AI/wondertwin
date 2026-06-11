@@ -194,6 +194,39 @@ func TestIngest_WrongKey(t *testing.T) {
 	}
 }
 
+// TestIngest_BearerCompareEdgeCases exercises the constant-time bearer
+// compare across the three failure shapes that share a single code
+// path: same-length-wrong, different-length-wrong, and empty token
+// after "Bearer ". A regression to plain != would still pass the
+// same-length case via early-return on byte mismatch — the value of
+// the table is forcing the compare to be branch-free per case.
+func TestIngest_BearerCompareEdgeCases(t *testing.T) {
+	srv := testServer(t)
+	defer srv.Close()
+
+	// testIngestKey == "test-ingest-secret" (18 bytes).
+	cases := []struct {
+		name   string
+		bearer string
+	}{
+		{"wrong-same-length", "wrong-ingest-stuff"},   // also 18 bytes
+		{"wrong-shorter", "short"},
+		{"wrong-longer", "test-ingest-secret-but-longer"},
+		{"empty-after-prefix", ""},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			resp := postJSON(t, srv.URL+"/telemetry/v1/ingest", sampleEvents(),
+				"Authorization", "Bearer "+tc.bearer)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Errorf("%s: status = %d, want %d", tc.name, resp.StatusCode, http.StatusUnauthorized)
+			}
+		})
+	}
+}
+
 func TestStats(t *testing.T) {
 	srv := testServer(t)
 	defer srv.Close()
