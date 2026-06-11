@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -63,7 +64,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		token := strings.TrimPrefix(auth, "Bearer ")
-		if token != h.ingestKey {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(h.ingestKey)) != 1 {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid ingest key"})
 			return
 		}
