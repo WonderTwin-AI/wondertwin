@@ -1412,7 +1412,7 @@ func cmdAuthLogin() error {
 		return fmt.Errorf("no license key provided")
 	}
 
-	info := config.ParseLicenseKey(key)
+	info := config.ValidateChecksum(key)
 	if info == nil {
 		return fmt.Errorf("invalid license key format")
 	}
@@ -1454,7 +1454,7 @@ func cmdAuthStatus() error {
 		return nil
 	}
 
-	info := config.ParseLicenseKey(cfg.LicenseKey)
+	info := config.ValidateChecksum(cfg.LicenseKey)
 	if info == nil {
 		fmt.Println("Tier: free (invalid license key)")
 		return nil

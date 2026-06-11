@@ -214,10 +214,10 @@ func TestOrgContextRoundTrip(t *testing.T) {
 	}
 }
 
-func TestParseLicenseKey(t *testing.T) {
+func TestValidateChecksum(t *testing.T) {
 	// Compute a valid checksum for the key "wt_com_acme_abcdef"
 	// payload bytes sum = 1842, 1842 % 256 = 50 = 0x32
-	info := ParseLicenseKey("wt_com_acme_abcdef_32")
+	info := ValidateChecksum("wt_com_acme_abcdef_32")
 	if info == nil {
 		t.Fatal("expected non-nil LicenseInfo")
 	}
