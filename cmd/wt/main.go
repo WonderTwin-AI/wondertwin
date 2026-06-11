@@ -34,11 +34,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -84,6 +86,16 @@ func resolveManifestPath(path string) string {
 }
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("wt: unrecovered panic",
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
+			os.Exit(1)
+		}
+	}()
+
 	cmd, args, manifestPath := parseArgs()
 	manifestPath = resolveManifestPath(manifestPath)
 
