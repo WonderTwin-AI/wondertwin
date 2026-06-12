@@ -169,7 +169,7 @@ func TestOrgContext(t *testing.T) {
 
 	cfg.OrgSlug = "acme"
 	cfg.OrgID = "org-123"
-	cfg.APIKey = "wt_live_abc123"
+	cfg.APIKey = "wt_abc123def456"
 	if !cfg.HasOrgContext() {
 		t.Error("expected org context after setting fields")
 	}
@@ -193,7 +193,7 @@ func TestOrgContextRoundTrip(t *testing.T) {
   "license_key": "",
   "org_slug": "acme",
   "org_id": "org-123",
-  "api_key": "wt_live_abc123"
+  "api_key": "wt_abc123def456"
 }`
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -209,8 +209,8 @@ func TestOrgContextRoundTrip(t *testing.T) {
 	if cfg.OrgID != "org-123" {
 		t.Errorf("org_id: got %q, want org-123", cfg.OrgID)
 	}
-	if cfg.APIKey != "wt_live_abc123" {
-		t.Errorf("api_key: got %q, want wt_live_abc123", cfg.APIKey)
+	if cfg.APIKey != "wt_abc123def456" {
+		t.Errorf("api_key: got %q, want wt_abc123def456", cfg.APIKey)
 	}
 }
 
