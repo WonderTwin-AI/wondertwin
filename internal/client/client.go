@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 )
 
 // AdminClient talks to twin /admin/* endpoints.
@@ -19,7 +21,7 @@ type AdminClient struct {
 // New creates an AdminClient with a 5-second timeout.
 func New() *AdminClient {
 	return &AdminClient{
-		http: &http.Client{Timeout: 5 * time.Second},
+		http: httpclient.New(httpclient.WithTimeout(5 * time.Second)),
 	}
 }
 

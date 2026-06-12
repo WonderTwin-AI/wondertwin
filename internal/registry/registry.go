@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"strings"
@@ -214,7 +215,7 @@ func toJSONURL(url string) string {
 // fetchAndParse downloads a registry file and parses it based on the URL extension.
 // JSON is used for .json URLs, YAML for everything else.
 func fetchAndParse(url, token string) (*Registry, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(30 * time.Second))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

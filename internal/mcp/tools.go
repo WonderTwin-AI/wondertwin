@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"strings"
@@ -323,7 +324,7 @@ func handleInspect(m *manifest.Manifest, _ *client.AdminClient, params json.RawM
 	}
 
 	// GET /admin/state to retrieve current twin state
-	httpClient := &http.Client{Timeout: 5 * time.Second}
+	httpClient := httpclient.New(httpclient.WithTimeout(5 * time.Second))
 	resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%d/admin/state", twin.AdminPort))
 	if err != nil {
 		return textResult(fmt.Sprintf("Error inspecting %s: %v", p.Twin, err))
@@ -360,7 +361,7 @@ func handleConfig(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 		return textResult(fmt.Sprintf("Error: %v", err))
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
+	httpClient := httpclient.New(httpclient.WithTimeout(5 * time.Second))
 
 	if len(p.Updates) > 0 {
 		// PUT /admin/config with updates
@@ -418,7 +419,7 @@ func handleQuirks(m *manifest.Manifest, _ *client.AdminClient, params json.RawMe
 		return textResult(fmt.Sprintf("Error: %v", err))
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
+	httpClient := httpclient.New(httpclient.WithTimeout(5 * time.Second))
 
 	if p.Action != "" {
 		if p.QuirkID == "" {

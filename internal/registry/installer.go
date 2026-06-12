@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/config"
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 )
 
@@ -62,7 +63,7 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	// Download binary
 	fmt.Printf("  Downloading twin-%s v%s (%s)...\n", twinName, resolvedVersion, platform)
 
-	client := &http.Client{Timeout: 5 * time.Minute}
+	client := httpclient.New(httpclient.WithTimeout(5 * time.Minute))
 	resp, err := client.Get(binaryURL)
 	if err != nil {
 		return fmt.Errorf("downloading binary: %w", err)
@@ -166,7 +167,7 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Minute}
+	client := httpclient.New(httpclient.WithTimeout(5 * time.Minute))
 	resp, err := client.Get(binaryURL)
 	if err != nil {
 		return fmt.Errorf("downloading binary: %w", err)

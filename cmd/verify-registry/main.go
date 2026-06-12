@@ -19,6 +19,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 )
 
 const defaultRegistryURL = "https://raw.githubusercontent.com/wondertwin-ai/registry/main/registry.json"
@@ -247,7 +249,7 @@ func ValidChecksum(cs string) bool {
 }
 
 func headCheck(url string) (bool, string) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(15 * time.Second))
 	resp, err := client.Head(url)
 	if err != nil {
 		return false, err.Error()
@@ -274,7 +276,7 @@ func headCheck(url string) (bool, string) {
 }
 
 func fetchRegistry(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.New(httpclient.WithTimeout(30 * time.Second))
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fetching registry: %w", err)

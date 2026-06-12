@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 	"github.com/wondertwin-ai/wondertwin/internal/manifest"
 )
 
@@ -42,7 +43,7 @@ type Runner struct {
 func NewRunner(m *manifest.Manifest) *Runner {
 	return &Runner{
 		manifest: m,
-		http:     &http.Client{Timeout: 10 * time.Second},
+		http:     httpclient.New(httpclient.WithTimeout(10 * time.Second)),
 	}
 }
 
