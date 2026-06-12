@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
 	"github.com/wondertwin-ai/wondertwin/internal/httpio"
 	"net/http"
 	"net/url"
@@ -34,11 +35,9 @@ func New(baseURL, apiKey string) *Client {
 		baseURL = DefaultBaseURL
 	}
 	return &Client{
-		baseURL: baseURL,
-		apiKey:  apiKey,
-		httpClient: &http.Client{
-			Timeout: requestTimeout,
-		},
+		baseURL:    baseURL,
+		apiKey:     apiKey,
+		httpClient: httpclient.New(httpclient.WithTimeout(requestTimeout)),
 	}
 }
 
