@@ -13,13 +13,13 @@ import (
 // Engine is the accounting ledger engine. It enforces accounting invariants
 // and delegates platform-specific behavior to hooks.
 type Engine struct {
-	mu         sync.RWMutex
-	journal    *journal.Journal
-	hooks      AccountingHooks
-	clock      *state.Clock
-	accounts   map[string]*Account
-	acctOrder  []string // insertion order
-	periodLock time.Time // reject entries before this time
+	mu          sync.RWMutex
+	journal     *journal.Journal
+	hooks       AccountingHooks
+	clock       *state.Clock
+	accounts    map[string]*Account
+	acctOrder   []string  // insertion order
+	periodLock  time.Time // reject entries before this time
 	acctCounter int
 
 	// Well-known account IDs for AR/AP. Set by CreateAccount or configurable.

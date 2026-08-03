@@ -72,8 +72,8 @@ func TestCompleteSubscriptionCheckoutSession(t *testing.T) {
 
 	// Create session with mode=subscription and line items.
 	resp = stripePostWithParams(tc, "/v1/checkout/sessions", map[string]string{
-		"mode":                      "subscription",
-		"customer":                  custID,
+		"mode":                    "subscription",
+		"customer":                custID,
 		"line_items[0][price]":    priceID,
 		"line_items[0][quantity]": "1",
 	})
@@ -157,7 +157,7 @@ func TestCheckoutSessionLineItems(t *testing.T) {
 
 	// Create session with line items.
 	resp = stripePostWithParams(tc, "/v1/checkout/sessions", map[string]string{
-		"mode":                      "payment",
+		"mode":                    "payment",
 		"line_items[0][price]":    priceID,
 		"line_items[0][quantity]": "2",
 	})

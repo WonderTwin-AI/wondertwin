@@ -12,10 +12,10 @@ import (
 // Engine processes messages through their lifecycle.
 type Engine struct {
 	mu           sync.RWMutex
-	messages     map[string]*Message          // id → message
+	messages     map[string]*Message // id → message
 	lifecycles   map[ChannelType]*Lifecycle
-	suppressions map[string]*Suppression      // "channel:address" → suppression
-	senders      map[string]*Sender           // id → sender
+	suppressions map[string]*Suppression // "channel:address" → suppression
+	senders      map[string]*Sender      // id → sender
 	hooks        MessagingHooks
 	clock        *state.Clock
 	idCounter    int

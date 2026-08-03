@@ -77,19 +77,19 @@ type User struct {
 
 // UserProfile holds profile fields for a Slack user.
 type UserProfile struct {
-	Email               string `json:"email,omitempty"`
-	DisplayName         string `json:"display_name"`
-	DisplayNameNorm     string `json:"display_name_normalized"`
-	RealName            string `json:"real_name"`
-	RealNameNorm        string `json:"real_name_normalized"`
-	StatusText          string `json:"status_text,omitempty"`
-	StatusEmoji         string `json:"status_emoji,omitempty"`
-	Image24             string `json:"image_24,omitempty"`
-	Image32             string `json:"image_32,omitempty"`
-	Image48             string `json:"image_48,omitempty"`
-	Image72             string `json:"image_72,omitempty"`
-	Image192            string `json:"image_192,omitempty"`
-	Image512            string `json:"image_512,omitempty"`
+	Email           string `json:"email,omitempty"`
+	DisplayName     string `json:"display_name"`
+	DisplayNameNorm string `json:"display_name_normalized"`
+	RealName        string `json:"real_name"`
+	RealNameNorm    string `json:"real_name_normalized"`
+	StatusText      string `json:"status_text,omitempty"`
+	StatusEmoji     string `json:"status_emoji,omitempty"`
+	Image24         string `json:"image_24,omitempty"`
+	Image32         string `json:"image_32,omitempty"`
+	Image48         string `json:"image_48,omitempty"`
+	Image72         string `json:"image_72,omitempty"`
+	Image192        string `json:"image_192,omitempty"`
+	Image512        string `json:"image_512,omitempty"`
 }
 
 // Pin represents a pinned item in a channel.
@@ -121,11 +121,11 @@ type File struct {
 
 // ScheduledMessage holds a message scheduled for future delivery.
 type ScheduledMessage struct {
-	ID        string `json:"id"`
-	Channel   string `json:"channel_id"`
-	PostAt    int64  `json:"post_at"`
+	ID          string `json:"id"`
+	Channel     string `json:"channel_id"`
+	PostAt      int64  `json:"post_at"`
 	DateCreated int64  `json:"date_created"`
-	Text      string `json:"text"`
+	Text        string `json:"text"`
 }
 
 // Team represents workspace info.
@@ -172,17 +172,17 @@ type Usergroup struct {
 
 // Star represents a starred item.
 type Star struct {
-	Type    string `json:"type"` // "message", "file", "channel"
-	Channel string `json:"channel,omitempty"`
+	Type    string   `json:"type"` // "message", "file", "channel"
+	Channel string   `json:"channel,omitempty"`
 	Message *Message `json:"message,omitempty"`
 	File    *File    `json:"file,omitempty"`
 }
 
 // DndStatus holds a user's Do Not Disturb state.
 type DndStatus struct {
-	DndEnabled   bool  `json:"dnd_enabled"`
-	NextStart    int64 `json:"next_dnd_start_ts"`
-	NextEnd      int64 `json:"next_dnd_end_ts"`
-	SnoozeEnabled bool `json:"snooze_enabled"`
+	DndEnabled    bool  `json:"dnd_enabled"`
+	NextStart     int64 `json:"next_dnd_start_ts"`
+	NextEnd       int64 `json:"next_dnd_end_ts"`
+	SnoozeEnabled bool  `json:"snooze_enabled"`
 	SnoozeEndtime int64 `json:"snooze_endtime,omitempty"`
 }

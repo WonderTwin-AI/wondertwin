@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/graphql"
 	"github.com/wondertwin-ai/wondertwin/twin-linear/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/graphql"
 )
 
 // RegisterResolvers registers all Linear API queries and mutations on the schema.
@@ -345,14 +345,14 @@ func registerMutations(schema *graphql.Schema, s *store.MemoryStore) {
 		now := s.Now()
 		id := s.NextID()
 		p := store.Project{
-			ID:        id,
-			Name:      getString(input, "name"),
+			ID:          id,
+			Name:        getString(input, "name"),
 			Description: getString(input, "description"),
-			State:     "planned",
-			SlugID:    id,
-			URL:       "https://linear.app/wondertwin/project/" + id,
-			CreatedAt: now,
-			UpdatedAt: now,
+			State:       "planned",
+			SlugID:      id,
+			URL:         "https://linear.app/wondertwin/project/" + id,
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 		s.Projects.Set(id, p)
 		return store.MutationResult(true, p, "project"), nil

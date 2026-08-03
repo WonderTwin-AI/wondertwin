@@ -50,7 +50,9 @@ func NewOAuthServer(cfg OAuthConfig, tokens *TokenRegistry) *OAuthServer {
 
 // Routes mounts the OAuth endpoints on the given router.
 // Call this from the twin's main.go to enable OAuth simulation.
-func (s *OAuthServer) Routes(mux interface{ HandleFunc(string, func(http.ResponseWriter, *http.Request)) }) {
+func (s *OAuthServer) Routes(mux interface {
+	HandleFunc(string, func(http.ResponseWriter, *http.Request))
+}) {
 	if s.config.AuthorizePath != "" {
 		mux.HandleFunc(s.config.AuthorizePath, s.handleAuthorize)
 	}

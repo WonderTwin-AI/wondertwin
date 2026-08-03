@@ -85,9 +85,9 @@ func (h *Handler) GetCombinedStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ghJSON(w, 200, map[string]any{
-		"state":      combined,
-		"statuses":   statuses,
-		"sha":        ref,
+		"state":       combined,
+		"statuses":    statuses,
+		"sha":         ref,
 		"total_count": len(statuses),
 		"repository": map[string]any{
 			"full_name": owner + "/" + repo,

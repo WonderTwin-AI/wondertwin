@@ -10,11 +10,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
-	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )
 
 func main() {

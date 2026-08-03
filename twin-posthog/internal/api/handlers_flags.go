@@ -35,7 +35,7 @@ func (h *Handler) Flags(w http.ResponseWriter, r *http.Request) {
 		"featureFlagPayloads":       featureFlagPayloads,
 		"errorsWhileComputingFlags": false,
 		"requestId":                 h.store.Events.NextID(),
-		"quotaLimited":             []string{},
+		"quotaLimited":              []string{},
 	})
 }
 
@@ -59,13 +59,13 @@ func (h *Handler) LocalEvaluation(w http.ResponseWriter, r *http.Request) {
 	flagDefs := make([]map[string]any, 0, len(flags))
 	for _, flag := range flags {
 		def := map[string]any{
-			"id":                  flag.Key,
-			"key":                 flag.Key,
-			"name":                flag.Key,
-			"active":              flag.Enabled,
-			"is_simple_flag":      true,
-			"rollout_percentage":  100,
-			"filters":             map[string]any{
+			"id":                 flag.Key,
+			"key":                flag.Key,
+			"name":               flag.Key,
+			"active":             flag.Enabled,
+			"is_simple_flag":     true,
+			"rollout_percentage": 100,
+			"filters": map[string]any{
 				"groups": []map[string]any{
 					{
 						"rollout_percentage": 100,
@@ -88,7 +88,7 @@ func (h *Handler) LocalEvaluation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"flags":             flagDefs,
+		"flags":              flagDefs,
 		"group_type_mapping": map[string]any{},
 	})
 }

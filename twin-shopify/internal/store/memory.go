@@ -100,13 +100,13 @@ func (s *MemoryStore) Now() string {
 }
 
 type stateSnapshot struct {
-	Products          map[string]Product     `json:"products,omitempty"`
-	Orders            map[string]Order       `json:"orders,omitempty"`
-	Customers         map[string]Customer    `json:"customers,omitempty"`
-	CustomCollections map[string]Collection  `json:"custom_collections,omitempty"`
-	Webhooks          map[string]Webhook     `json:"webhooks,omitempty"`
-	Locations         map[string]Location    `json:"locations,omitempty"`
-	Shop              *Shop                  `json:"shop,omitempty"`
+	Products          map[string]Product    `json:"products,omitempty"`
+	Orders            map[string]Order      `json:"orders,omitempty"`
+	Customers         map[string]Customer   `json:"customers,omitempty"`
+	CustomCollections map[string]Collection `json:"custom_collections,omitempty"`
+	Webhooks          map[string]Webhook    `json:"webhooks,omitempty"`
+	Locations         map[string]Location   `json:"locations,omitempty"`
+	Shop              *Shop                 `json:"shop,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {

@@ -3,9 +3,9 @@ package content
 
 // ContentPayload is the top-level response from the Content API.
 type ContentPayload struct {
-	Twin    string          `json:"twin"`
-	Version string          `json:"version"`
-	Quirks  []QuirkRecord   `json:"quirks,omitempty"`
+	Twin    string        `json:"twin"`
+	Version string        `json:"version"`
+	Quirks  []QuirkRecord `json:"quirks,omitempty"`
 }
 
 // QuirkRecord describes a single SDK quirk.

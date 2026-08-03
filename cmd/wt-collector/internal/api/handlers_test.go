@@ -209,7 +209,7 @@ func TestIngest_BearerCompareEdgeCases(t *testing.T) {
 		name   string
 		bearer string
 	}{
-		{"wrong-same-length", "wrong-ingest-stuff"},   // also 18 bytes
+		{"wrong-same-length", "wrong-ingest-stuff"}, // also 18 bytes
 		{"wrong-shorter", "short"},
 		{"wrong-longer", "test-ingest-secret-but-longer"},
 		{"empty-after-prefix", ""},

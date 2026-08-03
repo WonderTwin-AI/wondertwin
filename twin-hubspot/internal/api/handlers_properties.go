@@ -71,11 +71,11 @@ func (h *Handler) UpdateProperty(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Label       *string           `json:"label,omitempty"`
-		Type        *string           `json:"type,omitempty"`
-		FieldType   *string           `json:"fieldType,omitempty"`
-		GroupName   *string           `json:"groupName,omitempty"`
-		Description *string           `json:"description,omitempty"`
+		Label       *string                `json:"label,omitempty"`
+		Type        *string                `json:"type,omitempty"`
+		FieldType   *string                `json:"fieldType,omitempty"`
+		GroupName   *string                `json:"groupName,omitempty"`
+		Description *string                `json:"description,omitempty"`
 		Options     []store.PropertyOption `json:"options,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

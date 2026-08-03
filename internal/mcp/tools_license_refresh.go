@@ -171,4 +171,3 @@ func refreshLicenseIfStale(ctx context.Context, pc *platform.Client, cfg *config
 			"err", err)
 	}
 }
-

@@ -22,7 +22,7 @@ type NoOpSearchHooks struct{}
 
 func (NoOpSearchHooks) ValidateRecord(_ context.Context, _ string, _ *Record) error { return nil }
 func (NoOpSearchHooks) OnRecordSaved(_ context.Context, _ string, _ *Record) error  { return nil }
-func (NoOpSearchHooks) OnRecordDeleted(_ context.Context, _, _ string) error         { return nil }
+func (NoOpSearchHooks) OnRecordDeleted(_ context.Context, _, _ string) error        { return nil }
 func (NoOpSearchHooks) OnSearch(_ context.Context, _ string, _ *SearchParams, _ *SearchResult) error {
 	return nil
 }

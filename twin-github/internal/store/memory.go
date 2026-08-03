@@ -46,9 +46,9 @@ type MemoryStore struct {
 	Clock            *pkgstate.Clock
 
 	// Monotonic counters
-	issueCounter  atomic.Int64
-	idCounter     atomic.Int64
-	runCounter    atomic.Int64
+	issueCounter atomic.Int64
+	idCounter    atomic.Int64
+	runCounter   atomic.Int64
 }
 
 // New creates a new MemoryStore with empty state.
@@ -242,17 +242,17 @@ func MakeSHA(input string) string {
 }
 
 type stateSnapshot struct {
-	Repos        map[string]Repository    `json:"repos,omitempty"`
-	Issues       map[string]Issue         `json:"issues,omitempty"`
-	PullRequests map[string]PullRequest   `json:"pull_requests,omitempty"`
-	Comments     map[string]Comment       `json:"comments,omitempty"`
-	Labels       map[string]Label         `json:"labels,omitempty"`
-	Milestones   map[string]Milestone     `json:"milestones,omitempty"`
-	Users        map[string]User          `json:"users,omitempty"`
-	Webhooks     map[string]Webhook       `json:"webhooks,omitempty"`
-	Statuses     map[string]CommitStatus  `json:"statuses,omitempty"`
-	Releases     map[string]Release       `json:"releases,omitempty"`
-	Branches     map[string]Branch        `json:"branches,omitempty"`
+	Repos        map[string]Repository   `json:"repos,omitempty"`
+	Issues       map[string]Issue        `json:"issues,omitempty"`
+	PullRequests map[string]PullRequest  `json:"pull_requests,omitempty"`
+	Comments     map[string]Comment      `json:"comments,omitempty"`
+	Labels       map[string]Label        `json:"labels,omitempty"`
+	Milestones   map[string]Milestone    `json:"milestones,omitempty"`
+	Users        map[string]User         `json:"users,omitempty"`
+	Webhooks     map[string]Webhook      `json:"webhooks,omitempty"`
+	Statuses     map[string]CommitStatus `json:"statuses,omitempty"`
+	Releases     map[string]Release      `json:"releases,omitempty"`
+	Branches     map[string]Branch       `json:"branches,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {

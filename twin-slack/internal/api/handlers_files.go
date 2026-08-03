@@ -20,12 +20,12 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 
 	id := h.store.Files.NextID()
 	file := store.File{
-		ID:       id,
-		Name:     req.Filename,
-		Title:    req.Filename,
-		Size:     req.Length,
-		User:     "U_BOT",
-		Created:  h.store.Clock.Now().Unix(),
+		ID:      id,
+		Name:    req.Filename,
+		Title:   req.Filename,
+		Size:    req.Length,
+		User:    "U_BOT",
+		Created: h.store.Clock.Now().Unix(),
 	}
 	h.store.Files.Set(id, file)
 
@@ -38,7 +38,7 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 // FilesCompleteUploadExternal handles POST /api/files.completeUploadExternal
 func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Files   []struct {
+		Files []struct {
 			ID    string `json:"id"`
 			Title string `json:"title,omitempty"`
 		} `json:"files"`

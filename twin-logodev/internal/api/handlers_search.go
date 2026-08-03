@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // SearchBrands handles GET /api/v1/search?q=query — searches seeded brands.

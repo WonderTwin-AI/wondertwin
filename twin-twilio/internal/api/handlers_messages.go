@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 )
 
 // otpRegex matches 4-6 digit OTP codes in message bodies.
@@ -146,15 +146,15 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"messages":         messages,
-		"end":              len(messages) - 1,
-		"first_page_uri":  "/2010-04-01/Accounts/Messages.json?PageSize=50&Page=0",
-		"next_page_uri":   nil,
-		"page":            0,
-		"page_size":       50,
+		"messages":          messages,
+		"end":               len(messages) - 1,
+		"first_page_uri":    "/2010-04-01/Accounts/Messages.json?PageSize=50&Page=0",
+		"next_page_uri":     nil,
+		"page":              0,
+		"page_size":         50,
 		"previous_page_uri": nil,
-		"start":           0,
-		"uri":             "/2010-04-01/Accounts/Messages.json?PageSize=50&Page=0",
+		"start":             0,
+		"uri":               "/2010-04-01/Accounts/Messages.json?PageSize=50&Page=0",
 	})
 }
 

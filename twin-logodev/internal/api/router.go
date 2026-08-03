@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // Handler holds logo API state.
@@ -27,7 +27,6 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.tokenAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
 
-
 		r.Get("/name/{name}", h.GetLogoByName)
 		r.Get("/ticker/{symbol}", h.GetLogoByTicker)
 		r.Get("/crypto/{symbol}", h.GetLogoByCrypto)
@@ -39,7 +38,6 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(h.tokenAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
-
 
 		r.Get("/search", h.SearchBrands)
 		r.Get("/describe/{domain}", h.DescribeBrand)

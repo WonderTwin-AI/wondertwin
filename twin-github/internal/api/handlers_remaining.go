@@ -488,10 +488,10 @@ func (h *Handler) GetApp(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListAppInstallations(w http.ResponseWriter, r *http.Request) {
 	ghJSON(w, 200, []map[string]any{
 		{
-			"id":         1,
-			"app_id":     1,
+			"id":          1,
+			"app_id":      1,
 			"target_type": "Organization",
-			"account":    store.User{ID: 1, Login: "twin-bot", Type: "Organization"},
+			"account":     store.User{ID: 1, Login: "twin-bot", Type: "Organization"},
 		},
 	})
 }

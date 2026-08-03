@@ -3,50 +3,50 @@ package store
 
 // Repository represents a GitHub repository.
 type Repository struct {
-	ID            int64  `json:"id"`
-	Name          string `json:"name"`
-	FullName      string `json:"full_name"`
-	Description   string `json:"description"`
-	Private       bool   `json:"private"`
-	Fork          bool   `json:"fork"`
-	HTMLURL       string `json:"html_url"`
-	CloneURL      string `json:"clone_url"`
-	SSHURL        string `json:"ssh_url"`
-	DefaultBranch string `json:"default_branch"`
-	Language      string `json:"language,omitempty"`
-	ForksCount    int    `json:"forks_count"`
-	StarCount     int    `json:"stargazers_count"`
-	WatcherCount  int    `json:"watchers_count"`
-	OpenIssues    int    `json:"open_issues_count"`
-	HasIssues     bool   `json:"has_issues"`
-	HasProjects   bool   `json:"has_projects"`
-	HasWiki       bool   `json:"has_wiki"`
-	Archived      bool   `json:"archived"`
-	Disabled      bool   `json:"disabled"`
-	Owner         User   `json:"owner"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
-	PushedAt      string `json:"pushed_at"`
+	ID            int64    `json:"id"`
+	Name          string   `json:"name"`
+	FullName      string   `json:"full_name"`
+	Description   string   `json:"description"`
+	Private       bool     `json:"private"`
+	Fork          bool     `json:"fork"`
+	HTMLURL       string   `json:"html_url"`
+	CloneURL      string   `json:"clone_url"`
+	SSHURL        string   `json:"ssh_url"`
+	DefaultBranch string   `json:"default_branch"`
+	Language      string   `json:"language,omitempty"`
+	ForksCount    int      `json:"forks_count"`
+	StarCount     int      `json:"stargazers_count"`
+	WatcherCount  int      `json:"watchers_count"`
+	OpenIssues    int      `json:"open_issues_count"`
+	HasIssues     bool     `json:"has_issues"`
+	HasProjects   bool     `json:"has_projects"`
+	HasWiki       bool     `json:"has_wiki"`
+	Archived      bool     `json:"archived"`
+	Disabled      bool     `json:"disabled"`
+	Owner         User     `json:"owner"`
+	CreatedAt     string   `json:"created_at"`
+	UpdatedAt     string   `json:"updated_at"`
+	PushedAt      string   `json:"pushed_at"`
 	Topics        []string `json:"topics,omitempty"`
 }
 
 // Issue represents a GitHub issue.
 type Issue struct {
-	ID        int64    `json:"id"`
-	Number    int      `json:"number"`
-	Title     string   `json:"title"`
-	Body      string   `json:"body"`
-	State     string   `json:"state"` // "open" or "closed"
-	User      User     `json:"user"`
-	Labels    []Label  `json:"labels,omitempty"`
-	Assignees []User   `json:"assignees,omitempty"`
+	ID        int64      `json:"id"`
+	Number    int        `json:"number"`
+	Title     string     `json:"title"`
+	Body      string     `json:"body"`
+	State     string     `json:"state"` // "open" or "closed"
+	User      User       `json:"user"`
+	Labels    []Label    `json:"labels,omitempty"`
+	Assignees []User     `json:"assignees,omitempty"`
 	Milestone *Milestone `json:"milestone,omitempty"`
-	Locked    bool     `json:"locked"`
-	Comments  int      `json:"comments"`
-	HTMLURL   string   `json:"html_url"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
-	ClosedAt  string   `json:"closed_at,omitempty"`
+	Locked    bool       `json:"locked"`
+	Comments  int        `json:"comments"`
+	HTMLURL   string     `json:"html_url"`
+	CreatedAt string     `json:"created_at"`
+	UpdatedAt string     `json:"updated_at"`
+	ClosedAt  string     `json:"closed_at,omitempty"`
 
 	// Internal: which repo this belongs to
 	RepoOwner string `json:"-"`
@@ -55,31 +55,31 @@ type Issue struct {
 
 // PullRequest represents a GitHub pull request.
 type PullRequest struct {
-	ID        int64  `json:"id"`
-	Number    int    `json:"number"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	State     string `json:"state"` // "open", "closed"
-	Draft     bool   `json:"draft"`
-	Merged    bool   `json:"merged"`
-	User      User   `json:"user"`
-	Head      PRRef  `json:"head"`
-	Base      PRRef  `json:"base"`
-	Labels    []Label `json:"labels,omitempty"`
-	Assignees []User  `json:"assignees,omitempty"`
-	HTMLURL   string `json:"html_url"`
-	DiffURL   string `json:"diff_url"`
-	MergeCommitSHA string `json:"merge_commit_sha,omitempty"`
-	Mergeable      *bool  `json:"mergeable,omitempty"`
-	Comments       int    `json:"comments"`
-	Commits        int    `json:"commits"`
-	Additions      int    `json:"additions"`
-	Deletions      int    `json:"deletions"`
-	ChangedFiles   int    `json:"changed_files"`
-	CreatedAt      string `json:"created_at"`
-	UpdatedAt      string `json:"updated_at"`
-	ClosedAt       string `json:"closed_at,omitempty"`
-	MergedAt       string `json:"merged_at,omitempty"`
+	ID             int64   `json:"id"`
+	Number         int     `json:"number"`
+	Title          string  `json:"title"`
+	Body           string  `json:"body"`
+	State          string  `json:"state"` // "open", "closed"
+	Draft          bool    `json:"draft"`
+	Merged         bool    `json:"merged"`
+	User           User    `json:"user"`
+	Head           PRRef   `json:"head"`
+	Base           PRRef   `json:"base"`
+	Labels         []Label `json:"labels,omitempty"`
+	Assignees      []User  `json:"assignees,omitempty"`
+	HTMLURL        string  `json:"html_url"`
+	DiffURL        string  `json:"diff_url"`
+	MergeCommitSHA string  `json:"merge_commit_sha,omitempty"`
+	Mergeable      *bool   `json:"mergeable,omitempty"`
+	Comments       int     `json:"comments"`
+	Commits        int     `json:"commits"`
+	Additions      int     `json:"additions"`
+	Deletions      int     `json:"deletions"`
+	ChangedFiles   int     `json:"changed_files"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+	ClosedAt       string  `json:"closed_at,omitempty"`
+	MergedAt       string  `json:"merged_at,omitempty"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -150,13 +150,13 @@ type User struct {
 
 // Webhook represents a GitHub webhook.
 type Webhook struct {
-	ID        int64    `json:"id"`
-	Name      string   `json:"name"`
-	Active    bool     `json:"active"`
-	Events    []string `json:"events"`
+	ID        int64         `json:"id"`
+	Name      string        `json:"name"`
+	Active    bool          `json:"active"`
+	Events    []string      `json:"events"`
 	Config    WebhookConfig `json:"config"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	CreatedAt string        `json:"created_at"`
+	UpdatedAt string        `json:"updated_at"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -206,8 +206,8 @@ type Release struct {
 
 // Branch represents a Git branch.
 type Branch struct {
-	Name      string `json:"name"`
-	Protected bool   `json:"protected"`
+	Name      string       `json:"name"`
+	Protected bool         `json:"protected"`
 	Commit    BranchCommit `json:"commit"`
 
 	RepoOwner string `json:"-"`
@@ -243,46 +243,46 @@ type PRReview struct {
 	CommitID    string `json:"commit_id"`
 	SubmittedAt string `json:"submitted_at"`
 
-	RepoOwner  string `json:"-"`
-	RepoName   string `json:"-"`
-	PRNumber   int    `json:"-"`
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+	PRNumber  int    `json:"-"`
 }
 
 // PRReviewComment represents an inline/diff comment on a PR.
 type PRReviewComment struct {
-	ID                int64  `json:"id"`
-	Body              string `json:"body"`
-	Path              string `json:"path"`
-	Position          *int   `json:"position,omitempty"`
-	Line              *int   `json:"line,omitempty"`
-	Side              string `json:"side,omitempty"`
-	CommitID          string `json:"commit_id"`
-	OriginalCommitID  string `json:"original_commit_id"`
-	DiffHunk          string `json:"diff_hunk"`
-	User              User   `json:"user"`
-	HTMLURL           string `json:"html_url"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
-	InReplyToID       *int64 `json:"in_reply_to_id,omitempty"`
+	ID               int64  `json:"id"`
+	Body             string `json:"body"`
+	Path             string `json:"path"`
+	Position         *int   `json:"position,omitempty"`
+	Line             *int   `json:"line,omitempty"`
+	Side             string `json:"side,omitempty"`
+	CommitID         string `json:"commit_id"`
+	OriginalCommitID string `json:"original_commit_id"`
+	DiffHunk         string `json:"diff_hunk"`
+	User             User   `json:"user"`
+	HTMLURL          string `json:"html_url"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
+	InReplyToID      *int64 `json:"in_reply_to_id,omitempty"`
 
-	RepoOwner  string `json:"-"`
-	RepoName   string `json:"-"`
-	PRNumber   int    `json:"-"`
-	ReviewID   int64  `json:"-"`
+	RepoOwner string `json:"-"`
+	RepoName  string `json:"-"`
+	PRNumber  int    `json:"-"`
+	ReviewID  int64  `json:"-"`
 }
 
 // CheckRun represents a GitHub check run.
 type CheckRun struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	HeadSHA     string `json:"head_sha"`
-	Status      string `json:"status"` // "queued", "in_progress", "completed"
-	Conclusion  string `json:"conclusion,omitempty"` // "success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped"
-	StartedAt   string `json:"started_at,omitempty"`
-	CompletedAt string `json:"completed_at,omitempty"`
-	HTMLURL     string `json:"html_url"`
-	DetailsURL  string `json:"details_url,omitempty"`
-	ExternalID  string `json:"external_id,omitempty"`
+	ID          int64           `json:"id"`
+	Name        string          `json:"name"`
+	HeadSHA     string          `json:"head_sha"`
+	Status      string          `json:"status"`               // "queued", "in_progress", "completed"
+	Conclusion  string          `json:"conclusion,omitempty"` // "success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped"
+	StartedAt   string          `json:"started_at,omitempty"`
+	CompletedAt string          `json:"completed_at,omitempty"`
+	HTMLURL     string          `json:"html_url"`
+	DetailsURL  string          `json:"details_url,omitempty"`
+	ExternalID  string          `json:"external_id,omitempty"`
 	Output      *CheckRunOutput `json:"output,omitempty"`
 
 	RepoOwner string `json:"-"`
@@ -291,9 +291,9 @@ type CheckRun struct {
 
 // CheckRunOutput holds check run output details.
 type CheckRunOutput struct {
-	Title       string `json:"title"`
-	Summary     string `json:"summary"`
-	Text        string `json:"text,omitempty"`
+	Title   string `json:"title"`
+	Summary string `json:"summary"`
+	Text    string `json:"text,omitempty"`
 }
 
 // CheckSuite represents a GitHub check suite.
@@ -319,7 +319,7 @@ type Content struct {
 	Size        int    `json:"size"`
 	HTMLURL     string `json:"html_url"`
 	DownloadURL string `json:"download_url,omitempty"`
-	Content     string `json:"content,omitempty"` // base64-encoded for files
+	Content     string `json:"content,omitempty"`  // base64-encoded for files
 	Encoding    string `json:"encoding,omitempty"` // "base64"
 
 	RepoOwner string `json:"-"`
@@ -346,7 +346,7 @@ type Team struct {
 	Slug        string `json:"slug"`
 	Description string `json:"description,omitempty"`
 	Permission  string `json:"permission"` // "pull", "push", "admin"
-	Privacy     string `json:"privacy"` // "secret", "closed"
+	Privacy     string `json:"privacy"`    // "secret", "closed"
 	HTMLURL     string `json:"html_url"`
 
 	OrgLogin string   `json:"-"`
@@ -384,15 +384,15 @@ type Deployment struct {
 
 // DeploymentStatus represents a status for a deployment.
 type DeploymentStatus struct {
-	ID            int64  `json:"id"`
-	State         string `json:"state"` // "error", "failure", "inactive", "in_progress", "queued", "pending", "success"
-	Description   string `json:"description,omitempty"`
-	Environment   string `json:"environment,omitempty"`
+	ID             int64  `json:"id"`
+	State          string `json:"state"` // "error", "failure", "inactive", "in_progress", "queued", "pending", "success"
+	Description    string `json:"description,omitempty"`
+	Environment    string `json:"environment,omitempty"`
 	EnvironmentURL string `json:"environment_url,omitempty"`
-	LogURL        string `json:"log_url,omitempty"`
-	Creator       User   `json:"creator"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	LogURL         string `json:"log_url,omitempty"`
+	Creator        User   `json:"creator"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
 
 	RepoOwner    string `json:"-"`
 	RepoName     string `json:"-"`
@@ -401,17 +401,17 @@ type DeploymentStatus struct {
 
 // ReleaseAsset represents an asset attached to a release.
 type ReleaseAsset struct {
-	ID            int64  `json:"id"`
-	Name          string `json:"name"`
-	Label         string `json:"label,omitempty"`
-	ContentType   string `json:"content_type"`
-	Size          int    `json:"size"`
-	State         string `json:"state"` // "uploaded"
-	DownloadCount int    `json:"download_count"`
+	ID                 int64  `json:"id"`
+	Name               string `json:"name"`
+	Label              string `json:"label,omitempty"`
+	ContentType        string `json:"content_type"`
+	Size               int    `json:"size"`
+	State              string `json:"state"` // "uploaded"
+	DownloadCount      int    `json:"download_count"`
 	BrowserDownloadURL string `json:"browser_download_url"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
-	Uploader      User   `json:"uploader"`
+	CreatedAt          string `json:"created_at"`
+	UpdatedAt          string `json:"updated_at"`
+	Uploader           User   `json:"uploader"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -437,20 +437,20 @@ type Workflow struct {
 
 // WorkflowRun represents a single execution of a workflow.
 type WorkflowRun struct {
-	ID           int64  `json:"id"`
-	Name         string `json:"name"`
-	WorkflowID   int64  `json:"workflow_id"`
-	HeadBranch   string `json:"head_branch"`
-	HeadSHA      string `json:"head_sha"`
-	Status       string `json:"status"` // "queued", "in_progress", "completed"
-	Conclusion   string `json:"conclusion,omitempty"` // "success", "failure", "cancelled", etc.
-	Event        string `json:"event"` // "push", "pull_request", "workflow_dispatch", etc.
-	RunNumber    int    `json:"run_number"`
-	RunAttempt   int    `json:"run_attempt"`
-	HTMLURL      string `json:"html_url"`
-	Actor        User   `json:"actor"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	WorkflowID int64  `json:"workflow_id"`
+	HeadBranch string `json:"head_branch"`
+	HeadSHA    string `json:"head_sha"`
+	Status     string `json:"status"`               // "queued", "in_progress", "completed"
+	Conclusion string `json:"conclusion,omitempty"` // "success", "failure", "cancelled", etc.
+	Event      string `json:"event"`                // "push", "pull_request", "workflow_dispatch", etc.
+	RunNumber  int    `json:"run_number"`
+	RunAttempt int    `json:"run_attempt"`
+	HTMLURL    string `json:"html_url"`
+	Actor      User   `json:"actor"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -458,15 +458,15 @@ type WorkflowRun struct {
 
 // WorkflowJob represents a job within a workflow run.
 type WorkflowJob struct {
-	ID          int64    `json:"id"`
-	RunID       int64    `json:"run_id"`
-	Name        string   `json:"name"`
-	Status      string   `json:"status"` // "queued", "in_progress", "completed"
-	Conclusion  string   `json:"conclusion,omitempty"`
-	StartedAt   string   `json:"started_at,omitempty"`
-	CompletedAt string   `json:"completed_at,omitempty"`
+	ID          int64     `json:"id"`
+	RunID       int64     `json:"run_id"`
+	Name        string    `json:"name"`
+	Status      string    `json:"status"` // "queued", "in_progress", "completed"
+	Conclusion  string    `json:"conclusion,omitempty"`
+	StartedAt   string    `json:"started_at,omitempty"`
+	CompletedAt string    `json:"completed_at,omitempty"`
 	Steps       []JobStep `json:"steps,omitempty"`
-	HTMLURL     string   `json:"html_url"`
+	HTMLURL     string    `json:"html_url"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -530,12 +530,12 @@ type GitObject struct {
 
 // GitCommit represents a Git commit object (low-level).
 type GitCommit struct {
-	SHA     string        `json:"sha"`
-	Message string        `json:"message"`
-	Tree    GitTreeRef    `json:"tree"`
-	Parents []GitTreeRef  `json:"parents,omitempty"`
-	Author  GitSignature  `json:"author"`
-	HTMLURL string        `json:"html_url"`
+	SHA     string       `json:"sha"`
+	Message string       `json:"message"`
+	Tree    GitTreeRef   `json:"tree"`
+	Parents []GitTreeRef `json:"parents,omitempty"`
+	Author  GitSignature `json:"author"`
+	HTMLURL string       `json:"html_url"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -556,10 +556,10 @@ type GitSignature struct {
 
 // GitTree represents a Git tree object.
 type GitTree struct {
-	SHA       string        `json:"sha"`
+	SHA       string         `json:"sha"`
 	Tree      []GitTreeEntry `json:"tree"`
-	Truncated bool          `json:"truncated"`
-	URL       string        `json:"url"`
+	Truncated bool           `json:"truncated"`
+	URL       string         `json:"url"`
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`

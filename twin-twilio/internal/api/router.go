@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
 )
 
 // Handler holds all API handler state.
@@ -80,10 +80,10 @@ func (h *Handler) basicAuthMiddleware(next http.Handler) http.Handler {
 		if !ok || user == "" || pass == "" {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Twilio API"`)
 			twincore.JSON(w, http.StatusUnauthorized, map[string]any{
-				"code":     20003,
-				"message":  "Authenticate",
+				"code":      20003,
+				"message":   "Authenticate",
 				"more_info": "https://www.twilio.com/docs/errors/20003",
-				"status":   401,
+				"status":    401,
 			})
 			return
 		}

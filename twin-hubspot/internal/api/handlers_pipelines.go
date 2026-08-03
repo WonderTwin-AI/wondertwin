@@ -23,7 +23,7 @@ func (h *Handler) CreatePipeline(w http.ResponseWriter, r *http.Request) {
 	objectType := chi.URLParam(r, "objectType")
 
 	var body struct {
-		Label  string               `json:"label"`
+		Label  string                `json:"label"`
 		Stages []store.PipelineStage `json:"stages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

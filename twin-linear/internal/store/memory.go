@@ -30,9 +30,9 @@ type MemoryStore struct {
 
 	Org Organization
 
-	idCounter     atomic.Int64
-	issueCounter  atomic.Int64
-	cycleCounter  atomic.Int64
+	idCounter    atomic.Int64
+	issueCounter atomic.Int64
+	cycleCounter atomic.Int64
 }
 
 func New() *MemoryStore {

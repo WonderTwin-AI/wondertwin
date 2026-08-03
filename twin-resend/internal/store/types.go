@@ -38,11 +38,11 @@ type Domain struct {
 
 // DomainRecord is a DNS record needed for domain verification.
 type DomainRecord struct {
-	Record   string `json:"record"`   // CNAME, TXT, MX
+	Record   string `json:"record"` // CNAME, TXT, MX
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	TTL      string `json:"ttl"`
-	Status   string `json:"status"`   // not_started, verified
+	Status   string `json:"status"` // not_started, verified
 	Value    string `json:"value"`
 	Priority *int   `json:"priority,omitempty"`
 }
@@ -78,16 +78,16 @@ type Contact struct {
 
 // Broadcast represents a broadcast email to an audience.
 type Broadcast struct {
-	ID         string `json:"id"`
-	Object     string `json:"object"` // "broadcast"
-	Name       string `json:"name"`
-	AudienceID string `json:"audience_id"`
-	From       string `json:"from"`
-	Subject    string `json:"subject"`
+	ID         string   `json:"id"`
+	Object     string   `json:"object"` // "broadcast"
+	Name       string   `json:"name"`
+	AudienceID string   `json:"audience_id"`
+	From       string   `json:"from"`
+	Subject    string   `json:"subject"`
 	ReplyTo    []string `json:"reply_to,omitempty"`
-	HTML       string `json:"html,omitempty"`
-	Text       string `json:"text,omitempty"`
-	Status     string `json:"status"` // draft, queued, sending, sent
-	CreatedAt  string `json:"created_at"`
-	SentAt     string `json:"sent_at,omitempty"`
+	HTML       string   `json:"html,omitempty"`
+	Text       string   `json:"text,omitempty"`
+	Status     string   `json:"status"` // draft, queued, sending, sent
+	CreatedAt  string   `json:"created_at"`
+	SentAt     string   `json:"sent_at,omitempty"`
 }

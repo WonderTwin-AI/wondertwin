@@ -173,7 +173,7 @@ func compareVersions(schemaVersion, pinnedVersion string) (versionComparison, er
 
 	return versionComparison{
 		majorDrift: schemaMajor > pinMajor,
-		minorDrift: !((schemaMajor > pinMajor)) && schemaMinor > pinMinor,
+		minorDrift: !(schemaMajor > pinMajor) && schemaMinor > pinMinor,
 	}, nil
 }
 

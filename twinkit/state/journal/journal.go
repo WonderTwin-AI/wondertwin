@@ -26,7 +26,7 @@ type Entry struct {
 	TransactionID string    `json:"transaction_id"`
 	AccountID     string    `json:"account_id"`
 	Type          EntryType `json:"type"`
-	Amount        int64     `json:"amount"`   // always positive; direction determined by Type
+	Amount        int64     `json:"amount"` // always positive; direction determined by Type
 	Currency      string    `json:"currency"`
 	SourceType    string    `json:"source_type"` // what created this: "invoice", "payment", "manual"
 	SourceID      string    `json:"source_id"`

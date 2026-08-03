@@ -88,16 +88,16 @@ type Attestation struct {
 type AuditEventType string
 
 const (
-	AuditCreated         AuditEventType = "CONTRACT_CREATED"
-	AuditUpdated         AuditEventType = "CONTRACT_UPDATED"
-	AuditSent            AuditEventType = "CONTRACT_SENT"
+	AuditCreated           AuditEventType = "CONTRACT_CREATED"
+	AuditUpdated           AuditEventType = "CONTRACT_UPDATED"
+	AuditSent              AuditEventType = "CONTRACT_SENT"
 	AuditSignatureRecorded AuditEventType = "SIGNATURE_RECORDED"
-	AuditPartiallySigned AuditEventType = "CONTRACT_PARTIALLY_SIGNED"
-	AuditSigned          AuditEventType = "CONTRACT_SIGNED"
-	AuditExecuted        AuditEventType = "CONTRACT_EXECUTED"
-	AuditDeclined        AuditEventType = "CONTRACT_DECLINED"
-	AuditVoided          AuditEventType = "CONTRACT_VOIDED"
-	AuditExpired         AuditEventType = "CONTRACT_EXPIRED"
+	AuditPartiallySigned   AuditEventType = "CONTRACT_PARTIALLY_SIGNED"
+	AuditSigned            AuditEventType = "CONTRACT_SIGNED"
+	AuditExecuted          AuditEventType = "CONTRACT_EXECUTED"
+	AuditDeclined          AuditEventType = "CONTRACT_DECLINED"
+	AuditVoided            AuditEventType = "CONTRACT_VOIDED"
+	AuditExpired           AuditEventType = "CONTRACT_EXPIRED"
 )
 
 // AuditEntry is one append-only entry in a contract's audit log.
@@ -131,11 +131,11 @@ type Contract struct {
 
 // CreateInput is the input to Engine.Create.
 type CreateInput struct {
-	ID        string         // optional; engine generates if empty
-	Parties   []Party        // engine validates routing-order + witness pairing
+	ID        string  // optional; engine generates if empty
+	Parties   []Party // engine validates routing-order + witness pairing
 	Documents []DocumentRef
 	Metadata  map[string]any
-	ExpiresAt time.Time      // optional
+	ExpiresAt time.Time // optional
 }
 
 // Mutation is a partial update to a draft contract via Engine.Update.

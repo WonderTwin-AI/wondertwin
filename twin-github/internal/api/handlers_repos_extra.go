@@ -107,12 +107,12 @@ func (h *Handler) GetCommit(w http.ResponseWriter, r *http.Request) {
 // CompareCommits handles GET /repos/{owner}/{repo}/compare/{basehead}
 func (h *Handler) CompareCommits(w http.ResponseWriter, r *http.Request) {
 	ghJSON(w, 200, map[string]any{
-		"status":       "ahead",
-		"ahead_by":     1,
-		"behind_by":    0,
+		"status":        "ahead",
+		"ahead_by":      1,
+		"behind_by":     0,
 		"total_commits": 1,
-		"commits":      []any{},
-		"files":        []any{},
+		"commits":       []any{},
+		"files":         []any{},
 	})
 }
 

@@ -10,10 +10,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-hubspot/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-hubspot/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 func main() {

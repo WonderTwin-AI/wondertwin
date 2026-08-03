@@ -12,7 +12,7 @@ type Lifecycle struct {
 // AutoAdvanceConfig controls automatic state progression.
 type AutoAdvanceConfig struct {
 	// To is the default next status (used when Outcomes is empty).
-	To    MessageStatus
+	To MessageStatus
 	// Delay is the base delay before advancing.
 	Delay time.Duration
 	// Outcomes defines weighted alternative states.
@@ -85,8 +85,8 @@ func VoiceLifecycle() *Lifecycle {
 		InitialStatus: StatusQueued,
 		Transitions: map[MessageStatus][]MessageStatus{
 			StatusQueued:  {StatusSending},
-			StatusSending: {StatusSent, StatusFailed},         // ringing
-			StatusSent:    {StatusDelivered, StatusFailed},     // in-progress → completed
+			StatusSending: {StatusSent, StatusFailed},      // ringing
+			StatusSent:    {StatusDelivered, StatusFailed}, // in-progress → completed
 		},
 		AutoAdvance: map[MessageStatus]AutoAdvanceConfig{
 			StatusQueued:  {To: StatusSending, Delay: 0},

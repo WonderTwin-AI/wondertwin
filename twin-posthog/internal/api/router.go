@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )
 
 // Handler holds all API handler state.
@@ -32,11 +32,11 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/capture/", h.CaptureEvent)
 		r.Post("/batch", h.BatchCapture)
 		r.Post("/batch/", h.BatchCapture)
-		r.Post("/e", h.CaptureEvent)   // JS SDK alternative endpoint
+		r.Post("/e", h.CaptureEvent) // JS SDK alternative endpoint
 		r.Post("/e/", h.CaptureEvent)
-		r.Post("/decide/", h.Decide)    // Feature flag evaluation
+		r.Post("/decide/", h.Decide) // Feature flag evaluation
 		r.Post("/decide", h.Decide)
-		r.Post("/flags", h.Flags)       // Feature flags v2
+		r.Post("/flags", h.Flags) // Feature flags v2
 		r.Post("/flags/", h.Flags)
 		r.Get("/api/feature_flag/local_evaluation", h.LocalEvaluation)
 		r.Get("/api/feature_flag/local_evaluation/", h.LocalEvaluation)

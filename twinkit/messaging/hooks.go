@@ -23,8 +23,8 @@ type MessagingHooks interface {
 // Embed this in the twin's hook implementation to avoid implementing unused hooks.
 type NoOpMessagingHooks struct{}
 
-func (NoOpMessagingHooks) ValidateMessage(_ context.Context, _ *Message) error        { return nil }
-func (NoOpMessagingHooks) OnMessageCreated(_ context.Context, _ *Message) error        { return nil }
+func (NoOpMessagingHooks) ValidateMessage(_ context.Context, _ *Message) error  { return nil }
+func (NoOpMessagingHooks) OnMessageCreated(_ context.Context, _ *Message) error { return nil }
 func (NoOpMessagingHooks) OnStatusChange(_ context.Context, _ *Message, _, _ MessageStatus) error {
 	return nil
 }

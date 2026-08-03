@@ -148,8 +148,8 @@ func (h *Handler) BatchCreateAssociations(w http.ResponseWriter, r *http.Request
 		h.store.Associations.Set(id, assoc)
 
 		results = append(results, map[string]any{
-			"from":               map[string]any{"id": input.From.ID},
-			"to":                 map[string]any{"id": input.To.ID},
+			"from":                map[string]any{"id": input.From.ID},
+			"to":                  map[string]any{"id": input.To.ID},
 			"associationCategory": category,
 			"associationTypeId":   typeID,
 		})
