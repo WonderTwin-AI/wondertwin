@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 )
 
 // captureRequest represents a PostHog capture request body.
@@ -146,11 +146,11 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
-		"featureFlags":                featureFlags,
-		"featureFlagPayloads":         featureFlagPayloads,
-		"errorsWhileComputingFlags":   false,
-		"requestId":                   h.store.Events.NextID(),
-		"quotaLimited":               []string{},
+		"featureFlags":              featureFlags,
+		"featureFlagPayloads":       featureFlagPayloads,
+		"errorsWhileComputingFlags": false,
+		"requestId":                 h.store.Events.NextID(),
+		"quotaLimited":              []string{},
 	})
 }
 

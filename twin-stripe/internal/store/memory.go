@@ -1,8 +1,8 @@
 package store
 
 import (
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -15,43 +15,43 @@ import (
 type MemoryStore struct {
 	mu sync.RWMutex
 
-	Accounts         *pkgstate.Store[Account]
-	ExternalAccts    *pkgstate.Store[ExternalAccount]
-	Transfers        *pkgstate.Store[Transfer]
-	Payouts          *pkgstate.Store[Payout]
-	Events               *pkgstate.Store[Event]
-	BalanceTransactions  *pkgstate.Store[BalanceTransaction]
-	Customers            *pkgstate.Store[Customer]
-	Products             *pkgstate.Store[Product]
-	Prices               *pkgstate.Store[Price]
-	PaymentIntents       *pkgstate.Store[PaymentIntent]
-	PaymentMethods       *pkgstate.Store[PaymentMethod]
-	Charges              *pkgstate.Store[Charge]
-	Refunds              *pkgstate.Store[Refund]
-	Subscriptions        *pkgstate.Store[Subscription]
-	Invoices             *pkgstate.Store[Invoice]
-	InvoiceItems         *pkgstate.Store[InvoiceItem]
-	Coupons              *pkgstate.Store[Coupon]
-	SetupIntents         *pkgstate.Store[SetupIntent]
-	TaxRates             *pkgstate.Store[TaxRate]
-	Disputes             *pkgstate.Store[Dispute]
-	CheckoutSessions     *pkgstate.Store[CheckoutSession]
-	PaymentLinks         *pkgstate.Store[PaymentLink]
-	Tokens               *pkgstate.Store[Token]
-	Sources              *pkgstate.Store[Source]
-	Mandates             *pkgstate.Store[Mandate]
-	ConfirmationTokens   *pkgstate.Store[ConfirmationToken]
-	CreditNotes          *pkgstate.Store[CreditNote]
-	PromotionCodes       *pkgstate.Store[PromotionCode]
-	SubItems             *pkgstate.Store[SubscriptionItem]
-	Quotes               *pkgstate.Store[Quote]
+	Accounts              *pkgstate.Store[Account]
+	ExternalAccts         *pkgstate.Store[ExternalAccount]
+	Transfers             *pkgstate.Store[Transfer]
+	Payouts               *pkgstate.Store[Payout]
+	Events                *pkgstate.Store[Event]
+	BalanceTransactions   *pkgstate.Store[BalanceTransaction]
+	Customers             *pkgstate.Store[Customer]
+	Products              *pkgstate.Store[Product]
+	Prices                *pkgstate.Store[Price]
+	PaymentIntents        *pkgstate.Store[PaymentIntent]
+	PaymentMethods        *pkgstate.Store[PaymentMethod]
+	Charges               *pkgstate.Store[Charge]
+	Refunds               *pkgstate.Store[Refund]
+	Subscriptions         *pkgstate.Store[Subscription]
+	Invoices              *pkgstate.Store[Invoice]
+	InvoiceItems          *pkgstate.Store[InvoiceItem]
+	Coupons               *pkgstate.Store[Coupon]
+	SetupIntents          *pkgstate.Store[SetupIntent]
+	TaxRates              *pkgstate.Store[TaxRate]
+	Disputes              *pkgstate.Store[Dispute]
+	CheckoutSessions      *pkgstate.Store[CheckoutSession]
+	PaymentLinks          *pkgstate.Store[PaymentLink]
+	Tokens                *pkgstate.Store[Token]
+	Sources               *pkgstate.Store[Source]
+	Mandates              *pkgstate.Store[Mandate]
+	ConfirmationTokens    *pkgstate.Store[ConfirmationToken]
+	CreditNotes           *pkgstate.Store[CreditNote]
+	PromotionCodes        *pkgstate.Store[PromotionCode]
+	SubItems              *pkgstate.Store[SubscriptionItem]
+	Quotes                *pkgstate.Store[Quote]
 	BillingPortalSessions *pkgstate.Store[BillingPortalSession]
-	Reviews              *pkgstate.Store[Review]
-	TaxIDs               *pkgstate.Store[TaxID]
-	WebhookEndpoints     *pkgstate.Store[WebhookEndpoint]
-	Files                *pkgstate.Store[File]
-	FileLinks            *pkgstate.Store[FileLink]
-	ShippingRates        *pkgstate.Store[ShippingRate]
+	Reviews               *pkgstate.Store[Review]
+	TaxIDs                *pkgstate.Store[TaxID]
+	WebhookEndpoints      *pkgstate.Store[WebhookEndpoint]
+	Files                 *pkgstate.Store[File]
+	FileLinks             *pkgstate.Store[FileLink]
+	ShippingRates         *pkgstate.Store[ShippingRate]
 	ApplicationFees       *pkgstate.Store[ApplicationFee]
 	ApplicationFeeRefunds *pkgstate.Store[ApplicationFeeRefund]
 	TransferReversals     *pkgstate.Store[TransferReversal]
@@ -59,12 +59,12 @@ type MemoryStore struct {
 	TopUps                *pkgstate.Store[TopUp]
 
 	// Per-account balances (account ID -> balance)
-	Balances         map[string]*AccountBalance
+	Balances map[string]*AccountBalance
 
 	// Platform balance (the main Stripe account)
-	PlatformBalance  *AccountBalance
+	PlatformBalance *AccountBalance
 
-	Clock            *pkgstate.Clock
+	Clock *pkgstate.Clock
 
 	// Rand is the deterministic random source used by handlers for
 	// token-shaped strings (whsec_, client_secret, etc.). Wired by
@@ -90,51 +90,51 @@ func (s *MemoryStore) RandHex(n int) string {
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Accounts:        pkgstate.New[Account]("acct"),
-		ExternalAccts:   pkgstate.New[ExternalAccount]("ba"),
-		Transfers:       pkgstate.New[Transfer]("tr"),
-		Payouts:         pkgstate.New[Payout]("po"),
-		Events:              pkgstate.New[Event]("evt"),
-		BalanceTransactions: pkgstate.New[BalanceTransaction]("txn"),
-		Customers:           pkgstate.New[Customer]("cus"),
-		Products:            pkgstate.New[Product]("prod"),
-		Prices:              pkgstate.New[Price]("price"),
-		PaymentIntents:      pkgstate.New[PaymentIntent]("pi"),
-		PaymentMethods:      pkgstate.New[PaymentMethod]("pm"),
-		Charges:             pkgstate.New[Charge]("ch"),
-		Refunds:             pkgstate.New[Refund]("re"),
-		Subscriptions:       pkgstate.New[Subscription]("sub"),
-		Invoices:            pkgstate.New[Invoice]("in"),
-		InvoiceItems:        pkgstate.New[InvoiceItem]("ii"),
-		Coupons:             pkgstate.New[Coupon]("coup"),
-		SetupIntents:        pkgstate.New[SetupIntent]("seti"),
-		TaxRates:            pkgstate.New[TaxRate]("txr"),
-		Disputes:            pkgstate.New[Dispute]("dp"),
-		CheckoutSessions:    pkgstate.New[CheckoutSession]("cs"),
-		PaymentLinks:        pkgstate.New[PaymentLink]("plink"),
-		Tokens:              pkgstate.New[Token]("tok"),
-		Sources:             pkgstate.New[Source]("src"),
-		Mandates:            pkgstate.New[Mandate]("mandate"),
-		ConfirmationTokens:  pkgstate.New[ConfirmationToken]("ctoken"),
-		CreditNotes:         pkgstate.New[CreditNote]("cn"),
-		PromotionCodes:      pkgstate.New[PromotionCode]("promo"),
-		SubItems:            pkgstate.New[SubscriptionItem]("si"),
-		Quotes:              pkgstate.New[Quote]("qt"),
+		Accounts:              pkgstate.New[Account]("acct"),
+		ExternalAccts:         pkgstate.New[ExternalAccount]("ba"),
+		Transfers:             pkgstate.New[Transfer]("tr"),
+		Payouts:               pkgstate.New[Payout]("po"),
+		Events:                pkgstate.New[Event]("evt"),
+		BalanceTransactions:   pkgstate.New[BalanceTransaction]("txn"),
+		Customers:             pkgstate.New[Customer]("cus"),
+		Products:              pkgstate.New[Product]("prod"),
+		Prices:                pkgstate.New[Price]("price"),
+		PaymentIntents:        pkgstate.New[PaymentIntent]("pi"),
+		PaymentMethods:        pkgstate.New[PaymentMethod]("pm"),
+		Charges:               pkgstate.New[Charge]("ch"),
+		Refunds:               pkgstate.New[Refund]("re"),
+		Subscriptions:         pkgstate.New[Subscription]("sub"),
+		Invoices:              pkgstate.New[Invoice]("in"),
+		InvoiceItems:          pkgstate.New[InvoiceItem]("ii"),
+		Coupons:               pkgstate.New[Coupon]("coup"),
+		SetupIntents:          pkgstate.New[SetupIntent]("seti"),
+		TaxRates:              pkgstate.New[TaxRate]("txr"),
+		Disputes:              pkgstate.New[Dispute]("dp"),
+		CheckoutSessions:      pkgstate.New[CheckoutSession]("cs"),
+		PaymentLinks:          pkgstate.New[PaymentLink]("plink"),
+		Tokens:                pkgstate.New[Token]("tok"),
+		Sources:               pkgstate.New[Source]("src"),
+		Mandates:              pkgstate.New[Mandate]("mandate"),
+		ConfirmationTokens:    pkgstate.New[ConfirmationToken]("ctoken"),
+		CreditNotes:           pkgstate.New[CreditNote]("cn"),
+		PromotionCodes:        pkgstate.New[PromotionCode]("promo"),
+		SubItems:              pkgstate.New[SubscriptionItem]("si"),
+		Quotes:                pkgstate.New[Quote]("qt"),
 		BillingPortalSessions: pkgstate.New[BillingPortalSession]("bps"),
-		Reviews:             pkgstate.New[Review]("prv"),
-		TaxIDs:              pkgstate.New[TaxID]("txi"),
-		WebhookEndpoints:    pkgstate.New[WebhookEndpoint]("we"),
-		Files:               pkgstate.New[File]("file"),
-		FileLinks:           pkgstate.New[FileLink]("link"),
-		ShippingRates:       pkgstate.New[ShippingRate]("shr"),
+		Reviews:               pkgstate.New[Review]("prv"),
+		TaxIDs:                pkgstate.New[TaxID]("txi"),
+		WebhookEndpoints:      pkgstate.New[WebhookEndpoint]("we"),
+		Files:                 pkgstate.New[File]("file"),
+		FileLinks:             pkgstate.New[FileLink]("link"),
+		ShippingRates:         pkgstate.New[ShippingRate]("shr"),
 		ApplicationFees:       pkgstate.New[ApplicationFee]("fee"),
 		ApplicationFeeRefunds: pkgstate.New[ApplicationFeeRefund]("fr"),
 		TransferReversals:     pkgstate.New[TransferReversal]("trr"),
 		Persons:               pkgstate.New[Person]("person"),
 		TopUps:                pkgstate.New[TopUp]("tu"),
-		Balances:        make(map[string]*AccountBalance),
-		PlatformBalance: NewAccountBalance(),
-		Clock:           pkgstate.NewClock(),
+		Balances:              make(map[string]*AccountBalance),
+		PlatformBalance:       NewAccountBalance(),
+		Clock:                 pkgstate.NewClock(),
 	}
 }
 
@@ -258,99 +258,99 @@ func (s *MemoryStore) RecordBalanceTransaction(txType, source, currency string, 
 
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
-	Accounts            map[string]Account             `json:"accounts"`
-	ExternalAccts       map[string]ExternalAccount     `json:"external_accounts"`
-	Transfers           map[string]Transfer            `json:"transfers"`
-	Payouts             map[string]Payout              `json:"payouts"`
-	Events              map[string]Event               `json:"events"`
-	BalanceTransactions map[string]BalanceTransaction   `json:"balance_transactions"`
-	Customers           map[string]Customer            `json:"customers"`
-	Products            map[string]Product             `json:"products"`
-	Prices              map[string]Price               `json:"prices"`
-	PaymentIntents      map[string]PaymentIntent       `json:"payment_intents"`
-	PaymentMethods      map[string]PaymentMethod       `json:"payment_methods"`
-	Charges             map[string]Charge              `json:"charges"`
-	Refunds             map[string]Refund              `json:"refunds"`
-	Subscriptions       map[string]Subscription        `json:"subscriptions"`
-	Invoices            map[string]Invoice             `json:"invoices"`
-	InvoiceItems        map[string]InvoiceItem         `json:"invoice_items"`
-	Coupons             map[string]Coupon              `json:"coupons"`
-	SetupIntents        map[string]SetupIntent         `json:"setup_intents"`
-	TaxRates            map[string]TaxRate             `json:"tax_rates"`
-	Disputes            map[string]Dispute             `json:"disputes"`
-	CheckoutSessions    map[string]CheckoutSession     `json:"checkout_sessions"`
-	PaymentLinks        map[string]PaymentLink         `json:"payment_links"`
-	Tokens              map[string]Token               `json:"tokens"`
-	Sources             map[string]Source              `json:"sources"`
-	Mandates            map[string]Mandate             `json:"mandates"`
-	ConfirmationTokens  map[string]ConfirmationToken   `json:"confirmation_tokens"`
-	CreditNotes         map[string]CreditNote          `json:"credit_notes"`
-	PromotionCodes      map[string]PromotionCode       `json:"promotion_codes"`
-	SubItems            map[string]SubscriptionItem    `json:"sub_items"`
-	Quotes              map[string]Quote               `json:"quotes"`
+	Accounts              map[string]Account              `json:"accounts"`
+	ExternalAccts         map[string]ExternalAccount      `json:"external_accounts"`
+	Transfers             map[string]Transfer             `json:"transfers"`
+	Payouts               map[string]Payout               `json:"payouts"`
+	Events                map[string]Event                `json:"events"`
+	BalanceTransactions   map[string]BalanceTransaction   `json:"balance_transactions"`
+	Customers             map[string]Customer             `json:"customers"`
+	Products              map[string]Product              `json:"products"`
+	Prices                map[string]Price                `json:"prices"`
+	PaymentIntents        map[string]PaymentIntent        `json:"payment_intents"`
+	PaymentMethods        map[string]PaymentMethod        `json:"payment_methods"`
+	Charges               map[string]Charge               `json:"charges"`
+	Refunds               map[string]Refund               `json:"refunds"`
+	Subscriptions         map[string]Subscription         `json:"subscriptions"`
+	Invoices              map[string]Invoice              `json:"invoices"`
+	InvoiceItems          map[string]InvoiceItem          `json:"invoice_items"`
+	Coupons               map[string]Coupon               `json:"coupons"`
+	SetupIntents          map[string]SetupIntent          `json:"setup_intents"`
+	TaxRates              map[string]TaxRate              `json:"tax_rates"`
+	Disputes              map[string]Dispute              `json:"disputes"`
+	CheckoutSessions      map[string]CheckoutSession      `json:"checkout_sessions"`
+	PaymentLinks          map[string]PaymentLink          `json:"payment_links"`
+	Tokens                map[string]Token                `json:"tokens"`
+	Sources               map[string]Source               `json:"sources"`
+	Mandates              map[string]Mandate              `json:"mandates"`
+	ConfirmationTokens    map[string]ConfirmationToken    `json:"confirmation_tokens"`
+	CreditNotes           map[string]CreditNote           `json:"credit_notes"`
+	PromotionCodes        map[string]PromotionCode        `json:"promotion_codes"`
+	SubItems              map[string]SubscriptionItem     `json:"sub_items"`
+	Quotes                map[string]Quote                `json:"quotes"`
 	BillingPortalSessions map[string]BillingPortalSession `json:"billing_portal_sessions"`
-	Reviews             map[string]Review              `json:"reviews"`
-	TaxIDs              map[string]TaxID               `json:"tax_ids"`
-	WebhookEndpoints    map[string]WebhookEndpoint     `json:"webhook_endpoints"`
-	Files               map[string]File                `json:"files"`
-	FileLinks           map[string]FileLink            `json:"file_links"`
-	ShippingRates       map[string]ShippingRate         `json:"shipping_rates"`
+	Reviews               map[string]Review               `json:"reviews"`
+	TaxIDs                map[string]TaxID                `json:"tax_ids"`
+	WebhookEndpoints      map[string]WebhookEndpoint      `json:"webhook_endpoints"`
+	Files                 map[string]File                 `json:"files"`
+	FileLinks             map[string]FileLink             `json:"file_links"`
+	ShippingRates         map[string]ShippingRate         `json:"shipping_rates"`
 	ApplicationFees       map[string]ApplicationFee       `json:"application_fees"`
 	ApplicationFeeRefunds map[string]ApplicationFeeRefund `json:"application_fee_refunds"`
 	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
 	Persons               map[string]Person               `json:"persons"`
 	TopUps                map[string]TopUp                `json:"topups"`
-	Balances            map[string]*AccountBalance     `json:"balances"`
-	PlatformBalance     *AccountBalance                `json:"platform_balance"`
+	Balances              map[string]*AccountBalance      `json:"balances"`
+	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
-		Accounts:            s.Accounts.Snapshot(),
-		ExternalAccts:       s.ExternalAccts.Snapshot(),
-		Transfers:           s.Transfers.Snapshot(),
-		Payouts:             s.Payouts.Snapshot(),
-		Events:              s.Events.Snapshot(),
-		BalanceTransactions: s.BalanceTransactions.Snapshot(),
-		Customers:           s.Customers.Snapshot(),
-		Products:            s.Products.Snapshot(),
-		Prices:              s.Prices.Snapshot(),
-		PaymentIntents:      s.PaymentIntents.Snapshot(),
-		PaymentMethods:      s.PaymentMethods.Snapshot(),
-		Charges:             s.Charges.Snapshot(),
-		Refunds:             s.Refunds.Snapshot(),
-		Subscriptions:       s.Subscriptions.Snapshot(),
-		Invoices:            s.Invoices.Snapshot(),
-		InvoiceItems:        s.InvoiceItems.Snapshot(),
-		Coupons:             s.Coupons.Snapshot(),
-		SetupIntents:        s.SetupIntents.Snapshot(),
-		TaxRates:            s.TaxRates.Snapshot(),
-		Disputes:            s.Disputes.Snapshot(),
-		CheckoutSessions:    s.CheckoutSessions.Snapshot(),
-		PaymentLinks:        s.PaymentLinks.Snapshot(),
-		Tokens:              s.Tokens.Snapshot(),
-		Sources:             s.Sources.Snapshot(),
-		Mandates:            s.Mandates.Snapshot(),
-		ConfirmationTokens:  s.ConfirmationTokens.Snapshot(),
-		CreditNotes:         s.CreditNotes.Snapshot(),
-		PromotionCodes:      s.PromotionCodes.Snapshot(),
-		SubItems:            s.SubItems.Snapshot(),
-		Quotes:              s.Quotes.Snapshot(),
+		Accounts:              s.Accounts.Snapshot(),
+		ExternalAccts:         s.ExternalAccts.Snapshot(),
+		Transfers:             s.Transfers.Snapshot(),
+		Payouts:               s.Payouts.Snapshot(),
+		Events:                s.Events.Snapshot(),
+		BalanceTransactions:   s.BalanceTransactions.Snapshot(),
+		Customers:             s.Customers.Snapshot(),
+		Products:              s.Products.Snapshot(),
+		Prices:                s.Prices.Snapshot(),
+		PaymentIntents:        s.PaymentIntents.Snapshot(),
+		PaymentMethods:        s.PaymentMethods.Snapshot(),
+		Charges:               s.Charges.Snapshot(),
+		Refunds:               s.Refunds.Snapshot(),
+		Subscriptions:         s.Subscriptions.Snapshot(),
+		Invoices:              s.Invoices.Snapshot(),
+		InvoiceItems:          s.InvoiceItems.Snapshot(),
+		Coupons:               s.Coupons.Snapshot(),
+		SetupIntents:          s.SetupIntents.Snapshot(),
+		TaxRates:              s.TaxRates.Snapshot(),
+		Disputes:              s.Disputes.Snapshot(),
+		CheckoutSessions:      s.CheckoutSessions.Snapshot(),
+		PaymentLinks:          s.PaymentLinks.Snapshot(),
+		Tokens:                s.Tokens.Snapshot(),
+		Sources:               s.Sources.Snapshot(),
+		Mandates:              s.Mandates.Snapshot(),
+		ConfirmationTokens:    s.ConfirmationTokens.Snapshot(),
+		CreditNotes:           s.CreditNotes.Snapshot(),
+		PromotionCodes:        s.PromotionCodes.Snapshot(),
+		SubItems:              s.SubItems.Snapshot(),
+		Quotes:                s.Quotes.Snapshot(),
 		BillingPortalSessions: s.BillingPortalSessions.Snapshot(),
-		Reviews:             s.Reviews.Snapshot(),
-		TaxIDs:              s.TaxIDs.Snapshot(),
-		WebhookEndpoints:    s.WebhookEndpoints.Snapshot(),
-		Files:               s.Files.Snapshot(),
-		FileLinks:           s.FileLinks.Snapshot(),
-		ShippingRates:       s.ShippingRates.Snapshot(),
+		Reviews:               s.Reviews.Snapshot(),
+		TaxIDs:                s.TaxIDs.Snapshot(),
+		WebhookEndpoints:      s.WebhookEndpoints.Snapshot(),
+		Files:                 s.Files.Snapshot(),
+		FileLinks:             s.FileLinks.Snapshot(),
+		ShippingRates:         s.ShippingRates.Snapshot(),
 		ApplicationFees:       s.ApplicationFees.Snapshot(),
 		ApplicationFeeRefunds: s.ApplicationFeeRefunds.Snapshot(),
 		TransferReversals:     s.TransferReversals.Snapshot(),
 		Persons:               s.Persons.Snapshot(),
 		TopUps:                s.TopUps.Snapshot(),
-		Balances:            s.snapshotBalances(),
-		PlatformBalance:     s.PlatformBalance,
+		Balances:              s.snapshotBalances(),
+		PlatformBalance:       s.PlatformBalance,
 	}
 }
 

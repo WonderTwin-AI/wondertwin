@@ -151,7 +151,7 @@ func (h *Handler) ViewsOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	parseJSON(r, &req)
 	slackOK(w, map[string]any{"view": map[string]any{
-		"id": "V_" + h.store.Channels.NextID(),
+		"id":   "V_" + h.store.Channels.NextID(),
 		"type": "modal",
 	}})
 }
@@ -163,7 +163,7 @@ func (h *Handler) ViewsPush(w http.ResponseWriter, r *http.Request) {
 	}
 	parseJSON(r, &req)
 	slackOK(w, map[string]any{"view": map[string]any{
-		"id": "V_" + h.store.Channels.NextID(),
+		"id":   "V_" + h.store.Channels.NextID(),
 		"type": "modal",
 	}})
 }
@@ -180,7 +180,7 @@ func (h *Handler) ViewsUpdate(w http.ResponseWriter, r *http.Request) {
 		viewID = req.ExternalID
 	}
 	slackOK(w, map[string]any{"view": map[string]any{
-		"id": viewID,
+		"id":   viewID,
 		"type": "modal",
 	}})
 }
@@ -201,8 +201,8 @@ func (h *Handler) ViewsPublish(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) EmojiList(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"emoji": map[string]any{
-		"thumbsup":   "alias:+1",
-		"shipit":     "alias:squirrel",
+		"thumbsup": "alias:+1",
+		"shipit":   "alias:squirrel",
 	}})
 }
 
@@ -390,8 +390,8 @@ func (h *Handler) DndSetSnooze(w http.ResponseWriter, r *http.Request) {
 		NextStart: now, NextEnd: endtime,
 	}
 	slackOK(w, map[string]any{
-		"snooze_enabled":  true,
-		"snooze_endtime":  endtime,
+		"snooze_enabled":   true,
+		"snooze_endtime":   endtime,
 		"snooze_remaining": req.NumMinutes * 60,
 	})
 }

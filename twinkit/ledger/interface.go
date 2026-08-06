@@ -74,67 +74,67 @@ type LineItem struct {
 
 // Document represents an invoice, bill, or credit note.
 type Document struct {
-	ID          string         `json:"id"`
-	Type        DocumentType   `json:"type"`
-	Status      DocumentStatus `json:"status"`
-	ContactID   string         `json:"contact_id"`
-	Currency    string         `json:"currency"`
-	LineItems   []LineItem     `json:"line_items"`
-	SubTotal    int64          `json:"sub_total"`
-	Total       int64          `json:"total"`
-	AmountDue   int64          `json:"amount_due"`
-	AmountPaid  int64          `json:"amount_paid"`
-	Date        time.Time      `json:"date"`
-	DueDate     time.Time      `json:"due_date,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID         string         `json:"id"`
+	Type       DocumentType   `json:"type"`
+	Status     DocumentStatus `json:"status"`
+	ContactID  string         `json:"contact_id"`
+	Currency   string         `json:"currency"`
+	LineItems  []LineItem     `json:"line_items"`
+	SubTotal   int64          `json:"sub_total"`
+	Total      int64          `json:"total"`
+	AmountDue  int64          `json:"amount_due"`
+	AmountPaid int64          `json:"amount_paid"`
+	Date       time.Time      `json:"date"`
+	DueDate    time.Time      `json:"due_date,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 // Payment represents a payment applied against a document.
 type Payment struct {
-	ID            string    `json:"id"`
-	DocumentID    string    `json:"document_id"`
+	ID            string       `json:"id"`
+	DocumentID    string       `json:"document_id"`
 	DocumentType  DocumentType `json:"document_type"`
-	BankAccountID string    `json:"bank_account_id"`
-	Amount        int64     `json:"amount"`
-	Currency      string    `json:"currency"`
-	Date          time.Time `json:"date"`
-	CreatedAt     time.Time `json:"created_at"`
+	BankAccountID string       `json:"bank_account_id"`
+	Amount        int64        `json:"amount"`
+	Currency      string       `json:"currency"`
+	Date          time.Time    `json:"date"`
+	CreatedAt     time.Time    `json:"created_at"`
 }
 
 // ManualJournal represents a manually posted journal entry.
 type ManualJournal struct {
-	ID        string             `json:"id"`
-	Narration string             `json:"narration"`
+	ID        string              `json:"id"`
+	Narration string              `json:"narration"`
 	Lines     []ManualJournalLine `json:"lines"`
-	Date      time.Time          `json:"date"`
-	Status    string             `json:"status"` // DRAFT or POSTED
-	CreatedAt time.Time          `json:"created_at"`
+	Date      time.Time           `json:"date"`
+	Status    string              `json:"status"` // DRAFT or POSTED
+	CreatedAt time.Time           `json:"created_at"`
 }
 
 // ManualJournalLine is a single line in a manual journal.
 type ManualJournalLine struct {
-	AccountID   string `json:"account_id"`
-	Description string `json:"description"`
-	DebitAmount int64  `json:"debit_amount"`
-	CreditAmount int64 `json:"credit_amount"`
+	AccountID    string `json:"account_id"`
+	Description  string `json:"description"`
+	DebitAmount  int64  `json:"debit_amount"`
+	CreditAmount int64  `json:"credit_amount"`
 }
 
 // TrialBalanceRow is one row in a trial balance report.
 type TrialBalanceRow struct {
-	AccountID   string `json:"account_id"`
-	AccountName string `json:"account_name"`
+	AccountID   string      `json:"account_id"`
+	AccountName string      `json:"account_name"`
 	AccountType AccountType `json:"account_type"`
-	Debit       int64  `json:"debit"`
-	Credit      int64  `json:"credit"`
+	Debit       int64       `json:"debit"`
+	Credit      int64       `json:"credit"`
 }
 
 // TrialBalance is the full trial balance report.
 type TrialBalance struct {
-	Rows       []TrialBalanceRow `json:"rows"`
-	TotalDebit int64             `json:"total_debit"`
-	TotalCredit int64            `json:"total_credit"`
-	AsOf       time.Time         `json:"as_of"`
+	Rows        []TrialBalanceRow `json:"rows"`
+	TotalDebit  int64             `json:"total_debit"`
+	TotalCredit int64             `json:"total_credit"`
+	AsOf        time.Time         `json:"as_of"`
 }
 
 // ReportRow is a row in a P&L or balance sheet report.
@@ -154,11 +154,11 @@ type ReportSection struct {
 
 // ProfitAndLoss is the P&L report.
 type ProfitAndLoss struct {
-	Revenue     ReportSection `json:"revenue"`
-	Expenses    ReportSection `json:"expenses"`
-	NetProfit   int64         `json:"net_profit"`
-	FromDate    time.Time     `json:"from_date"`
-	ToDate      time.Time     `json:"to_date"`
+	Revenue   ReportSection `json:"revenue"`
+	Expenses  ReportSection `json:"expenses"`
+	NetProfit int64         `json:"net_profit"`
+	FromDate  time.Time     `json:"from_date"`
+	ToDate    time.Time     `json:"to_date"`
 }
 
 // BalanceSheet is the balance sheet report.

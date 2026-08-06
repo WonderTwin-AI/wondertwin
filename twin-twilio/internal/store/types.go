@@ -3,23 +3,23 @@ package store
 
 // Message represents a Twilio SMS message.
 type Message struct {
-	SID         string `json:"sid"`
-	AccountSID  string `json:"account_sid"`
-	To          string `json:"to"`
-	From        string `json:"from"`
-	Body        string `json:"body"`
-	Status      string `json:"status"`
-	Direction   string `json:"direction"`
-	NumSegments string `json:"num_segments"`
-	NumMedia    string `json:"num_media"`
-	Price       string `json:"price,omitempty"`
-	PriceUnit   string `json:"price_unit"`
-	ErrorCode   *int   `json:"error_code"`
+	SID          string `json:"sid"`
+	AccountSID   string `json:"account_sid"`
+	To           string `json:"to"`
+	From         string `json:"from"`
+	Body         string `json:"body"`
+	Status       string `json:"status"`
+	Direction    string `json:"direction"`
+	NumSegments  string `json:"num_segments"`
+	NumMedia     string `json:"num_media"`
+	Price        string `json:"price,omitempty"`
+	PriceUnit    string `json:"price_unit"`
+	ErrorCode    *int   `json:"error_code"`
 	ErrorMessage string `json:"error_message,omitempty"`
-	DateCreated string `json:"date_created"`
-	DateUpdated string `json:"date_updated"`
-	DateSent    string `json:"date_sent,omitempty"`
-	URI         string `json:"uri"`
+	DateCreated  string `json:"date_created"`
+	DateUpdated  string `json:"date_updated"`
+	DateSent     string `json:"date_sent,omitempty"`
+	URI          string `json:"uri"`
 }
 
 // Message status constants matching Twilio's lifecycle.
@@ -56,16 +56,16 @@ const (
 
 // VerifyService represents a Twilio Verify Service.
 type VerifyService struct {
-	SID                    string `json:"sid"`
-	AccountSID             string `json:"account_sid"`
-	FriendlyName           string `json:"friendly_name"`
-	CodeLength             int    `json:"code_length"`
-	LookupEnabled          bool   `json:"lookup_enabled"`
-	SkipSMSToLandlines     bool   `json:"skip_sms_to_landlines"`
-	DTMFInputRequired      bool   `json:"dtmf_input_required"`
-	TtsName                string `json:"tts_name,omitempty"`
-	DoNotShareWarningEnabled bool `json:"do_not_share_warning_enabled"`
-	DateCreated            string `json:"date_created"`
-	DateUpdated            string `json:"date_updated"`
-	URL                    string `json:"url"`
+	SID                      string `json:"sid"`
+	AccountSID               string `json:"account_sid"`
+	FriendlyName             string `json:"friendly_name"`
+	CodeLength               int    `json:"code_length"`
+	LookupEnabled            bool   `json:"lookup_enabled"`
+	SkipSMSToLandlines       bool   `json:"skip_sms_to_landlines"`
+	DTMFInputRequired        bool   `json:"dtmf_input_required"`
+	TtsName                  string `json:"tts_name,omitempty"`
+	DoNotShareWarningEnabled bool   `json:"do_not_share_warning_enabled"`
+	DateCreated              string `json:"date_created"`
+	DateUpdated              string `json:"date_updated"`
+	URL                      string `json:"url"`
 }

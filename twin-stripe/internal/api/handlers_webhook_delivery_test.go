@@ -10,18 +10,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
-	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
-	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
-	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 )
 
 // webhookReceiver collects incoming webhook deliveries for assertions.
 type webhookReceiver struct {
-	mu        sync.Mutex
+	mu         sync.Mutex
 	deliveries []map[string]any
 	headers    []http.Header
 }

@@ -16,12 +16,12 @@ func (h *Handler) CreateCheckRun(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "repo")
 
 	var req struct {
-		Name       string           `json:"name"`
-		HeadSHA    string           `json:"head_sha"`
-		Status     string           `json:"status"`
-		Conclusion string           `json:"conclusion,omitempty"`
-		DetailsURL string           `json:"details_url,omitempty"`
-		ExternalID string           `json:"external_id,omitempty"`
+		Name       string                `json:"name"`
+		HeadSHA    string                `json:"head_sha"`
+		Status     string                `json:"status"`
+		Conclusion string                `json:"conclusion,omitempty"`
+		DetailsURL string                `json:"details_url,omitempty"`
+		ExternalID string                `json:"external_id,omitempty"`
 		Output     *store.CheckRunOutput `json:"output,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -31,8 +31,8 @@ type MethodInfo struct {
 	Name            string `json:"name"`
 	InputType       string `json:"input_type"`
 	OutputType      string `json:"output_type"`
-	ClientStreaming  bool   `json:"client_streaming,omitempty"`
-	ServerStreaming  bool   `json:"server_streaming,omitempty"`
+	ClientStreaming bool   `json:"client_streaming,omitempty"`
+	ServerStreaming bool   `json:"server_streaming,omitempty"`
 }
 
 // Registry tracks registered gRPC services for discovery.

@@ -447,8 +447,8 @@ func TestClock_UsedForTimestamps(t *testing.T) {
 	createdAt := msg.CreatedAt
 
 	clock.Advance(60_000_000_000) // 1 minute
-	e.Advance(ctx(), msg.ID) // → SENDING
-	e.Advance(ctx(), msg.ID) // → SENT
+	e.Advance(ctx(), msg.ID)      // → SENDING
+	e.Advance(ctx(), msg.ID)      // → SENT
 
 	if !msg.SentAt.After(createdAt) {
 		t.Error("SentAt should be after CreatedAt when clock advances")

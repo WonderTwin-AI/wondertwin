@@ -22,16 +22,16 @@ import (
 // special cases like {port} which need to become integers.
 var placeholders = map[string]string{
 	// Names and identifiers
-	"{name}":             "test",
-	"{Service}":          "Test Service",
-	"{category}":         "testing",
-	"{Platform}":         "Test Platform",
+	"{name}":     "test",
+	"{Service}":  "Test Service",
+	"{category}": "testing",
+	"{Platform}": "Test Platform",
 
 	// SDK fields
-	"{sdk_import_path}":  "github.com/example/sdk",
-	"{sdk_version}":      "v1.0.0",
-	"{org}":              "example",
-	"{sdk-repo}":         "sdk-repo",
+	"{sdk_import_path}": "github.com/example/sdk",
+	"{sdk_version}":     "v1.0.0",
+	"{org}":             "example",
+	"{sdk-repo}":        "sdk-repo",
 
 	// Timestamps
 	"{ISO 8601 timestamp}": "2026-01-01T00:00:00Z",
@@ -48,12 +48,12 @@ var placeholders = map[string]string{
 	"{git commit of archive}": "abc123def456",
 
 	// Researcher-specific
-	"{developer docs URL}":    "https://developer.example.com",
-	"{platform}":              "test-platform",
-	"{source_type}":           "official_docs",
-	"{url}":                   "https://example.com/docs",
-	"{archive_path}":          "archive/official-docs/2026-01-01",
-	"{scope}":                 "candidate",
+	"{developer docs URL}": "https://developer.example.com",
+	"{platform}":           "test-platform",
+	"{source_type}":        "official_docs",
+	"{url}":                "https://example.com/docs",
+	"{archive_path}":       "archive/official-docs/2026-01-01",
+	"{scope}":              "candidate",
 
 	// Ports (handled specially — substituted as integer)
 	"{port}": "4200",

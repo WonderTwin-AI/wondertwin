@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/api"
-	"github.com/wondertwin-ai/wondertwin/twin-logodev/internal/store"
 )
 
 func setupLogodev(t *testing.T) (*httptest.Server, *testutil.TwinClient) {

@@ -6,11 +6,11 @@ package search
 
 // Index represents a search index with its configuration.
 type Index struct {
-	Name                 string   `json:"name"`
-	SearchableAttributes []string `json:"searchableAttributes,omitempty"`
+	Name                  string   `json:"name"`
+	SearchableAttributes  []string `json:"searchableAttributes,omitempty"`
 	AttributesForFaceting []string `json:"attributesForFaceting,omitempty"`
-	CustomRanking        []string `json:"customRanking,omitempty"`
-	RecordCount          int      `json:"recordCount"`
+	CustomRanking         []string `json:"customRanking,omitempty"`
+	RecordCount           int      `json:"recordCount"`
 }
 
 // Record is a single document in a search index.
@@ -24,9 +24,9 @@ type Record struct {
 // SearchParams defines the parameters for a search query.
 type SearchParams struct {
 	Query                string   `json:"query"`
-	Filters              string   `json:"filters,omitempty"`             // filter expression: "category:electronics AND price < 100"
-	FacetFilters         []string `json:"facetFilters,omitempty"`        // ["category:electronics", "brand:apple"]
-	Facets               []string `json:"facets,omitempty"`              // attributes to compute facet counts for
+	Filters              string   `json:"filters,omitempty"`      // filter expression: "category:electronics AND price < 100"
+	FacetFilters         []string `json:"facetFilters,omitempty"` // ["category:electronics", "brand:apple"]
+	Facets               []string `json:"facets,omitempty"`       // attributes to compute facet counts for
 	Page                 int      `json:"page"`
 	HitsPerPage          int      `json:"hitsPerPage"`
 	AttributesToRetrieve []string `json:"attributesToRetrieve,omitempty"` // limit returned attributes

@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // CreateExternalAccount handles POST /v1/accounts/{account_id}/external_accounts.

@@ -277,8 +277,8 @@ func (h *Handler) ConversationsSetTopic(w http.ResponseWriter, r *http.Request) 
 // ConversationsInvite handles POST /api/conversations.invite
 func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string   `json:"channel"`
-		Users   string   `json:"users"` // comma-separated
+		Channel string `json:"channel"`
+		Users   string `json:"users"` // comma-separated
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackError(w, "invalid_json")
@@ -428,9 +428,9 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Channels.Set(id, ch)
 	slackOK(w, map[string]any{
-		"channel":          ch,
-		"no_op":            false,
-		"already_open":     false,
+		"channel":      ch,
+		"no_op":        false,
+		"already_open": false,
 	})
 }
 
@@ -485,4 +485,3 @@ func splitParts(s string) []string {
 	parts = append(parts, s[start:])
 	return parts
 }
-

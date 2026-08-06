@@ -20,23 +20,23 @@ type Product struct {
 
 // Variant represents a product variant.
 type Variant struct {
-	ID                int64  `json:"id"`
-	ProductID         int64  `json:"product_id"`
-	Title             string `json:"title"`
-	Price             string `json:"price"`
-	CompareAtPrice    string `json:"compare_at_price,omitempty"`
-	SKU               string `json:"sku"`
-	Barcode           string `json:"barcode,omitempty"`
-	Position          int    `json:"position"`
-	InventoryItemID   int64  `json:"inventory_item_id"`
-	InventoryQuantity int    `json:"inventory_quantity"`
+	ID                int64   `json:"id"`
+	ProductID         int64   `json:"product_id"`
+	Title             string  `json:"title"`
+	Price             string  `json:"price"`
+	CompareAtPrice    string  `json:"compare_at_price,omitempty"`
+	SKU               string  `json:"sku"`
+	Barcode           string  `json:"barcode,omitempty"`
+	Position          int     `json:"position"`
+	InventoryItemID   int64   `json:"inventory_item_id"`
+	InventoryQuantity int     `json:"inventory_quantity"`
 	Weight            float64 `json:"weight"`
-	WeightUnit        string `json:"weight_unit"`
-	Option1           string `json:"option1,omitempty"`
-	Option2           string `json:"option2,omitempty"`
-	Option3           string `json:"option3,omitempty"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
+	WeightUnit        string  `json:"weight_unit"`
+	Option1           string  `json:"option1,omitempty"`
+	Option2           string  `json:"option2,omitempty"`
+	Option3           string  `json:"option3,omitempty"`
+	CreatedAt         string  `json:"created_at"`
+	UpdatedAt         string  `json:"updated_at"`
 }
 
 // Image represents a product image.
@@ -54,58 +54,58 @@ type Image struct {
 
 // Order represents a Shopify order.
 type Order struct {
-	ID                  int64       `json:"id"`
-	Name                string      `json:"name"` // "#1001"
-	OrderNumber         int         `json:"order_number"`
-	Email               string      `json:"email"`
-	FinancialStatus     string      `json:"financial_status"` // "pending", "paid", "refunded", etc.
-	FulfillmentStatus   string      `json:"fulfillment_status,omitempty"` // null, "fulfilled", "partial"
-	Currency            string      `json:"currency"`
-	TotalPrice          string      `json:"total_price"`
-	SubtotalPrice       string      `json:"subtotal_price"`
-	TotalTax            string      `json:"total_tax"`
-	TotalDiscounts      string      `json:"total_discounts"`
-	LineItems           []LineItem  `json:"line_items,omitempty"`
-	Customer            *Customer   `json:"customer,omitempty"`
-	ShippingAddress     *Address    `json:"shipping_address,omitempty"`
-	BillingAddress      *Address    `json:"billing_address,omitempty"`
-	Note                string      `json:"note,omitempty"`
-	Tags                string      `json:"tags,omitempty"`
-	Cancelled           bool        `json:"cancelled"`
-	CancelledAt         string      `json:"cancelled_at,omitempty"`
-	ClosedAt            string      `json:"closed_at,omitempty"`
-	CreatedAt           string      `json:"created_at"`
-	UpdatedAt           string      `json:"updated_at"`
+	ID                int64      `json:"id"`
+	Name              string     `json:"name"` // "#1001"
+	OrderNumber       int        `json:"order_number"`
+	Email             string     `json:"email"`
+	FinancialStatus   string     `json:"financial_status"`             // "pending", "paid", "refunded", etc.
+	FulfillmentStatus string     `json:"fulfillment_status,omitempty"` // null, "fulfilled", "partial"
+	Currency          string     `json:"currency"`
+	TotalPrice        string     `json:"total_price"`
+	SubtotalPrice     string     `json:"subtotal_price"`
+	TotalTax          string     `json:"total_tax"`
+	TotalDiscounts    string     `json:"total_discounts"`
+	LineItems         []LineItem `json:"line_items,omitempty"`
+	Customer          *Customer  `json:"customer,omitempty"`
+	ShippingAddress   *Address   `json:"shipping_address,omitempty"`
+	BillingAddress    *Address   `json:"billing_address,omitempty"`
+	Note              string     `json:"note,omitempty"`
+	Tags              string     `json:"tags,omitempty"`
+	Cancelled         bool       `json:"cancelled"`
+	CancelledAt       string     `json:"cancelled_at,omitempty"`
+	ClosedAt          string     `json:"closed_at,omitempty"`
+	CreatedAt         string     `json:"created_at"`
+	UpdatedAt         string     `json:"updated_at"`
 }
 
 // LineItem represents an order line item.
 type LineItem struct {
-	ID         int64  `json:"id"`
-	ProductID  int64  `json:"product_id"`
-	VariantID  int64  `json:"variant_id"`
-	Title      string `json:"title"`
-	Quantity   int    `json:"quantity"`
-	Price      string `json:"price"`
-	SKU        string `json:"sku,omitempty"`
-	Name       string `json:"name"`
+	ID        int64  `json:"id"`
+	ProductID int64  `json:"product_id"`
+	VariantID int64  `json:"variant_id"`
+	Title     string `json:"title"`
+	Quantity  int    `json:"quantity"`
+	Price     string `json:"price"`
+	SKU       string `json:"sku,omitempty"`
+	Name      string `json:"name"`
 }
 
 // Customer represents a Shopify customer.
 type Customer struct {
-	ID               int64      `json:"id"`
-	Email            string     `json:"email"`
-	FirstName        string     `json:"first_name"`
-	LastName         string     `json:"last_name"`
-	Phone            string     `json:"phone,omitempty"`
-	OrdersCount      int        `json:"orders_count"`
-	TotalSpent       string     `json:"total_spent"`
-	State            string     `json:"state"` // "enabled", "disabled", "invited"
-	Tags             string     `json:"tags,omitempty"`
-	Note             string     `json:"note,omitempty"`
-	Addresses        []Address  `json:"addresses,omitempty"`
-	DefaultAddress   *Address   `json:"default_address,omitempty"`
-	CreatedAt        string     `json:"created_at"`
-	UpdatedAt        string     `json:"updated_at"`
+	ID             int64     `json:"id"`
+	Email          string    `json:"email"`
+	FirstName      string    `json:"first_name"`
+	LastName       string    `json:"last_name"`
+	Phone          string    `json:"phone,omitempty"`
+	OrdersCount    int       `json:"orders_count"`
+	TotalSpent     string    `json:"total_spent"`
+	State          string    `json:"state"` // "enabled", "disabled", "invited"
+	Tags           string    `json:"tags,omitempty"`
+	Note           string    `json:"note,omitempty"`
+	Addresses      []Address `json:"addresses,omitempty"`
+	DefaultAddress *Address  `json:"default_address,omitempty"`
+	CreatedAt      string    `json:"created_at"`
+	UpdatedAt      string    `json:"updated_at"`
 }
 
 // Address represents a customer or order address.
@@ -142,22 +142,22 @@ type Collection struct {
 
 // Collect represents a product-to-collection link.
 type Collect struct {
-	ID           int64 `json:"id"`
-	CollectionID int64 `json:"collection_id"`
-	ProductID    int64 `json:"product_id"`
-	Position     int   `json:"position"`
+	ID           int64  `json:"id"`
+	CollectionID int64  `json:"collection_id"`
+	ProductID    int64  `json:"product_id"`
+	Position     int    `json:"position"`
 	CreatedAt    string `json:"created_at"`
 }
 
 // InventoryItem represents an inventory item.
 type InventoryItem struct {
-	ID                int64  `json:"id"`
-	SKU               string `json:"sku"`
-	Tracked           bool   `json:"tracked"`
-	Cost              string `json:"cost,omitempty"`
+	ID                  int64  `json:"id"`
+	SKU                 string `json:"sku"`
+	Tracked             bool   `json:"tracked"`
+	Cost                string `json:"cost,omitempty"`
 	CountryCodeOfOrigin string `json:"country_code_of_origin,omitempty"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
+	CreatedAt           string `json:"created_at"`
+	UpdatedAt           string `json:"updated_at"`
 }
 
 // InventoryLevel represents inventory at a location.
@@ -193,17 +193,17 @@ type Fulfillment struct {
 
 // FulfillmentOrder represents a fulfillment order.
 type FulfillmentOrder struct {
-	ID             int64  `json:"id"`
-	OrderID        int64  `json:"order_id"`
-	Status         string `json:"status"` // "open", "in_progress", "closed", "cancelled"
-	AssignedLocationID int64 `json:"assigned_location_id"`
+	ID                 int64  `json:"id"`
+	OrderID            int64  `json:"order_id"`
+	Status             string `json:"status"` // "open", "in_progress", "closed", "cancelled"
+	AssignedLocationID int64  `json:"assigned_location_id"`
 }
 
 // Transaction represents a payment transaction on an order.
 type Transaction struct {
 	ID        int64  `json:"id"`
 	OrderID   int64  `json:"order_id"`
-	Kind      string `json:"kind"` // "sale", "capture", "authorization", "void", "refund"
+	Kind      string `json:"kind"`   // "sale", "capture", "authorization", "void", "refund"
 	Status    string `json:"status"` // "success", "failure", "pending", "error"
 	Amount    string `json:"amount"`
 	Currency  string `json:"currency"`
@@ -246,15 +246,15 @@ type Webhook struct {
 
 // Metafield represents a metafield on any resource.
 type Metafield struct {
-	ID          int64  `json:"id"`
-	Namespace   string `json:"namespace"`
-	Key         string `json:"key"`
-	Value       string `json:"value"`
-	Type        string `json:"type"` // "single_line_text_field", "number_integer", etc.
-	OwnerID     int64  `json:"owner_id"`
+	ID            int64  `json:"id"`
+	Namespace     string `json:"namespace"`
+	Key           string `json:"key"`
+	Value         string `json:"value"`
+	Type          string `json:"type"` // "single_line_text_field", "number_integer", etc.
+	OwnerID       int64  `json:"owner_id"`
 	OwnerResource string `json:"owner_resource"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
 }
 
 // Theme represents a Shopify theme.
@@ -290,17 +290,17 @@ type Page struct {
 
 // PriceRule represents a Shopify price rule.
 type PriceRule struct {
-	ID                int64  `json:"id"`
-	Title             string `json:"title"`
-	TargetType        string `json:"target_type"` // "line_item", "shipping_line"
-	ValueType         string `json:"value_type"` // "fixed_amount", "percentage"
-	Value             string `json:"value"`
-	OncePerCustomer   bool   `json:"once_per_customer"`
-	UsageLimit        *int   `json:"usage_limit,omitempty"`
-	StartsAt          string `json:"starts_at"`
-	EndsAt            string `json:"ends_at,omitempty"`
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
+	ID              int64  `json:"id"`
+	Title           string `json:"title"`
+	TargetType      string `json:"target_type"` // "line_item", "shipping_line"
+	ValueType       string `json:"value_type"`  // "fixed_amount", "percentage"
+	Value           string `json:"value"`
+	OncePerCustomer bool   `json:"once_per_customer"`
+	UsageLimit      *int   `json:"usage_limit,omitempty"`
+	StartsAt        string `json:"starts_at"`
+	EndsAt          string `json:"ends_at,omitempty"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 // DiscountCode represents a discount code.
@@ -315,29 +315,29 @@ type DiscountCode struct {
 
 // GiftCard represents a Shopify gift card.
 type GiftCard struct {
-	ID          int64  `json:"id"`
-	Code        string `json:"code"`
-	Balance     string `json:"balance"`
+	ID           int64  `json:"id"`
+	Code         string `json:"code"`
+	Balance      string `json:"balance"`
 	InitialValue string `json:"initial_value"`
-	Currency    string `json:"currency"`
-	Disabled    bool   `json:"disabled_at,omitempty"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
+	Currency     string `json:"currency"`
+	Disabled     bool   `json:"disabled_at,omitempty"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 // Shop represents shop info.
 type Shop struct {
-	ID            int64  `json:"id"`
-	Name          string `json:"name"`
-	Email         string `json:"email"`
-	Domain        string `json:"domain"`
+	ID              int64  `json:"id"`
+	Name            string `json:"name"`
+	Email           string `json:"email"`
+	Domain          string `json:"domain"`
 	MyshopifyDomain string `json:"myshopify_domain"`
-	Currency      string `json:"currency"`
-	PlanName      string `json:"plan_name"`
-	Country       string `json:"country_name"`
-	Timezone      string `json:"timezone"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	Currency        string `json:"currency"`
+	PlanName        string `json:"plan_name"`
+	Country         string `json:"country_name"`
+	Timezone        string `json:"timezone"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
 }
 
 // ScriptTag represents a script tag.

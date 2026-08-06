@@ -28,8 +28,8 @@ type Association struct {
 type Property struct {
 	Name        string           `json:"name"`
 	Label       string           `json:"label"`
-	Type        string           `json:"type"`        // "string", "number", "date", "datetime", "enumeration", "bool"
-	FieldType   string           `json:"fieldType"`   // "text", "textarea", "number", "select", etc.
+	Type        string           `json:"type"`      // "string", "number", "date", "datetime", "enumeration", "bool"
+	FieldType   string           `json:"fieldType"` // "text", "textarea", "number", "select", etc.
 	GroupName   string           `json:"groupName"`
 	Description string           `json:"description,omitempty"`
 	Options     []PropertyOption `json:"options,omitempty"`
@@ -44,27 +44,27 @@ type PropertyOption struct {
 
 // PropertyGroup groups related properties.
 type PropertyGroup struct {
-	Name        string `json:"name"`
-	Label       string `json:"label"`
-	ObjectType  string `json:"-"`
+	Name       string `json:"name"`
+	Label      string `json:"label"`
+	ObjectType string `json:"-"`
 }
 
 // Pipeline represents a deal or ticket pipeline.
 type Pipeline struct {
-	ID          string          `json:"id"`
-	Label       string          `json:"label"`
-	Stages      []PipelineStage `json:"stages"`
-	ObjectType  string          `json:"-"` // "deals" or "tickets"
-	CreatedAt   string          `json:"createdAt"`
-	UpdatedAt   string          `json:"updatedAt"`
+	ID         string          `json:"id"`
+	Label      string          `json:"label"`
+	Stages     []PipelineStage `json:"stages"`
+	ObjectType string          `json:"-"` // "deals" or "tickets"
+	CreatedAt  string          `json:"createdAt"`
+	UpdatedAt  string          `json:"updatedAt"`
 }
 
 // PipelineStage represents a stage within a pipeline.
 type PipelineStage struct {
-	ID          string  `json:"id"`
-	Label       string  `json:"label"`
-	DisplayOrder int    `json:"displayOrder"`
-	Metadata    map[string]any `json:"metadata,omitempty"` // probability for deals, ticketState for tickets
+	ID           string         `json:"id"`
+	Label        string         `json:"label"`
+	DisplayOrder int            `json:"displayOrder"`
+	Metadata     map[string]any `json:"metadata,omitempty"` // probability for deals, ticketState for tickets
 }
 
 // Owner represents a HubSpot owner (user).
@@ -82,9 +82,9 @@ type Owner struct {
 type List struct {
 	ID             string   `json:"listId"`
 	Name           string   `json:"name"`
-	ObjectTypeID   string   `json:"objectTypeId"` // "0-1" contacts, "0-2" companies, etc.
+	ObjectTypeID   string   `json:"objectTypeId"`   // "0-1" contacts, "0-2" companies, etc.
 	ProcessingType string   `json:"processingType"` // "MANUAL" or "DYNAMIC"
-	MemberIDs      []string `json:"-"` // internal: member object IDs
+	MemberIDs      []string `json:"-"`              // internal: member object IDs
 }
 
 // Webhook represents a HubSpot webhook subscription.

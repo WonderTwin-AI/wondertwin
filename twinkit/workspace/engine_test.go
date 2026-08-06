@@ -452,11 +452,11 @@ func TestMembership_RemoveNonMember(t *testing.T) {
 
 type testHooks struct {
 	NoOpWorkspaceHooks
-	created    int
-	updated    int
-	deleted    int
+	created      int
+	updated      int
+	deleted      int
 	transitioned int
-	commented  int
+	commented    int
 }
 
 func (h *testHooks) OnEntityCreated(_ context.Context, _ *Entity) error {

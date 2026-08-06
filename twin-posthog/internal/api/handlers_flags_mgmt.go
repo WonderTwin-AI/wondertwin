@@ -51,10 +51,10 @@ func (h *Handler) GetFeatureFlag(w http.ResponseWriter, r *http.Request) {
 // CreateFeatureFlag handles POST /api/projects/{project_id}/feature_flags/
 func (h *Handler) CreateFeatureFlag(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Key                string `json:"key"`
-		Name               string `json:"name"`
-		Active             *bool  `json:"active"`
-		RolloutPercentage  *int   `json:"rollout_percentage"`
+		Key               string `json:"key"`
+		Name              string `json:"name"`
+		Active            *bool  `json:"active"`
+		RolloutPercentage *int   `json:"rollout_percentage"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Key == "" {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
@@ -146,12 +146,12 @@ func (h *Handler) ListEarlyAccessFeatures(w http.ResponseWriter, r *http.Request
 // flagToAPI converts a FeatureFlag to the PostHog API response format.
 func flagToAPI(flag store.FeatureFlag) map[string]any {
 	result := map[string]any{
-		"id":                   flag.Key, // use key as ID in sim
-		"key":                  flag.Key,
-		"name":                 flag.Key,
-		"active":               flag.Enabled,
-		"is_simple_flag":       flag.Variant == "",
-		"rollout_percentage":   100,
+		"id":                           flag.Key, // use key as ID in sim
+		"key":                          flag.Key,
+		"name":                         flag.Key,
+		"active":                       flag.Enabled,
+		"is_simple_flag":               flag.Variant == "",
+		"rollout_percentage":           100,
 		"ensure_experience_continuity": false,
 		"filters": map[string]any{
 			"groups": []map[string]any{

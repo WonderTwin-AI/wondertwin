@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
-	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 )
 
 func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
@@ -31,17 +31,17 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	id := h.store.Subscriptions.NextID()
 
 	sub := store.Subscription{
-		ID:                 id,
-		Object:             "subscription",
-		Customer:           customer,
-		Status:             "active",
-		CurrentPeriodStart: now.Unix(),
-		CurrentPeriodEnd:   now.AddDate(0, 1, 0).Unix(), // default monthly
-		CollectionMethod:   "charge_automatically",
+		ID:                   id,
+		Object:               "subscription",
+		Customer:             customer,
+		Status:               "active",
+		CurrentPeriodStart:   now.Unix(),
+		CurrentPeriodEnd:     now.AddDate(0, 1, 0).Unix(), // default monthly
+		CollectionMethod:     "charge_automatically",
 		DefaultPaymentMethod: r.FormValue("default_payment_method"),
-		Livemode:           false,
-		Metadata:           parseMetadata(r),
-		Created:            now.Unix(),
+		Livemode:             false,
+		Metadata:             parseMetadata(r),
+		Created:              now.Unix(),
 	}
 
 	if cm := r.FormValue("collection_method"); cm != "" {

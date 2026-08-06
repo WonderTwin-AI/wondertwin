@@ -7,7 +7,7 @@
 //   - Publisher: who authored and ships the twin (e.g. "wondertwin")
 //   - Vendor:    the vendor's name in the world (e.g. "stripe")
 //   - TwinID:    the directory/binary identity within a tier+publisher
-//                scope (always "twin-" + Vendor)
+//     scope (always "twin-" + Vendor)
 //
 // The fully-qualified identity is a Twin: a (Tier, Publisher, Vendor)
 // tuple. TwinID alone is insufficient outside of a tier+publisher-scoped

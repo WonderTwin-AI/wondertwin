@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/wondertwin-ai/wondertwin/twin-shopify/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-shopify/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-shopify/internal/api"
-	"github.com/wondertwin-ai/wondertwin/twin-shopify/internal/store"
 )
 
 const v = "/admin/api/2025-04"
@@ -80,9 +80,9 @@ func TestProductCRUD(t *testing.T) {
 	// Create
 	resp := sPost(tc, v+"/products.json", map[string]any{
 		"product": map[string]any{
-			"title":   "Test Widget",
-			"vendor":  "ACME",
-			"status":  "active",
+			"title":  "Test Widget",
+			"vendor": "ACME",
+			"status": "active",
 		},
 	})
 	resp.AssertStatus(201)
@@ -247,7 +247,7 @@ func TestInventoryLevels(t *testing.T) {
 	resp = sPost(tc, v+"/inventory_levels/set.json", map[string]any{
 		"inventory_item_id": 1,
 		"location_id":       1,
-		"available":          50,
+		"available":         50,
 	})
 	resp.AssertStatus(200)
 }

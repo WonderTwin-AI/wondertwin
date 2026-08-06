@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // Payout transition timing (in simulated seconds from creation).

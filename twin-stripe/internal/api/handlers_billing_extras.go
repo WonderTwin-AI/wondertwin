@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // --- Coupons ---
@@ -96,15 +96,15 @@ func (h *Handler) CreateSetupIntent(w http.ResponseWriter, r *http.Request) {
 
 	id := h.store.SetupIntents.NextID()
 	si := store.SetupIntent{
-		ID:            id,
-		Object:        "setup_intent",
-		Customer:      r.FormValue("customer"),
-		Status:        "requires_payment_method",
-		ClientSecret:  id + "_secret_" + h.randomHex(12),
-		Usage:         "off_session",
-		Livemode:      false,
-		Metadata:      parseMetadata(r),
-		Created:       h.store.Now(),
+		ID:           id,
+		Object:       "setup_intent",
+		Customer:     r.FormValue("customer"),
+		Status:       "requires_payment_method",
+		ClientSecret: id + "_secret_" + h.randomHex(12),
+		Usage:        "off_session",
+		Livemode:     false,
+		Metadata:     parseMetadata(r),
+		Created:      h.store.Now(),
 	}
 	if u := r.FormValue("usage"); u != "" {
 		si.Usage = u

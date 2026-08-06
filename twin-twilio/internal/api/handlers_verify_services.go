@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // ListVerifyServices handles GET /v2/Services
@@ -15,10 +15,10 @@ func (h *Handler) ListVerifyServices(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"services": services,
 		"meta": map[string]any{
-			"page":      0,
-			"page_size": 50,
+			"page":           0,
+			"page_size":      50,
 			"first_page_url": "/v2/Services?PageSize=50&Page=0",
-			"url":       "/v2/Services?PageSize=50&Page=0",
+			"url":            "/v2/Services?PageSize=50&Page=0",
 		},
 	})
 }

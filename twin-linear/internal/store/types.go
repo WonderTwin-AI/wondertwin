@@ -3,27 +3,27 @@ package store
 
 // Issue is the core work item in Linear.
 type Issue struct {
-	ID          string  `json:"id"`
-	Identifier  string  `json:"identifier"` // "ENG-123"
-	Title       string  `json:"title"`
-	Description string  `json:"description,omitempty"`
-	Priority    int     `json:"priority"` // 0=none, 1=urgent, 2=high, 3=medium, 4=low
-	Estimate    float64 `json:"estimate,omitempty"`
-	SortOrder   float64 `json:"sortOrder"`
-	BoardOrder  float64 `json:"boardOrder"`
-	DueDate     string  `json:"dueDate,omitempty"`
-	TeamID      string  `json:"teamId"`       // internal: team reference
-	StateID     string  `json:"stateId"`      // internal: workflow state
-	AssigneeID  string  `json:"assigneeId,omitempty"`
-	ProjectID   string  `json:"projectId,omitempty"`
-	CycleID     string  `json:"cycleId,omitempty"`
-	ParentID    string  `json:"parentId,omitempty"`
+	ID          string   `json:"id"`
+	Identifier  string   `json:"identifier"` // "ENG-123"
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Priority    int      `json:"priority"` // 0=none, 1=urgent, 2=high, 3=medium, 4=low
+	Estimate    float64  `json:"estimate,omitempty"`
+	SortOrder   float64  `json:"sortOrder"`
+	BoardOrder  float64  `json:"boardOrder"`
+	DueDate     string   `json:"dueDate,omitempty"`
+	TeamID      string   `json:"teamId"`  // internal: team reference
+	StateID     string   `json:"stateId"` // internal: workflow state
+	AssigneeID  string   `json:"assigneeId,omitempty"`
+	ProjectID   string   `json:"projectId,omitempty"`
+	CycleID     string   `json:"cycleId,omitempty"`
+	ParentID    string   `json:"parentId,omitempty"`
 	LabelIDs    []string `json:"labelIds,omitempty"`
-	CreatedAt   string  `json:"createdAt"`
-	UpdatedAt   string  `json:"updatedAt"`
-	ArchivedAt  string  `json:"archivedAt,omitempty"`
-	Number      int     `json:"number"`
-	URL         string  `json:"url"`
+	CreatedAt   string   `json:"createdAt"`
+	UpdatedAt   string   `json:"updatedAt"`
+	ArchivedAt  string   `json:"archivedAt,omitempty"`
+	Number      int      `json:"number"`
+	URL         string   `json:"url"`
 }
 
 // Team is an organizational unit. Issues belong to teams.
@@ -38,12 +38,12 @@ type Team struct {
 
 // WorkflowState represents an issue status.
 type WorkflowState struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"` // "backlog", "unstarted", "started", "completed", "canceled", "triage"
-	Color    string `json:"color"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Type     string  `json:"type"` // "backlog", "unstarted", "started", "completed", "canceled", "triage"
+	Color    string  `json:"color"`
 	Position float64 `json:"position"`
-	TeamID   string `json:"teamId"`
+	TeamID   string  `json:"teamId"`
 }
 
 // User represents a Linear workspace member.

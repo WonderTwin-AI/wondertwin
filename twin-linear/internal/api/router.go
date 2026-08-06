@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-linear/internal/store"
 	gql "github.com/wondertwin-ai/wondertwin/twinkit/graphql"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-linear/internal/store"
 )
 
 // Handler holds Linear API state.

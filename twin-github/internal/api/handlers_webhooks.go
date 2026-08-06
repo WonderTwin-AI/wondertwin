@@ -23,9 +23,9 @@ func (h *Handler) CreateWebhook(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "repo")
 
 	var req struct {
-		Name   string            `json:"name"`
-		Active *bool             `json:"active,omitempty"`
-		Events []string          `json:"events"`
+		Name   string              `json:"name"`
+		Active *bool               `json:"active,omitempty"`
+		Events []string            `json:"events"`
 		Config store.WebhookConfig `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

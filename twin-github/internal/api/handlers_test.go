@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/wondertwin-ai/wondertwin/twin-github/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twin-github/internal/api"
-	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 func setupGitHub(t *testing.T) (*httptest.Server, *testutil.TwinClient) {

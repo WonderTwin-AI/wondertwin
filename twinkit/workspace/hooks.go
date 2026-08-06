@@ -38,7 +38,7 @@ type WorkspaceHooks interface {
 // Embed this in the twin's hook implementation to avoid implementing unused hooks.
 type NoOpWorkspaceHooks struct{}
 
-func (NoOpWorkspaceHooks) ValidateEntity(_ context.Context, _ *Entity) error { return nil }
+func (NoOpWorkspaceHooks) ValidateEntity(_ context.Context, _ *Entity) error  { return nil }
 func (NoOpWorkspaceHooks) OnEntityCreated(_ context.Context, _ *Entity) error { return nil }
 func (NoOpWorkspaceHooks) OnEntityUpdated(_ context.Context, _ *Entity, _ map[string]any) error {
 	return nil
@@ -50,6 +50,6 @@ func (NoOpWorkspaceHooks) OnStatusTransition(_ context.Context, _ *Entity, _, _ 
 func (NoOpWorkspaceHooks) OnCommentAdded(_ context.Context, _ *Entity, _ *Comment) error {
 	return nil
 }
-func (NoOpWorkspaceHooks) OnMemberAdded(_ context.Context, _, _, _ string) error  { return nil }
-func (NoOpWorkspaceHooks) OnMemberRemoved(_ context.Context, _, _ string) error   { return nil }
-func (NoOpWorkspaceHooks) FormatEvent(event *MutationEvent) any                   { return event }
+func (NoOpWorkspaceHooks) OnMemberAdded(_ context.Context, _, _, _ string) error { return nil }
+func (NoOpWorkspaceHooks) OnMemberRemoved(_ context.Context, _, _ string) error  { return nil }
+func (NoOpWorkspaceHooks) FormatEvent(event *MutationEvent) any                  { return event }

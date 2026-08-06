@@ -33,11 +33,11 @@ type RPCError struct {
 
 // Standard JSON-RPC 2.0 error codes.
 const (
-	ErrCodeParse      = -32700
-	ErrCodeInvalidReq = -32600
-	ErrCodeNoMethod   = -32601
+	ErrCodeParse         = -32700
+	ErrCodeInvalidReq    = -32600
+	ErrCodeNoMethod      = -32601
 	ErrCodeInvalidParams = -32602
-	ErrCodeInternal   = -32603
+	ErrCodeInternal      = -32603
 )
 
 // newResponse creates a successful JSON-RPC response.

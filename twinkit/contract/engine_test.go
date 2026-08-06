@@ -337,14 +337,14 @@ func TestApprovalChain_NotImplementedV01(t *testing.T) {
 
 type recordingHooks struct {
 	NoOpHooks
-	executed       int
-	sigRecorded    int
-	transitions    []string // "FROM->TO"
-	declined       int
-	voided         int
-	expired        int
-	executeErr     error
-	validateErr    error
+	executed    int
+	sigRecorded int
+	transitions []string // "FROM->TO"
+	declined    int
+	voided      int
+	expired     int
+	executeErr  error
+	validateErr error
 }
 
 func (r *recordingHooks) ValidateCreate(_ context.Context, _ *Contract) error {

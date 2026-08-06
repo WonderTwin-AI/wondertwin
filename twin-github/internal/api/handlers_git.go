@@ -185,7 +185,7 @@ func (h *Handler) CreateGitTree(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "repo")
 
 	var req struct {
-		BaseTree string             `json:"base_tree,omitempty"`
+		BaseTree string               `json:"base_tree,omitempty"`
 		Tree     []store.GitTreeEntry `json:"tree"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
