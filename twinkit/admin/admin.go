@@ -258,12 +258,23 @@ func (h *Handler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleListQuirks reports the state of every quirk the twin knows about.
+//
+// A twin with no quirk store configured has an empty quirk set, not a missing
+// endpoint, so this returns 200 with an empty list rather than 404. Mutating a
+// *specific* quirk on such a twin still 404s — see handleEnableQuirk and
+// handleDisableQuirk, whose target genuinely cannot exist.
+//
+// The list is always emitted as [] and never null: a nil slice marshals to
+// null, which forces every client to special-case it.
 func (h *Handler) handleListQuirks(w http.ResponseWriter, r *http.Request) {
-	if h.quirks == nil {
-		twincore.Error(w, http.StatusNotFound, "quirk store not configured")
-		return
+	quirks := []QuirkStatus{}
+	if h.quirks != nil {
+		if got := h.quirks.ListQuirks(); got != nil {
+			quirks = got
+		}
 	}
-	twincore.JSON(w, http.StatusOK, h.quirks.ListQuirks())
+	twincore.JSON(w, http.StatusOK, quirks)
 }
 
 func (h *Handler) handleEnableQuirk(w http.ResponseWriter, r *http.Request) {
