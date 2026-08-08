@@ -34,8 +34,19 @@ jobs:
       - name: OSV-Scanner
         uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
         with:
+          # --no-call-analysis=go: the scanner's Go call analysis cannot run in
+          # this container. It ships an older toolchain and sets
+          # GOTOOLCHAIN=local, so it refuses any module whose go directive is
+          # newer than its own, and exits non-zero even when no vulnerability
+          # is found. The action passes a fixed env list to the container, so
+          # GOTOOLCHAIN cannot be overridden from here.
+          #
+          # Nothing is lost: the govulncheck job above does the same call
+          # analysis properly, on a runner with a correct toolchain. This job's
+          # value is the recursive go.mod-level sweep across every module.
           scan-args: |-
             --recursive
+            --no-call-analysis=go
             .
 
   semgrep:
