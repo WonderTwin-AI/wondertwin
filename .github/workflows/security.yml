@@ -32,23 +32,48 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: OSV-Scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
         with:
+          # --no-call-analysis=go: the scanner's Go call analysis cannot run in
+          # this container. It ships an older toolchain and sets
+          # GOTOOLCHAIN=local, so it refuses any module whose go directive is
+          # newer than its own, and exits non-zero even when no vulnerability
+          # is found. The action passes a fixed env list to the container, so
+          # GOTOOLCHAIN cannot be overridden from here.
+          #
+          # Nothing is lost: the govulncheck job above does the same call
+          # analysis properly, on a runner with a correct toolchain. This job's
+          # value is the recursive go.mod-level sweep across every module.
           scan-args: |-
             --recursive
+            --no-call-analysis=go
             .
 
   semgrep:
     name: Static analysis (Semgrep)
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep@sha256:bdf7013b2c3634a487671158da77c554f531742326b543a9464d2adf6c433ac8
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Run Semgrep
+        # Rule packs are pinned explicitly rather than using --config auto.
+        # auto resolves the newest registry rules at run time, so a rule
+        # published upstream turns this job red with no change on our side —
+        # that is what broke main from 2026-07-06 onward. Pinned packs mean new
+        # rules get adopted when someone bumps this list, deliberately.
+        #
+        # The image is pinned by digest for the same reason: `semgrep/semgrep`
+        # with no tag floats to latest.
         run: >-
-          semgrep scan --config auto --error
+          semgrep scan --error
+          --config p/golang
+          --config p/github-actions
+          --config p/secrets
+          --config p/security-audit
+          --config p/supply-chain
+          --config p/ci
           --exclude vendor --exclude node_modules
           --exclude-rule go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
           --exclude-rule go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
