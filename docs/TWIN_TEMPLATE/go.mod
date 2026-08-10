@@ -7,4 +7,4 @@ require (
 	github.com/wondertwin-ai/wondertwin/twinkit v0.0.0
 )
 
-replace github.com/wondertwin-ai/wondertwin/twinkit => ../twinkit
+replace github.com/wondertwin-ai/wondertwin/twinkit => ../../twinkit
