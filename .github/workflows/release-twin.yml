@@ -33,9 +33,20 @@ jobs:
           cache-dependency-path: "**/go.sum"
 
       - name: Install syft
+        # Fetch the installer to disk and verify its digest before executing it,
+        # rather than piping it straight into a shell. A pipe executes whatever
+        # the URL happens to serve at that moment, with no opportunity to detect
+        # a compromised or swapped script. Bump SYFT_VERSION and
+        # SYFT_INSTALLER_SHA256 together.
+        env:
+          SYFT_VERSION: v1.44.0
+          SYFT_INSTALLER_SHA256: 8a277b4b4dc21809ecd9a0e4926f4d7319affc6451a607fdeb3e5e1fbd9bc573
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.44.0/install.sh | \
-            sh -s -- -b /usr/local/bin v1.44.0
+          curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" \
+            -o "${RUNNER_TEMP}/syft-install.sh"
+          echo "${SYFT_INSTALLER_SHA256}  ${RUNNER_TEMP}/syft-install.sh" | sha256sum -c -
+          sh "${RUNNER_TEMP}/syft-install.sh" -b /usr/local/bin "${SYFT_VERSION}"
+          rm -f "${RUNNER_TEMP}/syft-install.sh"
           syft version
 
       - name: Create and push twin tag

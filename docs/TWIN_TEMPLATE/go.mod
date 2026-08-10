@@ -1,9 +1,9 @@
 module github.com/wondertwin-ai/wondertwin/twin-TEMPLATE
 
-go 1.26.4
+go 1.26.5
 
 require (
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/wondertwin-ai/wondertwin/twinkit v0.0.0
 )
 

@@ -1,0 +1,16 @@
+# osv-scanner suppressions. Each entry must state why the advisory is not
+# reachable in this repo, not merely that it is inconvenient.
+
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = """
+Advisory is against golang.org/x/crypto/openpgp, which is unmaintained and
+has no fixed version — it will never clear by upgrading.
+
+This repo does not import openpgp. The only x/crypto subpackages used
+anywhere in the workspace are bcrypt and hkdf. govulncheck, which does call
+analysis, reports zero reachable x/crypto vulnerabilities; osv-scanner
+matches it only at the go.mod level.
+
+Re-evaluate if this repo ever imports golang.org/x/crypto/openpgp.
+"""
