@@ -94,13 +94,20 @@ twin-{name}/
    ```bash
    cp -r docs/TWIN_TEMPLATE twin-{name}
    ```
-   Then find-and-replace `TEMPLATE` with your service name and update the placeholder values.
+   Then find-and-replace `TEMPLATE` with your service name, update the
+   placeholder values, and fix the `twinkit` replace path in `go.mod`
+   (`../../twinkit` → `../twinkit`) — see step 3.
 
 3. **Use the shared libraries.** All twins import `twinkit` for server scaffolding, in-memory storage, admin endpoints, webhooks, and test helpers:
    ```bash
    go get github.com/wondertwin-ai/twinkit@latest
    ```
-   Within the monorepo, the `go.mod` uses a replace directive:
+   Within the monorepo, the `go.mod` uses a replace directive pointing at the
+   local `twinkit`. **The path is relative, so it changes when you copy the
+   template.** `docs/TWIN_TEMPLATE/` sits one level deeper than a twin at the
+   repo root, so it ships with `../../twinkit` — which is what lets the
+   template itself build and be covered by CI. After copying to
+   `twin-{name}/`, change it to:
    ```
    replace github.com/wondertwin-ai/wondertwin/twinkit => ../twinkit
    ```
