@@ -1,0 +1,64 @@
+# Dependabot configuration.
+#
+# Closes this repo's share of the SOC2 gap recorded in
+# wondertwin-docs/operations/wondertwin-operational-systems.md §8.3
+# ("no automated dependency update tooling"). wondertwin-ops had this
+# already; wondertwin, wondertwin-pro and wondertwin-app did not.
+#
+# Monthly cadence keeps the noise manageable for a tiny team. Bump to
+# weekly if patches lag enough to matter.
+
+version: 2
+updates:
+  # Three modules, not one. docs/TWIN_TEMPLATE is listed deliberately:
+  # it is the template every new community twin is copied from, and it
+  # spent months on a vulnerable chi precisely because nothing watched
+  # it.
+  - package-ecosystem: "gomod"
+    directories:
+      - "/"
+      - "/twinkit"
+      - "/docs/TWIN_TEMPLATE"
+    schedule:
+      interval: "monthly"
+    # Wait 7 days before proposing a newly published version. A freshly
+    # released package is the window in which a compromised or yanked
+    # version is most likely to still be live.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "go"
+    # Minor and patch updates land as a single PR across the modules;
+    # majors stay individual so they can be reviewed on their own
+    # merits.
+    groups:
+      go-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
