@@ -40,7 +40,7 @@ jobs:
           done
 
       - name: Validate GoReleaser config
-        uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6.2.1
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v6.2.1
         with:
           distribution: goreleaser
           # Pinned to v2.15.x: v2.16 turned the brews-section deprecation into a
