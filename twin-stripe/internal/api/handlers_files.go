@@ -13,10 +13,15 @@ import (
 
 // --- Files ---
 
-// maxFileUploadBytes bounds a file-create request body. Stripe's own limit is
-// 10 MB for most purposes; matching it keeps the twin faithful and keeps an
-// oversized upload from exhausting memory.
-const maxFileUploadBytes = 10 << 20
+// Stripe's per-file limit is 10 MB. MaxBytesReader bounds the entire multipart
+// envelope — part boundaries, part headers and any other form fields — so the
+// body cap carries headroom above the file limit. Capping the body at exactly
+// 10 MB would reject a 10 MB file that real Stripe accepts, purely because of
+// envelope overhead.
+const (
+	maxFileBytes       = 10 << 20
+	maxUploadBodyBytes = maxFileBytes + (1 << 20)
+)
 
 // writeUploadParseError reports a file-upload parse failure. An over-cap body is
 // reported as a size error rather than surfacing the raw reader message, so the
@@ -25,7 +30,7 @@ func writeUploadParseError(w http.ResponseWriter, err error) {
 	msg := err.Error()
 	var maxErr *http.MaxBytesError
 	if errors.As(err, &maxErr) {
-		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxFileUploadBytes)
+		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxUploadBodyBytes)
 	}
 	twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
 }
@@ -33,12 +38,12 @@ func writeUploadParseError(w http.ResponseWriter, err error) {
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 	// Bound the body before any parsing so an oversized upload cannot exhaust
 	// memory, whatever content type it claims (G120).
-	r.Body = http.MaxBytesReader(w, r.Body, maxFileUploadBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBodyBytes)
 
 	// Stripe files API uses multipart/form-data; parse it but discard file bytes.
 	//nolint:gosec // G120: the body is already bounded by the MaxBytesReader above,
 	// and this call passes an explicit in-memory limit.
-	if err := r.ParseMultipartForm(maxFileUploadBytes); err != nil {
+	if err := r.ParseMultipartForm(maxFileBytes); err != nil {
 		// Report an over-cap body here. Without this the fallback below calls
 		// r.ParseForm(), which for multipart/form-data parses only the URL query
 		// and returns nil — swallowing the size failure and answering "Missing
