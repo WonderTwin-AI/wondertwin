@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,10 +21,25 @@ import (
 //   - ?compression=gzip-js or ?compression=gzip — body (or "data" field) is gzip bytes
 //   - ?compression=base64 — body (or "data" field) is base64-encoded JSON
 //   - Content-Encoding: gzip — body is gzipped
+//
+// Ingest bodies are read before any project-key check, so both the wire bytes
+// and the decompressed output need a ceiling: a few-KB gzip bomb otherwise
+// expands to hundreds of MB on an unauthenticated route. PostHog's own capture
+// payloads are far below these.
+const (
+	maxIngestWireBytes    = 5 << 20
+	maxIngestDecodedBytes = 20 << 20
+)
+
+var errIngestBodyTooLarge = errors.New("request body exceeds the maximum ingest size")
+
 func readCaptureBody(r *http.Request) ([]byte, string, error) {
-	raw, err := io.ReadAll(r.Body)
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxIngestWireBytes+1))
 	if err != nil {
 		return nil, "", fmt.Errorf("read body: %w", err)
+	}
+	if len(raw) > maxIngestWireBytes {
+		return nil, "", errIngestBodyTooLarge
 	}
 
 	// formKey carries an api_key posted as a sibling form field of data=, which
@@ -58,9 +74,12 @@ func readCaptureBody(r *http.Request) ([]byte, string, error) {
 			return nil, "", fmt.Errorf("gzip reader: %w", gerr)
 		}
 		defer gz.Close()
-		out, rerr := io.ReadAll(gz)
+		out, rerr := io.ReadAll(io.LimitReader(gz, maxIngestDecodedBytes+1))
 		if rerr != nil {
 			return nil, "", fmt.Errorf("gzip read: %w", rerr)
+		}
+		if len(out) > maxIngestDecodedBytes {
+			return nil, "", errIngestBodyTooLarge
 		}
 		return out, formKey, nil
 	case "base64":

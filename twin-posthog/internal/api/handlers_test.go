@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
@@ -568,6 +569,27 @@ func TestIngestRequiresProjectKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestIngestRejectsOversizedBody covers the ceiling on the ingest read path.
+// The body is consumed before any project-key check, so an unauthenticated
+// caller must not be able to make the twin allocate without bound.
+func TestIngestRejectsOversizedBody(t *testing.T) {
+	_, c := setupPostHog(t)
+	huge := strings.Repeat("a", (5<<20)+1024)
+	resp := c.Post("/capture", map[string]any{
+		"api_key": "phc_k", "event": "e", "distinct_id": "u1", "properties": map[string]any{"pad": huge},
+	})
+	resp.AssertStatus(400)
+}
+
+// TestDecideAcceptsFormWrappedBody pins /decide to the same body handling as
+// /capture and /flags — posthog-js sends it form-wrapped as well.
+func TestDecideAcceptsFormWrappedBody(t *testing.T) {
+	_, c := setupPostHog(t)
+	c.PostForm("/decide", map[string]string{
+		"data": `{"distinct_id":"u1","token":"phc_wrapped"}`,
+	}).AssertStatus(200)
 }
 
 // TestIngestAcceptsKeyFromEverySource pins the four places PostHog takes the

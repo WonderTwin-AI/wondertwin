@@ -55,6 +55,18 @@ func resolveAPIKey(r *http.Request, bodyKey string, props map[string]any) string
 	return ""
 }
 
+// eventKey returns the project key carried by a single batch event, from its
+// own api_key or its properties.$token.
+func eventKey(e captureRequest) string {
+	if e.APIKey != "" {
+		return e.APIKey
+	}
+	if t, ok := e.Properties["$token"].(string); ok {
+		return t
+	}
+	return ""
+}
+
 // CaptureEvent handles POST /capture, POST /e
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	body, formKey, err := readCaptureBody(r)
@@ -129,8 +141,10 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	// A batch's key may ride on any event rather than the envelope. Ask the same
 	// question per event so an api_key and a $token can never be paired across
 	// two different events.
+	// Only the event's own sources here — the header and query param were
+	// already settled by the envelope check and cannot change per iteration.
 	for i := 0; !keyed && i < len(req.Batch); i++ {
-		keyed = resolveAPIKey(r, req.Batch[i].APIKey, req.Batch[i].Properties) != ""
+		keyed = eventKey(req.Batch[i]) != ""
 	}
 	if !keyed {
 		noKeyError(w)
@@ -148,8 +162,19 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 
 // Decide handles POST /decide/?v=3 (feature flag evaluation)
 func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
+	// Same body handling as /capture and /flags: posthog-js sends /decide
+	// form-wrapped and compressed too, and a plain json.Decoder would 400 those
+	// even when they carry a valid token.
+	body, formKey, err := readCaptureBody(r)
+	if err != nil {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"status": 0,
+			"error":  "Invalid request body: " + err.Error(),
+		})
+		return
+	}
 	var req decideRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
@@ -161,6 +186,9 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 	decideKey := req.APIKey
 	if decideKey == "" {
 		decideKey = req.Token
+	}
+	if decideKey == "" {
+		decideKey = formKey
 	}
 	if resolveAPIKey(r, decideKey, nil) == "" {
 		noKeyError(w)
