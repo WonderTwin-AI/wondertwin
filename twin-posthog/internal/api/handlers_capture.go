@@ -113,9 +113,10 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PostHog reads a batch's project key from the top level or from the first
-	// event — which is why the loop below already falls back the other way. Gate
-	// on the same union, or a batch carrying per-event keys would 401.
+	// PostHog reads a batch's project key from the envelope or from the first
+	// event, so gate on that union — otherwise a batch carrying per-event keys
+	// would 401. The events themselves are stored without a key: this twin has
+	// no project registry, so the key is an admission check only.
 	batchKey := req.APIKey
 	var batchProps map[string]any
 	if len(req.Batch) > 0 {
@@ -130,9 +131,6 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range req.Batch {
-		if event.APIKey == "" {
-			event.APIKey = req.APIKey
-		}
 		h.storeEvent(event)
 	}
 
