@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -26,6 +28,18 @@ func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 	//nolint:gosec // G120: the body is already bounded by the MaxBytesReader above,
 	// and this call passes an explicit in-memory limit.
 	if err := r.ParseMultipartForm(maxFileUploadBytes); err != nil {
+		// Report an over-cap body as a size error. Without this the fallback
+		// below calls r.ParseForm(), which for multipart/form-data parses only
+		// the URL query and returns nil — swallowing the size failure and
+		// answering "Missing required param: purpose." for a request that did
+		// send one.
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			twincore.StripeError(w, http.StatusRequestEntityTooLarge,
+				"invalid_request_error", "file_too_large",
+				fmt.Sprintf("File exceeds the maximum size of %d bytes.", maxFileUploadBytes))
+			return
+		}
 		// Fall back to regular form parsing
 		if err2 := parseFormOrJSON(r); err2 != nil {
 			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err2.Error())

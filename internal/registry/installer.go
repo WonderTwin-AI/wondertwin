@@ -56,7 +56,10 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	expectedChecksum, hasChecksum := ver.Checksums[platform]
 
 	// Ensure binary directory exists
-	if err := os.MkdirAll(binaryDir, 0o750); err != nil {
+	//nolint:gosec // G301: 0755 for the same reason as the binary mode below —
+	// the installing user and the executing user are not always the same, and
+	// 0750 would make the directory untraversable for the latter.
+	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
 		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
 	}
 
@@ -109,9 +112,12 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 
 	// Write binary to disk
 	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
-	//nolint:gosec // G306: an installed twin binary must be executable; 0700 is the
-	// tightest mode that still allows the owning user to run it.
-	if err := os.WriteFile(binaryPath, data, 0o700); err != nil {
+	//nolint:gosec // G306: an installed twin binary must be executable. 0755 is
+	// kept deliberately: `wt install` may run as a different user than the one
+	// that later executes the twin (a container that installs during build and
+	// then drops to a non-root USER is the common case), and 0700 would fail
+	// that with EACCES.
+	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
 		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
 	}
 
@@ -165,7 +171,10 @@ func IsAlreadyInstalled(twinName, resolvedVersion, binaryDir string) bool {
 // checksum, and saves it to binaryDir. Used by lock file installs where the
 // exact URL and checksum are known.
 func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir string) error {
-	if err := os.MkdirAll(binaryDir, 0o750); err != nil {
+	//nolint:gosec // G301: 0755 for the same reason as the binary mode below —
+	// the installing user and the executing user are not always the same, and
+	// 0750 would make the directory untraversable for the latter.
+	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
 		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
 	}
 
@@ -208,9 +217,12 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 	}
 
 	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
-	//nolint:gosec // G306: an installed twin binary must be executable; 0700 is the
-	// tightest mode that still allows the owning user to run it.
-	if err := os.WriteFile(binaryPath, data, 0o700); err != nil {
+	//nolint:gosec // G306: an installed twin binary must be executable. 0755 is
+	// kept deliberately: `wt install` may run as a different user than the one
+	// that later executes the twin (a container that installs during build and
+	// then drops to a non-root USER is the common case), and 0700 would fail
+	// that with EACCES.
+	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
 		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
 	}
 

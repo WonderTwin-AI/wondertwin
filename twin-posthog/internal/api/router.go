@@ -66,3 +66,16 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/aliases", h.AdminListAliases)
 	r.Get("/admin/groups", h.AdminListGroups)
 }
+
+// Note on API keys: this twin does not authenticate. PostHog itself accepts a
+// project key from four places — the X-PostHog-Api-Key header, the
+// Authorization header, an ?api_key query param, and properties.$token in the
+// event body (the JS SDK path) — and answers an unknown key with 401
+// authentication_error / invalid_api_key.
+//
+// Extraction helpers for all four existed here but were never wired to a
+// rejection, so every request was accepted regardless. They were removed as
+// dead code rather than switched on, because rejecting keyless requests is a
+// breaking change for anyone already driving this twin without one. Wiring it
+// up is tracked separately; this comment is the record of what real PostHog
+// does so it does not have to be re-researched.
