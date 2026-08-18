@@ -2,8 +2,6 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
@@ -67,32 +65,4 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/persons", h.AdminListPersons)
 	r.Get("/admin/aliases", h.AdminListAliases)
 	r.Get("/admin/groups", h.AdminListGroups)
-}
-
-// apiKeyFromRequest extracts the PostHog api_key from the request.
-// PostHog accepts it via header, query param, or request body.
-// In sim mode we accept any non-empty key.
-func apiKeyFromRequest(r *http.Request) string {
-	// Check header
-	if key := r.Header.Get("X-PostHog-Api-Key"); key != "" {
-		return key
-	}
-	// Check Authorization header
-	if auth := r.Header.Get("Authorization"); auth != "" {
-		return auth
-	}
-	// Check query param
-	if key := r.URL.Query().Get("api_key"); key != "" {
-		return key
-	}
-	return ""
-}
-
-// noKeyError writes a PostHog-style auth error.
-func noKeyError(w http.ResponseWriter) {
-	twincore.JSON(w, http.StatusUnauthorized, map[string]any{
-		"type":   "authentication_error",
-		"code":   "invalid_api_key",
-		"detail": "Project API key invalid. You can find your project API key in PostHog project settings.",
-	})
 }

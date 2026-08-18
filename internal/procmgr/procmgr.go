@@ -45,14 +45,14 @@ func LoadPids() (PidMap, error) {
 
 // SavePids writes the PID tracking file.
 func SavePids(pids PidMap) error {
-	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o700); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(pids, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(pidFileName, data, 0o644)
+	return os.WriteFile(pidFileName, data, 0o600)
 }
 
 // Start launches a twin binary as a background process with output redirected to a log file.
@@ -88,6 +88,8 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 		args = append(args, "--seed-file", seedPath)
 	}
 
+	//nolint:gosec // G204: launching a resolved twin binary is this package's purpose;
+	// the path comes from the installer, not from untrusted input.
 	cmd := exec.Command(binary, args...)
 
 	// Inherit env and add twin-specific vars
@@ -97,11 +99,11 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 	}
 
 	// Set up log file
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
 		return 0, fmt.Errorf("creating log dir: %w", err)
 	}
 	logPath := filepath.Join(logDir, name+".log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return 0, fmt.Errorf("creating log file: %w", err)
 	}

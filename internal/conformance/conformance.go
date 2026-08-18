@@ -44,6 +44,8 @@ func Run(binaryPath string, port int) (*Report, error) {
 	}
 
 	// Start the twin
+	//nolint:gosec // G204: running the operator-supplied binary under test is the
+	// entire purpose of a conformance run.
 	cmd := exec.Command(binaryPath, "--port", fmt.Sprintf("%d", port))
 	setConformanceProcessAttrs(cmd)
 

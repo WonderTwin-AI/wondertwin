@@ -11,9 +11,21 @@ import (
 
 // --- Files ---
 
+// maxFileUploadBytes bounds a file-create request body. Stripe's own limit is
+// 10 MB for most purposes; matching it keeps the twin faithful and keeps an
+// oversized upload from exhausting memory.
+const maxFileUploadBytes = 10 << 20
+
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
+	// Bound the body before any parsing: the parseFormOrJSON fallback below calls
+	// r.ParseForm(), which is unbounded on its own and would let a large upload
+	// exhaust memory (G120).
+	r.Body = http.MaxBytesReader(w, r.Body, maxFileUploadBytes)
+
 	// Stripe files API uses multipart/form-data; parse it but discard file bytes.
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	//nolint:gosec // G120: the body is already bounded by the MaxBytesReader above,
+	// and this call passes an explicit in-memory limit.
+	if err := r.ParseMultipartForm(maxFileUploadBytes); err != nil {
 		// Fall back to regular form parsing
 		if err2 := parseFormOrJSON(r); err2 != nil {
 			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err2.Error())

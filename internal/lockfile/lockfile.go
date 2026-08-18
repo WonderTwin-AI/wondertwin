@@ -51,7 +51,7 @@ func Save(dir string, lf *LockFile) error {
 	}
 	data = append(data, '\n')
 	path := filepath.Join(dir, Filename)
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 // Exists returns true if a lock file exists in the given directory.

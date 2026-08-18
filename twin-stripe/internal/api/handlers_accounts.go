@@ -227,8 +227,7 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 	// If business_type, tos_acceptance, and some individual/company info is provided,
 	// mark requirements as satisfied and enable capabilities.
 	if acct.BusinessType != "" && acct.TOSAcceptance != nil {
-		hasDetails := (acct.Individual != nil && len(acct.Individual) > 0) ||
-			(acct.Company != nil && len(acct.Company) > 0)
+		hasDetails := len(acct.Individual) > 0 || len(acct.Company) > 0
 		if hasDetails {
 			acct.DetailsSubmitted = true
 			acct.Requirements.CurrentlyDue = []string{}

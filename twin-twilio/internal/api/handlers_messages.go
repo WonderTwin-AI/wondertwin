@@ -220,8 +220,3 @@ func (h *Handler) AdminGetOTP(w http.ResponseWriter, r *http.Request) {
 		"found": false,
 	})
 }
-
-// extractOTP finds OTP codes (4-6 digit numbers) in a message body.
-func extractOTP(body string) []string {
-	return otpRegex.FindAllString(body, -1)
-}

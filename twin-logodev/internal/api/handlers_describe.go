@@ -1,6 +1,9 @@
 package api
 
 import (
+	//nolint:gosec // G501: md5 here derives deterministic placeholder colours
+	// from a domain string. It is not used for authentication or integrity, and
+	// changing the digest would change every generated logo.
 	"crypto/md5"
 	"fmt"
 	"net/http"
@@ -31,6 +34,7 @@ func (h *Handler) DescribeBrand(w http.ResponseWriter, r *http.Request) {
 
 // describeBrandResponse builds a Logo.dev-compatible describe response.
 func describeBrandResponse(name, domain, ticker string) map[string]any {
+	//nolint:gosec // G401: non-cryptographic use; see the import comment.
 	hash := md5.Sum([]byte(domain))
 	r, g, b := int(hash[0]), int(hash[1]), int(hash[2])
 

@@ -56,7 +56,7 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	expectedChecksum, hasChecksum := ver.Checksums[platform]
 
 	// Ensure binary directory exists
-	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
+	if err := os.MkdirAll(binaryDir, 0o750); err != nil {
 		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
 	}
 
@@ -109,13 +109,15 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 
 	// Write binary to disk
 	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
-	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
+	//nolint:gosec // G306: an installed twin binary must be executable; 0700 is the
+	// tightest mode that still allows the owning user to run it.
+	if err := os.WriteFile(binaryPath, data, 0o700); err != nil {
 		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
 	}
 
 	// Write version sidecar file
 	versionPath := binaryPath + ".version"
-	if err := os.WriteFile(versionPath, []byte(resolvedVersion), 0o644); err != nil {
+	if err := os.WriteFile(versionPath, []byte(resolvedVersion), 0o600); err != nil {
 		return fmt.Errorf("writing version file: %w", err)
 	}
 
@@ -163,7 +165,7 @@ func IsAlreadyInstalled(twinName, resolvedVersion, binaryDir string) bool {
 // checksum, and saves it to binaryDir. Used by lock file installs where the
 // exact URL and checksum are known.
 func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir string) error {
-	if err := os.MkdirAll(binaryDir, 0o755); err != nil {
+	if err := os.MkdirAll(binaryDir, 0o750); err != nil {
 		return fmt.Errorf("creating binary dir %s: %w", binaryDir, err)
 	}
 
@@ -206,12 +208,14 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 	}
 
 	binaryPath := filepath.Join(binaryDir, "twin-"+twinName)
-	if err := os.WriteFile(binaryPath, data, 0o755); err != nil {
+	//nolint:gosec // G306: an installed twin binary must be executable; 0700 is the
+	// tightest mode that still allows the owning user to run it.
+	if err := os.WriteFile(binaryPath, data, 0o700); err != nil {
 		return fmt.Errorf("writing binary to %s: %w", binaryPath, err)
 	}
 
 	versionPath := binaryPath + ".version"
-	if err := os.WriteFile(versionPath, []byte(version), 0o644); err != nil {
+	if err := os.WriteFile(versionPath, []byte(version), 0o600); err != nil {
 		return fmt.Errorf("writing version file: %w", err)
 	}
 

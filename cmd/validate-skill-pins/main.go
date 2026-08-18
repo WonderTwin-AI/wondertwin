@@ -105,6 +105,7 @@ func main() {
 
 // parseFrontmatter extracts YAML frontmatter from a markdown file.
 func parseFrontmatter(path string) (skillFrontmatter, error) {
+	//nolint:gosec // G703: build-time validator reading a repo-relative path.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return skillFrontmatter{}, err
@@ -130,6 +131,7 @@ func parseFrontmatter(path string) (skillFrontmatter, error) {
 
 // extractSchemaVersion reads a JSON schema file and returns the $version field.
 func extractSchemaVersion(path string) (string, error) {
+	//nolint:gosec // G703: build-time validator reading a repo-relative path.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("cannot read schema: %w", err)

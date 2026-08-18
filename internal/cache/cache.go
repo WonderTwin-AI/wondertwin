@@ -59,7 +59,7 @@ func (s *Store) Get(twin, version string) ([]byte, *CacheMeta, error) {
 // Put encrypts and writes the payload to the cache along with metadata.
 func (s *Store) Put(twin, version string, payload []byte, ttlHours int) error {
 	dir := filepath.Dir(s.encPath(twin, version))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating cache dir: %w", err)
 	}
 

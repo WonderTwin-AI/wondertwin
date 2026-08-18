@@ -433,5 +433,5 @@ func writeRegistry(path string, reg *Registry) error {
 		return err
 	}
 	data = append(data, '\n')
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }

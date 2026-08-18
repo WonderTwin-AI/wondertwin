@@ -53,18 +53,6 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for API key in body or header
-	apiKey := req.APIKey
-	if apiKey == "" {
-		apiKey = apiKeyFromRequest(r)
-	}
-	// Also check properties.$token (JS SDK)
-	if apiKey == "" && req.Properties != nil {
-		if token, ok := req.Properties["$token"].(string); ok {
-			apiKey = token
-		}
-	}
-
 	if req.Event == "" {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,

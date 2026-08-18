@@ -37,8 +37,14 @@ func (h *Handler) idempotencyMiddleware(next http.Handler) http.Handler {
 		// Check for cached response
 		if status, body, ok := h.mw.Idempotent.Check(key); ok {
 			w.Header().Set("Content-Type", "application/json")
+			// The replayed body is a stored response, so pin the declared type and
+			// stop content sniffing from reinterpreting it as markup (G705).
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.Header().Set("Idempotent-Replayed", "true")
 			w.WriteHeader(status)
+			//nolint:gosec // G705: body is a response this twin generated and stored
+			// earlier, replayed verbatim under an explicit JSON content type with
+			// nosniff set above. It is not caller-controlled markup.
 			w.Write(body)
 			return
 		}

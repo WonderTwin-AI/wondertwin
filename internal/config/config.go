@@ -175,6 +175,7 @@ func Save(cfg *Config) error {
 	// to 0700 in case a prior version of the CLI created the dir
 	// with 0755. Skipped on Windows where Unix mode bits are inert.
 	if !runtimeIsWindows() {
+		//nolint:gosec // G302 assumes a file; 0700 is the tightest useful mode for a directory.
 		if err := os.Chmod(dir, 0o700); err != nil {
 			return fmt.Errorf("tightening config dir perms: %w", err)
 		}
@@ -182,6 +183,8 @@ func Save(cfg *Config) error {
 
 	path := filepath.Join(dir, DefaultConfigFile)
 
+	//nolint:gosec // G117: the CLI config file is the credential store; persisting
+	// the user's API key to it is the point, not a leak.
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
