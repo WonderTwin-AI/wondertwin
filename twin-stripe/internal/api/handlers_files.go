@@ -13,11 +13,15 @@ import (
 
 // --- Files ---
 
-// Stripe's per-file limit is 10 MB. MaxBytesReader bounds the entire multipart
-// envelope — part boundaries, part headers and any other form fields — so the
-// body cap carries headroom above the file limit. Capping the body at exactly
-// 10 MB would reject a 10 MB file that real Stripe accepts, purely because of
-// envelope overhead.
+// Stripe's per-file limit is 10 MB. Only the request-body cap below is
+// enforced here: maxFileBytes is ParseMultipartForm's in-memory spill
+// threshold, not a rejection limit, so a file between 10 MB and the body cap
+// is still accepted — matching this handler's behaviour before the cap
+// existed. The body cap carries headroom over the file limit because
+// MaxBytesReader bounds the whole multipart envelope (boundaries, part
+// headers, other fields); capping at exactly 10 MB would reject a 10 MB file
+// that real Stripe accepts. Enforcing the per-file limit properly is a parity
+// change, not a lint fix, and is deliberately left out of this branch.
 const (
 	maxFileBytes       = 10 << 20
 	maxUploadBodyBytes = maxFileBytes + (1 << 20)
@@ -36,8 +40,16 @@ func writeUploadParseError(w http.ResponseWriter, err error) {
 }
 
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
-	// Bound the body before any parsing so an oversized upload cannot exhaust
-	// memory, whatever content type it claims (G120).
+	// Reject an over-cap body before parsing. This has to be a Content-Length
+	// check rather than only errors.As on the parse error: for a urlencoded body
+	// ParseMultipartForm calls ParseForm internally, hits the MaxBytesError, then
+	// returns ErrNotMultipart and drops the inner error — so the multipart and
+	// urlencoded paths would otherwise answer differently for the same condition.
+	if r.ContentLength > maxUploadBodyBytes {
+		writeUploadParseError(w, &http.MaxBytesError{Limit: maxUploadBodyBytes})
+		return
+	}
+	// Still bound the reader: Content-Length is absent on a chunked body (G120).
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBodyBytes)
 
 	// Stripe files API uses multipart/form-data; parse it but discard file bytes.
