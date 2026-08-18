@@ -5,11 +5,23 @@
   "title": "Twin Contribution Manifest",
   "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
   "type": "object",
-  "required": ["tier", "publisher", "vendor", "twin_id", "display_name", "category", "sdk_target", "service_surface", "coverage", "generation", "vendor_certification"],
+  "required": [
+    "tier",
+    "publisher",
+    "vendor",
+    "twin_id",
+    "display_name",
+    "category",
+    "sdk_target",
+    "service_surface",
+    "coverage",
+    "generation",
+    "vendor_certification"
+  ],
   "properties": {
     "tier": {
       "type": "string",
-      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pattern is permissive for forward-compat with future tiers (enterprise, hosted) per twin-naming-design §3.3.",
+      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pattern is permissive for forward-compat with future tiers (enterprise, hosted) per twin-naming-design \u00a73.3.",
       "pattern": "^[a-z]+$"
     },
     "publisher": {
@@ -38,43 +50,95 @@
     },
     "version": {
       "type": "string",
-      "description": "Twin's own semver version. Source of truth for the binary's Version (embedded via go:embed per twin-versioning-design §3.1).",
+      "description": "Twin's own semver version. Source of truth for the binary's Version (embedded via go:embed per twin-versioning-design \u00a73.1).",
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$"
     },
     "compatible_versions": {
       "type": "array",
-      "description": "Semver ranges this twin self-declares as wire-compatible across releases of itself. Consumed by `wt install` and license entitlement matching (twin-versioning-design §3.2).",
+      "description": "Semver ranges this twin self-declares as wire-compatible across releases of itself. Consumed by `wt install` and license entitlement matching (twin-versioning-design \u00a73.2).",
       "items": {
         "type": "string"
       },
       "minItems": 1
     },
     "vendor_api_version": {
-      "type": ["string", "null"],
-      "description": "Vendor API surface this twin claims to faithfully simulate (e.g. \"2024-10-15\" for Stripe). Vendor-specific format. Null if the vendor doesn't version its API or the twin tracks latest. Per twin-versioning-design §3.2."
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Vendor API surface this twin claims to faithfully simulate (e.g. \"2024-10-15\" for Stripe). Vendor-specific format. Null if the vendor doesn't version its API or the twin tracks latest. Per twin-versioning-design \u00a73.2."
     },
     "vendor_certification": {
       "type": "object",
-      "description": "Whether the vendor has officially certified the twin. Required on every manifest; may be {\"status\": \"none\"}. Per twin-versioning-design §3.2.",
-      "required": ["status"],
+      "description": "Whether the vendor has officially certified the twin. Required on every manifest; may be {\"status\": \"none\"}. Per twin-versioning-design \u00a73.2.",
+      "required": [
+        "status"
+      ],
       "properties": {
         "status": {
           "type": "string",
-          "enum": ["certified", "pending", "none"]
+          "enum": [
+            "certified",
+            "pending",
+            "none"
+          ]
         },
-        "certified_by": {"type": "string"},
-        "certified_at": {"type": "string", "format": "date-time"},
-        "certificate_url": {"type": "string", "format": "uri"},
-        "valid_until": {"type": "string", "format": "date-time"}
+        "certified_by": {
+          "type": "string"
+        },
+        "certified_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "certificate_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
       "allOf": [
         {
-          "if": {"properties": {"status": {"const": "certified"}}, "required": ["status"]},
-          "then": {"required": ["status", "certified_by", "certified_at", "certificate_url", "valid_until"]}
+          "if": {
+            "properties": {
+              "status": {
+                "const": "certified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "status",
+              "certified_by",
+              "certified_at",
+              "certificate_url",
+              "valid_until"
+            ]
+          }
         },
         {
-          "if": {"properties": {"status": {"const": "pending"}}, "required": ["status"]},
-          "then": {"required": ["status", "certified_by", "certified_at"]}
+          "if": {
+            "properties": {
+              "status": {
+                "const": "pending"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "status",
+              "certified_by",
+              "certified_at"
+            ]
+          }
         }
       ],
       "additionalProperties": false
@@ -95,12 +159,19 @@
     "sdk_target": {
       "type": "object",
       "description": "SDK targeting information.",
-      "required": ["primary"],
+      "required": [
+        "primary"
+      ],
       "properties": {
         "primary": {
           "type": "object",
           "description": "Primary SDK target.",
-          "required": ["package", "language", "version", "repo_url"],
+          "required": [
+            "package",
+            "language",
+            "version",
+            "repo_url"
+          ],
           "properties": {
             "package": {
               "type": "string",
@@ -134,7 +205,10 @@
           "description": "Additional SDK targets with compatibility status.",
           "items": {
             "type": "object",
-            "required": ["package", "language"],
+            "required": [
+              "package",
+              "language"
+            ],
             "properties": {
               "package": {
                 "type": "string",
@@ -159,7 +233,11 @@
               "compatibility": {
                 "type": "string",
                 "description": "Compatibility confidence level.",
-                "enum": ["tested", "inferred", "untested"]
+                "enum": [
+                  "tested",
+                  "inferred",
+                  "untested"
+                ]
               },
               "last_validated": {
                 "type": "string",
@@ -169,7 +247,11 @@
               "validation_method": {
                 "type": "string",
                 "description": "How compatibility was validated.",
-                "enum": ["scenario_suite", "manual", "none"]
+                "enum": [
+                  "scenario_suite",
+                  "manual",
+                  "none"
+                ]
               },
               "known_gaps": {
                 "type": "array",
@@ -211,7 +293,14 @@
         "auth_pattern": {
           "type": "string",
           "description": "Authentication pattern used by the service.",
-          "enum": ["api_key", "oauth2", "basic", "jwt", "custom", "none"]
+          "enum": [
+            "api_key",
+            "oauth2",
+            "basic",
+            "jwt",
+            "custom",
+            "none"
+          ]
         },
         "has_webhooks": {
           "type": "boolean",
@@ -249,18 +338,26 @@
           "maximum": 100
         }
       },
-      "required": ["resources_implemented"],
+      "required": [
+        "resources_implemented"
+      ],
       "additionalProperties": false
     },
     "generation": {
       "type": "object",
       "description": "How the twin was generated.",
-      "required": ["method"],
+      "required": [
+        "method"
+      ],
       "properties": {
         "method": {
           "type": "string",
           "description": "Generation method used.",
-          "enum": ["wondertwin_skill", "manual", "other"]
+          "enum": [
+            "wondertwin_skill",
+            "manual",
+            "other"
+          ]
         },
         "skill_version": {
           "type": "string",
@@ -284,6 +381,59 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "lifecycle": {
+      "type": "object",
+      "description": "Optional release lifecycle metadata. Consumed by cmd/gen-registry when publishing a version to the registry; CLI flags override any value supplied here.",
+      "properties": {
+        "release_type": {
+          "type": "string",
+          "description": "Release stream for this version.",
+          "enum": [
+            "stable",
+            "beta",
+            "rc"
+          ]
+        },
+        "maintenance_status": {
+          "type": "string",
+          "description": "Maintenance posture for this twin.",
+          "enum": [
+            "active",
+            "security_only",
+            "eol"
+          ]
+        },
+        "maintenance_until": {
+          "type": "string",
+          "description": "Maintenance end date, ISO 8601 (YYYY-MM-DD).",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "bsl_expiry_date": {
+          "type": "string",
+          "description": "BSL expiry date, ISO 8601 (YYYY-MM-DD). Commercial tier only.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "changelog": {
+          "type": "string",
+          "description": "Release notes for this version, as markdown. Rendered on /docs/twins/<vendor>/releases and used as the GitHub release body.",
+          "minLength": 1
+        },
+        "announcement_url": {
+          "type": "string",
+          "description": "Optional link to a longer-form /updates post for notable releases.",
+          "format": "uri"
+        },
+        "breaking_changes": {
+          "type": "array",
+          "description": "Breaking changes introduced by this version.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false

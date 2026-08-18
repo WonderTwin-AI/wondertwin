@@ -401,6 +401,17 @@ func upsert(reg *Registry, twin, version, tier string, manifest *TwinManifest, v
 		}
 	}
 
+	// Refresh manifest-derived fields on every release, not just on
+	// entry creation. A twin's description and category track what it
+	// actually covers, and both drift as the twin grows — twin-stripe
+	// went from 6 resources to 44 while its registry description still
+	// advertised the Connect-and-Payouts surface it shipped with at
+	// v0.1.0. Leaving these write-once meant the registry, and the
+	// /docs/twins pages generated from it, described the first release
+	// forever.
+	entry.Description = manifest.Description
+	entry.Category = manifest.Category
+
 	entry.Tier = tier
 	if tier == "commercial" {
 		entry.DownloadAuth = "required"
