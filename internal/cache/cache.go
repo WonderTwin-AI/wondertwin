@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -62,6 +63,9 @@ func (s *Store) Put(twin, version string, payload []byte, ttlHours int) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("creating cache dir: %w", err)
 	}
+	if err := tightenPerms(dir, 0o700); err != nil {
+		return fmt.Errorf("tightening cache dir perms: %w", err)
+	}
 
 	key, err := DeriveKey(s.LicenseKey, twin, version)
 	if err != nil {
@@ -114,4 +118,18 @@ func (s *Store) Clear(twin, version string) error {
 	os.Remove(s.encPath(twin, version))
 	os.Remove(s.metaPath(twin, version))
 	return nil
+}
+
+// tightenPerms drops mode bits on a path that already exists. MkdirAll is a
+// no-op on an existing directory and WriteFile/OpenFile do not chmod an
+// existing file, so a path created by an older CLI version keeps its original,
+// looser mode until something re-tightens it. Mirrors the follow-up chmod in
+// internal/config. No-op on Windows, where Unix mode bits are inert.
+func tightenPerms(path string, mode os.FileMode) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	//nolint:gosec // G302: callers pass 0700 for directories, which G302 reads
+	// as a file mode; it is the tightest useful mode for a directory.
+	return os.Chmod(path, mode)
 }

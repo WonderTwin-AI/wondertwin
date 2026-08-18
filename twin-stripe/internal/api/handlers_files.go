@@ -45,6 +45,10 @@ func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 	// ParseMultipartForm calls ParseForm internally, hits the MaxBytesError, then
 	// returns ErrNotMultipart and drops the inner error — so the multipart and
 	// urlencoded paths would otherwise answer differently for the same condition.
+	// Known gap: a chunked urlencoded body over the cap has no Content-Length to
+	// check and still falls through to the parameter_missing shape. Uploads from
+	// the Stripe SDKs always declare a length, so this is left rather than
+	// restructured around the ParseForm caching.
 	if r.ContentLength > maxUploadBodyBytes {
 		writeUploadParseError(w, &http.MaxBytesError{Limit: maxUploadBodyBytes})
 		return
