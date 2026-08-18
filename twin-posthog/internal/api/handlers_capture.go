@@ -57,7 +57,7 @@ func resolveAPIKey(r *http.Request, bodyKey string, props map[string]any) string
 
 // CaptureEvent handles POST /capture, POST /e
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
-	body, err := readCaptureBody(r)
+	body, formKey, err := readCaptureBody(r)
 	if err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
@@ -74,7 +74,11 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if resolveAPIKey(r, req.APIKey, req.Properties) == "" {
+	captureKey := req.APIKey
+	if captureKey == "" {
+		captureKey = formKey
+	}
+	if resolveAPIKey(r, captureKey, req.Properties) == "" {
 		noKeyError(w)
 		return
 	}
@@ -96,7 +100,7 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 
 // BatchCapture handles POST /batch
 func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
-	body, err := readCaptureBody(r)
+	body, formKey, err := readCaptureBody(r)
 	if err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
@@ -117,22 +121,18 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	// event, so gate on that union — otherwise a batch carrying per-event keys
 	// would 401. The events themselves are stored without a key: this twin has
 	// no project registry, so the key is an admission check only.
-	batchKey := req.APIKey
-	var batchProps map[string]any
-	for i := range req.Batch {
-		if batchKey == "" {
-			batchKey = req.Batch[i].APIKey
-		}
-		if batchProps == nil {
-			if t, ok := req.Batch[i].Properties["$token"].(string); ok && t != "" {
-				batchProps = req.Batch[i].Properties
-			}
-		}
-		if batchKey != "" && batchProps != nil {
-			break
-		}
+	envelopeKey := req.APIKey
+	if envelopeKey == "" {
+		envelopeKey = formKey
 	}
-	if resolveAPIKey(r, batchKey, batchProps) == "" {
+	keyed := resolveAPIKey(r, envelopeKey, nil) != ""
+	// A batch's key may ride on any event rather than the envelope. Ask the same
+	// question per event so an api_key and a $token can never be paired across
+	// two different events.
+	for i := 0; !keyed && i < len(req.Batch); i++ {
+		keyed = resolveAPIKey(r, req.Batch[i].APIKey, req.Batch[i].Properties) != ""
+	}
+	if !keyed {
 		noKeyError(w)
 		return
 	}

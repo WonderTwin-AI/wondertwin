@@ -624,6 +624,15 @@ func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
 		c.Post("/flags", map[string]any{"distinct_id": "u1", "token": "phc_flags"}).AssertStatus(200)
 	})
 
+	t.Run("form-encoded api_key sibling of data", func(t *testing.T) {
+		// posthog-js posts data=<json> with api_key as a sibling form field.
+		_, c := setupPostHog(t)
+		c.PostForm("/capture", map[string]string{
+			"api_key": "phc_form",
+			"data":    `{"event":"page_view","distinct_id":"u1"}`,
+		}).AssertStatus(200)
+	})
+
 	t.Run("api_key query param", func(t *testing.T) {
 		_, c := setupPostHog(t)
 		c.Post("/capture?api_key=phc_query", base()).AssertStatus(200)

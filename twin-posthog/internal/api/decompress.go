@@ -20,16 +20,21 @@ import (
 //   - ?compression=gzip-js or ?compression=gzip — body (or "data" field) is gzip bytes
 //   - ?compression=base64 — body (or "data" field) is base64-encoded JSON
 //   - Content-Encoding: gzip — body is gzipped
-func readCaptureBody(r *http.Request) ([]byte, error) {
+func readCaptureBody(r *http.Request) ([]byte, string, error) {
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, "", fmt.Errorf("read body: %w", err)
 	}
 
+	// formKey carries an api_key posted as a sibling form field of data=, which
+	// is how posthog-js sends it. It would otherwise be discarded here and the
+	// request would look keyless to the ingest gate.
+	var formKey string
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "application/x-www-form-urlencoded") ||
 		(len(raw) >= 5 && bytes.HasPrefix(raw, []byte("data="))) {
 		if values, perr := url.ParseQuery(string(raw)); perr == nil {
+			formKey = values.Get("api_key")
 			if d := values.Get("data"); d != "" {
 				raw = []byte(d)
 			}
@@ -50,22 +55,22 @@ func readCaptureBody(r *http.Request) ([]byte, error) {
 		}
 		gz, gerr := gzip.NewReader(bytes.NewReader(raw))
 		if gerr != nil {
-			return nil, fmt.Errorf("gzip reader: %w", gerr)
+			return nil, "", fmt.Errorf("gzip reader: %w", gerr)
 		}
 		defer gz.Close()
 		out, rerr := io.ReadAll(gz)
 		if rerr != nil {
-			return nil, fmt.Errorf("gzip read: %w", rerr)
+			return nil, "", fmt.Errorf("gzip read: %w", rerr)
 		}
-		return out, nil
+		return out, formKey, nil
 	case "base64":
 		decoded, derr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(raw)))
 		if derr != nil {
-			return nil, fmt.Errorf("base64 decode: %w", derr)
+			return nil, "", fmt.Errorf("base64 decode: %w", derr)
 		}
-		return decoded, nil
+		return decoded, formKey, nil
 	default:
-		return raw, nil
+		return raw, formKey, nil
 	}
 }
 
