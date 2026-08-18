@@ -123,5 +123,10 @@
   "twin_id": "twin-stripe",
   "vendor_certification": {
     "status": "none"
+  },
+  "lifecycle": {
+    "release_type": "stable",
+    "maintenance_status": "active",
+    "changelog": "Stripe twin now covers the full payments and billing surface, not just Connect and Payouts. If you tested against v0.1.0, this is the release where the twin stops being a Connect fixture and starts standing in for Stripe proper — customers, subscriptions, invoices, checkout, and disputes all run their real lifecycles, deterministically.\n\n### Features\n- Full payments surface: Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds (#131, #138, #139)\n- Subscription lifecycle — trials, cancel-at-period-end, renewal (#145)\n- Invoice lifecycle, payout cancel, product cascade (#150)\n- Checkout session completion flow (#144)\n- Coupon/discount application and tax rate calculation (#143)\n- Proration on subscription item changes (#149)\n- Dispute lifecycle and 3D Secure simulation (#151)\n- Test card number support (#146)\n- Manual capture on payment intents, `POST /v1/charges` (#141)\n- Workspace engine driving invoice, subscription and payment-intent lifecycles (#174)\n- Deterministic seeding contract (#234)\n\n### Fixes\n- Webhook delivery now reaches registered endpoints (#142)\n- Customer validation and deletion cascade (#148)\n- Randomness routed through `twin.Rand` / `twin.Clock`, so runs are reproducible\n\n### Coverage\n- 44 resources implemented, ~80% of the SDK surface (v0.1.0: 6 resources, ~5%)\n- Not yet covered: Issuing, Terminal, Treasury, Radar, Identity, Financial Connections, Tax, Climate, Sigma, Reporting, Forwarding\n"
   }
 }
