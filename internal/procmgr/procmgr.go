@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -49,17 +48,11 @@ func SavePids(pids PidMap) error {
 	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o700); err != nil {
 		return err
 	}
-	if err := tightenPerms(filepath.Dir(pidFileName), 0o700); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(pids, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(pidFileName, data, 0o600); err != nil {
-		return err
-	}
-	return tightenPerms(pidFileName, 0o600)
+	return os.WriteFile(pidFileName, data, 0o600)
 }
 
 // Start launches a twin binary as a background process with output redirected to a log file.
@@ -106,19 +99,18 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 	}
 
 	// Set up log file
-	if err := os.MkdirAll(logDir, 0o700); err != nil {
+	//nolint:gosec // G301: twin logs are project-local operational output, not
+	// secrets, and `wt logs` or a log shipper may read them as a different user
+	// than the one that started the twin — the same cross-user case that keeps
+	// installed binaries at 0755.
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return 0, fmt.Errorf("creating log dir: %w", err)
 	}
-	if err := tightenPerms(logDir, 0o700); err != nil {
-		return 0, fmt.Errorf("tightening log dir perms: %w", err)
-	}
 	logPath := filepath.Join(logDir, name+".log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	//nolint:gosec // G302: readable for the same reason as the log directory.
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("creating log file: %w", err)
-	}
-	if err := tightenPerms(logPath, 0o600); err != nil {
-		return 0, fmt.Errorf("tightening log file perms: %w", err)
 	}
 
 	cmd.Stdout = logFile
@@ -186,18 +178,4 @@ func IsRunning(pid int) bool {
 // RemovePidFile deletes the PID tracking file.
 func RemovePidFile() {
 	os.Remove(pidFileName)
-}
-
-// tightenPerms drops mode bits on a path that already exists. MkdirAll is a
-// no-op on an existing directory and WriteFile/OpenFile do not chmod an
-// existing file, so a path created by an older CLI version keeps its original,
-// looser mode until something re-tightens it. Mirrors the follow-up chmod in
-// internal/config. No-op on Windows, where Unix mode bits are inert.
-func tightenPerms(path string, mode os.FileMode) error {
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	//nolint:gosec // G302: callers pass 0700 for directories, which G302 reads
-	// as a file mode; it is the tightest useful mode for a directory.
-	return os.Chmod(path, mode)
 }
