@@ -7,7 +7,8 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
-// Flags handles POST /flags/?v=2 (feature flag evaluation v2 path)
+// Flags handles POST /flags/?v=2 (feature flag evaluation v2 path).
+// Requires a project key; answers 401 without one.
 func (h *Handler) Flags(w http.ResponseWriter, r *http.Request) {
 	// /flags is the v2 successor to /decide and PostHog gates it on the project
 	// token identically. Read through readCaptureBody so the form-wrapped,

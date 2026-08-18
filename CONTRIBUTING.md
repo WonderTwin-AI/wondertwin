@@ -49,6 +49,7 @@ This means when you build a twin for Stripe, you run the `stripe-go` SDK against
 ### What You Need
 
 - Go 1.21+
+- [`golangci-lint`](https://golangci-lint.run) v2 -- the repo's `.golangci.yml` is enforced by the pre-push gate (`.no-mistakes.yaml`), which is stricter than CI. CI runs `go vet` only, so a branch can be green there and still be blocked by the lint gate.
 - The target service's public docs or SDK reference
 - An AI coding agent (recommended -- most twins are generated in 2-4 hours)
 
@@ -214,6 +215,8 @@ Before submitting your PR, verify:
 - [ ] **Standard directory structure is followed.** `cmd/`, `internal/api/`, `internal/store/`.
 - [ ] **Admin API conformance passes.** Run `wt conformance` -- health, reset, state snapshot/load, fault injection, and time simulation must all work.
 - [ ] **Handler tests pass.** `go test ./...` in the twin directory.
+- [ ] **Lint is clean.** `golangci-lint run ./...` and `go vet ./...` from the repo root. Where a `gosec` finding is a deliberate choice, suppress it with a `//nolint:gosec` comment that says why -- an unexplained suppression is not accepted.
+- [ ] **Formatting is clean.** `gofmt -l .` prints nothing.
 - [ ] **At least one seed data example exists.** Either as a JSON file or inline in tests.
 - [ ] **SDK client works.** Point the official SDK at the twin and run real operations.
 - [ ] **Error formats match.** The SDK parses error responses -- yours must match the real service.

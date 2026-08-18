@@ -67,7 +67,8 @@ func eventKey(e captureRequest) string {
 	return ""
 }
 
-// CaptureEvent handles POST /capture, POST /e
+// CaptureEvent handles POST /capture, POST /e.
+// Requires a project key; answers 401 without one.
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	body, formKey, err := readCaptureBody(r)
 	if err != nil {
@@ -110,7 +111,8 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BatchCapture handles POST /batch
+// BatchCapture handles POST /batch. Requires a project key on the envelope or
+// on any event in the batch; answers 401 without one.
 func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	body, formKey, err := readCaptureBody(r)
 	if err != nil {
@@ -160,7 +162,8 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Decide handles POST /decide/?v=3 (feature flag evaluation)
+// Decide handles POST /decide/?v=3 (feature flag evaluation).
+// Requires a project key, sent as api_key or token; answers 401 without one.
 func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 	// Same body handling as /capture and /flags: posthog-js sends /decide
 	// form-wrapped and compressed too, and a plain json.Decoder would 400 those

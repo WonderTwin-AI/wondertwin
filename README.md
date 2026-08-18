@@ -133,8 +133,15 @@ Works with any test framework. Go, Python, Node, Rust, Java — if it speaks HTT
 | **Stripe** | Accounts, Balance, Transfers, Payouts, External Accounts, Events, Webhooks | 4111 |
 | **Twilio** | Messages, Verify (OTP send/check) | 4112 |
 | **Resend** | Email send, delivery status | 4113 |
-| **PostHog** | Event capture, batch ingestion | 4114 |
+| **PostHog** | Event capture, batch ingestion, feature flag evaluation | 4114 |
 | **Logo.dev** | Logo image retrieval | 4116 |
+
+Twins reject unauthenticated calls the way the real service does. The PostHog
+twin, for example, answers `401 invalid_api_key` on `/capture`, `/e`, `/batch`,
+`/decide` and `/flags` when no project key is present — in the body, the
+`X-PostHog-Api-Key` or `Authorization` header, the `?api_key` query param, or
+`properties.$token`. Any non-empty key is accepted; twins check that a
+credential was sent, not that it is the right one.
 
 More twins coming. [Request a twin →](https://github.com/wondertwin-ai/wondertwin/issues/new?template=twin-request.yml)
 

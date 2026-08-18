@@ -12,16 +12,6 @@ import (
 	"strings"
 )
 
-// readCaptureBody reads a PostHog capture body, transparently handling the
-// compression and form-wrapping variants emitted by posthog-js and other SDKs.
-//
-// Supported shapes:
-//   - Raw JSON
-//   - Form-encoded "data=<value>" (value may itself be base64+gzip)
-//   - ?compression=gzip-js or ?compression=gzip — body (or "data" field) is gzip bytes
-//   - ?compression=base64 — body (or "data" field) is base64-encoded JSON
-//   - Content-Encoding: gzip — body is gzipped
-//
 // Ingest bodies are read before any project-key check, so both the wire bytes
 // and the decompressed output need a ceiling: a few-KB gzip bomb otherwise
 // expands to hundreds of MB on an unauthenticated route. PostHog's own capture
@@ -31,8 +21,26 @@ const (
 	maxIngestDecodedBytes = 20 << 20
 )
 
+// errIngestBodyTooLarge is returned when a body exceeds either ceiling. The
+// ingest handlers surface it as a 400 with the usual PostHog error envelope.
 var errIngestBodyTooLarge = errors.New("request body exceeds the maximum ingest size")
 
+// readCaptureBody reads a PostHog ingest body, transparently handling the
+// compression and form-wrapping variants emitted by posthog-js and other SDKs.
+// Every ingest endpoint — /capture, /e, /batch, /decide and /flags — reads its
+// body through here, so all of them accept the same shapes.
+//
+// Supported shapes:
+//   - Raw JSON
+//   - Form-encoded "data=<value>" (value may itself be base64+gzip)
+//   - ?compression=gzip-js or ?compression=gzip — body (or "data" field) is gzip bytes
+//   - ?compression=base64 — body (or "data" field) is base64-encoded JSON
+//   - Content-Encoding: gzip — body is gzipped
+//
+// It returns the decoded body and, separately, any api_key posted as a sibling
+// form field of data=. The caller needs that key handed back because it is not
+// part of the decoded body. A body over either ceiling above is rejected with
+// errIngestBodyTooLarge rather than being buffered.
 func readCaptureBody(r *http.Request) ([]byte, string, error) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, maxIngestWireBytes+1))
 	if err != nil {

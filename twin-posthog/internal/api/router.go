@@ -24,7 +24,11 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, ee *pkgevents.Eng
 
 // Routes mounts the PostHog API routes and admin extras.
 func (h *Handler) Routes(r chi.Router) {
-	// PostHog capture API routes (minimal auth - accept api_key in body/header)
+	// PostHog ingest routes. /capture, /e, /batch, /decide and /flags require a
+	// non-empty project key — any of the sources resolveAPIKey checks — and
+	// answer noKeyError's 401 without one. Any key is accepted: this twin has no
+	// project registry, so the check is admission only. local_evaluation is not
+	// gated here; real PostHog takes a personal API key for it.
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 
