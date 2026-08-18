@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
 )
 
 func TestCreateAndGetWebhookEndpoint(t *testing.T) {
@@ -315,4 +317,57 @@ func decodeJSONBody(t *testing.T, body io.Reader) map[string]any {
 		t.Fatalf("failed to decode JSON: %v", err)
 	}
 	return m
+}
+
+// TestCreateFileRejectsOversizedBody locks in the over-cap behaviour added
+// alongside the MaxBytesReader guard: multipart and urlencoded bodies must
+// answer the same shape for the same condition, rather than the urlencoded
+// path falling through to "Missing required param: purpose."
+func TestCreateFileRejectsOversizedBody(t *testing.T) {
+	restore := api.SetMaxUploadBodyBytes(1 << 10)
+	t.Cleanup(restore)
+
+	srv, _ := setupStripe(t)
+	body := strings.Repeat("a", 4<<10) + "&purpose=dispute_evidence"
+
+	for _, tc := range []struct {
+		name        string
+		contentType string
+	}{
+		{"urlencoded", "application/x-www-form-urlencoded"},
+		{"multipart", "multipart/form-data; boundary=xyz"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := http.NewRequest("POST", srv.URL+"/v1/files", strings.NewReader(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Header.Set("Authorization", "Bearer sk_test_sim_123")
+			r.Header.Set("Content-Type", tc.contentType)
+
+			resp, err := http.DefaultClient.Do(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != 400 {
+				t.Fatalf("expected 400 for an over-cap body, got %d", resp.StatusCode)
+			}
+			m := decodeJSONBody(t, resp.Body)
+			errObj, ok := m["error"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected a Stripe error envelope, got %v", m)
+			}
+			if got := errObj["type"]; got != "invalid_request_error" {
+				t.Errorf("error.type = %v, want invalid_request_error", got)
+			}
+			if got := errObj["code"]; got != "parse_error" {
+				t.Errorf("error.code = %v, want parse_error", got)
+			}
+			if msg, _ := errObj["message"].(string); !strings.Contains(msg, "maximum size") {
+				t.Errorf("message = %q, want it to mention the maximum size", msg)
+			}
+		})
+	}
 }

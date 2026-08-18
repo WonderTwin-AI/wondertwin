@@ -25,10 +25,11 @@ import (
 // is a parity change rather than a lint fix and is deliberately not done here.
 // maxFileBytes stays as ParseMultipartForm's in-memory spill threshold, which
 // is not a rejection limit.
-const (
-	maxFileBytes       = 10 << 20
-	maxUploadBodyBytes = 32 << 20
-)
+const maxFileBytes = 10 << 20
+
+// var, not const, so tests can lower the guard rather than transmitting a
+// 32 MB body. Never reassigned outside tests.
+var maxUploadBodyBytes int64 = 32 << 20
 
 // writeUploadParseError reports a file-upload parse failure. An over-cap body is
 // reported as a size error rather than surfacing the raw reader message, so the

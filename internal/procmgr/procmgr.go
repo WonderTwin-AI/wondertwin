@@ -56,7 +56,11 @@ func SavePids(pids PidMap) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(pidFileName, data, 0o600)
+	//nolint:gosec // G306: pids.json holds process IDs, not secrets, and must be
+	// readable by whichever account runs `wt up`/`wt stop` — LoadPids' EACCES is
+	// discarded by its callers, so an unreadable file silently reads as "no twins
+	// running" rather than failing loudly.
+	return os.WriteFile(pidFileName, data, 0o644)
 }
 
 // Start launches a twin binary as a background process with output redirected to a log file.
