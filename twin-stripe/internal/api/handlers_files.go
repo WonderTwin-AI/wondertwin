@@ -13,18 +13,21 @@ import (
 
 // --- Files ---
 
-// Stripe's per-file limit is 10 MB. Only the request-body cap below is
-// enforced here: maxFileBytes is ParseMultipartForm's in-memory spill
-// threshold, not a rejection limit, so a file between 10 MB and the body cap
-// is still accepted — matching this handler's behaviour before the cap
-// existed. The body cap carries headroom over the file limit because
-// MaxBytesReader bounds the whole multipart envelope (boundaries, part
-// headers, other fields); capping at exactly 10 MB would reject a 10 MB file
-// that real Stripe accepts. Enforcing the per-file limit properly is a parity
-// change, not a lint fix, and is deliberately left out of this branch.
+// maxUploadBodyBytes is a memory guard, not an emulation of Stripe's limit.
+// Its only job is to stop an unbounded body from being buffered (G120), so it
+// sits far above anything a legal upload produces — real Stripe caps a file at
+// 10 MB, and this twin previously accepted any size. Choosing 32 MB keeps the
+// rejection out of the path of real traffic: a 10 MB file and its multipart
+// envelope pass exactly as before, and only a body no Stripe client would send
+// is refused.
+//
+// Enforcing Stripe's actual 10 MB per-file limit, with Stripe's error shape,
+// is a parity change rather than a lint fix and is deliberately not done here.
+// maxFileBytes stays as ParseMultipartForm's in-memory spill threshold, which
+// is not a rejection limit.
 const (
 	maxFileBytes       = 10 << 20
-	maxUploadBodyBytes = maxFileBytes + (1 << 20)
+	maxUploadBodyBytes = 32 << 20
 )
 
 // writeUploadParseError reports a file-upload parse failure. An over-cap body is

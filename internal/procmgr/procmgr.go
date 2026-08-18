@@ -45,7 +45,11 @@ func LoadPids() (PidMap, error) {
 
 // SavePids writes the PID tracking file.
 func SavePids(pids PidMap) error {
-	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o700); err != nil {
+	//nolint:gosec // G301: .wt is the shared parent of the log directory, which
+	// is deliberately traversable by a different user (see Start). Creating it
+	// 0700 here would silently defeat that whenever SavePids runs first. The
+	// privacy that matters is on pids.json itself, written 0600 below.
+	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o755); err != nil {
 		return err
 	}
 	data, err := json.MarshalIndent(pids, "", "  ")
