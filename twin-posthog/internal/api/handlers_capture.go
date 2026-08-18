@@ -34,6 +34,27 @@ type decideRequest struct {
 	Token      string `json:"token"`
 }
 
+// resolveAPIKey returns the project key for a request, checking every place
+// PostHog accepts one: the body's api_key, the X-PostHog-Api-Key header, the
+// Authorization header, the ?api_key query param, and properties.$token, which
+// is where the JS SDK puts it. Any non-empty key is accepted — this twin has no
+// project registry to validate against, so it distinguishes "no key" from "some
+// key" rather than "right key" from "wrong key".
+func resolveAPIKey(r *http.Request, bodyKey string, props map[string]any) string {
+	if bodyKey != "" {
+		return bodyKey
+	}
+	if key := apiKeyFromRequest(r); key != "" {
+		return key
+	}
+	if props != nil {
+		if token, ok := props["$token"].(string); ok && token != "" {
+			return token
+		}
+	}
+	return ""
+}
+
 // CaptureEvent handles POST /capture, POST /e
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	body, err := readCaptureBody(r)
@@ -50,6 +71,11 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
 		})
+		return
+	}
+
+	if resolveAPIKey(r, req.APIKey, req.Properties) == "" {
+		noKeyError(w)
 		return
 	}
 
@@ -87,6 +113,11 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if resolveAPIKey(r, req.APIKey, nil) == "" {
+		noKeyError(w)
+		return
+	}
+
 	for _, event := range req.Batch {
 		if event.APIKey == "" {
 			event.APIKey = req.APIKey
@@ -107,6 +138,16 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
 		})
+		return
+	}
+
+	// /decide takes the project key as either api_key or token.
+	decideKey := req.APIKey
+	if decideKey == "" {
+		decideKey = req.Token
+	}
+	if resolveAPIKey(r, decideKey, nil) == "" {
+		noKeyError(w)
 		return
 	}
 

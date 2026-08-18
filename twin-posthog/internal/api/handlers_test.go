@@ -533,3 +533,75 @@ func TestAdminListGroups(t *testing.T) {
 		t.Errorf("expected total=1, got %v", m["total"])
 	}
 }
+
+// --- Project-key enforcement ---
+
+// TestIngestRequiresProjectKey covers the ingest endpoints that PostHog gates
+// on a project key. Real PostHog answers a missing key with 401
+// authentication_error / invalid_api_key; this twin accepts any non-empty key,
+// having no project registry to validate against.
+func TestIngestRequiresProjectKey(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path string
+		body map[string]any
+	}{
+		{"capture", "/capture", map[string]any{"event": "page_view", "distinct_id": "u1"}},
+		{"e", "/e", map[string]any{"event": "page_view", "distinct_id": "u1"}},
+		{"batch", "/batch", map[string]any{"batch": []any{
+			map[string]any{"event": "page_view", "distinct_id": "u1"},
+		}}},
+		{"decide", "/decide", map[string]any{"distinct_id": "u1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, c := setupPostHog(t)
+			resp := c.Post(tc.path, tc.body)
+			resp.AssertStatus(401)
+
+			m := resp.JSONMap()
+			if m["type"] != "authentication_error" {
+				t.Errorf("type = %v, want authentication_error", m["type"])
+			}
+			if m["code"] != "invalid_api_key" {
+				t.Errorf("code = %v, want invalid_api_key", m["code"])
+			}
+		})
+	}
+}
+
+// TestIngestAcceptsKeyFromEverySource pins the four places PostHog takes the
+// project key. Each must satisfy the check on its own.
+func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
+	base := func() map[string]any {
+		return map[string]any{"event": "page_view", "distinct_id": "u1"}
+	}
+
+	t.Run("body api_key", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		b := base()
+		b["api_key"] = "phc_body"
+		c.Post("/capture", b).AssertStatus(200)
+	})
+
+	t.Run("properties $token", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		b := base()
+		b["properties"] = map[string]any{"$token": "phc_js_sdk"}
+		c.Post("/capture", b).AssertStatus(200)
+	})
+
+	for _, h := range []struct{ name, header string }{
+		{"X-PostHog-Api-Key header", "X-PostHog-Api-Key"},
+		{"Authorization header", "Authorization"},
+	} {
+		t.Run(h.name, func(t *testing.T) {
+			_, c := setupPostHog(t)
+			c.DoWithHeaders("POST", "/capture", base(), map[string]string{h.header: "phc_hdr"}).AssertStatus(200)
+		})
+	}
+
+	t.Run("api_key query param", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		c.Post("/capture?api_key=phc_query", base()).AssertStatus(200)
+	})
+}

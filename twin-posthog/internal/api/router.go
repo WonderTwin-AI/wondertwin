@@ -2,6 +2,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
@@ -67,17 +69,27 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/groups", h.AdminListGroups)
 }
 
-// Note on API keys: this twin does not authenticate the capture/ingest path.
-// (LocalEvaluation in handlers_flags.go is the exception — it rejects a missing
-// Authorization header with 401, matching PostHog's personal-API-key rule.)
-// PostHog itself accepts a project key from four places — the X-PostHog-Api-Key header, the
-// Authorization header, an ?api_key query param, and properties.$token in the
-// event body (the JS SDK path) — and answers an unknown key with 401
-// authentication_error / invalid_api_key.
-//
-// Extraction helpers for all four existed here but were never wired to a
-// rejection, so every request was accepted regardless. They were removed as
-// dead code rather than switched on, because rejecting keyless requests is a
-// breaking change for anyone already driving this twin without one. Wiring it
-// up is tracked separately; this comment is the record of what real PostHog
-// does so it does not have to be re-researched.
+// apiKeyFromRequest extracts the PostHog project key from the places PostHog
+// accepts one outside the request body: the X-PostHog-Api-Key header, the
+// Authorization header, and the ?api_key query param.
+func apiKeyFromRequest(r *http.Request) string {
+	if key := r.Header.Get("X-PostHog-Api-Key"); key != "" {
+		return key
+	}
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		return auth
+	}
+	if key := r.URL.Query().Get("api_key"); key != "" {
+		return key
+	}
+	return ""
+}
+
+// noKeyError writes PostHog's response to a missing project key.
+func noKeyError(w http.ResponseWriter) {
+	twincore.JSON(w, http.StatusUnauthorized, map[string]any{
+		"type":   "authentication_error",
+		"code":   "invalid_api_key",
+		"detail": "Project API key invalid. You can find your project API key in PostHog project settings.",
+	})
+}
