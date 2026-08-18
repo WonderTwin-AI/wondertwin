@@ -51,7 +51,10 @@ func Save(dir string, lf *LockFile) error {
 	}
 	data = append(data, '\n')
 	path := filepath.Join(dir, Filename)
-	return os.WriteFile(path, data, 0o600)
+	//nolint:gosec // G306: the lock file is a project-local, checked-in manifest of
+	// versions, checksums and public URLs — not a secret — and Load must be able to
+	// read it as the executing user, which is not always the installing user.
+	return os.WriteFile(path, data, 0o644)
 }
 
 // Exists returns true if a lock file exists in the given directory.

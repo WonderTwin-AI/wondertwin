@@ -18,31 +18,39 @@ import (
 // oversized upload from exhausting memory.
 const maxFileUploadBytes = 10 << 20
 
+// writeUploadParseError reports a file-upload parse failure. An over-cap body is
+// reported as a size error rather than surfacing the raw reader message, so the
+// multipart and urlencoded paths answer the same shape for the same condition.
+func writeUploadParseError(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxFileUploadBytes)
+	}
+	twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
+}
+
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
-	// Bound the body before any parsing: the parseFormOrJSON fallback below calls
-	// r.ParseForm(), which is unbounded on its own and would let a large upload
-	// exhaust memory (G120).
+	// Bound the body before any parsing so an oversized upload cannot exhaust
+	// memory, whatever content type it claims (G120).
 	r.Body = http.MaxBytesReader(w, r.Body, maxFileUploadBytes)
 
 	// Stripe files API uses multipart/form-data; parse it but discard file bytes.
 	//nolint:gosec // G120: the body is already bounded by the MaxBytesReader above,
 	// and this call passes an explicit in-memory limit.
 	if err := r.ParseMultipartForm(maxFileUploadBytes); err != nil {
-		// Report an over-cap body as a size error. Without this the fallback
-		// below calls r.ParseForm(), which for multipart/form-data parses only
-		// the URL query and returns nil — swallowing the size failure and
-		// answering "Missing required param: purpose." for a request that did
-		// send one.
+		// Report an over-cap body here. Without this the fallback below calls
+		// r.ParseForm(), which for multipart/form-data parses only the URL query
+		// and returns nil — swallowing the size failure and answering "Missing
+		// required param: purpose." for a request that did send one.
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			twincore.StripeError(w, http.StatusRequestEntityTooLarge,
-				"invalid_request_error", "file_too_large",
-				fmt.Sprintf("File exceeds the maximum size of %d bytes.", maxFileUploadBytes))
+			writeUploadParseError(w, err)
 			return
 		}
 		// Fall back to regular form parsing
 		if err2 := parseFormOrJSON(r); err2 != nil {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err2.Error())
+			writeUploadParseError(w, err2)
 			return
 		}
 	}
