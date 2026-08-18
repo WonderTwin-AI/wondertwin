@@ -600,6 +600,15 @@ func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
 		})
 	}
 
+	t.Run("batch per-event api_key", func(t *testing.T) {
+		// PostHog accepts a batch whose key rides on the first event rather than
+		// the envelope; the storeEvent loop already falls back that way.
+		_, c := setupPostHog(t)
+		c.Post("/batch", map[string]any{"batch": []any{
+			map[string]any{"api_key": "phc_per_event", "event": "page_view", "distinct_id": "u1"},
+		}}).AssertStatus(200)
+	})
+
 	t.Run("api_key query param", func(t *testing.T) {
 		_, c := setupPostHog(t)
 		c.Post("/capture?api_key=phc_query", base()).AssertStatus(200)

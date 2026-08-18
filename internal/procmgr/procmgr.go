@@ -48,7 +48,8 @@ func SavePids(pids PidMap) error {
 	//nolint:gosec // G301: .wt is the shared parent of the log directory, which
 	// is deliberately traversable by a different user (see Start). Creating it
 	// 0700 here would silently defeat that whenever SavePids runs first. The
-	// privacy that matters is on pids.json itself, written 0600 below.
+	// pid file itself is written 0644 for the same reason — see the comment on
+	// that write.
 	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o755); err != nil {
 		return err
 	}

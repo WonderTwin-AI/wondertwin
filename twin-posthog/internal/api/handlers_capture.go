@@ -113,7 +113,18 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if resolveAPIKey(r, req.APIKey, nil) == "" {
+	// PostHog reads a batch's project key from the top level or from the first
+	// event — which is why the loop below already falls back the other way. Gate
+	// on the same union, or a batch carrying per-event keys would 401.
+	batchKey := req.APIKey
+	var batchProps map[string]any
+	if len(req.Batch) > 0 {
+		if batchKey == "" {
+			batchKey = req.Batch[0].APIKey
+		}
+		batchProps = req.Batch[0].Properties
+	}
+	if resolveAPIKey(r, batchKey, batchProps) == "" {
 		noKeyError(w)
 		return
 	}
