@@ -552,6 +552,7 @@ func TestIngestRequiresProjectKey(t *testing.T) {
 			map[string]any{"event": "page_view", "distinct_id": "u1"},
 		}}},
 		{"decide", "/decide", map[string]any{"distinct_id": "u1"}},
+		{"flags", "/flags", map[string]any{"distinct_id": "u1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, c := setupPostHog(t)
@@ -607,6 +608,20 @@ func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
 		c.Post("/batch", map[string]any{"batch": []any{
 			map[string]any{"api_key": "phc_per_event", "event": "page_view", "distinct_id": "u1"},
 		}}).AssertStatus(200)
+	})
+
+	t.Run("batch key on a later event", func(t *testing.T) {
+		// The key may ride on any event in the batch, not only the first.
+		_, c := setupPostHog(t)
+		c.Post("/batch", map[string]any{"batch": []any{
+			map[string]any{"event": "page_view", "distinct_id": "u1"},
+			map[string]any{"api_key": "phc_later", "event": "click", "distinct_id": "u2"},
+		}}).AssertStatus(200)
+	})
+
+	t.Run("flags accepts a token", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		c.Post("/flags", map[string]any{"distinct_id": "u1", "token": "phc_flags"}).AssertStatus(200)
 	})
 
 	t.Run("api_key query param", func(t *testing.T) {

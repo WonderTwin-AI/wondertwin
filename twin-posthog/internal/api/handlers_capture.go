@@ -119,11 +119,18 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	// no project registry, so the key is an admission check only.
 	batchKey := req.APIKey
 	var batchProps map[string]any
-	if len(req.Batch) > 0 {
+	for i := range req.Batch {
 		if batchKey == "" {
-			batchKey = req.Batch[0].APIKey
+			batchKey = req.Batch[i].APIKey
 		}
-		batchProps = req.Batch[0].Properties
+		if batchProps == nil {
+			if t, ok := req.Batch[i].Properties["$token"].(string); ok && t != "" {
+				batchProps = req.Batch[i].Properties
+			}
+		}
+		if batchKey != "" && batchProps != nil {
+			break
+		}
 	}
 	if resolveAPIKey(r, batchKey, batchProps) == "" {
 		noKeyError(w)

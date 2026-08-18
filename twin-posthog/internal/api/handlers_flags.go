@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -8,6 +9,20 @@ import (
 
 // Flags handles POST /flags/?v=2 (feature flag evaluation v2 path)
 func (h *Handler) Flags(w http.ResponseWriter, r *http.Request) {
+	// /flags is the v2 successor to /decide and PostHog gates it on the project
+	// token identically. Decode leniently: unlike /decide the body is optional
+	// here, so a key supplied by header or query param still satisfies the gate.
+	var req decideRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	flagsKey := req.APIKey
+	if flagsKey == "" {
+		flagsKey = req.Token
+	}
+	if resolveAPIKey(r, flagsKey, nil) == "" {
+		noKeyError(w)
+		return
+	}
+
 	flags := h.store.GetFeatureFlags()
 
 	featureFlags := make(map[string]any, len(flags))
