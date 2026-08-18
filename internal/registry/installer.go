@@ -123,7 +123,10 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 
 	// Write version sidecar file
 	versionPath := binaryPath + ".version"
-	if err := os.WriteFile(versionPath, []byte(resolvedVersion), 0o600); err != nil {
+	//nolint:gosec // G306: the sidecar holds a version string, not a secret, and
+	// IsAlreadyInstalled must be able to read it as the executing user, which is
+	// not always the installing user. 0600 would make every run re-download.
+	if err := os.WriteFile(versionPath, []byte(resolvedVersion), 0o644); err != nil {
 		return fmt.Errorf("writing version file: %w", err)
 	}
 
@@ -227,7 +230,10 @@ func InstallFromURL(twinName, version, binaryURL, expectedChecksum, binaryDir st
 	}
 
 	versionPath := binaryPath + ".version"
-	if err := os.WriteFile(versionPath, []byte(version), 0o600); err != nil {
+	//nolint:gosec // G306: the sidecar holds a version string, not a secret, and
+	// IsAlreadyInstalled must be able to read it as the executing user, which is
+	// not always the installing user. 0600 would make every run re-download.
+	if err := os.WriteFile(versionPath, []byte(version), 0o644); err != nil {
 		return fmt.Errorf("writing version file: %w", err)
 	}
 

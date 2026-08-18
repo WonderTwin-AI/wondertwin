@@ -67,8 +67,10 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/groups", h.AdminListGroups)
 }
 
-// Note on API keys: this twin does not authenticate. PostHog itself accepts a
-// project key from four places — the X-PostHog-Api-Key header, the
+// Note on API keys: this twin does not authenticate the capture/ingest path.
+// (LocalEvaluation in handlers_flags.go is the exception — it rejects a missing
+// Authorization header with 401, matching PostHog's personal-API-key rule.)
+// PostHog itself accepts a project key from four places — the X-PostHog-Api-Key header, the
 // Authorization header, an ?api_key query param, and properties.$token in the
 // event body (the JS SDK path) — and answers an unknown key with 401
 // authentication_error / invalid_api_key.

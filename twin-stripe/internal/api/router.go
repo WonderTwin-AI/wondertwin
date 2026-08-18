@@ -28,6 +28,8 @@ func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middle
 // Routes mounts the Stripe v1 API routes.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v1", func(r chi.Router) {
+		// Declared content types are authoritative on every response, replayed or not
+		r.Use(nosniffMiddleware)
 		// Auth middleware for all v1 routes
 		r.Use(h.authMiddleware)
 		// Idempotency key caching for POST requests
@@ -299,6 +301,16 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/admin/payment_intents/{id}/authenticate", h.AdminAuthenticatePaymentIntent)
 	r.Post("/admin/disputes", h.AdminCreateDispute)
 	r.Post("/admin/disputes/{id}/resolve", h.AdminResolveDispute)
+}
+
+// nosniffMiddleware pins the declared content type on every v1 response so a
+// replayed idempotent response and the original it replays carry identical
+// headers.
+func nosniffMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // authMiddleware validates Stripe-style Bearer token authentication.
