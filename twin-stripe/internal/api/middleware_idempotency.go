@@ -39,6 +39,10 @@ func (h *Handler) idempotencyMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Idempotent-Replayed", "true")
 			w.WriteHeader(status)
+			//nolint:gosec // G705: body is a response this twin generated and stored
+			// earlier, replayed verbatim under an explicit JSON content type. It is
+			// not caller-controlled markup. No hardening header is added here: real
+			// Stripe does not send one, and this twin is held to header parity.
 			w.Write(body)
 			return
 		}

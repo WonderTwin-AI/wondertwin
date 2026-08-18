@@ -1,6 +1,8 @@
 package api
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -11,12 +13,69 @@ import (
 
 // --- Files ---
 
+// maxUploadBodyBytes is a memory guard, not an emulation of Stripe's limit.
+// Its only job is to stop an unbounded body from being buffered (G120), so it
+// sits far above anything a legal upload produces — real Stripe caps a file at
+// 10 MB, and this twin previously accepted any size. Choosing 32 MB keeps the
+// rejection out of the path of real traffic: a 10 MB file and its multipart
+// envelope pass exactly as before, and only a body no Stripe client would send
+// is refused.
+//
+// Enforcing Stripe's actual 10 MB per-file limit, with Stripe's error shape,
+// is a parity change rather than a lint fix and is deliberately not done here.
+// maxFileBytes stays as ParseMultipartForm's in-memory spill threshold, which
+// is not a rejection limit.
+const maxFileBytes = 10 << 20
+
+// var, not const, so tests can lower the guard rather than transmitting a
+// 32 MB body. Never reassigned outside tests.
+var maxUploadBodyBytes int64 = 32 << 20
+
+// writeUploadParseError reports a file-upload parse failure. An over-cap body is
+// reported as a size error rather than surfacing the raw reader message, so the
+// multipart and urlencoded paths answer the same shape for the same condition.
+func writeUploadParseError(w http.ResponseWriter, err error) {
+	msg := err.Error()
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxErr.Limit)
+	}
+	twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
+}
+
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
+	// Reject an over-cap body before parsing. This has to be a Content-Length
+	// check rather than only errors.As on the parse error: for a urlencoded body
+	// ParseMultipartForm calls ParseForm internally, hits the MaxBytesError, then
+	// returns ErrNotMultipart and drops the inner error — so the multipart and
+	// urlencoded paths would otherwise answer differently for the same condition.
+	// Known gap: a chunked urlencoded body over the cap has no Content-Length to
+	// check and still falls through to the parameter_missing shape. Uploads from
+	// the Stripe SDKs always declare a length, so this is left rather than
+	// restructured around the ParseForm caching.
+	if r.ContentLength > maxUploadBodyBytes {
+		writeUploadParseError(w, &http.MaxBytesError{Limit: maxUploadBodyBytes})
+		return
+	}
+	// Still bound the reader: Content-Length is absent on a chunked body (G120).
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBodyBytes)
+
 	// Stripe files API uses multipart/form-data; parse it but discard file bytes.
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	//nolint:gosec // G120: the body is already bounded by the MaxBytesReader above,
+	// and this call passes an explicit in-memory limit.
+	if err := r.ParseMultipartForm(maxFileBytes); err != nil {
+		// Report an over-cap body here. Without this the fallback below calls
+		// r.ParseForm(), which for multipart/form-data parses only the URL query
+		// and returns nil — swallowing the size failure and answering "Missing
+		// required param: purpose." for a request that did send one.
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeUploadParseError(w, err)
+			return
+		}
 		// Fall back to regular form parsing
 		if err2 := parseFormOrJSON(r); err2 != nil {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err2.Error())
+			writeUploadParseError(w, err2)
 			return
 		}
 	}

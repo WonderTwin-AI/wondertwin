@@ -72,6 +72,8 @@ func main() {
 		for _, c := range checks {
 			filePath := filepath.Join(root, dir, c.file)
 
+			//nolint:gosec // G703: build-time validator reading a repo-relative path it
+			// constructed itself from a fixed dir list.
 			data, err := os.ReadFile(filePath)
 			if err != nil {
 				if os.IsNotExist(err) {

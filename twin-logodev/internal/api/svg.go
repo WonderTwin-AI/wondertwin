@@ -1,6 +1,9 @@
 package api
 
 import (
+	//nolint:gosec // G501: md5 here derives deterministic placeholder colours
+	// from a domain string. It is not used for authentication or integrity, and
+	// changing the digest would change every generated logo.
 	"crypto/md5"
 	"fmt"
 	"strings"
@@ -9,6 +12,7 @@ import (
 // generatePlaceholderSVG creates a colored square with domain initials.
 // theme: "dark" inverts light logos (white bg → dark), "light" inverts dark logos.
 func generatePlaceholderSVG(domain string, size int, greyscale bool, theme string) string {
+	//nolint:gosec // G401: non-cryptographic use; see the import comment.
 	hash := md5.Sum([]byte(domain))
 	r, g, b := int(hash[0]), int(hash[1]), int(hash[2])
 

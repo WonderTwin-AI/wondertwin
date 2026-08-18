@@ -82,6 +82,8 @@ func (s *MemoryStore) RandHex(n int) string {
 	}
 	buf := make([]byte, n)
 	for i := range buf {
+		//nolint:gosec // G115: Intn(256) returns 0..255 by contract; the
+		// conversion to byte cannot overflow.
 		buf[i] = byte(s.Rand.Intn(256))
 	}
 	return hex.EncodeToString(buf)

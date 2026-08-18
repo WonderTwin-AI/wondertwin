@@ -92,6 +92,7 @@ func main() {
 		}
 
 		path := filepath.Join(skillsDir, e.Name())
+		//nolint:gosec // G703: build-time validator reading a repo-relative path.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "WARN: cannot read %s: %v\n", e.Name(), err)
@@ -168,7 +169,7 @@ func findAnnotatedBlocks(content string) []annotatedBlock {
 		// Verify the code block comes before any other annotation
 		nextAnnotation := annotationRe.FindStringIndex(rest[1:])
 		codeBlockIdx := strings.Index(rest, "```json")
-		if nextAnnotation != nil && nextAnnotation[0]+1 < codeBlockIdx {
+		if len(nextAnnotation) > 0 && nextAnnotation[0]+1 < codeBlockIdx {
 			continue // Another annotation comes before this code block
 		}
 

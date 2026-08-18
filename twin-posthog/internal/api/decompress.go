@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,23 @@ import (
 	"strings"
 )
 
-// readCaptureBody reads a PostHog capture body, transparently handling the
+// Ingest bodies are read before any project-key check, so both the wire bytes
+// and the decompressed output need a ceiling: a few-KB gzip bomb otherwise
+// expands to hundreds of MB on an unauthenticated route. PostHog's own capture
+// payloads are far below these.
+const (
+	maxIngestWireBytes    = 5 << 20
+	maxIngestDecodedBytes = 20 << 20
+)
+
+// errIngestBodyTooLarge is returned when a body exceeds either ceiling. The
+// ingest handlers surface it as a 400 with the usual PostHog error envelope.
+var errIngestBodyTooLarge = errors.New("request body exceeds the maximum ingest size")
+
+// readCaptureBody reads a PostHog ingest body, transparently handling the
 // compression and form-wrapping variants emitted by posthog-js and other SDKs.
+// Every ingest endpoint — /capture, /e, /batch, /decide and /flags — reads its
+// body through here, so all of them accept the same shapes.
 //
 // Supported shapes:
 //   - Raw JSON
@@ -20,16 +36,29 @@ import (
 //   - ?compression=gzip-js or ?compression=gzip — body (or "data" field) is gzip bytes
 //   - ?compression=base64 — body (or "data" field) is base64-encoded JSON
 //   - Content-Encoding: gzip — body is gzipped
-func readCaptureBody(r *http.Request) ([]byte, error) {
-	raw, err := io.ReadAll(r.Body)
+//
+// It returns the decoded body and, separately, any api_key posted as a sibling
+// form field of data=. The caller needs that key handed back because it is not
+// part of the decoded body. A body over either ceiling above is rejected with
+// errIngestBodyTooLarge rather than being buffered.
+func readCaptureBody(r *http.Request) ([]byte, string, error) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxIngestWireBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("read body: %w", err)
+		return nil, "", fmt.Errorf("read body: %w", err)
+	}
+	if len(raw) > maxIngestWireBytes {
+		return nil, "", errIngestBodyTooLarge
 	}
 
+	// formKey carries an api_key posted as a sibling form field of data=, which
+	// is how posthog-js sends it. It would otherwise be discarded here and the
+	// request would look keyless to the ingest gate.
+	var formKey string
 	ct := r.Header.Get("Content-Type")
 	if strings.HasPrefix(ct, "application/x-www-form-urlencoded") ||
 		(len(raw) >= 5 && bytes.HasPrefix(raw, []byte("data="))) {
 		if values, perr := url.ParseQuery(string(raw)); perr == nil {
+			formKey = values.Get("api_key")
 			if d := values.Get("data"); d != "" {
 				raw = []byte(d)
 			}
@@ -50,22 +79,25 @@ func readCaptureBody(r *http.Request) ([]byte, error) {
 		}
 		gz, gerr := gzip.NewReader(bytes.NewReader(raw))
 		if gerr != nil {
-			return nil, fmt.Errorf("gzip reader: %w", gerr)
+			return nil, "", fmt.Errorf("gzip reader: %w", gerr)
 		}
 		defer gz.Close()
-		out, rerr := io.ReadAll(gz)
+		out, rerr := io.ReadAll(io.LimitReader(gz, maxIngestDecodedBytes+1))
 		if rerr != nil {
-			return nil, fmt.Errorf("gzip read: %w", rerr)
+			return nil, "", fmt.Errorf("gzip read: %w", rerr)
 		}
-		return out, nil
+		if len(out) > maxIngestDecodedBytes {
+			return nil, "", errIngestBodyTooLarge
+		}
+		return out, formKey, nil
 	case "base64":
 		decoded, derr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(raw)))
 		if derr != nil {
-			return nil, fmt.Errorf("base64 decode: %w", derr)
+			return nil, "", fmt.Errorf("base64 decode: %w", derr)
 		}
-		return decoded, nil
+		return decoded, formKey, nil
 	default:
-		return raw, nil
+		return raw, formKey, nil
 	}
 }
 

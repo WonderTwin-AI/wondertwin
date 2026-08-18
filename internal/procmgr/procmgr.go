@@ -45,6 +45,11 @@ func LoadPids() (PidMap, error) {
 
 // SavePids writes the PID tracking file.
 func SavePids(pids PidMap) error {
+	//nolint:gosec // G301: .wt is the shared parent of the log directory, which
+	// is deliberately traversable by a different user (see Start). Creating it
+	// 0700 here would silently defeat that whenever SavePids runs first. The
+	// pid file itself is written 0644 for the same reason — see the comment on
+	// that write.
 	if err := os.MkdirAll(filepath.Dir(pidFileName), 0o755); err != nil {
 		return err
 	}
@@ -52,6 +57,10 @@ func SavePids(pids PidMap) error {
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G306: pids.json holds process IDs, not secrets, and must be
+	// readable by whichever account runs `wt up`/`wt stop` — LoadPids' EACCES is
+	// discarded by its callers, so an unreadable file silently reads as "no twins
+	// running" rather than failing loudly.
 	return os.WriteFile(pidFileName, data, 0o644)
 }
 
@@ -88,6 +97,8 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 		args = append(args, "--seed-file", seedPath)
 	}
 
+	//nolint:gosec // G204: launching a resolved twin binary is this package's purpose;
+	// the path comes from the installer, not from untrusted input.
 	cmd := exec.Command(binary, args...)
 
 	// Inherit env and add twin-specific vars
@@ -97,10 +108,15 @@ func Start(name string, twin manifest.Twin, logDir string, verbose bool) (int, e
 	}
 
 	// Set up log file
+	//nolint:gosec // G301: twin logs are project-local operational output, not
+	// secrets, and `wt logs` or a log shipper may read them as a different user
+	// than the one that started the twin — the same cross-user case that keeps
+	// installed binaries at 0755.
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return 0, fmt.Errorf("creating log dir: %w", err)
 	}
 	logPath := filepath.Join(logDir, name+".log")
+	//nolint:gosec // G302: readable for the same reason as the log directory.
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return 0, fmt.Errorf("creating log file: %w", err)

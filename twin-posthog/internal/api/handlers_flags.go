@@ -1,13 +1,43 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
-// Flags handles POST /flags/?v=2 (feature flag evaluation v2 path)
+// Flags handles POST /flags/?v=2 (feature flag evaluation v2 path).
+// Requires a project key; answers 401 without one.
 func (h *Handler) Flags(w http.ResponseWriter, r *http.Request) {
+	// /flags is the v2 successor to /decide and PostHog gates it on the project
+	// token identically. Read through readCaptureBody so the form-wrapped,
+	// base64 and gzipped shapes posthog-js sends decode here exactly as they do
+	// on /capture — a plain json.Decoder would see zero values for all of them
+	// and 401 a request that did carry a key. The body itself is optional, so a
+	// decode failure is not fatal: a header or query param can still satisfy it.
+	body, formKey, err := readCaptureBody(r)
+	if err != nil {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"status": 0,
+			"error":  "Invalid request body: " + err.Error(),
+		})
+		return
+	}
+	var req decideRequest
+	_ = json.Unmarshal(body, &req)
+	flagsKey := req.APIKey
+	if flagsKey == "" {
+		flagsKey = req.Token
+	}
+	if flagsKey == "" {
+		flagsKey = formKey
+	}
+	if resolveAPIKey(r, flagsKey, nil) == "" {
+		noKeyError(w)
+		return
+	}
+
 	flags := h.store.GetFeatureFlags()
 
 	featureFlags := make(map[string]any, len(flags))

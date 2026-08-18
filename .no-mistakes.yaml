@@ -1,0 +1,27 @@
+# no-mistakes gate config.
+#
+# The gate is deliberately STRICTER than ci.yml, which is not a mistake to be
+# reconciled later. ci.yml runs `go vet` only; a .golangci.yml has sat in this
+# repo unreferenced by any workflow, so 39 golangci-lint issues accumulated
+# behind it unnoticed (29 gosec, 3 gocritic, 3 staticcheck, 3 unused,
+# 1 ineffassign). Those are fixed in the commit that adds this file, and
+# pinning golangci-lint here is what stops them coming back.
+#
+# The consequence is worth stating plainly: a branch that is green in CI can
+# still be blocked locally by this gate, and the gate needs golangci-lint v2 on
+# PATH. That is the intended trade — the gate is the strict pre-push check, CI
+# is the shared floor. If the two should converge, the move is to add a lint
+# job to ci.yml, not to weaken this file.
+#
+# The three `validate-*` commands are cheap `go run` passes that catch twin
+# schema drift, skill-schema pin drift, and malformed skill JSON templates.
+# They are the checks most likely to be broken by an ordinary twin edit, so
+# they belong in the fast pre-push gate rather than only in CI.
+#
+# Left to CI: the `conformance` job (builds the wt CLI and twin-stripe, then
+# drives a conformance run against the binary) and the GoReleaser config
+# check, which needs the goreleaser toolchain.
+commands:
+  test: "go test ./... -count=1 -timeout 120s"
+  lint: 'golangci-lint run ./... && go vet ./... && go run ./cmd/validate-schemas/ && go run ./cmd/validate-skill-pins/ && go run ./cmd/validate-skill-templates/ && { test -z "$(gofmt -l .)" || { echo "unformatted files (run gofmt -w .):"; gofmt -l .; exit 1; }; }'
+  format: "gofmt -w ."

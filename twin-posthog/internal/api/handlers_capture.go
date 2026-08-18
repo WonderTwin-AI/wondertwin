@@ -34,9 +34,43 @@ type decideRequest struct {
 	Token      string `json:"token"`
 }
 
-// CaptureEvent handles POST /capture, POST /e
+// resolveAPIKey returns the project key for a request, checking every place
+// PostHog accepts one: the body's api_key, the X-PostHog-Api-Key header, the
+// Authorization header, the ?api_key query param, and properties.$token, which
+// is where the JS SDK puts it. Any non-empty key is accepted — this twin has no
+// project registry to validate against, so it distinguishes "no key" from "some
+// key" rather than "right key" from "wrong key".
+func resolveAPIKey(r *http.Request, bodyKey string, props map[string]any) string {
+	if bodyKey != "" {
+		return bodyKey
+	}
+	if key := apiKeyFromRequest(r); key != "" {
+		return key
+	}
+	if props != nil {
+		if token, ok := props["$token"].(string); ok && token != "" {
+			return token
+		}
+	}
+	return ""
+}
+
+// eventKey returns the project key carried by a single batch event, from its
+// own api_key or its properties.$token.
+func eventKey(e captureRequest) string {
+	if e.APIKey != "" {
+		return e.APIKey
+	}
+	if t, ok := e.Properties["$token"].(string); ok {
+		return t
+	}
+	return ""
+}
+
+// CaptureEvent handles POST /capture, POST /e.
+// Requires a project key; answers 401 without one.
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
-	body, err := readCaptureBody(r)
+	body, formKey, err := readCaptureBody(r)
 	if err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
@@ -53,16 +87,13 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for API key in body or header
-	apiKey := req.APIKey
-	if apiKey == "" {
-		apiKey = apiKeyFromRequest(r)
+	captureKey := req.APIKey
+	if captureKey == "" {
+		captureKey = formKey
 	}
-	// Also check properties.$token (JS SDK)
-	if apiKey == "" && req.Properties != nil {
-		if token, ok := req.Properties["$token"].(string); ok {
-			apiKey = token
-		}
+	if resolveAPIKey(r, captureKey, req.Properties) == "" {
+		noKeyError(w)
+		return
 	}
 
 	if req.Event == "" {
@@ -80,9 +111,10 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// BatchCapture handles POST /batch
+// BatchCapture handles POST /batch. Requires a project key on the envelope or
+// on any event in the batch; answers 401 without one.
 func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
-	body, err := readCaptureBody(r)
+	body, formKey, err := readCaptureBody(r)
 	if err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
@@ -99,10 +131,29 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PostHog reads a batch's project key from the envelope or from the first
+	// event, so gate on that union — otherwise a batch carrying per-event keys
+	// would 401. The events themselves are stored without a key: this twin has
+	// no project registry, so the key is an admission check only.
+	envelopeKey := req.APIKey
+	if envelopeKey == "" {
+		envelopeKey = formKey
+	}
+	keyed := resolveAPIKey(r, envelopeKey, nil) != ""
+	// A batch's key may ride on any event rather than the envelope. Ask the same
+	// question per event so an api_key and a $token can never be paired across
+	// two different events.
+	// Only the event's own sources here — the header and query param were
+	// already settled by the envelope check and cannot change per iteration.
+	for i := 0; !keyed && i < len(req.Batch); i++ {
+		keyed = eventKey(req.Batch[i]) != ""
+	}
+	if !keyed {
+		noKeyError(w)
+		return
+	}
+
 	for _, event := range req.Batch {
-		if event.APIKey == "" {
-			event.APIKey = req.APIKey
-		}
 		h.storeEvent(event)
 	}
 
@@ -111,14 +162,39 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Decide handles POST /decide/?v=3 (feature flag evaluation)
+// Decide handles POST /decide/?v=3 (feature flag evaluation).
+// Requires a project key, sent as api_key or token; answers 401 without one.
 func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
-	var req decideRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Same body handling as /capture and /flags: posthog-js sends /decide
+	// form-wrapped and compressed too, and a plain json.Decoder would 400 those
+	// even when they carry a valid token.
+	body, formKey, err := readCaptureBody(r)
+	if err != nil {
 		twincore.JSON(w, http.StatusBadRequest, map[string]any{
 			"status": 0,
 			"error":  "Invalid request body: " + err.Error(),
 		})
+		return
+	}
+	var req decideRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		twincore.JSON(w, http.StatusBadRequest, map[string]any{
+			"status": 0,
+			"error":  "Invalid request body: " + err.Error(),
+		})
+		return
+	}
+
+	// /decide takes the project key as either api_key or token.
+	decideKey := req.APIKey
+	if decideKey == "" {
+		decideKey = req.Token
+	}
+	if decideKey == "" {
+		decideKey = formKey
+	}
+	if resolveAPIKey(r, decideKey, nil) == "" {
+		noKeyError(w)
 		return
 	}
 

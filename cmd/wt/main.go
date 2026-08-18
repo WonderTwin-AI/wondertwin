@@ -512,6 +512,8 @@ func cmdLogs(manifestPath string, args []string) error {
 	}
 
 	// tail -f the log file
+	//nolint:gosec // G204: logPath is derived from the twin name we just resolved
+	// against the local log directory, not from untrusted input.
 	cmd := exec.Command("tail", "-f", "-n", "100", logPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

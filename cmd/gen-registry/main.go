@@ -433,5 +433,8 @@ func writeRegistry(path string, reg *Registry) error {
 		return err
 	}
 	data = append(data, '\n')
+	//nolint:gosec // G306: registry.json is the public, published index — version,
+	// checksum and URL metadata only — and release-pipeline steps that serve or
+	// upload it often run as a different user than the one that generated it.
 	return os.WriteFile(path, data, 0o644)
 }

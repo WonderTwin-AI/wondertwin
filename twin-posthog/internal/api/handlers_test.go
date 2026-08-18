@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
@@ -532,4 +533,139 @@ func TestAdminListGroups(t *testing.T) {
 	if m["total"] != float64(1) {
 		t.Errorf("expected total=1, got %v", m["total"])
 	}
+}
+
+// --- Project-key enforcement ---
+
+// TestIngestRequiresProjectKey covers the ingest endpoints that PostHog gates
+// on a project key. Real PostHog answers a missing key with 401
+// authentication_error / invalid_api_key; this twin accepts any non-empty key,
+// having no project registry to validate against.
+func TestIngestRequiresProjectKey(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path string
+		body map[string]any
+	}{
+		{"capture", "/capture", map[string]any{"event": "page_view", "distinct_id": "u1"}},
+		{"e", "/e", map[string]any{"event": "page_view", "distinct_id": "u1"}},
+		{"batch", "/batch", map[string]any{"batch": []any{
+			map[string]any{"event": "page_view", "distinct_id": "u1"},
+		}}},
+		{"decide", "/decide", map[string]any{"distinct_id": "u1"}},
+		{"flags", "/flags", map[string]any{"distinct_id": "u1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, c := setupPostHog(t)
+			resp := c.Post(tc.path, tc.body)
+			resp.AssertStatus(401)
+
+			m := resp.JSONMap()
+			if m["type"] != "authentication_error" {
+				t.Errorf("type = %v, want authentication_error", m["type"])
+			}
+			if m["code"] != "invalid_api_key" {
+				t.Errorf("code = %v, want invalid_api_key", m["code"])
+			}
+		})
+	}
+}
+
+// TestIngestRejectsOversizedBody covers the ceiling on the ingest read path.
+// The body is consumed before any project-key check, so an unauthenticated
+// caller must not be able to make the twin allocate without bound.
+func TestIngestRejectsOversizedBody(t *testing.T) {
+	_, c := setupPostHog(t)
+	huge := strings.Repeat("a", (5<<20)+1024)
+	resp := c.Post("/capture", map[string]any{
+		"api_key": "phc_k", "event": "e", "distinct_id": "u1", "properties": map[string]any{"pad": huge},
+	})
+	resp.AssertStatus(400)
+}
+
+// TestDecideAcceptsFormWrappedBody pins /decide to the same body handling as
+// /capture and /flags — posthog-js sends it form-wrapped as well.
+func TestDecideAcceptsFormWrappedBody(t *testing.T) {
+	_, c := setupPostHog(t)
+	c.PostForm("/decide", map[string]string{
+		"data": `{"distinct_id":"u1","token":"phc_wrapped"}`,
+	}).AssertStatus(200)
+}
+
+// TestIngestAcceptsKeyFromEverySource pins the four places PostHog takes the
+// project key. Each must satisfy the check on its own.
+func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
+	base := func() map[string]any {
+		return map[string]any{"event": "page_view", "distinct_id": "u1"}
+	}
+
+	t.Run("body api_key", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		b := base()
+		b["api_key"] = "phc_body"
+		c.Post("/capture", b).AssertStatus(200)
+	})
+
+	t.Run("properties $token", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		b := base()
+		b["properties"] = map[string]any{"$token": "phc_js_sdk"}
+		c.Post("/capture", b).AssertStatus(200)
+	})
+
+	for _, h := range []struct{ name, header string }{
+		{"X-PostHog-Api-Key header", "X-PostHog-Api-Key"},
+		{"Authorization header", "Authorization"},
+	} {
+		t.Run(h.name, func(t *testing.T) {
+			_, c := setupPostHog(t)
+			c.DoWithHeaders("POST", "/capture", base(), map[string]string{h.header: "phc_hdr"}).AssertStatus(200)
+		})
+	}
+
+	t.Run("batch per-event api_key", func(t *testing.T) {
+		// PostHog accepts a batch whose key rides on the first event rather than
+		// the envelope, so the admission check scans the events too.
+		_, c := setupPostHog(t)
+		c.Post("/batch", map[string]any{"batch": []any{
+			map[string]any{"api_key": "phc_per_event", "event": "page_view", "distinct_id": "u1"},
+		}}).AssertStatus(200)
+	})
+
+	t.Run("batch key on a later event", func(t *testing.T) {
+		// The key may ride on any event in the batch, not only the first.
+		_, c := setupPostHog(t)
+		c.Post("/batch", map[string]any{"batch": []any{
+			map[string]any{"event": "page_view", "distinct_id": "u1"},
+			map[string]any{"api_key": "phc_later", "event": "click", "distinct_id": "u2"},
+		}}).AssertStatus(200)
+	})
+
+	t.Run("flags accepts a token", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		c.Post("/flags", map[string]any{"distinct_id": "u1", "token": "phc_flags"}).AssertStatus(200)
+	})
+
+	t.Run("form-encoded api_key sibling of data", func(t *testing.T) {
+		// posthog-js posts data=<json> with api_key as a sibling form field.
+		_, c := setupPostHog(t)
+		c.PostForm("/capture", map[string]string{
+			"api_key": "phc_form",
+			"data":    `{"event":"page_view","distinct_id":"u1"}`,
+		}).AssertStatus(200)
+	})
+
+	t.Run("flags with a form-wrapped body", func(t *testing.T) {
+		// posthog-js posts /flags form-wrapped too; a plain JSON decode would
+		// see nothing and 401 a request that carried a token.
+		_, c := setupPostHog(t)
+		c.PostForm("/flags", map[string]string{
+			"data": `{"distinct_id":"u1","token":"phc_wrapped"}`,
+		}).AssertStatus(200)
+	})
+
+	t.Run("api_key query param", func(t *testing.T) {
+		_, c := setupPostHog(t)
+		c.Post("/capture?api_key=phc_query", base()).AssertStatus(200)
+	})
 }

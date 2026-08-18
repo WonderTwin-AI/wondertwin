@@ -40,13 +40,13 @@ func registerQueries(schema *graphql.Schema, s *store.MemoryStore) {
 		return iss, nil
 	})
 
-	// issues(filter, first, after)
+	// Query: issues, taking filter/first/after arguments.
 	schema.Query("issues", func(ctx context.Context, args map[string]any) (any, error) {
 		issues := s.Issues.List()
 		return store.Connection(issues), nil
 	})
 
-	// issueSearch(query)
+	// Query: issueSearch, taking a query argument.
 	schema.Query("issueSearch", func(ctx context.Context, args map[string]any) (any, error) {
 		issues := s.Issues.List()
 		return store.Connection(issues), nil

@@ -24,7 +24,11 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, ee *pkgevents.Eng
 
 // Routes mounts the PostHog API routes and admin extras.
 func (h *Handler) Routes(r chi.Router) {
-	// PostHog capture API routes (minimal auth - accept api_key in body/header)
+	// PostHog ingest routes. /capture, /e, /batch, /decide and /flags require a
+	// non-empty project key — any of the sources resolveAPIKey checks — and
+	// answer noKeyError's 401 without one. Any key is accepted: this twin has no
+	// project registry, so the check is admission only. local_evaluation is not
+	// gated here; real PostHog takes a personal API key for it.
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 
@@ -69,26 +73,23 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/groups", h.AdminListGroups)
 }
 
-// apiKeyFromRequest extracts the PostHog api_key from the request.
-// PostHog accepts it via header, query param, or request body.
-// In sim mode we accept any non-empty key.
+// apiKeyFromRequest extracts the PostHog project key from the places PostHog
+// accepts one outside the request body: the X-PostHog-Api-Key header, the
+// Authorization header, and the ?api_key query param.
 func apiKeyFromRequest(r *http.Request) string {
-	// Check header
 	if key := r.Header.Get("X-PostHog-Api-Key"); key != "" {
 		return key
 	}
-	// Check Authorization header
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		return auth
 	}
-	// Check query param
 	if key := r.URL.Query().Get("api_key"); key != "" {
 		return key
 	}
 	return ""
 }
 
-// noKeyError writes a PostHog-style auth error.
+// noKeyError writes PostHog's response to a missing project key.
 func noKeyError(w http.ResponseWriter) {
 	twincore.JSON(w, http.StatusUnauthorized, map[string]any{
 		"type":   "authentication_error",
