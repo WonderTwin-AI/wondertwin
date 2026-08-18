@@ -371,3 +371,51 @@ func TestCreateFileRejectsOversizedBody(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateFileRejectsOversizedChunkedBody covers the MaxBytesReader path.
+// A chunked request has no Content-Length, so the pre-check in CreateFile
+// cannot fire and the errors.As(err, &maxErr) branch inside the
+// ParseMultipartForm failure is what must produce the size error.
+func TestCreateFileRejectsOversizedChunkedBody(t *testing.T) {
+	restore := api.SetMaxUploadBodyBytes(1 << 10)
+	t.Cleanup(restore)
+
+	srv, _ := setupStripe(t)
+
+	pr, pw := io.Pipe()
+	go func() {
+		defer pw.Close()
+		_, _ = io.WriteString(pw, strings.Repeat("a", 8<<10))
+	}()
+
+	r, err := http.NewRequest("POST", srv.URL+"/v1/files", pr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A non-seekable body leaves ContentLength at 0/-1, so the request is sent
+	// chunked and the pre-check is bypassed by construction.
+	r.ContentLength = -1
+	r.Header.Set("Authorization", "Bearer sk_test_sim_123")
+	r.Header.Set("Content-Type", "multipart/form-data; boundary=xyz")
+
+	resp, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for an over-cap chunked body, got %d", resp.StatusCode)
+	}
+	m := decodeJSONBody(t, resp.Body)
+	errObj, ok := m["error"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a Stripe error envelope, got %v", m)
+	}
+	if got := errObj["code"]; got != "parse_error" {
+		t.Errorf("error.code = %v, want parse_error", got)
+	}
+	if msg, _ := errObj["message"].(string); !strings.Contains(msg, "maximum size") {
+		t.Errorf("message = %q, want it to mention the maximum size", msg)
+	}
+}

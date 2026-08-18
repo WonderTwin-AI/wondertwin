@@ -38,7 +38,7 @@ func writeUploadParseError(w http.ResponseWriter, err error) {
 	msg := err.Error()
 	var maxErr *http.MaxBytesError
 	if errors.As(err, &maxErr) {
-		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxUploadBodyBytes)
+		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxErr.Limit)
 	}
 	twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
 }

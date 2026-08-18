@@ -633,6 +633,15 @@ func TestIngestAcceptsKeyFromEverySource(t *testing.T) {
 		}).AssertStatus(200)
 	})
 
+	t.Run("flags with a form-wrapped body", func(t *testing.T) {
+		// posthog-js posts /flags form-wrapped too; a plain JSON decode would
+		// see nothing and 401 a request that carried a token.
+		_, c := setupPostHog(t)
+		c.PostForm("/flags", map[string]string{
+			"data": `{"distinct_id":"u1","token":"phc_wrapped"}`,
+		}).AssertStatus(200)
+	})
+
 	t.Run("api_key query param", func(t *testing.T) {
 		_, c := setupPostHog(t)
 		c.Post("/capture?api_key=phc_query", base()).AssertStatus(200)
