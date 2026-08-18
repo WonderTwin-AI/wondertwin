@@ -3,7 +3,7 @@ module github.com/wondertwin-ai/wondertwin/twin-TEMPLATE
 go 1.26.6
 
 require (
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/wondertwin-ai/wondertwin/twinkit v0.0.0
 )
 
