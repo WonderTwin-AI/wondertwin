@@ -180,6 +180,72 @@ func TestAddSecondVersion(t *testing.T) {
 	}
 }
 
+// A twin's description and category track what it actually covers, and
+// both drift as the twin grows. They were previously written only when
+// the registry entry was created, so a twin that expanded after its
+// first release kept advertising its original surface forever.
+func TestSecondVersionRefreshesDescriptionAndCategory(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.1.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The twin grows: rewrite the manifest the way a real expansion would.
+	grown := `{
+  "twin": "stripe",
+  "display_name": "Stripe",
+  "category": "billing",
+  "description": "Now covers the full payments and billing surface",
+  "sdk_target": {
+    "primary": {
+      "package": "github.com/stripe/stripe-go",
+      "language": "go",
+      "version": "v81"
+    }
+  }
+}`
+	manifestPath := filepath.Join(dir, "twin-stripe", "twin-manifest.json")
+	if err := os.WriteFile(manifestPath, []byte(grown), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := run([]string{
+		"--twin", "stripe", "--version", "0.2.0",
+		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	json.Unmarshal(data, &reg)
+
+	entry := reg.Twins["stripe"]
+	if want := "Now covers the full payments and billing surface"; entry.Description != want {
+		t.Errorf("description = %q, want %q", entry.Description, want)
+	}
+	if want := "billing"; entry.Category != want {
+		t.Errorf("category = %q, want %q", entry.Category, want)
+	}
+	// Refreshing metadata must not disturb the version history.
+	if len(entry.Versions) != 2 {
+		t.Errorf("versions count = %d, want 2", len(entry.Versions))
+	}
+}
+
 func TestAddSecondTwin(t *testing.T) {
 	dir := setupManifest(t)
 	// Also create a twilio manifest
