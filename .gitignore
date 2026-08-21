@@ -5,5 +5,8 @@ dist/
 wondertwin.json
 /wt
 .claude/
+
+# Claude Code native worktrees (used for concurrent agent sessions)
+.claude/worktrees/
 twin-posthog/seed.json
 twin-posthog/demo.sh

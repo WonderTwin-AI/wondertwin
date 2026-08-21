@@ -114,3 +114,9 @@ When anything goes wrong (CI failure, missing file, wrong enum, broken test), im
 2. Determine what process change would have prevented it
 3. Codify that change in this file or in memory
 4. Do not just fix the symptom and move on
+
+## Concurrent Agent Work Uses Git Worktrees
+
+When more than one agent session needs to work in this repo at the same time, each session runs in its own git worktree rather than sharing this checkout. Two sessions sharing one working tree will clobber each other the moment either one switches branches or rebases, since both operations rewrite the same working directory and index the other session may be mid-edit in.
+
+Worktrees for this purpose live under `.claude/worktrees/` (already ignored in `.gitignore`) and branch from `origin/main` by default, not from whatever branch happens to be checked out in the primary working tree.
