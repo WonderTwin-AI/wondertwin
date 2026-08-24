@@ -124,3 +124,36 @@ func TestInstallFromURLHTTPError(t *testing.T) {
 		t.Fatal("expected error for HTTP 404")
 	}
 }
+
+// TestCheckTierAccessFreeTiers pins the contract that gen-registry writes
+// against: every tier value a community twin can carry installs without a
+// license. "community" is here because gen-registry published that value at
+// the version level between the --tier flag landing and the versionTier fix,
+// so registry entries in the wild still carry it.
+func TestCheckTierAccessFreeTiers(t *testing.T) {
+	for _, tier := range []string{"", "free", "community"} {
+		t.Run("tier="+tier, func(t *testing.T) {
+			// cfg is nil: no license configured at all.
+			if err := CheckTierAccess("stripe", "0.2.0", Version{Tier: tier}, nil); err != nil {
+				t.Errorf("tier %q must install without a license, got: %v", tier, err)
+			}
+		})
+	}
+}
+
+// TestCheckTierAccessCommercialRequiresLicense is the other half of the
+// contract: anything outside the free set still demands a license.
+func TestCheckTierAccessCommercialRequiresLicense(t *testing.T) {
+	err := CheckTierAccess("measure", "0.1.0", Version{Tier: "commercial"}, nil)
+	if err == nil {
+		t.Fatal("commercial tier must require a license, got nil")
+	}
+}
+
+// TestCheckTierAccessUnknownTierIsGated documents the fail-closed default:
+// an unrecognised tier is treated as license-required, not waved through.
+func TestCheckTierAccessUnknownTierIsGated(t *testing.T) {
+	if err := CheckTierAccess("x", "1.0.0", Version{Tier: "enterprise"}, nil); err == nil {
+		t.Fatal("unknown tier must be gated, got nil")
+	}
+}

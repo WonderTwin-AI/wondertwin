@@ -125,8 +125,11 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 	if ver.SDKVersion != "v81" {
 		t.Errorf("sdk_version = %q", ver.SDKVersion)
 	}
-	if ver.Tier != "community" {
-		t.Errorf("tier = %q, want %q", ver.Tier, "community")
+	// Version-level tier is what registry.CheckTierAccess gates on, so a
+	// community release must publish "free" here. The entry-level tier
+	// stays descriptive and keeps saying "community".
+	if ver.Tier != "free" {
+		t.Errorf("version tier = %q, want %q", ver.Tier, "free")
 	}
 	if entry.Tier != "community" {
 		t.Errorf("entry.tier = %q, want %q", entry.Tier, "community")
@@ -690,6 +693,55 @@ func TestCommercialTier(t *testing.T) {
 	ver := entry.Versions["0.1.0"]
 	if ver.Tier != "commercial" {
 		t.Errorf("version tier = %q, want %q", ver.Tier, "commercial")
+	}
+}
+
+// TestCommunityTierPublishesFreeVersionTier is the regression guard for the
+// twin-stripe 0.2.0 incident. The --tier flag introduced the "community"
+// vocabulary on the publish side, but registry.CheckTierAccess only ever
+// admitted "" and "free", so every community release landed license-gated
+// and had to be patched by hand. The entry-level tier stays descriptive;
+// the version-level tier is the one the installer enforces on.
+func TestCommunityTierPublishesFreeVersionTier(t *testing.T) {
+	dir := setupManifest(t)
+	orig, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(orig)
+
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	checksumsPath := writeChecksums(t, dir)
+	registryPath := writeEmptyRegistry(t, dir)
+
+	err := run([]string{
+		"--twin", "stripe",
+		"--version", "0.2.0",
+		"--checksums-file", checksumsPath,
+		"--registry-file", registryPath,
+		"--tier", "community",
+	})
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(registryPath)
+	var reg Registry
+	if err := json.Unmarshal(data, &reg); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	entry := reg.Twins["stripe"]
+	if entry.Tier != "community" {
+		t.Errorf("entry.tier = %q, want %q", entry.Tier, "community")
+	}
+	if entry.DownloadAuth != "" {
+		t.Errorf("download_auth = %q, want empty for community", entry.DownloadAuth)
+	}
+
+	ver := entry.Versions["0.2.0"]
+	if ver.Tier != "free" {
+		t.Errorf("version tier = %q, want %q (community must not be license-gated)", ver.Tier, "free")
 	}
 }
 

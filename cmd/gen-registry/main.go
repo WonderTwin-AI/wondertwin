@@ -258,6 +258,21 @@ func loadRegistry(path string) (*Registry, error) {
 	return &reg, nil
 }
 
+// versionTier maps the release-time tier vocabulary onto the value the
+// installer actually gates on. The entry-level tier is descriptive and
+// carries "community" verbatim; the version-level tier is load-bearing,
+// because registry.CheckTierAccess treats anything it does not recognise
+// as license-required. Community twins are free to install, so they must
+// be published as "free" at the version level. Writing "community" here
+// license-gates every community twin: that is what forced the manual
+// patch of twin-stripe 0.2.0 after the --tier flag landed.
+func versionTier(tier string) string {
+	if tier == "commercial" {
+		return "commercial"
+	}
+	return "free"
+}
+
 func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, checksums map[string]string, lc lifecycleInputs) Version {
 	platforms := []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
 	binaryURLs := make(map[string]string, len(platforms))
@@ -273,7 +288,7 @@ func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, chec
 		SDKPackage:        manifest.SDKTarget.Primary.Package,
 		SDKVersion:        manifest.SDKTarget.Primary.Version,
 		APIVersion:        manifest.SDKTarget.Primary.APIVersion,
-		Tier:              tier,
+		Tier:              versionTier(tier),
 		Checksums:         checksums,
 		BinaryURLs:        binaryURLs,
 		ReleaseType:       lc.releaseType,
