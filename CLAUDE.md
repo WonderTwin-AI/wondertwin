@@ -10,6 +10,10 @@ This is the **public, MIT-licensed** WonderTwin repository. It contains:
 
 Pro twins are available separately for commercial customers.
 
+## Product docs live in Notion
+
+As of 2026-08-20, product and strategy documentation is canonical in Notion, not in `wondertwin-docs` or any repo. Do not write product strategy, positioning, roadmap, pricing, GTM or planning docs into this repository. Code-level docs, READMEs, and ADRs about this code stay here. Vendor research artifacts stay in `wondertwin-docs/research/`, because the pipeline reads them as files. See `wondertwin-docs/AGENTS.md` for the full split.
+
 ## Twin Coverage Policy
 
 The goal for all twins is **100% API parity** with the real service. Every endpoint, every parameter, every error shape.
@@ -114,3 +118,9 @@ When anything goes wrong (CI failure, missing file, wrong enum, broken test), im
 2. Determine what process change would have prevented it
 3. Codify that change in this file or in memory
 4. Do not just fix the symptom and move on
+
+## Concurrent Agent Work Uses Git Worktrees
+
+When more than one agent session needs to work in this repo at the same time, each session runs in its own git worktree rather than sharing this checkout. Two sessions sharing one working tree will clobber each other the moment either one switches branches or rebases, since both operations rewrite the same working directory and index the other session may be mid-edit in.
+
+Worktrees for this purpose live under `.claude/worktrees/` (already ignored in `.gitignore`) and branch from `origin/main` by default, not from whatever branch happens to be checked out in the primary working tree.
