@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Deliberately unfiltered. `branches:` on pull_request matches the
+    # PR's BASE branch, not its head, so a `[main]` filter gives a stacked
+    # PR (one based on another feature branch) zero checks. Keep the
+    # filter on push:, where it does mean what it looks like.
   schedule:
     - cron: '0 6 * * 1' # Weekly Monday 6am UTC
 
