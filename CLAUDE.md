@@ -10,6 +10,10 @@ This is the **public, MIT-licensed** WonderTwin repository. It contains:
 
 Pro twins are available separately for commercial customers.
 
+## Product docs live in Notion
+
+As of 2026-08-20, product and strategy documentation is canonical in Notion, not in `wondertwin-docs` or any repo. Do not write product strategy, positioning, roadmap, pricing, GTM or planning docs into this repository. Code-level docs, READMEs, and ADRs about this code stay here. Vendor research artifacts stay in `wondertwin-docs/research/`, because the pipeline reads them as files. See `wondertwin-docs/AGENTS.md` for the full split.
+
 ## Twin Coverage Policy
 
 The goal for all twins is **100% API parity** with the real service. Every endpoint, every parameter, every error shape.
