@@ -134,10 +134,18 @@ func Install(twinName string, resolvedVersion string, ver Version, binaryDir str
 	return nil
 }
 
+// freeTiers are the version-level tier values that install without a
+// license. "" predates the tier field; "free" is what gen-registry
+// publishes for community twins; "community" is accepted defensively so
+// that an entry published by a gen-registry older than the versionTier
+// fix still installs, rather than demanding a license for a free twin.
+// Anything outside this set is treated as license-required.
+var freeTiers = map[string]bool{"": true, "free": true, "community": true}
+
 // CheckTierAccess verifies that the user has the required license for a version's tier.
 // Returns nil if access is allowed, or an error with instructions if not.
 func CheckTierAccess(twinName, resolvedVersion string, ver Version, cfg *config.Config) error {
-	if ver.Tier == "" || ver.Tier == "free" {
+	if freeTiers[ver.Tier] {
 		return nil
 	}
 
