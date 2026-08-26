@@ -42,12 +42,14 @@ type registrySchema struct {
 }
 
 type twinEntry struct {
-	Description string                `json:"description"`
-	Repo        string                `json:"repo"`
-	Category    string                `json:"category"`
-	Author      string                `json:"author"`
-	Latest      string                `json:"latest"`
-	Versions    map[string]versionDef `json:"versions"`
+	Description  string                `json:"description"`
+	Repo         string                `json:"repo"`
+	Category     string                `json:"category"`
+	Author       string                `json:"author"`
+	Tier         string                `json:"tier"`
+	DownloadAuth string                `json:"download_auth,omitempty"`
+	Latest       string                `json:"latest"`
+	Versions     map[string]versionDef `json:"versions"`
 }
 
 type versionDef struct {
@@ -74,6 +76,25 @@ var (
 	}
 )
 
+// publicTiers are the tier values permitted in the public registry. The set is
+// an allowlist rather than a "commercial" denylist on purpose: a tier name
+// introduced later must fail this gate until someone decides it is public,
+// instead of shipping silently. An empty tier is permitted because older
+// entries predate the field.
+var publicTiers = map[string]struct{}{
+	"": {}, "free": {}, "community": {},
+}
+
+// nonPublicRepos are repo path segments that must never appear in the public
+// registry. A commercial twin's source is not public, so an entry pointing at
+// one is either a mis-targeted release or a namespace takeover: registry.json
+// is keyed by bare twin name, so a commercial release published under an
+// existing open-source name silently flips that entry to requiring auth.
+var nonPublicRepos = []string{
+	"wondertwin-pro",
+	"wondertwin-intelligence",
+}
+
 // checkResult stores the outcome of a single check.
 type checkResult struct {
 	Name   string
@@ -83,9 +104,16 @@ type checkResult struct {
 
 func main() {
 	registryURL := flag.String("registry-url", defaultRegistryURL, "URL of the registry.json to validate")
+	registryFile := flag.String("registry-file", "", "path to a local registry.json to validate instead of fetching a URL (use in CI to gate a proposed change before merge)")
+	public := flag.Bool("public", true, "enforce public-registry safety rules: no commercial tier, no download_auth, no non-public repo URLs")
 	flag.Parse()
 
-	results := run(*registryURL)
+	source := *registryURL
+	if *registryFile != "" {
+		source = *registryFile
+	}
+
+	results := runWithPolicy(source, *public)
 	printResults(results)
 
 	for _, r := range results {
@@ -95,8 +123,15 @@ func main() {
 	}
 }
 
-// run performs all validation checks and returns the results.
+// run performs all validation checks against a public registry.
 func run(registryURL string) []checkResult {
+	return runWithPolicy(registryURL, true)
+}
+
+// runWithPolicy performs all validation checks and returns the results. When
+// public is true it additionally enforces the public-registry safety rules;
+// pass false to validate a commercial registry, where those entries are legal.
+func runWithPolicy(registryURL string, public bool) []checkResult {
 	var results []checkResult
 
 	// 1. Fetch registry
@@ -129,14 +164,18 @@ func run(registryURL string) []checkResult {
 
 	// 4. Per-twin checks
 	for name, entry := range reg.Twins {
-		results = append(results, validateTwin(name, entry)...)
+		results = append(results, validateTwin(name, entry, public)...)
 	}
 
 	return results
 }
 
-func validateTwin(name string, entry twinEntry) []checkResult {
+func validateTwin(name string, entry twinEntry, public bool) []checkResult {
 	var results []checkResult
+
+	if public {
+		results = append(results, validatePublicTwin(name, entry)...)
+	}
 
 	// latest points to existing version
 	if entry.Latest == "" {
@@ -148,15 +187,59 @@ func validateTwin(name string, entry twinEntry) []checkResult {
 	}
 
 	for ver, vd := range entry.Versions {
-		results = append(results, validateVersion(name, ver, vd)...)
+		results = append(results, validateVersion(name, ver, vd, public)...)
 	}
 
 	return results
 }
 
-func validateVersion(name, ver string, vd versionDef) []checkResult {
+// validatePublicTwin enforces the rules that keep commercial artifacts out of
+// the public registry. Any failure here is a disclosure problem, not a
+// formatting one, so these run before the shape checks.
+func validatePublicTwin(name string, entry twinEntry) []checkResult {
+	var results []checkResult
+
+	if _, ok := publicTiers[entry.Tier]; !ok {
+		results = append(results, checkResult{
+			fmt.Sprintf("[%s] public tier", name), false,
+			fmt.Sprintf("tier=%q is not publishable to the public registry", entry.Tier),
+		})
+	} else {
+		results = append(results, checkResult{fmt.Sprintf("[%s] public tier", name), true, entry.Tier})
+	}
+
+	if entry.DownloadAuth != "" {
+		results = append(results, checkResult{
+			fmt.Sprintf("[%s] public download_auth", name), false,
+			fmt.Sprintf("download_auth=%q set on a public entry; auth-gated twins do not belong here", entry.DownloadAuth),
+		})
+	}
+
+	for _, marker := range nonPublicRepos {
+		if strings.Contains(entry.Repo, marker) {
+			results = append(results, checkResult{
+				fmt.Sprintf("[%s] public repo", name), false,
+				fmt.Sprintf("repo points at non-public source %q: %s", marker, entry.Repo),
+			})
+			break
+		}
+	}
+
+	return results
+}
+
+func validateVersion(name, ver string, vd versionDef, public bool) []checkResult {
 	var results []checkResult
 	prefix := fmt.Sprintf("[%s@%s]", name, ver)
+
+	if public {
+		if _, ok := publicTiers[vd.Tier]; !ok {
+			results = append(results, checkResult{
+				prefix + " public tier", false,
+				fmt.Sprintf("tier=%q is not publishable to the public registry", vd.Tier),
+			})
+		}
+	}
 
 	// Platform entries in binary_urls
 	results = append(results, checkPlatforms(prefix+" binary_urls", vd.BinaryURLs)...)
@@ -275,7 +358,19 @@ func headCheck(url string) (bool, string) {
 	return false, fmt.Sprintf("HTTP %d", resp.StatusCode)
 }
 
-func fetchRegistry(url string) ([]byte, error) {
+// fetchRegistry reads the registry from a URL, or from disk when source is a
+// path rather than an http(s) URL. The local path exists so CI can gate the
+// registry.json proposed in a pull request, which is not published anywhere yet.
+func fetchRegistry(source string) ([]byte, error) {
+	if !strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://") {
+		data, err := os.ReadFile(source)
+		if err != nil {
+			return nil, fmt.Errorf("reading registry file: %w", err)
+		}
+		return data, nil
+	}
+
+	url := source
 	client := httpclient.New(httpclient.WithTimeout(30 * time.Second))
 	resp, err := client.Get(url)
 	if err != nil {
