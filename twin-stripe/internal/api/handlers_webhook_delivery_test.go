@@ -70,7 +70,7 @@ func setupStripeWithWebhooks(t *testing.T, receiver *webhookReceiver) (*httptest
 	})
 	dispatcher.SetEndpointProvider(memStore)
 
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)
@@ -98,7 +98,7 @@ func TestWebhookDeliveryToRegisteredEndpoint(t *testing.T) {
 	})
 	dispatcher.SetEndpointProvider(memStore)
 
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)
@@ -159,7 +159,7 @@ func TestWebhookFilteringByEnabledEvents(t *testing.T) {
 	})
 	dispatcher.SetEndpointProvider(memStore)
 
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)
@@ -223,7 +223,7 @@ func TestWebhookWildcardEnabledEvents(t *testing.T) {
 	})
 	dispatcher.SetEndpointProvider(memStore)
 
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)

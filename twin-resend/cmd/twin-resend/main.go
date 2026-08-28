@@ -13,7 +13,6 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
-	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -27,29 +26,8 @@ func main() {
 	memStore := store.New()
 	memStore.Rand = twin.Rand
 
-	// Messaging engine for email lifecycle.
-	msgEngine := messaging.NewEngine(
-		messaging.WithClock(memStore.Clock),
-		messaging.WithLifecycle(messaging.ChannelEmail, &messaging.Lifecycle{
-			InitialStatus: messaging.StatusQueued,
-			Transitions: map[messaging.MessageStatus][]messaging.MessageStatus{
-				messaging.StatusQueued:    {messaging.StatusSending, messaging.StatusDropped},
-				messaging.StatusSending:   {messaging.StatusSent},
-				messaging.StatusSent:      {messaging.StatusDelivered, messaging.StatusBounced},
-				messaging.StatusDelivered: {},
-				messaging.StatusBounced:   {},
-				messaging.StatusDropped:   {},
-			},
-			AutoAdvance: map[messaging.MessageStatus]messaging.AutoAdvanceConfig{
-				messaging.StatusQueued:  {To: messaging.StatusSending},
-				messaging.StatusSending: {To: messaging.StatusSent},
-				messaging.StatusSent:    {To: messaging.StatusDelivered},
-			},
-		}),
-	)
-
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), msgEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware())
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

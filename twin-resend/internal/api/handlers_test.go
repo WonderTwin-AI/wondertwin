@@ -17,7 +17,7 @@ func setupResend(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 	memStore.Rand = twin.Rand
-	handler := api.NewHandler(memStore, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)

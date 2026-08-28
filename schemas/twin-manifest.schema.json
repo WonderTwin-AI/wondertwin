@@ -26,7 +26,7 @@
     },
     "publisher": {
       "type": "string",
-      "description": "Identity that authored and ships the twin. 'wondertwin' is reserved for first-party WonderTwin-published twins; third-party publishers use their own kebab-case identifier.",
+      "description": "Identity that authored and ships the twin. 'localstack' is the first-party publisher; 'wondertwin' is the legacy first-party value still present on unmigrated manifests; third-party publishers use their own kebab-case identifier.",
       "pattern": "^[a-z][a-z0-9-]*$"
     },
     "vendor": {

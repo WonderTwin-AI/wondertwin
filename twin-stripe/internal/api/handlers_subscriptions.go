@@ -1,14 +1,12 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 )
 
 func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
@@ -145,20 +143,6 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Subscriptions.Set(id, sub)
 	h.emitEvent("customer.subscription.created", mapFromJSON(sub))
-
-	// Track subscription lifecycle through workspace engine for telemetry.
-	if h.wsEngine != nil {
-		h.wsEngine.CreateEntity(context.Background(), &workspace.Entity{
-			ID:     id,
-			Type:   "subscription",
-			Status: sub.Status,
-			Properties: map[string]any{
-				"customer":          customer,
-				"collection_method": sub.CollectionMethod,
-				"item_count":        len(sub.Items.Data),
-			},
-		})
-	}
 
 	twincore.JSON(w, http.StatusOK, sub)
 }
@@ -354,9 +338,6 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	sub.CanceledAt = h.store.Now()
 	h.store.Subscriptions.Set(id, sub)
 	h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
-	if h.wsEngine != nil {
-		h.wsEngine.TransitionStatus(context.Background(), "subscription", id, "canceled")
-	}
 	twincore.JSON(w, http.StatusOK, sub)
 }
 

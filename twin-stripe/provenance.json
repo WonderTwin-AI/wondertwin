@@ -10,11 +10,18 @@
   "sources": {
     "openapi": {
       "origin": "vendor_published",
-      "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json"
+      "url": "https://raw.githubusercontent.com/stripe/openapi/3b6451bba542f42b8df3c2cfca2f98e053411cc3/openapi/spec3.json",
+      "retrieved_at": "2026-05-08T20:31:00Z",
+      "sha256": "6f7c5c122b98ccca6218b3980cbbf48773ffd40dc2fc9a09c4783143b9261915",
+      "api_version": "2026-04-22.dahlia"
     },
     "sdk_analysis": {
       "method": "manual",
-      "repo": "https://github.com/stripe/stripe-go"
+      "repo": "https://github.com/stripe/stripe-go",
+      "repo_ref": "v81"
     }
-  }
+  },
+  "research_archive": "wondertwin-docs/research/twins/stripe",
+  "research_completed": "2026-05-08T20:32:00Z",
+  "api_version": "2024-12-18"
 }
