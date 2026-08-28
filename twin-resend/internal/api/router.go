@@ -7,20 +7,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // Handler holds all API handler state.
 type Handler struct {
-	store     *store.MemoryStore
-	mw        *twincore.Middleware
-	msgEngine *messaging.Engine
+	store *store.MemoryStore
+	mw    *twincore.Middleware
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, mw *twincore.Middleware, me *messaging.Engine) *Handler {
-	return &Handler{store: s, mw: mw, msgEngine: me}
+func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
+	return &Handler{store: s, mw: mw}
 }
 
 // Routes mounts the Resend API routes and admin extras.

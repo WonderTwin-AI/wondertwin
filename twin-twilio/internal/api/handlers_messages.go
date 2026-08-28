@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-twilio/internal/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/messaging"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -83,25 +81,6 @@ func (h *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Messages.Set(sid, msg)
-
-	// Feed through messaging engine for lifecycle hooks + telemetry.
-	if h.msgEngine != nil {
-		engineMsg := &messaging.Message{
-			ID:      sid,
-			Channel: messaging.ChannelSMS,
-			From:    from,
-			To:      []string{to},
-			Body:    body,
-		}
-		h.msgEngine.Send(context.Background(), engineMsg)
-		// Auto-advance through lifecycle to match sim instant delivery.
-		for {
-			evt, _ := h.msgEngine.Advance(context.Background(), sid)
-			if evt == nil {
-				break
-			}
-		}
-	}
 
 	twincore.JSON(w, http.StatusCreated, msg)
 }

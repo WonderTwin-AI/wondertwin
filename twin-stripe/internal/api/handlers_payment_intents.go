@@ -1,14 +1,12 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 )
 
 func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
@@ -89,20 +87,6 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
 	} else if pi.Status == "requires_capture" {
 		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
-	}
-
-	// Track payment intent lifecycle through workspace engine for telemetry.
-	if h.wsEngine != nil {
-		h.wsEngine.CreateEntity(context.Background(), &workspace.Entity{
-			ID:     id,
-			Type:   "payment_intent",
-			Status: pi.Status,
-			Properties: map[string]any{
-				"amount":         pi.Amount,
-				"currency":       pi.Currency,
-				"capture_method": pi.CaptureMethod,
-			},
-		})
 	}
 
 	twincore.JSON(w, http.StatusOK, pi)
@@ -216,9 +200,6 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
 	}
-	if h.wsEngine != nil {
-		h.wsEngine.TransitionStatus(context.Background(), "payment_intent", id, pi.Status)
-	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
@@ -271,9 +252,6 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	} else {
 		h.emitEvent("payment_intent.amount_capturable_updated", mapFromJSON(pi))
 	}
-	if h.wsEngine != nil {
-		h.wsEngine.TransitionStatus(context.Background(), "payment_intent", id, pi.Status)
-	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
 
@@ -300,9 +278,6 @@ func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 
 	h.store.PaymentIntents.Set(id, pi)
 	h.emitEvent("payment_intent.canceled", mapFromJSON(pi))
-	if h.wsEngine != nil {
-		h.wsEngine.TransitionStatus(context.Background(), "payment_intent", id, "canceled")
-	}
 	twincore.JSON(w, http.StatusOK, pi)
 }
 

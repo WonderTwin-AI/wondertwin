@@ -22,7 +22,7 @@ func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	// output across runs.
 	memStore.Rand = twin.Rand
 	dispatcher := webhook.NewDispatcher(webhook.Config{})
-	handler := api.NewHandler(memStore, dispatcher, twin.Middleware(), nil)
+	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)

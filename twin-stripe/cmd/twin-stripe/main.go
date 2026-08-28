@@ -16,7 +16,6 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
-	"github.com/wondertwin-ai/wondertwin/twinkit/workspace"
 )
 
 func main() {
@@ -28,46 +27,6 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 	memStore.Rand = twin.Rand
-
-	// Workspace engine for invoice, subscription, and payment_intent lifecycle.
-	wsEngine := workspace.NewEngine(
-		workspace.WithClock(memStore.Clock),
-		workspace.WithWorkflow(workspace.WorkflowConfig{
-			EntityType:     "invoice",
-			InitialStatus:  "draft",
-			TerminalStates: []string{"paid", "void", "uncollectible"},
-			Transitions: map[string][]string{
-				"draft": {"open", "void"},
-				"open":  {"paid", "void", "uncollectible"},
-			},
-		}),
-		workspace.WithWorkflow(workspace.WorkflowConfig{
-			EntityType:     "subscription",
-			InitialStatus:  "active",
-			TerminalStates: []string{"canceled", "incomplete_expired"},
-			Transitions: map[string][]string{
-				"incomplete":         {"active", "incomplete_expired"},
-				"trialing":           {"active", "canceled"},
-				"active":             {"past_due", "canceled", "unpaid", "paused"},
-				"past_due":           {"active", "canceled", "unpaid"},
-				"unpaid":             {"active", "canceled"},
-				"paused":             {"active", "canceled"},
-				"canceled":           {},
-				"incomplete_expired": {},
-			},
-		}),
-		workspace.WithWorkflow(workspace.WorkflowConfig{
-			EntityType:     "payment_intent",
-			InitialStatus:  "requires_payment_method",
-			TerminalStates: []string{"succeeded", "canceled"},
-			Transitions: map[string][]string{
-				"requires_payment_method": {"requires_confirmation", "canceled"},
-				"requires_confirmation":   {"requires_action", "requires_capture", "succeeded", "canceled"},
-				"requires_action":         {"requires_confirmation", "requires_capture", "succeeded", "canceled"},
-				"requires_capture":        {"succeeded", "canceled"},
-			},
-		}),
-	)
 
 	// Webhook secret from env or default
 	webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
@@ -89,7 +48,7 @@ func main() {
 	dispatcher.SetEndpointProvider(memStore)
 
 	// API handlers
-	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware(), wsEngine)
+	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

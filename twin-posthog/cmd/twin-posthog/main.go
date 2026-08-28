@@ -13,7 +13,6 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
-	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -26,13 +25,8 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 
-	// Events engine for event ingestion and identity resolution.
-	eventsEngine := pkgevents.NewEngine(
-		pkgevents.WithClock(memStore.Clock),
-	)
-
 	// API handlers
-	apiHandler := api.NewHandler(memStore, twin.Middleware(), eventsEngine)
+	apiHandler := api.NewHandler(memStore, twin.Middleware())
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane

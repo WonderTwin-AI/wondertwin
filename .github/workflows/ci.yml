@@ -26,6 +26,28 @@ jobs:
       - name: Validate twin schemas
         run: go run ./cmd/validate-schemas/
 
+      - name: Enforce tier bright lines
+        # Community twins never link commercial code or domain engines
+        # (CTO-45 / CTO-50). Structural check: the declared tier plus the
+        # actual dependency graph via go list, not a source grep.
+        run: |
+          set -euo pipefail
+          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events)(/|$)'
+          for dir in twin-*/; do
+            twin="${dir%/}"
+            tier=$(jq -r .tier "$twin/twin-manifest.json")
+            if [ "$tier" != "community" ]; then
+              echo "::error::$twin declares tier '$tier'; every twin in this repo must be community"
+              exit 1
+            fi
+            if deps=$(go list -deps "./$twin/..." | grep -E "$forbidden"); then
+              echo "::error::$twin links forbidden packages:"
+              echo "$deps"
+              exit 1
+            fi
+          done
+          echo "Tier bright lines hold for all twins"
+
       - name: Validate skill-schema pins
         run: go run ./cmd/validate-skill-pins/
 

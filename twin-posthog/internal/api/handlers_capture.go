@@ -2,13 +2,11 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/twin-posthog/internal/store"
-	pkgevents "github.com/wondertwin-ai/wondertwin/twinkit/events"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
@@ -250,34 +248,6 @@ func (h *Handler) storeEvent(req captureRequest) {
 	}
 
 	h.store.Events.Set(id, evt)
-
-	// Feed through events engine for lifecycle hooks + telemetry.
-	if h.eventsEngine != nil {
-		engineEvt := &pkgevents.Event{
-			ID:         id,
-			EventName:  req.Event,
-			DistinctID: req.DistinctID,
-			Properties: req.Properties,
-		}
-		if parsedTime, err := time.Parse(time.RFC3339, ts); err == nil {
-			engineEvt.Timestamp = parsedTime
-		}
-		h.eventsEngine.Track(context.Background(), engineEvt)
-
-		// For $identify events, also call Identify on the engine.
-		if req.Event == "$identify" {
-			setProps := make(map[string]any)
-			if req.Properties != nil {
-				if sp, ok := req.Properties["$set"].(map[string]any); ok {
-					setProps = sp
-				}
-			}
-			h.eventsEngine.Identify(context.Background(), &pkgevents.IdentifyCall{
-				DistinctID: req.DistinctID,
-				Properties: setProps,
-			})
-		}
-	}
 
 	// Process special event types (store-level processing for API responses).
 	switch req.Event {
