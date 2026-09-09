@@ -6,9 +6,10 @@ This is the **public, MIT-licensed** WonderTwin repository. It contains:
 - **twinkit** — the shared library for building API twins
 - **Community twins** — 10 open-source twins built with the community skill
 - **wt CLI** — the command-line tool for managing twins
-- **twin-researcher skill** — the research methodology (public process, private artifacts)
 
-Pro twins are available separately for commercial customers.
+Pro twins are available separately for commercial customers. Code contributions,
+including the skill-driven build process below, are paused while the architecture
+is reworked — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Product docs live in Notion
 
@@ -89,7 +90,11 @@ twin-{name}/
 This is the proven process for building a new community twin from scratch. Follow it in order.
 
 ### Phase 0: Research
-Before writing any code, research the full API surface of the target service. Use the `twin-researcher` skill, which produces structured artifacts in `wondertwin-docs/research/`. The research output is the source of truth for 100% parity.
+Before writing any code, research the full API surface of the target service. The
+in-repo `twin-researcher` skill that used to drive this step has been retired
+(see [CONTRIBUTING.md](CONTRIBUTING.md)); until the build process is reworked,
+research artifacts still land in `wondertwin-docs/research/` and remain the
+source of truth for 100% parity.
 
 ### Phase 1: Scaffold + Core
 1. Create directory structure following the standard layout
