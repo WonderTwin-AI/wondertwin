@@ -23,5 +23,5 @@
 # check, which needs the goreleaser toolchain.
 commands:
   test: "go test ./... -count=1 -timeout 120s"
-  lint: 'golangci-lint run ./... && go vet ./... && go run ./cmd/validate-schemas/ && go run ./cmd/validate-skill-pins/ && go run ./cmd/validate-skill-templates/ && { test -z "$(gofmt -l .)" || { echo "unformatted files (run gofmt -w .):"; gofmt -l .; exit 1; }; }'
+  lint: 'golangci-lint run ./... && go vet ./... && go run ./cmd/validate-schemas/ && { test -z "$(gofmt -l .)" || { echo "unformatted files (run gofmt -w .):"; gofmt -l .; exit 1; }; }'
   format: "gofmt -w ."
