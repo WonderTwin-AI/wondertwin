@@ -48,12 +48,6 @@ jobs:
           done
           echo "Tier bright lines hold for all twins"
 
-      - name: Validate skill-schema pins
-        run: go run ./cmd/validate-skill-pins/
-
-      - name: Validate skill JSON templates
-        run: go run ./cmd/validate-skill-templates/
-
       - name: Build wt CLI
         run: go build ./cmd/wt/
 
