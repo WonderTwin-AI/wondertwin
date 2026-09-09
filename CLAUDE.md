@@ -9,7 +9,7 @@ This is the **public, MIT-licensed** WonderTwin repository. It contains:
 
 Pro twins are available separately for commercial customers. Code contributions,
 including the skill-driven build process below, are paused while the architecture
-is reworked — see [CONTRIBUTING.md](CONTRIBUTING.md).
+is reworked. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Product docs live in Notion
 
@@ -91,10 +91,9 @@ This is the proven process for building a new community twin from scratch. Follo
 
 ### Phase 0: Research
 Before writing any code, research the full API surface of the target service. The
-in-repo `twin-researcher` skill that used to drive this step has been retired
-(see [CONTRIBUTING.md](CONTRIBUTING.md)); until the build process is reworked,
-research artifacts still land in `wondertwin-docs/research/` and remain the
-source of truth for 100% parity.
+`twin-researcher` skill that drives this step has moved to a private library and
+is no longer in this repo. Research artifacts still land in
+`wondertwin-docs/research/` and remain the source of truth for 100% parity.
 
 ### Phase 1: Scaffold + Core
 1. Create directory structure following the standard layout
