@@ -4,7 +4,7 @@
 
 This is the **public, MIT-licensed** WonderTwin repository. It contains:
 - **twinkit** — the shared library for building API twins
-- **Community twins** — 10 open-source twins built with the community skill
+- **Community twins** — 10 open-source twins
 - **wt CLI** — the command-line tool for managing twins
 
 Pro twins are available separately for commercial customers. Code contributions,
