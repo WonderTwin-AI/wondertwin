@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Keep domain engines out of the public kit.
+
+THE FAILURE THIS EXISTS FOR. The ledger engine sat on the public default
+branch for months (CTO-46). The tier gate in CI did not catch it, because
+that gate reads the dependency graph and so only sees an engine some twin
+already USES. An engine re-added with no consumer yet is invisible to it.
+This is a presence check instead: it asks what exists under twinkit/, not
+what imports it.
+
+WHY AN ALLOWLIST. The obvious shape is a list of banned engine names, and
+it cannot work. A list of the nine engines we happen to have deleted does
+not catch the tenth under a name nobody has thought of yet, which is the
+exact failure it claims to prevent, and it goes stale silently because
+nothing fails when someone forgets to extend it. Naming what may exist
+inverts that: a new package under twinkit/ fails until somebody adds it
+here deliberately, so the decision is forced at the moment it is made
+rather than remembered later.
+
+WHERE THE LINE IS. Primitives are open, semantics are commercial. A store,
+a clock, seeded randomness and transport shims are primitives. Double-entry,
+period close and approval graphs are semantics. If the caller can be wrong
+about it, it belongs in the commercial kit.
+
+Usage:  scripts/check-engine-boundary
+"""
+
+import sys
+from pathlib import Path
+
+ALLOWED_PACKAGES = frozenset(
+    {
+        "admin",
+        "twincore",
+        "state",
+        "sim",
+        "webhook",
+        "testutil",
+        "pagination",
+        "identity",
+        "graphql",
+        "grpc",
+        "soap",
+        "ws",
+    }
+)
+ALLOWED_FILES = frozenset({"go.mod", "go.sum"})
+
+KIT = Path(__file__).resolve().parent.parent / "twinkit"
+
+
+def has_go_source(directory: Path) -> bool:
+    return any(p.suffix == ".go" for p in directory.iterdir() if p.is_file())
+
+
+def violations(kit: Path):
+    """Yield (path, reason) for everything under the kit that is not allowlisted."""
+    for entry in sorted(kit.iterdir()):
+        rel = entry.relative_to(kit).as_posix()
+
+        # A re-added engine need not be a directory. `twinkit/ledger.go` is
+        # the same engine on the same public branch.
+        if entry.is_file():
+            if entry.name not in ALLOWED_FILES:
+                yield rel, "only go.mod and go.sum may sit at the root of the kit"
+            continue
+
+        if entry.name not in ALLOWED_PACKAGES:
+            yield rel, "not an allowlisted public-kit package"
+            continue
+
+        # An allowlisted package does not allowlist its subtree: the ledger's
+        # journal lived at twinkit/state/journal, under a package that stays.
+        for sub in sorted(p for p in entry.rglob("*") if p.is_dir()):
+            if has_go_source(sub):
+                yield (
+                    sub.relative_to(kit).as_posix(),
+                    "nested package is not allowlisted; allowlisting a package "
+                    "does not allowlist its subpackages",
+                )
+
+
+def main() -> int:
+    if not KIT.is_dir():
+        print(f"check-engine-boundary: FAIL, no kit directory at {KIT}")
+        return 1
+
+    found = sorted(violations(KIT))
+    if not found:
+        print(
+            f"check-engine-boundary: {len(ALLOWED_PACKAGES)} allowlisted packages, "
+            f"no domain engines in the public kit"
+        )
+        return 0
+
+    print("check-engine-boundary: FAIL, the public kit contains unallowlisted paths.")
+    for path, reason in found:
+        print(f"  twinkit/{path}: {reason}")
+    print(
+        "  Domain engines belong in the commercial kit. If this path is a "
+        "primitive\n"
+        "  the public kit should carry, add it to ALLOWED_PACKAGES in "
+        f"{Path(__file__).name} and say why in the commit."
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
