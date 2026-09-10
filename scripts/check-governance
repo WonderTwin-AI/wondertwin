@@ -80,7 +80,7 @@ def main() -> int:
             f"`Skill:` citation.\n"
             f"  Emulators touched: {' '.join(emulators) or '(none directly)'}\n"
             f"  Add a skill citation naming the skill that governed this change, e.g.\n"
-            f"    Skill: fleet-wide-hygiene-sweep\n"
+            f"    Skill: sweep-fleet-hygiene\n"
             f"  If no skill applies, say so and why:\n"
             f"    Skill: none (reason)"
         )
