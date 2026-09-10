@@ -21,9 +21,11 @@ jobs:
 
       - name: Governance record on fleet-shaped changes
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --quiet origin "${{ github.base_ref }}"
-          ./scripts/check-governance "origin/${{ github.base_ref }}" HEAD
+          git fetch --quiet origin "$BASE_REF"
+          ./scripts/check-governance "origin/$BASE_REF" HEAD
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
