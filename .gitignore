@@ -10,3 +10,7 @@ wondertwin.json
 .claude/worktrees/
 twin-posthog/seed.json
 twin-posthog/demo.sh
+
+# Python bytecode from scripts/ tooling
+__pycache__/
+*.pyc
