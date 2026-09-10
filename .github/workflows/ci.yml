@@ -19,6 +19,9 @@ jobs:
           # shallow clone would see no history to read them from.
           fetch-depth: 0
 
+      - name: Governance check behaves
+        run: ./scripts/test-check-governance
+
       - name: Governance record on fleet-shaped changes
         if: github.event_name == 'pull_request'
         env:

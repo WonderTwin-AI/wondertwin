@@ -33,7 +33,14 @@ import sys
 THRESHOLD = 2
 EMULATOR_DIR = re.compile(r"^(twin-[a-z0-9-]+)/")
 CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
-SHARED = ("twinkit/", "schemas/")
+# Derived, not listed. This file is copied verbatim into every emulator repo,
+# and the one line that used to differ (which kit is "shared" here) was the
+# line that had to be reconciled by hand on every change. It was mis-reconciled
+# twice in two days, once losing the case-insensitive `none` check below. A
+# pattern resolves correctly in each repo, so the copies are byte-identical and
+# any divergence is a plain diff. It also survives the twinkit to emulator-kit
+# rename rather than silently matching nothing afterwards.
+SHARED_DIR = re.compile(r"^(twinkit[a-z-]*|emulator-kit[a-z-]*|schemas)/")
 
 
 def git(*args: str) -> str:
@@ -50,7 +57,7 @@ def main() -> int:
 
     files = [f for f in git("diff", "--name-only", f"{base}...{head}").split() if f]
     emulators = sorted({m.group(1) for f in files if (m := EMULATOR_DIR.match(f))})
-    shared = sorted({p for f in files for p in SHARED if f.startswith(p)})
+    shared = sorted({m.group(1) + "/" for f in files if (m := SHARED_DIR.match(f))})
 
     # A change to twinkit or the schemas reaches every emulator whether or not
     # it edits their directories, so it is fleet-shaped by reach, not by count.
@@ -73,7 +80,7 @@ def main() -> int:
             f"`Skill:` citation.\n"
             f"  Emulators touched: {' '.join(emulators) or '(none directly)'}\n"
             f"  Add a skill citation naming the skill that governed this change, e.g.\n"
-            f"    Skill: sweep-fleet-hygiene\n"
+            f"    Skill: fleet-wide-hygiene-sweep\n"
             f"  If no skill applies, say so and why:\n"
             f"    Skill: none (reason)"
         )
@@ -82,7 +89,10 @@ def main() -> int:
     print(f"check-governance: fleet-shaped ({why}), governed by:")
     for t in citations:
         print(f"  {t}")
-    unreasoned = [t for t in citations if t.split()[0] == "none" and "(" not in t]
+    unreasoned = [
+        t for t in citations
+        if t.split()[0].lower() == "none" and "(" not in t
+    ]
     if unreasoned:
         print("check-governance: FAIL, `Skill: none` must carry a reason in parens")
         return 1
