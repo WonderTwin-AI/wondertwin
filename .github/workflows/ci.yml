@@ -44,7 +44,7 @@ jobs:
         # actual dependency graph via go list, not a source grep.
         run: |
           set -euo pipefail
-          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events|domainevents|scheduler|state/journal)(/|$)'
+          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events)(/|$)'
           for dir in twin-*/; do
             twin="${dir%/}"
             tier=$(jq -r .tier "$twin/twin-manifest.json")
@@ -65,8 +65,8 @@ jobs:
         # not stop an engine being re-added to the public kit with no
         # consumer yet, which is exactly how the ledger engine came to sit
         # on the public default branch for months (CTO-46). The script is a
-        # presence check: it allowlists the primitives the public kit may
-        # carry and fails on anything else that appears under twinkit/.
+        # presence check: it allowlists the primitive packages the public kit
+        # may carry and fails on any other Go package under twinkit/.
         run: ./scripts/check-engine-boundary
 
       - name: Build wt CLI

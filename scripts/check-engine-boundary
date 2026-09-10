@@ -17,16 +17,33 @@ inverts that: a new package under twinkit/ fails until somebody adds it
 here deliberately, so the decision is forced at the moment it is made
 rather than remembered later.
 
-WHERE THE LINE IS. Primitives are open, semantics are commercial. A store,
-a clock, seeded randomness and transport shims are primitives. Double-entry,
-period close and approval graphs are semantics. If the caller can be wrong
-about it, it belongs in the commercial kit.
+THE RULE, WHICH IS ONE RULE. Every directory that directly contains a .go
+file is a Go package. Each one, spelled relative to twinkit/, must be an
+exact member of ALLOWED_PACKAGES. The kit root is covered by the same
+rule and not a second one: a stray twinkit/ledger.go makes the root a
+package whose relative path is "", which is not a member.
+
+WHAT THIS DOES NOT CATCH, SAID PLAINLY. This is a path rule, so it is
+package-granular, not file-granular. A single .go file smuggled into a
+package that is already allowlisted -- twinkit/twincore/ledger.go, say --
+looks exactly like a legitimate file of that package to any path rule,
+and no allowlist of paths can tell them apart. That case is left to code
+review. What the rule does catch is a new package directory, nested or
+top-level, which is the shape an engine actually has and the shape the
+ledger arrived in.
+
+WHY TRACKED FILES ONLY. Reading the index rather than the filesystem
+makes a local run mean what CI's run means. Walking the worktree failed
+on a .DS_Store, which is line 1 of this repo's .gitignore and which
+Finder writes just for opening the directory, and a gate that cries wolf
+locally is one people learn to skip.
 
 Usage:  scripts/check-engine-boundary
 """
 
+import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ALLOWED_PACKAGES = frozenset(
     {
@@ -44,63 +61,57 @@ ALLOWED_PACKAGES = frozenset(
         "ws",
     }
 )
-ALLOWED_FILES = frozenset({"go.mod", "go.sum"})
 
-KIT = Path(__file__).resolve().parent.parent / "twinkit"
-
-
-def has_go_source(directory: Path) -> bool:
-    return any(p.suffix == ".go" for p in directory.iterdir() if p.is_file())
+ROOT = Path(__file__).resolve().parent.parent
+KIT = "twinkit"
 
 
-def violations(kit: Path):
-    """Yield (path, reason) for everything under the kit that is not allowlisted."""
-    for entry in sorted(kit.iterdir()):
-        rel = entry.relative_to(kit).as_posix()
+def tracked_files() -> list[PurePosixPath]:
+    out = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-z", "--", KIT],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return [PurePosixPath(p) for p in out.split("\0") if p]
 
-        # A re-added engine need not be a directory. `twinkit/ledger.go` is
-        # the same engine on the same public branch.
-        if entry.is_file():
-            if entry.name not in ALLOWED_FILES:
-                yield rel, "only go.mod and go.sum may sit at the root of the kit"
+
+def packages() -> dict[str, PurePosixPath]:
+    """Map each Go package under the kit to one of its files, for the report."""
+    found: dict[str, PurePosixPath] = {}
+    for path in tracked_files():
+        if path.suffix != ".go":
             continue
-
-        if entry.name not in ALLOWED_PACKAGES:
-            yield rel, "not an allowlisted public-kit package"
+        # Go itself ignores testdata, so fixtures are not packages.
+        if "testdata" in path.parts:
             continue
-
-        # An allowlisted package does not allowlist its subtree: the ledger's
-        # journal lived at twinkit/state/journal, under a package that stays.
-        for sub in sorted(p for p in entry.rglob("*") if p.is_dir()):
-            if has_go_source(sub):
-                yield (
-                    sub.relative_to(kit).as_posix(),
-                    "nested package is not allowlisted; allowlisting a package "
-                    "does not allowlist its subpackages",
-                )
+        rel = path.parent.relative_to(KIT).as_posix()
+        found.setdefault("" if rel == "." else rel, path)
+    return found
 
 
 def main() -> int:
-    if not KIT.is_dir():
-        print(f"check-engine-boundary: FAIL, no kit directory at {KIT}")
+    if not (ROOT / KIT).is_dir():
+        print(f"check-engine-boundary: FAIL, no kit directory at {ROOT / KIT}")
         return 1
 
-    found = sorted(violations(KIT))
-    if not found:
+    found = packages()
+    offenders = sorted(set(found) - ALLOWED_PACKAGES)
+    if not offenders:
         print(
-            f"check-engine-boundary: {len(ALLOWED_PACKAGES)} allowlisted packages, "
-            f"no domain engines in the public kit"
+            f"check-engine-boundary: {len(found)} Go packages under {KIT}/, "
+            f"all allowlisted; no domain engines in the public kit"
         )
         return 0
 
-    print("check-engine-boundary: FAIL, the public kit contains unallowlisted paths.")
-    for path, reason in found:
-        print(f"  twinkit/{path}: {reason}")
+    print(f"check-engine-boundary: FAIL, unallowlisted Go packages under {KIT}/.")
+    for pkg in offenders:
+        where = f"{KIT}/{pkg}" if pkg else f"the {KIT}/ root"
+        print(f"  {where}  (e.g. {found[pkg]})")
     print(
-        "  Domain engines belong in the commercial kit. If this path is a "
-        "primitive\n"
-        "  the public kit should carry, add it to ALLOWED_PACKAGES in "
-        f"{Path(__file__).name} and say why in the commit."
+        "  Domain engines belong in the commercial kit. If one of these is a\n"
+        "  primitive the public kit should carry, add its path to "
+        f"ALLOWED_PACKAGES\n  in {Path(__file__).name} and say why in the commit."
     )
     return 1
 

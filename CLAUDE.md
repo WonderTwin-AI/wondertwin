@@ -155,10 +155,15 @@ wrong about it, it is not a primitive.
 
 CI enforces this by presence, not by imports, because the ledger engine sat on
 the public default branch for months with no consumer to give it away
-(CTO-46). Any path under `twinkit/` that is not on the allowlist fails,
-whether or not anything uses it. Adding a genuinely new primitive means adding
-it to `ALLOWED_PACKAGES` in the script and saying why in the commit. Run it
-locally with `scripts/check-engine-boundary`.
+(CTO-46). Any Go package directory under `twinkit/` that is not on the
+allowlist fails, whether or not anything uses it. Adding a genuinely new
+primitive means adding its path to `ALLOWED_PACKAGES` in the script and saying
+why in the commit. Run it locally with `scripts/check-engine-boundary`.
+
+The gate is package-granular, not path-granular. It catches a new package
+directory, which is the shape an engine has, but a single `.go` file added to
+a package that is already allowlisted is indistinguishable from that package's
+own code to any path rule. That case is left to code review.
 
 ## Concurrent Agent Work Uses Git Worktrees
 
