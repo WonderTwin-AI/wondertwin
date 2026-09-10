@@ -20,6 +20,7 @@ Exit 0 when every case behaves, 1 on the first mismatch.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -27,11 +28,20 @@ import tempfile
 from pathlib import Path
 
 CHECK = Path(__file__).resolve().parent / "check-governance"
+# The throwaway repos have to be throwaway. Ambient config reaches into them
+# otherwise: commit.gpgsign with an unusable key, or a global core.hooksPath
+# with a failing pre-commit, makes setup exit non-zero and the whole harness
+# reports "setup failed" for a reason that has nothing to do with the gate.
+ENV = {
+    **os.environ,
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_SYSTEM": os.devnull,
+}
 FAILED = []
 
 
 def sh(cwd, *args):
-    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=ENV)
     if r.returncode != 0:
         # Setup breakage is a broken harness, not a case result. A silent
         # failure here leaves `main...HEAD` empty, and every case that wants
@@ -71,11 +81,11 @@ def change(root: Path, paths, message: str):
 def run(root: Path):
     return subprocess.run(
         [sys.executable, str(root / "scripts" / "check-governance"), "main", "HEAD"],
-        cwd=root, capture_output=True, text=True,
+        cwd=root, capture_output=True, text=True, env=ENV,
     )
 
 
-def case(label, paths, message, want_rc, want_text=""):
+def case(label, paths, message, want_rc, *want_text):
     with tempfile.TemporaryDirectory() as tmp:
         root = repo(tmp)
         change(root, paths, message)
@@ -84,17 +94,21 @@ def case(label, paths, message, want_rc, want_text=""):
         if r.returncode != want_rc:
             print(f"FAIL {label}: exit {r.returncode}, wanted {want_rc}\n{out}")
             FAILED.append(label); return
-        if want_text and want_text not in out:
-            print(f"FAIL {label}: output missing {want_text!r}\n{out}")
-            FAILED.append(label); return
+        for want in want_text:
+            if want not in out:
+                print(f"FAIL {label}: output missing {want!r}\n{out}")
+                FAILED.append(label); return
         print(f"ok   {label}")
 
 
 def main():
     case("one emulator needs no citation",
          ["twin-alpha/a.txt"], "touch one", 0, "not fleet-shaped")
+    # The suggested skill has to be one that exists. A hand-sync restored a
+    # stale name here once; asserting the exit code alone let it print ok.
     case("two emulators without a citation fail",
-         ["twin-alpha/a.txt", "twin-beta/b.txt"], "touch two", 1, "no `Skill:`")
+         ["twin-alpha/a.txt", "twin-beta/b.txt"], "touch two", 1,
+         "no `Skill:`", "Skill: sweep-fleet-hygiene")
     case("two emulators with a citation pass",
          ["twin-alpha/a.txt", "twin-beta/b.txt"],
          "touch two\n\nSkill: sweep-fleet-hygiene", 0, "governed by")
