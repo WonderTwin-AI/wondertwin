@@ -3,7 +3,8 @@
 
 THE FAILURE THIS EXISTS FOR. On 2026-08-28 an agent ran a four-emulator
 remediation sweep and shipped it while sweep-fleet-hygiene,
-synthesise-batch and umbrella-tracker-issue sat unused in the library.
+synthesise-batch sat unused, and the umbrella-tracker-issue discipline with
+them.
 Nothing was wrong with the library. The problem was that nothing made the
 sweep discoverable at the moment it was needed, and nothing recorded that it
 had not been used, so the omission left no trace to review.
