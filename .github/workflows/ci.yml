@@ -44,7 +44,7 @@ jobs:
         # actual dependency graph via go list, not a source grep.
         run: |
           set -euo pipefail
-          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events)(/|$)'
+          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events|domainevents|scheduler|state/journal)(/|$)'
           for dir in twin-*/; do
             twin="${dir%/}"
             tier=$(jq -r .tier "$twin/twin-manifest.json")
@@ -59,6 +59,30 @@ jobs:
             fi
           done
           echo "Tier bright lines hold for all twins"
+
+      - name: Enforce the engine boundary
+        # The import gate above only catches an engine a twin USES. It does
+        # not stop an engine being re-added to the public kit with no
+        # consumer yet, which is exactly how the ledger engine came to sit
+        # on the public default branch for months (CTO-46). This is a
+        # presence check: domain engines must not exist here at all.
+        #
+        # Primitives are open, semantics are commercial. A store, a clock
+        # and seeded randomness are primitives. Double-entry, period close
+        # and approval graphs are semantics. If the caller can be wrong
+        # about it, it belongs in the commercial kit.
+        run: |
+          set -euo pipefail
+          engines='contract ledger workspace messaging search events domainevents scheduler state/journal'
+          found=0
+          for engine in $engines; do
+            if [ -d "twinkit/$engine" ]; then
+              echo "::error file=twinkit/$engine::domain engine '$engine' must live in the commercial kit, not the public one"
+              found=1
+            fi
+          done
+          [ "$found" -eq 0 ] || exit 1
+          echo "No domain engines in the public kit"
 
       - name: Build wt CLI
         run: go build ./cmd/wt/
