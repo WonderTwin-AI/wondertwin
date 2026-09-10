@@ -131,7 +131,7 @@ in front of you. CI requires a skill citation naming the skill that governed
 it.
 
 ```
-Skill: fleet-wide-hygiene-sweep
+Skill: sweep-fleet-hygiene
 ```
 
 If no skill applies, record that decision rather than omitting the citation:
