@@ -123,6 +123,29 @@ When anything goes wrong (CI failure, missing file, wrong enum, broken test), im
 3. Codify that change in this file or in memory
 4. Do not just fix the symptom and move on
 
+## Fleet-shaped changes record their governing skill
+
+A change touching two or more `twin-*` directories, or anything under
+`twinkit/` or `schemas/`, is fleet-shaped: it reaches emulators beyond the one
+in front of you. CI requires a commit trailer naming the skill that governed
+it.
+
+```
+Skill: fleet-wide-hygiene-sweep
+```
+
+If no skill applies, record that decision rather than omitting the trailer:
+
+```
+Skill: none (single-vendor SDK bump, no cross-emulator pattern)
+```
+
+This exists because a four-emulator sweep once shipped while the sweep and
+synthesis skills sat unused, and the omission left no trace to review. The
+requirement is that the choice is auditable, not that it is approved, so a
+reasoned `none` passes. Run it locally with
+`scripts/check-governance origin/main HEAD`.
+
 ## Concurrent Agent Work Uses Git Worktrees
 
 When more than one agent session needs to work in this repo at the same time, each session runs in its own git worktree rather than sharing this checkout. Two sessions sharing one working tree will clobber each other the moment either one switches branches or rebases, since both operations rewrite the same working directory and index the other session may be mid-edit in.
