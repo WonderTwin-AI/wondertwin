@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The check reads commit trailers across the PR's commits, so a
+          # The check reads skill citations across the PR's commits, so a
           # shallow clone would see no history to read them from.
           fetch-depth: 0
 

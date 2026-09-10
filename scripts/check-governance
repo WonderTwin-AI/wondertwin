@@ -8,9 +8,11 @@ Nothing was wrong with the library. The problem was that nothing made the
 sweep discoverable at the moment it was needed, and nothing recorded that it
 had not been used, so the omission left no trace to review.
 
-WHY A TRAILER AND NOT A PROMPT. A prompt is advice and advice loses to time
-pressure. A trailer is a fact in the commit, which means the gate and any
-later reader can audit which skill governed a change. Auditable is the
+WHY A CITATION AND NOT A PROMPT. A prompt is advice and advice loses to time
+pressure. A citation is a fact in the commit, which means the gate and any
+later reader can audit which skill governed a change. It rides as a git
+trailer mechanically; "skill citation" is what to call it in prose, because
+"trailer" names the transport rather than the thing. Auditable is the
 requirement; blocked is not. `Skill: none` with a reason passes, because a
 recorded decision satisfies the requirement while an unrecordable rule just
 teaches people to route around it.
@@ -29,7 +31,7 @@ import sys
 
 THRESHOLD = 2
 EMULATOR_DIR = re.compile(r"^(twin-[a-z0-9-]+)/")
-TRAILER = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
+CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 SHARED = ("twinkit/", "schemas/")
 
 
@@ -54,22 +56,22 @@ def main() -> int:
     fleet = len(emulators) >= THRESHOLD or bool(shared)
     if not fleet:
         scope = emulators[0] if emulators else "no emulator"
-        print(f"check-governance: not fleet-shaped ({scope}); no trailer required")
+        print(f"check-governance: not fleet-shaped ({scope}); no skill citation required")
         return 0
 
     body = git("log", "--format=%B", f"{base}..{head}")
-    trailers = [t.strip() for t in TRAILER.findall(body)]
+    citations = [t.strip() for t in CITATION.findall(body)]
 
     why = f"{len(emulators)} emulator(s)" if len(emulators) >= THRESHOLD else ""
     if shared:
         why = ", ".join(filter(None, [why, f"shared: {' '.join(shared)}"]))
 
-    if not trailers:
+    if not citations:
         print(
             f"check-governance: FAIL, fleet-shaped change ({why}) with no "
-            f"`Skill:` trailer.\n"
+            f"`Skill:` citation.\n"
             f"  Emulators touched: {' '.join(emulators) or '(none directly)'}\n"
-            f"  Add a trailer naming the skill that governed this change, e.g.\n"
+            f"  Add a skill citation naming the skill that governed this change, e.g.\n"
             f"    Skill: fleet-wide-hygiene-sweep\n"
             f"  If no skill applies, say so and why:\n"
             f"    Skill: none (reason)"
@@ -77,9 +79,9 @@ def main() -> int:
         return 1
 
     print(f"check-governance: fleet-shaped ({why}), governed by:")
-    for t in trailers:
+    for t in citations:
         print(f"  {t}")
-    unreasoned = [t for t in trailers if t.split()[0] == "none" and "(" not in t]
+    unreasoned = [t for t in citations if t.split()[0] == "none" and "(" not in t]
     if unreasoned:
         print("check-governance: FAIL, `Skill: none` must carry a reason in parens")
         return 1
