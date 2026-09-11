@@ -41,6 +41,11 @@ jobs:
       - name: Validate twin schemas
         run: go run ./cmd/validate-schemas/
 
+      - name: Guard the twinkit resolution model
+        run: |
+          ./scripts/check-twinkit-resolution
+          ./scripts/test-check-twinkit-resolution
+
       - name: Enforce tier bright lines
         # Community twins never link commercial code (CTO-45 / CTO-50).
         # Structural check: the declared tier plus the actual dependency

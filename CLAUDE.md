@@ -174,6 +174,21 @@ package that is already allowlisted is indistinguishable from that package's
 own code to any path rule. That case, and only that case, is left to code
 review.
 
+## The repo is one Go module
+
+The root `go.mod` replaces `github.com/wondertwin-ai/wondertwin/twinkit` with
+`./twinkit`, and no `twin-*` directory carries a `go.mod` of its own. Those two
+facts together are what makes every emulator import resolve against this working
+tree rather than the module proxy, which is how the engine boundary (CTO-45 /
+CTO-46) stays enforced by the compiler instead of by convention. So: do not add
+a `go.mod` anywhere under an emulator directory, and do not pin the replace to a
+version — a version-pinned replace applies to that one version and leaves the
+rest resolving from the proxy.
+
+CI fails on either break. Run it locally with
+`scripts/check-twinkit-resolution`, and `scripts/test-check-twinkit-resolution`
+to exercise the check itself. The full rationale is in the script's docstring.
+
 ## Concurrent Agent Work Uses Git Worktrees
 
 When more than one agent session needs to work in this repo at the same time, each session runs in its own git worktree rather than sharing this checkout. Two sessions sharing one working tree will clobber each other the moment either one switches branches or rebases, since both operations rewrite the same working directory and index the other session may be mid-edit in.

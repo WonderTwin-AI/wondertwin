@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Fail if community emulators could resolve twinkit from the module proxy.
+
+WHAT THIS PROTECTS. After the domain engines leave the public kit (CTO-46), a
+community emulator importing one cannot compile: the root go.mod replaces
+twinkit with ./twinkit and the emulators have no go.mod of their own, so every
+import resolves against the working tree where the engine no longer exists.
+The build is the gate, which is why the CI denylist for those packages is dead
+code rather than defence.
+
+WHY IT NEEDS A CHECK. That safety rests on two facts nothing enforced:
+
+  1. the replace directive exists, and
+  2. no emulator has its own go.mod.
+
+Break either and imports resolve from proxy.golang.org instead, where
+twinkit@v0.1.0 is published and still serves every engine. The module proxy is
+append-only, so that version keeps serving them no matter what this repo does
+to its default branch. The protection would disappear with nobody noticing,
+because nothing fails: the code compiles, importing an engine that is supposed
+to be unreachable.
+
+Neither fact decays by accident. Both are actively targeted by work already in
+the backlog: CTO-7 (ship emulators as containers) and CTO-35 (extract twinkit
+as emulator-kit) push toward per-module layouts, and extraction specifically
+removes the reason for the replace. So this lands before CTO-35, not after, or
+the window opens with nobody watching it.
+
+This is the structural-rule-over-denylist move: check the invariant the safety
+depends on, rather than enumerating the imports it makes impossible.
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TWINKIT = "github.com/wondertwin-ai/wondertwin/twinkit"
+
+
+def replacement_for(gomod: Path, module: str) -> str | None:
+    """Return what go.mod replaces every version of `module` with, else None."""
+    try:
+        proc = subprocess.run(
+            ["go", "mod", "edit", "-json", str(gomod)],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as err:
+        sys.exit(f"check-twinkit-resolution: cannot run the go tool: {err}")
+    if proc.returncode != 0:
+        sys.exit(
+            f"check-twinkit-resolution: go could not parse {gomod}\n"
+            f"{proc.stderr.strip()}"
+        )
+    for entry in json.loads(proc.stdout).get("Replace") or []:
+        if entry["Old"]["Path"] == module and not entry["Old"].get("Version"):
+            return entry["New"]["Path"]
+    return None
+
+
+def main() -> int:
+    failures = []
+
+    gomod = ROOT / "go.mod"
+    if not gomod.exists():
+        sys.exit("check-twinkit-resolution: no go.mod at the repo root")
+    if replacement_for(gomod, TWINKIT) != "./twinkit":
+        failures.append(
+            "go.mod no longer replaces github.com/wondertwin-ai/wondertwin/twinkit\n"
+            "    with ./twinkit. Without it, emulator imports resolve from the module\n"
+            "    proxy, where twinkit@v0.1.0 still serves every domain engine, and a\n"
+            "    community emulator can link one and compile."
+        )
+
+    strays = sorted(
+        p.relative_to(ROOT).as_posix()
+        for p in ROOT.glob("twin-*/**/go.mod")
+    )
+    if strays:
+        failures.append(
+            "these emulator directories contain a go.mod, so the packages under\n"
+            "    them resolve twinkit from the module proxy rather than this working\n"
+            "    tree:\n      "
+            + "\n      ".join(strays)
+        )
+
+    if failures:
+        print("check-twinkit-resolution: FAIL")
+        for f in failures:
+            print(f"  - {f}")
+        print(
+            "\n  If this is a deliberate move to per-module emulators, the engine\n"
+            "  boundary stops being enforced by the compiler and needs a real import\n"
+            "  check first. See CTO-45 and CTO-46."
+        )
+        return 1
+
+    print(
+        f"check-twinkit-resolution: twinkit resolves from the working tree "
+        f"({len(list(ROOT.glob('twin-*/'))) } emulators, no stray go.mod)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
