@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Behavioural test for scripts/check-twinkit-resolution.
+
+Builds throwaway trees and drives the real script. Source-text assertions
+would be worthless: this check's failure mode is passing while the invariant
+is broken, and that output is identical to a genuine pass.
+
+Exit 0 when every case behaves, 1 on the first mismatch.
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().parent / "check-twinkit-resolution"
+FAILED = []
+
+GOMOD = """module github.com/wondertwin-ai/wondertwin
+
+go 1.25
+
+require github.com/wondertwin-ai/wondertwin/twinkit v0.1.0
+
+replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit
+"""
+
+
+def tree(tmp: str, *, replace: bool = True, stray: list[str] | None = None) -> Path:
+    root = Path(tmp)
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(CHECK, root / "scripts" / "check-twinkit-resolution")
+    (root / "twinkit").mkdir()
+    for name in ("twin-alpha", "twin-beta"):
+        (root / name).mkdir()
+    text = GOMOD if replace else GOMOD.replace(
+        "replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit\n", "")
+    (root / "go.mod").write_text(text)
+    for name in stray or []:
+        (root / name / "go.mod").write_text("module example.com/x\n\ngo 1.25\n")
+    return root
+
+
+def run(root: Path):
+    return subprocess.run(
+        [sys.executable, str(root / "scripts" / "check-twinkit-resolution")],
+        capture_output=True, text=True,
+    )
+
+
+def case(label, want_rc, want_text="", **kw):
+    with tempfile.TemporaryDirectory() as tmp:
+        r = run(tree(tmp, **kw))
+        out = r.stdout + r.stderr
+        if r.returncode != want_rc:
+            print(f"FAIL {label}: exit {r.returncode}, wanted {want_rc}\n{out}")
+            FAILED.append(label); return
+        if want_text and want_text not in out:
+            print(f"FAIL {label}: missing {want_text!r}\n{out}")
+            FAILED.append(label); return
+        print(f"ok   {label}")
+
+
+def main():
+    case("the healthy layout passes", 0, "resolves from the working tree")
+    # Condition 1. CTO-35 extraction removes the reason for this directive.
+    case("a missing replace directive fails", 1, "no longer replaces",
+         replace=False)
+    # Condition 2. CTO-7 containers push toward per-module emulators.
+    case("an emulator with its own go.mod fails", 1, "their own go.mod",
+         stray=["twin-alpha"])
+    case("the failing emulator is named", 1, "twin-alpha/go.mod",
+         stray=["twin-alpha"])
+    case("several stray go.mod files are all reported", 1, "twin-beta/go.mod",
+         stray=["twin-alpha", "twin-beta"])
+    # Both at once is the state CTO-35 plus CTO-7 would produce together.
+    case("both conditions broken fails", 1, "no longer replaces",
+         replace=False, stray=["twin-alpha"])
+
+    if FAILED:
+        print(f"test-check-twinkit-resolution: {len(FAILED)} failed")
+        sys.exit(1)
+    print("test-check-twinkit-resolution: pass")
+
+
+if __name__ == "__main__":
+    main()
