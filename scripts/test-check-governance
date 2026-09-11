@@ -104,8 +104,6 @@ def case(label, paths, message, want_rc, *want_text):
 def main():
     case("one emulator needs no citation",
          ["twin-alpha/a.txt"], "touch one", 0, "not fleet-shaped")
-    # The suggested skill has to be one that exists. A hand-sync restored a
-    # stale name here once; asserting the exit code alone let it print ok.
     case("two emulators without a citation fail",
          ["twin-alpha/a.txt", "twin-beta/b.txt"], "touch two", 1,
          "no `Skill:`", "Skill: sweep-fleet-hygiene")
@@ -132,6 +130,8 @@ def main():
          ["twinkit-pro/state.go"], "touch the pro kit", 1, "shared")
     case("a renamed kit is still recognised",
          ["emulator-kit/state.go"], "touch the renamed kit", 1, "shared")
+    case("a shared schema change alone is fleet-shaped",
+         ["schemas/twin.schema.json"], "touch the schemas", 1, "shared")
     case("an unrelated file needs no citation",
          ["docs/notes.md"], "unrelated", 0, "not fleet-shaped")
 
