@@ -160,10 +160,12 @@ allowlist fails, whether or not anything uses it. Adding a genuinely new
 primitive means adding its path to `ALLOWED_PACKAGES` in the script and saying
 why in the commit. Run it locally with `scripts/check-engine-boundary`.
 
-The gate is package-granular, not path-granular. It catches a new package
-directory, which is the shape an engine has, but a single `.go` file added to
-a package that is already allowlisted is indistinguishable from that package's
-own code to any path rule. That case is left to code review.
+The gate is a path rule, so it is package-granular, not file-granular. It
+catches a new package directory, nested or top-level, which is the shape an
+engine has and the shape the ledger arrived in. A single `.go` file added to a
+package that is already allowlisted is indistinguishable from that package's
+own code to any path rule. That case, and only that case, is left to code
+review.
 
 ## Concurrent Agent Work Uses Git Worktrees
 

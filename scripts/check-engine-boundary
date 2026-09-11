@@ -82,9 +82,6 @@ def packages() -> dict[str, PurePosixPath]:
     for path in tracked_files():
         if path.suffix != ".go":
             continue
-        # Go itself ignores testdata, so fixtures are not packages.
-        if "testdata" in path.parts:
-            continue
         rel = path.parent.relative_to(KIT).as_posix()
         found.setdefault("" if rel == "." else rel, path)
     return found
