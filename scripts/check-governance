@@ -40,7 +40,13 @@ CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 # pattern resolves correctly in each repo, so the copies are byte-identical and
 # any divergence is a plain diff. It also survives the twinkit to emulator-kit
 # rename rather than silently matching nothing afterwards.
-SHARED_DIR = re.compile(r"^(twinkit[a-z-]*|emulator-kit[a-z-]*|schemas)/")
+#
+# It does NOT pre-name the post-rename kit. CTO-56 has not settled the naming
+# scheme, so an alias for a guessed name would read as a decision that was
+# never made. The guard is the test instead: it asserts this pattern matches a
+# shared kit directory that actually exists in the repo, so a rename fails
+# loudly here rather than quietly ceasing to treat kit changes as fleet-shaped.
+SHARED_DIR = re.compile(r"^(twinkit[a-z-]*|schemas)/")
 
 
 def git(*args: str) -> str:

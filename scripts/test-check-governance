@@ -85,6 +85,28 @@ def run(root: Path):
     )
 
 
+def shared_kit() -> str:
+    """The shared kit directory this repo actually has.
+
+    Pinning the real name is the point. SHARED_DIR used to carry a guessed
+    alias for the post-CTO-56 name, which reads as a naming decision nobody
+    made. Asserting against the directory on disk means a rename fails here
+    instead of silently making kit changes stop counting as fleet-shaped,
+    which is a gate that quietly narrows rather than one that breaks.
+    """
+    root = Path(__file__).resolve().parent.parent
+    kits = sorted(
+        p.name for p in root.iterdir()
+        if p.is_dir() and (p.name.startswith("twinkit") or p.name == "schemas")
+    )
+    if not kits:
+        sys.exit(
+            "test-check-governance: no shared kit directory found; if it was "
+            "renamed, update SHARED_DIR in check-governance to match"
+        )
+    return kits[0]
+
+
 def case(label, paths, message, want_rc, *want_text):
     with tempfile.TemporaryDirectory() as tmp:
         root = repo(tmp)
@@ -128,8 +150,8 @@ def main():
          ["twinkit/state.go"], "touch the kit", 1, "shared")
     case("a shared pro kit change alone is fleet-shaped",
          ["twinkit-pro/state.go"], "touch the pro kit", 1, "shared")
-    case("a renamed kit is still recognised",
-         ["emulator-kit/state.go"], "touch the renamed kit", 1, "shared")
+    case("the kit in THIS repo is recognised as shared",
+         [f"{shared_kit()}/probe.go"], "touch this repo's kit", 1, "shared")
     case("a shared schema change alone is fleet-shaped",
          ["schemas/twin.schema.json"], "touch the schemas", 1, "shared")
     case("an unrelated file needs no citation",
