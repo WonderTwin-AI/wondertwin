@@ -40,7 +40,7 @@ TWINKIT = "github.com/wondertwin-ai/wondertwin/twinkit"
 
 
 def replacement_for(gomod: Path, module: str) -> str | None:
-    """Return what go.mod replaces `module` with, or None if it does not."""
+    """Return what go.mod replaces every version of `module` with, else None."""
     try:
         proc = subprocess.run(
             ["go", "mod", "edit", "-json", str(gomod)],
@@ -55,7 +55,7 @@ def replacement_for(gomod: Path, module: str) -> str | None:
             f"{proc.stderr.strip()}"
         )
     for entry in json.loads(proc.stdout).get("Replace") or []:
-        if entry["Old"]["Path"] == module:
+        if entry["Old"]["Path"] == module and not entry["Old"].get("Version"):
             return entry["New"]["Path"]
     return None
 

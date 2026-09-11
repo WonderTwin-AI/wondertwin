@@ -33,7 +33,15 @@ BLOCK_REPLACE = (
     "\tgithub.com/wondertwin-ai/wondertwin/twinkit => ./twinkit\n"
     ")\n"
 )
-FORMS = {"line": LINE_REPLACE, "block": BLOCK_REPLACE, "none": ""}
+PINNED_REPLACE = (
+    "replace github.com/wondertwin-ai/wondertwin/twinkit v0.0.1 => ./twinkit\n"
+)
+FORMS = {
+    "line": LINE_REPLACE,
+    "block": BLOCK_REPLACE,
+    "pinned": PINNED_REPLACE,
+    "none": "",
+}
 
 
 def tree(tmp: str, *, replace: str = "line", stray: list[str] | None = None) -> Path:
@@ -80,6 +88,10 @@ def main():
     # Condition 1. CTO-35 extraction removes the reason for this directive.
     case("a missing replace directive fails", 1, "no longer replaces",
          replace="none")
+    # A replace pinned to one version leaves every other version resolving from
+    # the proxy, so the require above it lands there.
+    case("a version-pinned replace fails", 1, "no longer replaces",
+         replace="pinned")
     # Condition 2. CTO-7 containers push toward per-module emulators.
     case("an emulator with its own go.mod fails", 1, "contain a go.mod",
          stray=["twin-alpha"])
