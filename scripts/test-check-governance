@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Behavioural test for scripts/check-governance.
+
+WHY THIS EXISTS. The case-insensitive `Skill: none` check landed once, was
+silently reverted a day later by a hand-sync between two copies of this
+script, and nothing caught it. The reverting commit asserted "the mechanism is
+unchanged". A fix with no executable guard survived less than 24 hours, and
+the failure was a gate that passes an unreasoned citation: it fails open,
+which is the direction that leaves no trace.
+
+Builds throwaway git repos and drives the real script. Source-text assertions
+would not have caught the revert, because the reverted file still contained
+the word "none".
+
+This file is copied verbatim into every emulator repo alongside the script it
+tests. Keep them byte-identical.
+
+Runs every case, then exits 0 when all of them behave and 1 when any did not.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().parent / "check-governance"
+# The throwaway repos have to be throwaway. Ambient config reaches into them
+# otherwise: commit.gpgsign with an unusable key, or a global core.hooksPath
+# with a failing pre-commit, makes setup exit non-zero and the whole harness
+# reports "setup failed" for a reason that has nothing to do with the gate.
+ENV = {
+    **os.environ,
+    "GIT_CONFIG_GLOBAL": os.devnull,
+    "GIT_CONFIG_SYSTEM": os.devnull,
+}
+FAILED = []
+
+
+def sh(cwd, *args):
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=ENV)
+    if r.returncode != 0:
+        # Setup breakage is a broken harness, not a case result. A silent
+        # failure here leaves `main...HEAD` empty, and every case that wants
+        # exit 0 then reports ok down the "no emulator touched" path.
+        sys.exit(
+            f"test-check-governance: setup failed ({' '.join(args)}) "
+            f"exit {r.returncode}\n{r.stdout}{r.stderr}"
+        )
+
+
+def repo(tmp: str) -> Path:
+    root = Path(tmp)
+    (root / "scripts").mkdir(parents=True)
+    shutil.copy2(CHECK, root / "scripts" / "check-governance")
+    sh(root, "git", "init", "-q", "-b", "main")
+    sh(root, "git", "config", "user.email", "t@example.com")
+    sh(root, "git", "config", "user.name", "T")
+    (root / "README.md").write_text("base\n")
+    sh(root, "git", "add", "-A")
+    sh(root, "git", "commit", "-qm", "base")
+    # The change has to live on a branch off main. Committing onto main itself
+    # makes `main...HEAD` empty, so every case reads as "no emulator touched"
+    # and passes for the wrong reason. That mistake produced one false ok here.
+    sh(root, "git", "checkout", "-q", "-b", "work")
+    return root
+
+
+def change(root: Path, paths, message: str):
+    for rel in paths:
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("x\n")
+    sh(root, "git", "add", "-A")
+    sh(root, "git", "commit", "-qm", message)
+
+
+def run(root: Path):
+    return subprocess.run(
+        [sys.executable, str(root / "scripts" / "check-governance"), "main", "HEAD"],
+        cwd=root, capture_output=True, text=True, env=ENV,
+    )
+
+
+def case(label, paths, message, want_rc, *want_text):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = repo(tmp)
+        change(root, paths, message)
+        r = run(root)
+        out = r.stdout + r.stderr
+        if r.returncode != want_rc:
+            print(f"FAIL {label}: exit {r.returncode}, wanted {want_rc}\n{out}")
+            FAILED.append(label); return
+        for want in want_text:
+            if want not in out:
+                print(f"FAIL {label}: output missing {want!r}\n{out}")
+                FAILED.append(label); return
+        print(f"ok   {label}")
+
+
+def main():
+    case("one emulator needs no citation",
+         ["twin-alpha/a.txt"], "touch one", 0, "not fleet-shaped")
+    case("two emulators without a citation fail",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"], "touch two", 1,
+         "no `Skill:`", "Skill: sweep-fleet-hygiene")
+    case("two emulators with a citation pass",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"],
+         "touch two\n\nSkill: sweep-fleet-hygiene", 0, "governed by")
+    case("a reasoned none passes",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"],
+         "touch two\n\nSkill: none (single-vendor SDK bump)", 0, "governed by")
+    # The regression. Each of these reverted once and shipped as passing.
+    case("bare none is rejected",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"],
+         "touch two\n\nSkill: none", 1, "must carry a reason")
+    case("capitalised None is rejected",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"],
+         "touch two\n\nSkill: None", 1, "must carry a reason")
+    case("upper-case NONE is rejected",
+         ["twin-alpha/a.txt", "twin-beta/b.txt"],
+         "touch two\n\nSkill: NONE", 1, "must carry a reason")
+    # Fleet-shaped by reach: the kit is shared, whatever it is called here.
+    case("a shared kit change alone is fleet-shaped",
+         ["twinkit/state.go"], "touch the kit", 1, "shared")
+    case("a shared pro kit change alone is fleet-shaped",
+         ["twinkit-pro/state.go"], "touch the pro kit", 1, "shared")
+    case("a renamed kit is still recognised",
+         ["emulator-kit/state.go"], "touch the renamed kit", 1, "shared")
+    case("a shared schema change alone is fleet-shaped",
+         ["schemas/twin.schema.json"], "touch the schemas", 1, "shared")
+    case("an unrelated file needs no citation",
+         ["docs/notes.md"], "unrelated", 0, "not fleet-shaped")
+
+    if FAILED:
+        print(f"test-check-governance: {len(FAILED)} failed")
+        sys.exit(1)
+    print("test-check-governance: pass")
+
+
+if __name__ == "__main__":
+    main()
