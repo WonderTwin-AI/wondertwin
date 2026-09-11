@@ -25,22 +25,29 @@ go 1.25
 
 require github.com/wondertwin-ai/wondertwin/twinkit v0.1.0
 
-replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit
 """
 
+LINE_REPLACE = "replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit\n"
+BLOCK_REPLACE = (
+    "replace (\n"
+    "\tgithub.com/wondertwin-ai/wondertwin/twinkit => ./twinkit\n"
+    ")\n"
+)
+FORMS = {"line": LINE_REPLACE, "block": BLOCK_REPLACE, "none": ""}
 
-def tree(tmp: str, *, replace: bool = True, stray: list[str] | None = None) -> Path:
+
+def tree(tmp: str, *, replace: str = "line", stray: list[str] | None = None) -> Path:
     root = Path(tmp)
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(CHECK, root / "scripts" / "check-twinkit-resolution")
     (root / "twinkit").mkdir()
     for name in ("twin-alpha", "twin-beta"):
         (root / name).mkdir()
-    text = GOMOD if replace else GOMOD.replace(
-        "replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit\n", "")
-    (root / "go.mod").write_text(text)
-    for name in stray or []:
-        (root / name / "go.mod").write_text("module example.com/x\n\ngo 1.25\n")
+    (root / "go.mod").write_text(GOMOD + FORMS[replace])
+    for rel in stray or []:
+        path = root / rel / "go.mod"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("module example.com/x\n\ngo 1.25\n")
     return root
 
 
@@ -66,19 +73,28 @@ def case(label, want_rc, want_text="", **kw):
 
 def main():
     case("the healthy layout passes", 0, "resolves from the working tree")
+    # go.mod's grouped form is as effective as the single-line one, and is what
+    # a contributor writes when a second replace arrives.
+    case("a block-form replace passes", 0, "resolves from the working tree",
+         replace="block")
     # Condition 1. CTO-35 extraction removes the reason for this directive.
     case("a missing replace directive fails", 1, "no longer replaces",
-         replace=False)
+         replace="none")
     # Condition 2. CTO-7 containers push toward per-module emulators.
-    case("an emulator with its own go.mod fails", 1, "their own go.mod",
+    case("an emulator with its own go.mod fails", 1, "contain a go.mod",
          stray=["twin-alpha"])
     case("the failing emulator is named", 1, "twin-alpha/go.mod",
          stray=["twin-alpha"])
     case("several stray go.mod files are all reported", 1, "twin-beta/go.mod",
          stray=["twin-alpha", "twin-beta"])
+    # A go.mod anywhere under an emulator carves that subtree out of the root
+    # module, which is the same escape at a deeper path.
+    case("a nested go.mod under an emulator fails", 1,
+         "twin-alpha/internal/engine/go.mod",
+         stray=["twin-alpha/internal/engine"])
     # Both at once is the state CTO-35 plus CTO-7 would produce together.
     case("both conditions broken fails", 1, "no longer replaces",
-         replace=False, stray=["twin-alpha"])
+         replace="none", stray=["twin-alpha"])
 
     if FAILED:
         print(f"test-check-twinkit-resolution: {len(FAILED)} failed")

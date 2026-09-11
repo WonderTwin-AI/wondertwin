@@ -30,15 +30,34 @@ This is the structural-rule-over-denylist move: check the invariant the safety
 depends on, rather than enumerating the imports it makes impossible.
 """
 
-import re
+import json
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPLACE = re.compile(
-    r"^\s*replace\s+github\.com/wondertwin-ai/wondertwin/twinkit\s*=>\s*\./twinkit\s*$",
-    re.MULTILINE,
-)
+TWINKIT = "github.com/wondertwin-ai/wondertwin/twinkit"
+
+
+def replacement_for(gomod: Path, module: str) -> str | None:
+    """Return what go.mod replaces `module` with, or None if it does not."""
+    try:
+        proc = subprocess.run(
+            ["go", "mod", "edit", "-json", str(gomod)],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as err:
+        sys.exit(f"check-twinkit-resolution: cannot run the go tool: {err}")
+    if proc.returncode != 0:
+        sys.exit(
+            f"check-twinkit-resolution: go could not parse {gomod}\n"
+            f"{proc.stderr.strip()}"
+        )
+    for entry in json.loads(proc.stdout).get("Replace") or []:
+        if entry["Old"]["Path"] == module:
+            return entry["New"]["Path"]
+    return None
 
 
 def main() -> int:
@@ -47,7 +66,7 @@ def main() -> int:
     gomod = ROOT / "go.mod"
     if not gomod.exists():
         sys.exit("check-twinkit-resolution: no go.mod at the repo root")
-    if not REPLACE.search(gomod.read_text()):
+    if replacement_for(gomod, TWINKIT) != "./twinkit":
         failures.append(
             "go.mod no longer replaces github.com/wondertwin-ai/wondertwin/twinkit\n"
             "    with ./twinkit. Without it, emulator imports resolve from the module\n"
@@ -57,12 +76,13 @@ def main() -> int:
 
     strays = sorted(
         p.relative_to(ROOT).as_posix()
-        for p in ROOT.glob("twin-*/go.mod")
+        for p in ROOT.glob("twin-*/**/go.mod")
     )
     if strays:
         failures.append(
-            "these emulators have their own go.mod, so they resolve twinkit from\n"
-            "    the module proxy rather than this working tree:\n      "
+            "these emulator directories contain a go.mod, so the packages under\n"
+            "    them resolve twinkit from the module proxy rather than this working\n"
+            "    tree:\n      "
             + "\n      ".join(strays)
         )
 
