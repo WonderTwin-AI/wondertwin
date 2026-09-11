@@ -126,9 +126,8 @@ When anything goes wrong (CI failure, missing file, wrong enum, broken test), im
 ## Fleet-shaped changes record their governing skill
 
 A change touching two or more `twin-*` directories, or anything under a shared
-directory — `twinkit/` or `schemas/` here, any `twinkit*` or `emulator-kit*`
-directory in the sibling repos the gate is copied into — is fleet-shaped: it
-reaches emulators beyond the one in front of you. CI requires a skill citation
+directory (`twinkit/` or `schemas/` here, `twinkit-pro/` in the commercial
+repo) is fleet-shaped: it reaches emulators beyond the one in front of you. CI requires a skill citation
 naming the skill that governed it.
 
 ```
