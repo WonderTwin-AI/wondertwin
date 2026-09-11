@@ -1,12 +1,19 @@
 // Package scripts_test covers the repo's CI gate scripts by running them.
 //
 // check-engine-boundary is the durable fix for CTO-46, so the thing that
-// must not rot is the gate's own behaviour: a refactor that collapsed a
-// nested path to its top-level component, or an extra name appended to
-// ALLOWED_PACKAGES, would reopen the hole while CI still printed green.
-// These cases execute the real script against a throwaway git index
-// rather than reading its source, because a gate is only worth what it
-// exits with.
+// must not rot is the gate's own behaviour. These cases execute the real
+// script against a throwaway git index rather than reading its source,
+// because a gate is only worth what it exits with.
+//
+// What they pin: that a nested path is not collapsed to its top-level
+// component, that the kit root is covered, that testdata is not exempt,
+// and that an empty read fails instead of reporting clean.
+//
+// What they do not pin is the allowlist's contents. They probe four
+// names, so an appended entry is caught only where it collides with one
+// of those. That is by design rather than a gap to close: adding a name
+// is the gate's deliberate escape hatch, and what forces the decision
+// into review is the commit that adds it, not this suite.
 package scripts_test
 
 import (

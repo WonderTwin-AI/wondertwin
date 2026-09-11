@@ -54,9 +54,18 @@ jobs:
               echo "::error::$twin declares tier '$tier'; every twin in this repo must be community"
               exit 1
             fi
-            if deps=$(go list -deps "./$twin/..." | grep -E "$forbidden"); then
+            # Resolve first, judge second. Folding these together let a twin
+            # go list could not resolve -- one with its own go.mod, say --
+            # read as "no forbidden imports", because the `if` shields the
+            # assignment from errexit and grep finds nothing in empty input.
+            deps=$(go list -deps "./$twin/...") || deps=""
+            if [ -z "$deps" ]; then
+              echo "::error::$twin resolved no packages; the tier check did not run, so it is not clean"
+              exit 1
+            fi
+            if linked=$(printf '%s\n' "$deps" | grep -E "$forbidden"); then
               echo "::error::$twin links forbidden packages:"
-              echo "$deps"
+              echo "$linked"
               exit 1
             fi
           done
