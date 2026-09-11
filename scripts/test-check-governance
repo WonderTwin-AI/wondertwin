@@ -15,7 +15,7 @@ the word "none".
 This file is copied verbatim into every emulator repo alongside the script it
 tests. Keep them byte-identical.
 
-Exit 0 when every case behaves, 1 on the first mismatch.
+Runs every case, then exits 0 when all of them behave and 1 when any did not.
 """
 
 from __future__ import annotations

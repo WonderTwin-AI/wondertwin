@@ -125,10 +125,11 @@ When anything goes wrong (CI failure, missing file, wrong enum, broken test), im
 
 ## Fleet-shaped changes record their governing skill
 
-A change touching two or more `twin-*` directories, or anything under
-`twinkit/` or `schemas/`, is fleet-shaped: it reaches emulators beyond the one
-in front of you. CI requires a skill citation naming the skill that governed
-it.
+A change touching two or more `twin-*` directories, or anything under a shared
+directory — `twinkit/` or `schemas/` here, any `twinkit*` or `emulator-kit*`
+directory in the sibling repos the gate is copied into — is fleet-shaped: it
+reaches emulators beyond the one in front of you. CI requires a skill citation
+naming the skill that governed it.
 
 ```
 Skill: sweep-fleet-hygiene
@@ -144,7 +145,8 @@ This exists because a four-emulator sweep once shipped while the sweep and
 synthesis skills sat unused, and the omission left no trace to review. The
 requirement is that the choice is auditable, not that it is approved, so a
 reasoned `none` passes. Run it locally with
-`scripts/check-governance origin/main HEAD`.
+`scripts/check-governance origin/main HEAD`; `scripts/test-check-governance`
+drives the gate against throwaway repos and runs in CI on every change.
 
 ## Concurrent Agent Work Uses Git Worktrees
 
