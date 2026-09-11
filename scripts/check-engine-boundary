@@ -32,11 +32,14 @@ review. What the rule does catch is a new package directory, nested or
 top-level, which is the shape an engine actually has and the shape the
 ledger arrived in.
 
-WHY TRACKED FILES ONLY. Reading the index rather than the filesystem
-makes a local run mean what CI's run means. Walking the worktree failed
-on a .DS_Store, which is line 1 of this repo's .gitignore and which
-Finder writes just for opening the directory, and a gate that cries wolf
-locally is one people learn to skip.
+WHY THE INDEX, AND WHAT THAT COSTS. This reads git ls-files, not the
+worktree. Walking the worktree failed on a .DS_Store, which is line 1 of
+this repo's .gitignore and which Finder writes just for opening the
+directory, and a gate that cries wolf locally is one people learn to
+skip. The cost is the mirror image, and it is real: an engine you have
+copied in but not yet git added is invisible here, so a local run can
+print green on a tree CI will reject. Stage it first, or CI will see
+what your local run did not.
 
 Usage:  scripts/check-engine-boundary
 """

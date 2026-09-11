@@ -39,12 +39,14 @@ jobs:
         run: go run ./cmd/validate-schemas/
 
       - name: Enforce tier bright lines
-        # Community twins never link commercial code or domain engines
-        # (CTO-45 / CTO-50). Structural check: the declared tier plus the
-        # actual dependency graph via go list, not a source grep.
+        # Community twins never link commercial code (CTO-45 / CTO-50).
+        # Structural check: the declared tier plus the actual dependency
+        # graph via go list, not a source grep. Domain engines are not
+        # named here; the engine boundary below covers them structurally,
+        # and a second copy of that list would only drift.
         run: |
           set -euo pipefail
-          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events)(/|$)'
+          forbidden='github.com/wondertwin-ai/wondertwin-pro/'
           for dir in twin-*/; do
             twin="${dir%/}"
             tier=$(jq -r .tier "$twin/twin-manifest.json")
