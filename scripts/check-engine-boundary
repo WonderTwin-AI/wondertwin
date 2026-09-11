@@ -23,6 +23,13 @@ exact member of ALLOWED_PACKAGES. The kit root is covered by the same
 rule and not a second one: a stray twinkit/ledger.go makes the root a
 package whose relative path is "", which is not a member.
 
+Testdata is not exempt, though Go itself ignores it. The exemption that
+used to be here matched any path component, so it did not wave through a
+fixture, it waved through a subtree: twinkit/ledger/testdata/engine.go
+and twinkit/testdata/ledger/engine.go both passed. A genuine testdata
+package goes on ALLOWED_PACKAGES by its exact relative path, like any
+other package.
+
 WHAT THIS DOES NOT CATCH, SAID PLAINLY. This is a path rule, so it is
 package-granular, not file-granular. A single .go file smuggled into a
 package that is already allowlisted -- twinkit/twincore/ledger.go, say --
