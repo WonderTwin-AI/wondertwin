@@ -1,5 +1,22 @@
 # twin-TEMPLATE
 
+> **Using this template: delete `go.mod` when you copy it.**
+>
+> The template carries its own `go.mod` for one reason: it makes this
+> directory a separate module, so `go build ./...` at the repo root does not
+> try to compile `twin-TEMPLATE` placeholders. Dependabot tracks it from
+> there too.
+>
+> A real emulator has no `go.mod`. All ten community emulators are part of
+> the root module, which is what makes the engine boundary enforceable by the
+> compiler: the root `go.mod` replaces `twinkit` with `./twinkit`, so an
+> emulator importing a package that is not in the public kit fails to build.
+> Give an emulator its own `go.mod` and it resolves from the module proxy
+> instead, where `twinkit@v0.1.0` still serves every domain engine.
+>
+> `scripts/check-twinkit-resolution` fails CI on any `twin-*/go.mod`, so this
+> is caught rather than discovered later.
+
 WonderTwin behavioral twin for the **Your Service** API.
 
 ## Covered Resources

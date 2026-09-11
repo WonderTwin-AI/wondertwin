@@ -20,14 +20,28 @@ Runs every case, then exits 0 when all of them behave and 1 when any did not.
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 CHECK = Path(__file__).resolve().parent / "check-governance"
+
+
+def _gate():
+    loader = SourceFileLoader("check_governance", str(CHECK))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+KIT_DIR = re.compile(f"^{_gate().KIT_DIR}$")
 # The throwaway repos have to be throwaway. Ambient config reaches into them
 # otherwise: commit.gpgsign with an unusable key, or a global core.hooksPath
 # with a failing pre-commit, makes setup exit non-zero and the whole harness
@@ -85,6 +99,27 @@ def run(root: Path):
     )
 
 
+def shared_kit() -> str:
+    """The shared kit directory this repo actually has.
+
+    Pinning the real name is the point. SHARED_DIR used to carry a guessed
+    alias for the post-CTO-56 name, which reads as a naming decision nobody
+    made. Asserting against the directory on disk means a rename fails here
+    instead of silently making kit changes stop counting as fleet-shaped,
+    which is a gate that quietly narrows rather than one that breaks.
+    """
+    root = Path(__file__).resolve().parent.parent
+    kits = sorted(
+        p.name for p in root.iterdir() if p.is_dir() and KIT_DIR.match(p.name)
+    )
+    if not kits:
+        sys.exit(
+            "test-check-governance: KIT_DIR in check-governance matches no "
+            "directory in this repo; if the kit was renamed, update KIT_DIR"
+        )
+    return kits[0]
+
+
 def case(label, paths, message, want_rc, *want_text):
     with tempfile.TemporaryDirectory() as tmp:
         root = repo(tmp)
@@ -128,8 +163,8 @@ def main():
          ["twinkit/state.go"], "touch the kit", 1, "shared")
     case("a shared pro kit change alone is fleet-shaped",
          ["twinkit-pro/state.go"], "touch the pro kit", 1, "shared")
-    case("a renamed kit is still recognised",
-         ["emulator-kit/state.go"], "touch the renamed kit", 1, "shared")
+    case("the kit in THIS repo is recognised as shared",
+         [f"{shared_kit()}/probe.go"], "touch this repo's kit", 1, "shared")
     case("a shared schema change alone is fleet-shaped",
          ["schemas/twin.schema.json"], "touch the schemas", 1, "shared")
     case("an unrelated file needs no citation",
