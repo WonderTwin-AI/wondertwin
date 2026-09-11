@@ -419,7 +419,7 @@
         },
         "changelog": {
           "type": "string",
-          "description": "Release notes for this version, as markdown. Rendered on /docs/twins/<vendor>/releases and used as the GitHub release body.",
+          "description": "Release notes for this version, as markdown. Rendered on /docs/twins/<vendor>/releases and used as the GitHub release body, and copied verbatim into the public registry entry, so it must not name internal or commercial-tier components.",
           "minLength": 1
         },
         "announcement_url": {
