@@ -20,14 +20,28 @@ Runs every case, then exits 0 when all of them behave and 1 when any did not.
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 CHECK = Path(__file__).resolve().parent / "check-governance"
+
+
+def _gate():
+    loader = SourceFileLoader("check_governance", str(CHECK))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+KIT_DIR = re.compile(f"^{_gate().KIT_DIR}$")
 # The throwaway repos have to be throwaway. Ambient config reaches into them
 # otherwise: commit.gpgsign with an unusable key, or a global core.hooksPath
 # with a failing pre-commit, makes setup exit non-zero and the whole harness
@@ -96,13 +110,12 @@ def shared_kit() -> str:
     """
     root = Path(__file__).resolve().parent.parent
     kits = sorted(
-        p.name for p in root.iterdir()
-        if p.is_dir() and p.name.startswith("twinkit")
+        p.name for p in root.iterdir() if p.is_dir() and KIT_DIR.match(p.name)
     )
     if not kits:
         sys.exit(
-            "test-check-governance: no shared kit directory found; if it was "
-            "renamed, update SHARED_DIR in check-governance to match"
+            "test-check-governance: KIT_DIR in check-governance matches no "
+            "directory in this repo; if the kit was renamed, update KIT_DIR"
         )
     return kits[0]
 

@@ -45,7 +45,8 @@ CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 # never made. The guard is the test instead: it asserts this pattern matches a
 # shared kit directory that actually exists in the repo, so a rename fails
 # loudly here rather than quietly ceasing to treat kit changes as fleet-shaped.
-SHARED_DIR = re.compile(r"^(twinkit[a-z-]*|schemas)/")
+KIT_DIR = r"twinkit[a-z-]*"
+SHARED_DIR = re.compile(rf"^({KIT_DIR}|schemas)/")
 
 
 def git(*args: str) -> str:
