@@ -38,8 +38,7 @@ CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 # line that had to be reconciled by hand on every change. It was mis-reconciled
 # twice in two days, once losing the case-insensitive `none` check below. A
 # pattern resolves correctly in each repo, so the copies are byte-identical and
-# any divergence is a plain diff. It also survives the twinkit to emulator-kit
-# rename rather than silently matching nothing afterwards.
+# any divergence is a plain diff.
 #
 # It does NOT pre-name the post-rename kit. CTO-56 has not settled the naming
 # scheme, so an alias for a guessed name would read as a decision that was

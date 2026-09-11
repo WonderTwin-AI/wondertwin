@@ -97,7 +97,7 @@ def shared_kit() -> str:
     root = Path(__file__).resolve().parent.parent
     kits = sorted(
         p.name for p in root.iterdir()
-        if p.is_dir() and (p.name.startswith("twinkit") or p.name == "schemas")
+        if p.is_dir() and p.name.startswith("twinkit")
     )
     if not kits:
         sys.exit(
