@@ -148,6 +148,32 @@ reasoned `none` passes. Run it locally with
 `scripts/check-governance origin/main HEAD`; `scripts/test-check-governance`
 drives the gate against throwaway repos and runs in CI on every change.
 
+## The public kit carries primitives, not domain engines
+
+`twinkit/` is an allowlist. A store, a clock, seeded randomness and transport
+shims are primitives and belong here. Double-entry, period close and approval
+graphs are semantics and ship in the commercial kit: if the caller can be
+wrong about it, it is not a primitive.
+
+CI enforces this by presence, not by imports, because the ledger engine sat on
+the public default branch for months with no consumer to give it away
+(CTO-46). Any Go package directory under `twinkit/` that is not on the
+allowlist fails, whether or not anything uses it. Adding a genuinely new
+primitive means adding its path to `ALLOWED_PACKAGES` in the script and saying
+why in the commit. Run it locally with `scripts/check-engine-boundary`.
+
+It reads the git index, not the worktree. An engine you have copied in but
+not yet `git add`ed is invisible here, so a local run can print green on a
+tree CI will reject. Stage it first, or CI will see what your local run did
+not.
+
+The gate is a path rule, so it is package-granular, not file-granular. It
+catches a new package directory, nested or top-level, which is the shape an
+engine has and the shape the ledger arrived in. A single `.go` file added to a
+package that is already allowlisted is indistinguishable from that package's
+own code to any path rule. That case, and only that case, is left to code
+review.
+
 ## Concurrent Agent Work Uses Git Worktrees
 
 When more than one agent session needs to work in this repo at the same time, each session runs in its own git worktree rather than sharing this checkout. Two sessions sharing one working tree will clobber each other the moment either one switches branches or rebases, since both operations rewrite the same working directory and index the other session may be mid-edit in.

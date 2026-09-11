@@ -42,12 +42,14 @@ jobs:
         run: go run ./cmd/validate-schemas/
 
       - name: Enforce tier bright lines
-        # Community twins never link commercial code or domain engines
-        # (CTO-45 / CTO-50). Structural check: the declared tier plus the
-        # actual dependency graph via go list, not a source grep.
+        # Community twins never link commercial code (CTO-45 / CTO-50).
+        # Structural check: the declared tier plus the actual dependency
+        # graph via go list, not a source grep. Domain engines are not
+        # named here; the engine boundary below covers them structurally,
+        # and a second copy of that list would only drift.
         run: |
           set -euo pipefail
-          forbidden='github.com/wondertwin-ai/wondertwin-pro/|github.com/wondertwin-ai/wondertwin/twinkit/(contract|ledger|workspace|messaging|search|events)(/|$)'
+          forbidden='github.com/wondertwin-ai/wondertwin-pro/'
           for dir in twin-*/; do
             twin="${dir%/}"
             tier=$(jq -r .tier "$twin/twin-manifest.json")
@@ -55,13 +57,39 @@ jobs:
               echo "::error::$twin declares tier '$tier'; every twin in this repo must be community"
               exit 1
             fi
-            if deps=$(go list -deps "./$twin/..." | grep -E "$forbidden"); then
+            # Resolve first, judge second. Folding these together let a twin
+            # go list could not resolve -- one with its own go.mod, say --
+            # read as "no forbidden imports", because the `if` shields the
+            # assignment from errexit and grep finds nothing in empty input.
+            deps=$(go list -deps "./$twin/...") || deps=""
+            if [ -z "$deps" ]; then
+              echo "::error::$twin resolved no packages; the tier check did not run, so it is not clean"
+              exit 1
+            fi
+            if linked=$(printf '%s\n' "$deps" | grep -E "$forbidden"); then
               echo "::error::$twin links forbidden packages:"
-              echo "$deps"
+              echo "$linked"
               exit 1
             fi
           done
           echo "Tier bright lines hold for all twins"
+
+      - name: Enforce the engine boundary
+        # The import gate above only catches an engine a twin USES. It does
+        # not stop an engine being re-added to the public kit with no
+        # consumer yet, which is exactly how the ledger engine came to sit
+        # on the public default branch for months (CTO-46). The script is a
+        # presence check: it allowlists the primitive packages the public kit
+        # may carry and fails on any other Go package under twinkit/.
+        #
+        # Coupling worth not rediscovering: presence covers engine IMPORTS
+        # only while the root go.mod keeps `replace ... => ./twinkit` and the
+        # community twins stay in the root module, which is what forces every
+        # twinkit import to resolve against this working tree. Give a twin its
+        # own go.mod and it resolves from the proxy instead, where twinkit
+        # v0.1.0 still serves every deleted engine, and an import-level check
+        # becomes load-bearing again.
+        run: ./scripts/check-engine-boundary
 
       - name: Build wt CLI
         run: go build ./cmd/wt/
