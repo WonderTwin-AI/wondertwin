@@ -91,11 +91,16 @@ def packages() -> dict[str, PurePosixPath]:
 
 
 def main() -> int:
-    if not (ROOT / KIT).is_dir():
-        print(f"check-engine-boundary: FAIL, no kit directory at {ROOT / KIT}")
+    found = packages()
+    if not found:
+        print(
+            f"check-engine-boundary: FAIL, read no Go packages under {KIT}/.\n"
+            f"  An empty read is not a clean kit. Either {ROOT / KIT} is not\n"
+            f"  there, or git ls-files returned nothing for it. Refusing to\n"
+            f"  report clean on evidence this run does not have."
+        )
         return 1
 
-    found = packages()
     offenders = sorted(set(found) - ALLOWED_PACKAGES)
     if not offenders:
         print(

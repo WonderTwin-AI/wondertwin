@@ -11,6 +11,7 @@ package scripts_test
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,8 @@ var allowlistedKit = []string{
 	"admin", "twincore", "state", "sim", "webhook", "testutil",
 	"pagination", "identity", "graphql", "grpc", "soap", "ws",
 }
+
+const kitGoMod = "module github.com/wondertwin-ai/wondertwin/twinkit\n\ngo 1.26.6\n"
 
 func write(t *testing.T, path, content string) {
 	t.Helper()
@@ -46,10 +49,10 @@ func git(t *testing.T, root string, args ...string) {
 	}
 }
 
-// newKit builds a throwaway repo holding a clean, fully allowlisted kit and
-// a copy of the gate, then stages it. The gate resolves twinkit/ relative to
-// its own parent's parent, so the copy has to sit at <root>/scripts/.
-func newKit(t *testing.T, extra map[string]string) string {
+// newRepo builds a throwaway repo holding the given files and a copy of the
+// gate, then stages it. The gate resolves twinkit/ relative to its own
+// parent's parent, so the copy has to sit at <root>/scripts/.
+func newRepo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
 
@@ -63,18 +66,24 @@ func newKit(t *testing.T, extra map[string]string) string {
 		t.Fatal(err)
 	}
 
-	write(t, filepath.Join(root, "twinkit", "go.mod"),
-		"module github.com/wondertwin-ai/wondertwin/twinkit\n\ngo 1.26.6\n")
-	for _, pkg := range allowlistedKit {
-		write(t, filepath.Join(root, "twinkit", pkg, "doc.go"), "package "+pkg+"\n")
-	}
-	for path, content := range extra {
+	for path, content := range files {
 		write(t, filepath.Join(root, filepath.FromSlash(path)), content)
 	}
 
 	git(t, root, "init", "-q")
 	git(t, root, "add", "-A")
 	return root
+}
+
+// newKit builds a repo whose kit is clean and fully allowlisted, plus extra.
+func newKit(t *testing.T, extra map[string]string) string {
+	t.Helper()
+	files := map[string]string{"twinkit/go.mod": kitGoMod}
+	for _, pkg := range allowlistedKit {
+		files["twinkit/"+pkg+"/doc.go"] = "package " + pkg + "\n"
+	}
+	maps.Copy(files, extra)
+	return newRepo(t, files)
 }
 
 func runGate(t *testing.T, root string) int {
@@ -131,14 +140,6 @@ func TestEngineBoundary(t *testing.T) {
 			extra: map[string]string{"twinkit/testutil/testdata/fixture.go": "package testdata\n"},
 			want:  1,
 		},
-		{
-			// The documented residual gap, asserted so it stays a known
-			// gap rather than quietly widening: the gate is a path rule,
-			// so it is package-granular, not file-granular.
-			name:  "a go file inside an allowlisted package passes",
-			extra: map[string]string{"twinkit/state/journal.go": "package state\n"},
-			want:  0,
-		},
 	}
 
 	for _, tc := range tests {
@@ -150,18 +151,19 @@ func TestEngineBoundary(t *testing.T) {
 	}
 }
 
-// An unstaged engine is invisible to the gate, which is the cost the
-// docstring names: it reads the index, not the worktree. Asserted so the
-// claim and the behaviour cannot drift apart again.
-func TestEngineBoundaryOnlySeesTheIndex(t *testing.T) {
-	root := newKit(t, nil)
-	write(t, filepath.Join(root, "twinkit", "ledger", "engine.go"), "package ledger\n")
+// A kit that yields no Go packages means the gate did not read what it
+// claims to have read, so it must not report clean. Without this floor the
+// gate prints "no domain engines in the public kit" on zero evidence.
+func TestEngineBoundaryFailsOnAnEmptyRead(t *testing.T) {
+	t.Run("kit present but holding no Go package", func(t *testing.T) {
+		if got := runGate(t, newRepo(t, map[string]string{"twinkit/go.mod": kitGoMod})); got != 1 {
+			t.Errorf("gate exit = %d, want 1", got)
+		}
+	})
 
-	if got := runGate(t, root); got != 0 {
-		t.Errorf("unstaged engine: gate exit = %d, want 0", got)
-	}
-	git(t, root, "add", "-A")
-	if got := runGate(t, root); got != 1 {
-		t.Errorf("staged engine: gate exit = %d, want 1", got)
-	}
+	t.Run("no kit at all", func(t *testing.T) {
+		if got := runGate(t, newRepo(t, map[string]string{"go.mod": kitGoMod})); got != 1 {
+			t.Errorf("gate exit = %d, want 1", got)
+		}
+	})
 }

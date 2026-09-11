@@ -69,6 +69,14 @@ jobs:
         # on the public default branch for months (CTO-46). The script is a
         # presence check: it allowlists the primitive packages the public kit
         # may carry and fails on any other Go package under twinkit/.
+        #
+        # Coupling worth not rediscovering: presence covers engine IMPORTS
+        # only while the root go.mod keeps `replace ... => ./twinkit` and the
+        # community twins stay in the root module, which is what forces every
+        # twinkit import to resolve against this working tree. Give a twin its
+        # own go.mod and it resolves from the proxy instead, where twinkit
+        # v0.1.0 still serves every deleted engine, and an import-level check
+        # becomes load-bearing again.
         run: ./scripts/check-engine-boundary
 
       - name: Build wt CLI

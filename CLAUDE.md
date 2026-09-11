@@ -160,6 +160,11 @@ allowlist fails, whether or not anything uses it. Adding a genuinely new
 primitive means adding its path to `ALLOWED_PACKAGES` in the script and saying
 why in the commit. Run it locally with `scripts/check-engine-boundary`.
 
+It reads the git index, not the worktree. An engine you have copied in but
+not yet `git add`ed is invisible here, so a local run can print green on a
+tree CI will reject. Stage it first, or CI will see what your local run did
+not.
+
 The gate is a path rule, so it is package-granular, not file-granular. It
 catches a new package directory, nested or top-level, which is the shape an
 engine has and the shape the ledger arrived in. A single `.go` file added to a
