@@ -30,14 +30,17 @@ const maxDepth = 8
 // current value is a string ID with the resolver's full object for that ID,
 // recursing into nested paths (e.g. "latest_invoice.payment_intent" expands
 // latest_invoice, then expands payment_intent within the resulting object).
+// A field whose value is already an embedded object rather than an ID
+// string (e.g. invoice.lines, subscription.items) is left as-is, but any
+// subpaths are still walked into it.
 //
 // List envelopes ({"object": "list", "data": [...]}) use the "data.<field>"
 // convention: a path of "data.customer" expands the customer field of every
 // item in the data array.
 //
-// Fields that are absent, not strings, or unresolved by the Resolver are
-// left unchanged. body is mutated and returned for convenience; a nil body,
-// nil resolver, or empty paths list is a no-op.
+// Fields that are absent or unresolved by the Resolver are left unchanged.
+// body is mutated and returned for convenience; a nil body, nil resolver,
+// or empty paths list is a no-op.
 func Apply(body map[string]any, paths []string, resolver Resolver) map[string]any {
 	if body == nil || resolver == nil || len(paths) == 0 {
 		return body
