@@ -3,7 +3,7 @@
   "vendor_domain": "stripe.com",
   "tier": "community",
   "category": "payments",
-  "description": "Simulates the Stripe API \u2014 Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs with webhook delivery.",
+  "description": "Simulates the Stripe API \u2014 Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs with webhook delivery. Responses support the `expand[]` request parameter (including nested paths like `latest_invoice.payment_intent` and list responses via `data.<field>`), resolving any known object ID regardless of endpoint-specific allowlists.",
   "sdk_target": {
     "primary": {
       "package": "github.com/stripe/stripe-go",
@@ -127,6 +127,6 @@
   "lifecycle": {
     "release_type": "stable",
     "maintenance_status": "active",
-    "changelog": "Architecture release: the twin now builds on the tagged twinkit v0.1.0 library and carries auditable provenance. No API surface changes.\n\n### Changed\n- Publisher is now `localstack`: this twin is published by LocalStack (CTO-50)\n- Removed internal lifecycle wiring that duplicated the handlers and store: invoice, subscription and payment_intent lifecycles were already owned there; behavior is unchanged and covered by the existing tests and conformance checks\n- Provenance now points at the pinned research archive: OpenAPI spec pinned to commit 3b6451b (2026-04-22.dahlia) with sha256, recorded as the conformance reference; the twin's generation target remains stripe-go v81 / API 2024-12-18\n- Built against twinkit v0.1.0 (first tagged release) instead of an untagged checkout\n"
+    "changelog": "Architecture release: the twin now builds on the tagged twinkit v0.1.0 library and carries auditable provenance. No API surface changes.\n\n### Changed\n- Publisher is now `localstack`: this twin is published by LocalStack (CTO-50)\n- Removed the internal workspace engine wiring: invoice, subscription and payment_intent lifecycles were already owned by the handlers and store; behavior is unchanged and covered by the existing tests and conformance checks\n- Provenance now points at the pinned research archive: OpenAPI spec pinned to commit 3b6451b (2026-04-22.dahlia) with sha256, recorded as the conformance reference; the twin's generation target remains stripe-go v81 / API 2024-12-18\n- Built against twinkit v0.1.0 (first tagged release) instead of an untagged checkout\n"
   }
 }
