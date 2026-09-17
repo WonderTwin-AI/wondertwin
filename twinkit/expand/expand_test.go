@@ -140,3 +140,58 @@ func TestApply_EmptyStringIDIgnored(t *testing.T) {
 		t.Errorf("expected empty-string ID left untouched, got %v", body["customer"])
 	}
 }
+
+// TestApply_AlreadyEmbeddedObjectWalksDeeper covers fields that are never a
+// lazily-expandable ID reference to begin with - real Stripe embeds some
+// sub-resources directly (invoice.lines, subscription.items) as a
+// {object, data, ...} list wrapper. A path like "lines.data.price" must
+// still walk into that embedded structure and expand within it, even
+// though there is no ID to resolve at "lines" itself.
+func TestApply_AlreadyEmbeddedObjectWalksDeeper(t *testing.T) {
+	resolver := mapResolver{
+		"price_1": {"id": "price_1", "object": "price", "unit_amount": float64(1000)},
+	}
+	body := map[string]any{
+		"id":     "in_1",
+		"object": "invoice",
+		"lines": map[string]any{
+			"object": "list",
+			"data": []any{
+				map[string]any{"id": "il_1", "price": "price_1"},
+			},
+		},
+	}
+
+	Apply(body, []string{"lines.data.price"}, resolver)
+
+	lines := body["lines"].(map[string]any)
+	data := lines["data"].([]any)
+	item := data[0].(map[string]any)
+	price, ok := item["price"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected nested price expanded within embedded lines.data, got %T: %v", item["price"], item["price"])
+	}
+	if price["unit_amount"] != float64(1000) {
+		t.Errorf("expected expanded price unit_amount, got %v", price["unit_amount"])
+	}
+}
+
+// TestApply_AlreadyEmbeddedObjectNoSubpathIsNoop covers requesting the
+// embedded field itself with nothing further after it: there is nothing to
+// substitute (it's already the full object), so this must be a harmless
+// no-op rather than an error or a dropped field.
+func TestApply_AlreadyEmbeddedObjectNoSubpathIsNoop(t *testing.T) {
+	body := map[string]any{
+		"id":    "in_1",
+		"lines": map[string]any{"object": "list", "data": []any{}},
+	}
+	Apply(body, []string{"lines"}, mapResolver{})
+
+	lines, ok := body["lines"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected lines to remain an embedded object, got %T", body["lines"])
+	}
+	if lines["object"] != "list" {
+		t.Errorf("expected embedded object left intact, got %v", lines)
+	}
+}

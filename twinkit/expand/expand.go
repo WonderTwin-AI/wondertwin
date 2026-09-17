@@ -91,17 +91,30 @@ func applyGroups(body map[string]any, groups map[string][]string, resolver Resol
 		if !ok {
 			continue
 		}
-		id, ok := raw.(string)
-		if !ok || id == "" {
-			continue
-		}
-		resolved, ok := resolver.Resolve(id)
-		if !ok {
-			continue
-		}
-		body[field] = resolved
-		if len(subpaths) > 0 {
-			applyGroups(resolved, groupPaths(subpaths), resolver, depth+1)
+
+		switch v := raw.(type) {
+		case string:
+			if v == "" {
+				continue
+			}
+			resolved, ok := resolver.Resolve(v)
+			if !ok {
+				continue
+			}
+			body[field] = resolved
+			if len(subpaths) > 0 {
+				applyGroups(resolved, groupPaths(subpaths), resolver, depth+1)
+			}
+		case map[string]any:
+			// Already an embedded object rather than a lazily-expandable ID
+			// reference (e.g. Stripe's always-embedded list sub-resources
+			// like invoice.lines or subscription.items). There is nothing
+			// to substitute, but a deeper path still needs to walk into it
+			// (e.g. "lines.data.price" reaches the list-envelope handling
+			// above on the next recursion).
+			if len(subpaths) > 0 {
+				applyGroups(v, groupPaths(subpaths), resolver, depth+1)
+			}
 		}
 	}
 }
