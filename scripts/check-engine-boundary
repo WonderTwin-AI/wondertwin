@@ -69,6 +69,12 @@ ALLOWED_PACKAGES = frozenset(
         "grpc",
         "soap",
         "ws",
+        # Mechanical response-expansion primitive: resolves an ID string to
+        # its object, same category as webhook/pagination. It enforces no
+        # per-endpoint expandable-fields policy -- that strict, validating
+        # behavior is a commercial-kit concern (twinkit-pro/expand), not
+        # this package's.
+        "expand",
     }
 )
 

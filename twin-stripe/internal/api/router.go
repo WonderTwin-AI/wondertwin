@@ -32,6 +32,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
 		r.Use(h.mw.FaultInjection)
+		// Stripe-style expand[] response expansion
+		r.Use(h.expandMiddleware)
 
 		// Customers
 		r.Post("/customers", h.CreateCustomer)
