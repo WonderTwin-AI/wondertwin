@@ -11,6 +11,11 @@ on:
         description: "Version string without v prefix (e.g., 0.1.0)"
         required: true
         type: string
+      dry_run:
+        description: "Build, scan and diff only. Publishes nothing."
+        required: false
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -49,7 +54,38 @@ jobs:
           rm -f "${RUNNER_TEMP}/syft-install.sh"
           syft version
 
+      - name: Check the tag and release do not already exist
+        working-directory: wondertwin
+        env:
+          GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # A published version is immutable. Fail here with a readable
+          # message rather than letting the tag push reject opaquely, or
+          # worse, letting a force push rewrite what customers resolved.
+          TAG="twin-${TWIN}-v${VERSION}"
+          FOUND=""
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            FOUND="tag ${TAG}"
+          fi
+          if gh release view "$TAG" --repo wondertwin-ai/registry >/dev/null 2>&1; then
+            FOUND="${FOUND:+${FOUND} and }release ${TAG}"
+          fi
+          if [ -n "$FOUND" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::${FOUND} already published; a real run would stop here."
+            else
+              echo "::error::${FOUND} already published. Bump the version."
+              exit 1
+            fi
+          else
+            echo "${TAG} is unpublished; proceeding."
+          fi
+
       - name: Create and push twin tag
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
@@ -58,8 +94,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TAG="twin-${TWIN}-v${VERSION}"
-          git tag -f "$TAG"
-          git push origin -f "$TAG"
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Build binaries
         working-directory: wondertwin
@@ -104,6 +140,7 @@ jobs:
           osv-scanner --sbom="dist/twin-${TWIN}-${VERSION}.cdx.json"
 
       - name: Create release
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
@@ -139,7 +176,24 @@ jobs:
             --checksums-file dist/checksums.txt \
             --registry-file "$REGISTRY_FILE"
 
+      - name: Show the registry.json diff a real run would push
+        if: ${{ inputs.dry_run }}
+        working-directory: registry
+        run: |
+          {
+            echo "### Dry run: registry.json diff"
+            echo
+            if git diff --quiet -- registry.json; then
+              echo "No change to \`registry.json\`."
+            else
+              echo '```diff'
+              git --no-pager diff -- registry.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Push registry update
+        if: ${{ !inputs.dry_run }}
         working-directory: registry
         env:
           TWIN: ${{ inputs.twin }}
@@ -155,7 +209,41 @@ jobs:
             git push
           fi
 
+      # -- Post-release validation ------------------------------------------
+      # Skipped on a dry run: these install the twin from the registry, and
+      # a dry run deliberately publishes nothing for them to install.
+      - name: Build wt CLI from source
+        if: ${{ !inputs.dry_run }}
+        working-directory: wondertwin
+        run: go build -o ./wt-test ./cmd/wt/
+
+      - name: Clear local twin cache
+        if: ${{ !inputs.dry_run }}
+        run: rm -rf ~/.wondertwin/bin/
+
+      - name: Install the just-released twin
+        if: ${{ !inputs.dry_run }}
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: ./wt-test install "${TWIN}@${VERSION}"
+
+      - name: Run conformance on installed twin
+        if: ${{ !inputs.dry_run }}
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: ./wt-test conformance ~/.wondertwin/bin/twin-"${TWIN}"
+
+      # -- Post-validation bookkeeping --------------------------------------
+      # Runs last on purpose. Mirroring is bookkeeping, not a release gate,
+      # and when it ran before validation a failure here skipped the install
+      # and conformance checks entirely. That is how twin-measure shipped
+      # unverified on 2026-05-08. The SBOM is read from the workspace, which
+      # "Clear local twin cache" does not touch.
       - name: Mirror SBOM to wondertwin-docs
+        if: ${{ !inputs.dry_run }}
         env:
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
@@ -183,24 +271,3 @@ jobs:
             git commit -m "sbom: twin-${TWIN} v${VERSION} (community)"
             git push
           fi
-
-      # -- Post-release validation ------------------------------------------
-      - name: Build wt CLI from source
-        working-directory: wondertwin
-        run: go build -o ./wt-test ./cmd/wt/
-
-      - name: Clear local twin cache
-        run: rm -rf ~/.wondertwin/bin/
-
-      - name: Install the just-released twin
-        working-directory: wondertwin
-        env:
-          TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
-        run: ./wt-test install "${TWIN}@${VERSION}"
-
-      - name: Run conformance on installed twin
-        working-directory: wondertwin
-        env:
-          TWIN: ${{ inputs.twin }}
-        run: ./wt-test conformance ~/.wondertwin/bin/twin-"${TWIN}"
