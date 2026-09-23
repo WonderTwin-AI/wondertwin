@@ -11,6 +11,11 @@ on:
         description: "Version string without v prefix (e.g., 0.1.0)"
         required: true
         type: string
+      dry_run:
+        description: "Build, scan and diff only. Publishes nothing."
+        required: false
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -55,6 +60,7 @@ jobs:
           GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           # A published version is immutable. Fail here with a readable
           # message rather than letting the tag push reject opaquely, or
@@ -68,12 +74,18 @@ jobs:
             FOUND="${FOUND:+${FOUND} and }release ${TAG}"
           fi
           if [ -n "$FOUND" ]; then
-            echo "::error::${FOUND} already published. Bump the version."
-            exit 1
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::${FOUND} already published; a real run would stop here."
+            else
+              echo "::error::${FOUND} already published. Bump the version."
+              exit 1
+            fi
+          else
+            echo "${TAG} is unpublished; proceeding."
           fi
-          echo "${TAG} is unpublished; proceeding."
 
       - name: Create and push twin tag
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
@@ -128,6 +140,7 @@ jobs:
           osv-scanner --sbom="dist/twin-${TWIN}-${VERSION}.cdx.json"
 
       - name: Create release
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
@@ -163,7 +176,24 @@ jobs:
             --checksums-file dist/checksums.txt \
             --registry-file "$REGISTRY_FILE"
 
+      - name: Show the registry.json diff a real run would push
+        if: ${{ inputs.dry_run }}
+        working-directory: registry
+        run: |
+          {
+            echo "### Dry run: registry.json diff"
+            echo
+            if git diff --quiet -- registry.json; then
+              echo "No change to \`registry.json\`."
+            else
+              echo '```diff'
+              git --no-pager diff -- registry.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Push registry update
+        if: ${{ !inputs.dry_run }}
         working-directory: registry
         env:
           TWIN: ${{ inputs.twin }}
@@ -180,14 +210,19 @@ jobs:
           fi
 
       # -- Post-release validation ------------------------------------------
+      # Skipped on a dry run: these install the twin from the registry, and
+      # a dry run deliberately publishes nothing for them to install.
       - name: Build wt CLI from source
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         run: go build -o ./wt-test ./cmd/wt/
 
       - name: Clear local twin cache
+        if: ${{ !inputs.dry_run }}
         run: rm -rf ~/.wondertwin/bin/
 
       - name: Install the just-released twin
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
@@ -195,6 +230,7 @@ jobs:
         run: ./wt-test install "${TWIN}@${VERSION}"
 
       - name: Run conformance on installed twin
+        if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
@@ -207,6 +243,7 @@ jobs:
       # unverified on 2026-05-08. The SBOM is read from the workspace, which
       # "Clear local twin cache" does not touch.
       - name: Mirror SBOM to wondertwin-docs
+        if: ${{ !inputs.dry_run }}
         env:
           TWIN: ${{ inputs.twin }}
           VERSION: ${{ inputs.version }}
