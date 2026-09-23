@@ -62,6 +62,12 @@ Every new community twin must include all of the following before pushing.
 3. **Full suite clean**: `go test ./... -short` — ensure no regressions in other twins
 4. **Binary compiles**: `go build -o /dev/null ./twin-{name}/cmd/twin-{name}/`
 
+**no-mistakes gate — Claude-subscription toggle.** `claude` (when configured as
+the review agent) normally routes through bifrost -> Venice. Toggle to Tela's
+real Claude subscription with `no-mistakes-claude-mode {subscription|bifrost|status}`
+(no daemon restart needed). Mechanism and rationale:
+[`dotfiles/docs/decisions.md`](../dotfiles/docs/decisions.md) (2026-09-21).
+
 ### Community twins in this repo
 stripe, posthog, resend, twilio, logodev, slack, github, shopify, linear, hubspot
 
