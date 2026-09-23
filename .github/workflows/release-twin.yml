@@ -49,6 +49,30 @@ jobs:
           rm -f "${RUNNER_TEMP}/syft-install.sh"
           syft version
 
+      - name: Check the tag and release do not already exist
+        working-directory: wondertwin
+        env:
+          GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # A published version is immutable. Fail here with a readable
+          # message rather than letting the tag push reject opaquely, or
+          # worse, letting a force push rewrite what customers resolved.
+          TAG="twin-${TWIN}-v${VERSION}"
+          FOUND=""
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            FOUND="tag ${TAG}"
+          fi
+          if gh release view "$TAG" --repo wondertwin-ai/registry >/dev/null 2>&1; then
+            FOUND="${FOUND:+${FOUND} and }release ${TAG}"
+          fi
+          if [ -n "$FOUND" ]; then
+            echo "::error::${FOUND} already published. Bump the version."
+            exit 1
+          fi
+          echo "${TAG} is unpublished; proceeding."
+
       - name: Create and push twin tag
         working-directory: wondertwin
         env:
@@ -58,8 +82,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TAG="twin-${TWIN}-v${VERSION}"
-          git tag -f "$TAG"
-          git push origin -f "$TAG"
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Build binaries
         working-directory: wondertwin
