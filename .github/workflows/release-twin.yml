@@ -179,6 +179,33 @@ jobs:
             git push
           fi
 
+      # -- Post-release validation ------------------------------------------
+      - name: Build wt CLI from source
+        working-directory: wondertwin
+        run: go build -o ./wt-test ./cmd/wt/
+
+      - name: Clear local twin cache
+        run: rm -rf ~/.wondertwin/bin/
+
+      - name: Install the just-released twin
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          VERSION: ${{ inputs.version }}
+        run: ./wt-test install "${TWIN}@${VERSION}"
+
+      - name: Run conformance on installed twin
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: ./wt-test conformance ~/.wondertwin/bin/twin-"${TWIN}"
+
+      # -- Post-validation bookkeeping --------------------------------------
+      # Runs last on purpose. Mirroring is bookkeeping, not a release gate,
+      # and when it ran before validation a failure here skipped the install
+      # and conformance checks entirely. That is how twin-measure shipped
+      # unverified on 2026-05-08. The SBOM is read from the workspace, which
+      # "Clear local twin cache" does not touch.
       - name: Mirror SBOM to wondertwin-docs
         env:
           TWIN: ${{ inputs.twin }}
@@ -207,24 +234,3 @@ jobs:
             git commit -m "sbom: twin-${TWIN} v${VERSION} (community)"
             git push
           fi
-
-      # -- Post-release validation ------------------------------------------
-      - name: Build wt CLI from source
-        working-directory: wondertwin
-        run: go build -o ./wt-test ./cmd/wt/
-
-      - name: Clear local twin cache
-        run: rm -rf ~/.wondertwin/bin/
-
-      - name: Install the just-released twin
-        working-directory: wondertwin
-        env:
-          TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
-        run: ./wt-test install "${TWIN}@${VERSION}"
-
-      - name: Run conformance on installed twin
-        working-directory: wondertwin
-        env:
-          TWIN: ${{ inputs.twin }}
-        run: ./wt-test conformance ~/.wondertwin/bin/twin-"${TWIN}"
