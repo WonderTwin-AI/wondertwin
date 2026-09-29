@@ -74,3 +74,12 @@ func TestDecline_VisaTestMethodSucceedsAndAttaches(t *testing.T) {
 		t.Fatalf("expected an issuer-decline card to be refused on attach, got %v", e)
 	}
 }
+
+func TestTestMethod_BypassPendingSucceeds(t *testing.T) {
+	_, tc := setupStripe(t)
+	pi := stripeForm(t, tc, "POST", "/v1/payment_intents",
+		url.Values{"amount": {"5000"}, "currency": {"usd"}, "confirm": {"true"}, "payment_method": {"pm_card_bypassPending"}}, nil).assertStatus(200).json()
+	if pi["status"] != "succeeded" {
+		t.Fatalf("expected succeeded, got %v", pi["status"])
+	}
+}

@@ -183,7 +183,8 @@ const cases = {
   async 'stripe-connect-transfer'() {
     const account = await stripe.accounts.create({type: 'express', country: 'US', email: 'seller@example.com'});
     assert.equal(account.object, 'account');
-    const charge = await stripe.paymentIntents.create({amount: 5000, currency: 'usd', payment_method: 'pm_card_visa', confirm: true, payment_method_types: ['card']});
+    // Transfers draw on the available balance; this test method funds it directly.
+    const charge = await stripe.paymentIntents.create({amount: 5000, currency: 'usd', payment_method: 'pm_card_bypassPending', confirm: true, payment_method_types: ['card']});
     assert.equal(charge.status, 'succeeded');
     const transfer = await stripe.transfers.create({amount: 1000, currency: 'usd', destination: account.id});
     assert.equal(transfer.destination, account.id);

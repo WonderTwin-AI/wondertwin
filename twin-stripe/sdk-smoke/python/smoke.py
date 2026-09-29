@@ -233,11 +233,12 @@ def case_idempotent_retry():
 def case_connect_transfer():
     account = v1.accounts.create({"type": "express", "country": "US", "email": "seller@example.com"})
     eq(account.object, "account", "account")
+    # Transfers draw on the available balance; this test method funds it directly.
     pi = v1.payment_intents.create(
         {
             "amount": 5000,
             "currency": "usd",
-            "payment_method": "pm_card_visa",
+            "payment_method": "pm_card_bypassPending",
             "confirm": True,
             "payment_method_types": ["card"],
         }
