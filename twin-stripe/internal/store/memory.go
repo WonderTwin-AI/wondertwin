@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // MemoryStore holds all Stripe twin state in memory.
@@ -140,8 +140,9 @@ func New() *MemoryStore {
 	}
 }
 
-// ActiveEndpoints returns all enabled webhook endpoints, implementing webhook.EndpointProvider.
-func (s *MemoryStore) ActiveEndpoints() []webhook.Endpoint {
+// StripeEndpoints returns the enabled webhook endpoints, implementing
+// webhook.EndpointSource.
+func (s *MemoryStore) StripeEndpoints() []webhook.Endpoint {
 	all := s.WebhookEndpoints.Filter(func(_ string, we WebhookEndpoint) bool {
 		return we.Status == "enabled"
 	})
@@ -150,8 +151,8 @@ func (s *MemoryStore) ActiveEndpoints() []webhook.Endpoint {
 		endpoints = append(endpoints, webhook.Endpoint{
 			URL:           we.URL,
 			Secret:        we.Secret,
+			APIVersion:    we.APIVersion,
 			EnabledEvents: we.EnabledEvents,
-			Enabled:       true,
 		})
 	}
 	return endpoints

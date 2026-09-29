@@ -8,19 +8,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
+
+// EventPublisher delivers a Stripe event object to webhook endpoints.
+type EventPublisher interface {
+	Publish(event map[string]any)
+}
 
 // Handler holds all API handler state.
 type Handler struct {
 	store      *store.MemoryStore
-	dispatcher *webhook.Dispatcher
+	dispatcher EventPublisher
 	mw         *twincore.Middleware
 	apiVersion string
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
+func NewHandler(s *store.MemoryStore, d EventPublisher, mw *twincore.Middleware) *Handler {
 	return &Handler{store: s, dispatcher: d, mw: mw}
 }
 

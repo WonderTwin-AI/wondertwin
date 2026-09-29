@@ -7,10 +7,10 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
@@ -22,7 +22,7 @@ func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	// callers (whsec_, client_secret, promo codes) produce stable
 	// output across runs.
 	memStore.Rand = twin.Rand
-	dispatcher := webhook.NewDispatcher(webhook.Config{})
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{Endpoints: memStore, Clock: memStore.Clock})
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)

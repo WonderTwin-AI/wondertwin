@@ -176,7 +176,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 		h.store.PaymentIntents.Set(piID, pi)
 		h.store.CreditBalance("", currency, amount)
 		h.store.RecordBalanceTransaction("charge", chargeID, currency, amount, 0)
-		h.dispatcher.Enqueue("payment_intent.succeeded", mapFromJSON(pi))
+		h.emitEvent("payment_intent.succeeded", mapFromJSON(pi))
 
 		cs.PaymentIntent = piID
 		cs.PaymentStatus = "paid"
@@ -219,7 +219,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 			invoiceID := h.createSubscriptionInvoice(&sub, items)
 			sub.LatestInvoice = invoiceID
 			h.store.Subscriptions.Set(subID, sub)
-			h.dispatcher.Enqueue("customer.subscription.created", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.created", mapFromJSON(sub))
 
 			cs.Subscription = subID
 		}
@@ -229,7 +229,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 	cs.Status = "complete"
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
-	h.dispatcher.Enqueue("checkout.session.completed", mapFromJSON(cs))
+	h.emitEvent("checkout.session.completed", mapFromJSON(cs))
 	twincore.JSON(w, http.StatusOK, cs)
 }
 

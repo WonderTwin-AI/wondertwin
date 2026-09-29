@@ -69,7 +69,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 		if sub.Status == "trialing" && sub.TrialEnd > 0 && now >= sub.TrialEnd {
 			sub.Status = "active"
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 		}
 
 		// Active + cancel_at_period_end + past period_end → Canceled.
@@ -77,7 +77,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 			sub.Status = "canceled"
 			sub.CanceledAt = now
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.deleted", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
 		}
 
 		// Active + past period_end → Renew (advance period, create invoice).
@@ -97,7 +97,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 			}
 
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 		}
 
 		if changed {

@@ -24,18 +24,9 @@ func (h *Handler) emitEvent(eventType string, objectData map[string]any) {
 	}
 	h.store.Events.Set(id, evt)
 
-	// Enqueue webhook delivery
+	// Deliver to matching webhook endpoints
 	if h.dispatcher != nil {
-		h.dispatcher.Enqueue(eventType, map[string]any{
-			"id":               evt.ID,
-			"object":           "event",
-			"type":             evt.Type,
-			"data":             evt.Data,
-			"api_version":      evt.APIVersion,
-			"created":          evt.Created,
-			"livemode":         evt.Livemode,
-			"pending_webhooks": evt.PendingWebhooks,
-		})
+		h.dispatcher.Publish(mapFromJSON(evt))
 	}
 }
 

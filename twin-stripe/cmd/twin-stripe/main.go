@@ -22,7 +22,6 @@ import (
 	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	pkgwebhook "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 func main() {
@@ -41,18 +40,15 @@ func main() {
 		webhookSecret = "whsec_sim_test_secret"
 	}
 
-	// Webhook dispatcher with Stripe v1 signing
-	dispatcher := pkgwebhook.NewDispatcher(pkgwebhook.Config{
-		URL:         cfg.WebhookURL,
-		Secret:      webhookSecret,
-		Signer:      stripewh.NewStripeSigner(memStore.Clock),
-		Logger:      twin.Logger,
-		EventPrefix: "evt",
-		AutoDeliver: cfg.WebhookURL != "",
+	// Webhook delivery: Stripe event objects, signed, to every endpoint
+	// registered through the API and to --webhook-url if given.
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{
+		URL:       cfg.WebhookURL,
+		Secret:    webhookSecret,
+		Endpoints: memStore,
+		Clock:     memStore.Clock,
+		Logger:    twin.Logger,
 	})
-
-	// Wire MemoryStore as endpoint provider for multi-endpoint webhook delivery
-	dispatcher.SetEndpointProvider(memStore)
 
 	// API handlers
 	apiHandler := api.NewHandler(memStore, dispatcher, twin.Middleware())
