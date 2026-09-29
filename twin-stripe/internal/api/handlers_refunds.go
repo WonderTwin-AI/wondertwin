@@ -11,7 +11,7 @@ import (
 
 func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -27,7 +27,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 	} else if piID != "" {
 		pi, ok := h.store.PaymentIntents.Get(piID)
 		if !ok {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such payment_intent: "+piID)
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such payment_intent: "+piID)
 			return
 		}
 		if pi.LatestCharge != "" {
@@ -37,7 +37,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Must provide charge or payment_intent.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Must provide charge or payment_intent.")
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if amount > ch.Amount-ch.AmountRefunded {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
 			"Refund amount is greater than the unrefunded amount.")
 		return
 	}
@@ -88,7 +88,7 @@ func (h *Handler) GetRefund(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ref, ok := h.store.Refunds.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such refund: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such refund: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, ref)

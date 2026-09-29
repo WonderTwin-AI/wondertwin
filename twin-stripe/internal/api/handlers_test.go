@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
@@ -68,7 +69,11 @@ func TestStripeAuthRequired(t *testing.T) {
 	// No auth header → 401
 	resp := tc.Get("/v1/accounts")
 	resp.AssertStatus(401)
-	resp.AssertBodyContains("api_key_required")
+	// Stripe's missing-key error carries no code.
+	resp.AssertBodyContains("You did not provide an API key.")
+	if strings.Contains(string(resp.Body), `"code"`) {
+		t.Errorf("expected no code on the missing-key error, got %s", resp.Body)
+	}
 }
 
 func TestCreateAndGetAccount(t *testing.T) {

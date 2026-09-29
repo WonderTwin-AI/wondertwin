@@ -11,14 +11,14 @@ import (
 
 func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	currency := r.FormValue("currency")
 	if amountStr == "" || currency == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: amount, currency.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "amount", "currency"))
 		return
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
@@ -60,7 +60,7 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		// Check card behavior for test cards.
 		behavior := h.checkCardBehavior(pm)
 		if !behavior.Succeed && behavior.DeclineCode != "" {
-			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+			stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
 			return
 		}
 		if behavior.RequiresAction {
@@ -97,16 +97,16 @@ func (h *Handler) UpdatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status == "succeeded" || pi.Status == "canceled" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+", which is not updatable.")
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -143,7 +143,7 @@ func (h *Handler) GetPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, pi)
@@ -153,11 +153,11 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status != "requires_payment_method" && pi.Status != "requires_confirmation" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+", which is not confirmable.")
 		return
 	}
@@ -171,7 +171,7 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	// Check card behavior for test cards.
 	behavior := h.checkCardBehavior(pi.PaymentMethod)
 	if !behavior.Succeed && behavior.DeclineCode != "" {
-		twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
 		return
 	}
 	if behavior.RequiresAction {
@@ -208,11 +208,11 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status != "requires_capture" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+". Only a PaymentIntent with status requires_capture can be captured.")
 		return
 	}
@@ -226,7 +226,7 @@ func (h *Handler) CapturePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if captureAmount > pi.Amount {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "amount_too_large",
 			"Capture amount exceeds the authorized amount.")
 		return
 	}
@@ -259,11 +259,11 @@ func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status == "succeeded" || pi.Status == "canceled" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+", which is not cancelable.")
 		return
 	}

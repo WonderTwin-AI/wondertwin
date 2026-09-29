@@ -12,14 +12,14 @@ import (
 // CreateCharge handles POST /v1/charges (direct charge creation).
 func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	currency := r.FormValue("currency")
 	if amountStr == "" || currency == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: amount, currency.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "amount", "currency"))
 		return
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
@@ -27,7 +27,7 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	// Check card behavior if source is a payment method.
 	if source := r.FormValue("source"); source != "" {
 		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.DeclineCode != "" {
-			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+			stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
 			return
 		}
 	}
@@ -61,11 +61,11 @@ func (h *Handler) UpdateCharge(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ch, ok := h.store.Charges.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -88,7 +88,7 @@ func (h *Handler) GetCharge(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ch, ok := h.store.Charges.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, ch)

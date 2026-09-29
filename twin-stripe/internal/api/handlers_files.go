@@ -40,7 +40,7 @@ func writeUploadParseError(w http.ResponseWriter, err error) {
 	if errors.As(err, &maxErr) {
 		msg = fmt.Sprintf("Request exceeds the maximum size of %d bytes.", maxErr.Limit)
 	}
-	twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
+	stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", msg)
 }
 
 func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,7 @@ func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 
 	purpose := r.FormValue("purpose")
 	if purpose == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: purpose.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: purpose.")
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	f, ok := h.store.Files.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, f)
@@ -145,13 +145,13 @@ func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateFileLink(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	fileID := r.FormValue("file")
 	if fileID == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: file.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: file.")
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *Handler) GetFileLink(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	fl, ok := h.store.FileLinks.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file_link: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file_link: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, fl)
@@ -188,11 +188,11 @@ func (h *Handler) UpdateFileLink(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	fl, ok := h.store.FileLinks.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file_link: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such file_link: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 

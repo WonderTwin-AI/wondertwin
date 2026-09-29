@@ -10,13 +10,13 @@ import (
 
 func (h *Handler) CreateWebhookEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	url := r.FormValue("url")
 	if url == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: url.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: url.")
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *Handler) GetWebhookEndpoint(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	we, ok := h.store.WebhookEndpoints.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, we)
@@ -56,11 +56,11 @@ func (h *Handler) UpdateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 	we, ok := h.store.WebhookEndpoints.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *Handler) UpdateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) DeleteWebhookEndpoint(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.store.WebhookEndpoints.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such webhook_endpoint: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "webhook_endpoint", "deleted": true})

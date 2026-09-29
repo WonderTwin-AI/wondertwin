@@ -16,33 +16,33 @@ import (
 // Stripe SDK: transfer.New(params)
 func (h *Handler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	if amountStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: amount.")
 		return
 	}
 	amount, err := strconv.ParseInt(amountStr, 10, 64)
 	if err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Invalid integer: "+amountStr)
 		return
 	}
 
 	destination := r.FormValue("destination")
 	if destination == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: destination.")
 		return
 	}
 
 	// Verify destination account exists
 	if _, ok := h.store.Accounts.Get(destination); !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing",
 			"No such account: '"+destination+"'")
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) GetTransfer(w http.ResponseWriter, r *http.Request) {
 
 	transfer, ok := h.store.Transfers.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such transfer: '"+id+"'")
 		return

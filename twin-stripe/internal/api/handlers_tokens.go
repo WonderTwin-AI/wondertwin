@@ -14,7 +14,7 @@ import (
 
 func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	tok, ok := h.store.Tokens.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
 			"No such token: '"+id+"'")
 		return
 	}
@@ -82,13 +82,13 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateSource(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	srcType := r.FormValue("type")
 	if srcType == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: type.")
 		return
 	}
@@ -128,7 +128,7 @@ func (h *Handler) GetSource(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	src, ok := h.store.Sources.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
 			"No such source: '"+id+"'")
 		return
 	}
@@ -139,13 +139,13 @@ func (h *Handler) UpdateSource(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	src, ok := h.store.Sources.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
 			"No such source: '"+id+"'")
 		return
 	}
 
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *Handler) GetMandate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	mandate, ok := h.store.Mandates.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
 			"No such mandate: '"+id+"'")
 		return
 	}
@@ -176,7 +176,7 @@ func (h *Handler) GetConfirmationToken(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ct, ok := h.store.ConfirmationTokens.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing",
 			"No such confirmation token: '"+id+"'")
 		return
 	}

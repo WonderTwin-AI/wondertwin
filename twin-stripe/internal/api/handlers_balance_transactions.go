@@ -31,7 +31,7 @@ func (h *Handler) GetBalanceTransaction(w http.ResponseWriter, r *http.Request) 
 
 	bt, ok := h.store.BalanceTransactions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such balance transaction: '"+id+"'")
 		return

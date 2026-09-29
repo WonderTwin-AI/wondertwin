@@ -12,7 +12,7 @@ import (
 
 func (h *Handler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -38,7 +38,7 @@ func (h *Handler) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cus, ok := h.store.Customers.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, cus)
@@ -48,11 +48,11 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cus, ok := h.store.Customers.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.store.Customers.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
 

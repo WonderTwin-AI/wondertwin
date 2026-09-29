@@ -12,14 +12,14 @@ import (
 
 func (h *Handler) CreateCreditNote(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	invoice := r.FormValue("invoice")
 	amountStr := r.FormValue("amount")
 	if invoice == "" || amountStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: invoice, amount.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "invoice", "amount"))
 		return
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
@@ -61,7 +61,7 @@ func (h *Handler) GetCreditNote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cn, ok := h.store.CreditNotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such credit note: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such credit note: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, cn)
@@ -79,11 +79,11 @@ func (h *Handler) VoidCreditNote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cn, ok := h.store.CreditNotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such credit note: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such credit note: "+id)
 		return
 	}
 	if cn.Status == "void" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Credit note is already void.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Credit note is already void.")
 		return
 	}
 	cn.Status = "void"
@@ -96,7 +96,7 @@ func (h *Handler) PreviewCreditNote(w http.ResponseWriter, r *http.Request) {
 	invoice := r.URL.Query().Get("invoice")
 	amountStr := r.URL.Query().Get("amount")
 	if invoice == "" || amountStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: invoice, amount.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "invoice", "amount"))
 		return
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)

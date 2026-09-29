@@ -12,13 +12,13 @@ import (
 
 func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	customer := r.FormValue("customer")
 	if customer == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	if couponID := r.FormValue("discounts[0][coupon]"); couponID != "" {
 		coup, ok := h.store.Coupons.Get(couponID)
 		if !ok {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
 			return
 		}
 		if coup.PercentOff > 0 {
@@ -136,16 +136,16 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	if inv.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_editable",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_editable",
 			"Invoice is not a draft. Only draft invoices can be updated.")
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *Handler) GetInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, inv)
@@ -181,11 +181,11 @@ func (h *Handler) FinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	if inv.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_draft", "Invoice is not a draft.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_draft", "Invoice is not a draft.")
 		return
 	}
 	inv.Status = "open"
@@ -201,11 +201,11 @@ func (h *Handler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	if inv.Status != "open" && inv.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_sendable",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_sendable",
 			"Invoice status is "+inv.Status+", which is not sendable.")
 		return
 	}
@@ -223,11 +223,11 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	if inv.Status != "open" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_open", "Invoice is not open.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_open", "Invoice is not open.")
 		return
 	}
 
@@ -273,11 +273,11 @@ func (h *Handler) VoidInvoice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inv, ok := h.store.Invoices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoice: "+id)
 		return
 	}
 	if inv.Status != "open" && inv.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_voidable", "Invoice cannot be voided.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_voidable", "Invoice cannot be voided.")
 		return
 	}
 	inv.Status = "void"
@@ -306,13 +306,13 @@ func (h *Handler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateInvoiceItem(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	customer := r.FormValue("customer")
 	if customer == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
 
@@ -357,7 +357,7 @@ func (h *Handler) GetInvoiceItem(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ii, ok := h.store.InvoiceItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoiceitem: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoiceitem: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, ii)
@@ -366,7 +366,7 @@ func (h *Handler) GetInvoiceItem(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteInvoiceItem(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.store.InvoiceItems.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoiceitem: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such invoiceitem: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "invoiceitem", "deleted": true})

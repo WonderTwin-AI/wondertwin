@@ -22,7 +22,7 @@ func (h *Handler) AdminFundAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Verify account exists
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
@@ -118,11 +118,11 @@ func (h *Handler) AdminAuthenticatePaymentIntent(w http.ResponseWriter, r *http.
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status != "requires_action" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+". Only requires_action can be authenticated.")
 		return
 	}

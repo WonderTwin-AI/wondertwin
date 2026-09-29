@@ -14,7 +14,7 @@ import (
 
 func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cs, ok := h.store.CheckoutSessions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, cs)
@@ -107,11 +107,11 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 	cs, ok := h.store.CheckoutSessions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
 	if cs.Status != "open" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_invalid",
 			fmt.Sprintf("This Session can not be expired because it has a status of %s.", cs.Status))
 		return
 	}
@@ -129,11 +129,11 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 	id := chi.URLParam(r, "id")
 	cs, ok := h.store.CheckoutSessions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
 	if cs.Status != "open" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_invalid",
 			fmt.Sprintf("This Session can not be completed because it has a status of %s.", cs.Status))
 		return
 	}
@@ -237,7 +237,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 
 func (h *Handler) CreatePaymentLink(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -264,7 +264,7 @@ func (h *Handler) GetPaymentLink(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pl, ok := h.store.PaymentLinks.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment link: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment link: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, pl)
@@ -274,11 +274,11 @@ func (h *Handler) UpdatePaymentLink(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pl, ok := h.store.PaymentLinks.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment link: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment link: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 

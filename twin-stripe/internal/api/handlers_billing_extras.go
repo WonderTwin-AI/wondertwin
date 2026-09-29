@@ -13,13 +13,13 @@ import (
 
 func (h *Handler) CreateCoupon(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	duration := r.FormValue("duration")
 	if duration == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: duration.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: duration.")
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *Handler) GetCoupon(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	coup, ok := h.store.Coupons.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such coupon: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such coupon: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, coup)
@@ -70,7 +70,7 @@ func (h *Handler) GetCoupon(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteCoupon(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.store.Coupons.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such coupon: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such coupon: "+id)
 		return
 	}
 	h.emitEvent("coupon.deleted", map[string]any{"id": id})
@@ -89,7 +89,7 @@ func (h *Handler) ListCoupons(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateSetupIntent(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *Handler) GetSetupIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SetupIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, si)
@@ -138,7 +138,7 @@ func (h *Handler) ConfirmSetupIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SetupIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err == nil {
@@ -156,7 +156,7 @@ func (h *Handler) CancelSetupIntent(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SetupIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such setup_intent: "+id)
 		return
 	}
 	si.Status = "canceled"
@@ -177,13 +177,13 @@ func (h *Handler) ListSetupIntents(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateTaxRate(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 	displayName := r.FormValue("display_name")
 	percentageStr := r.FormValue("percentage")
 	if displayName == "" || percentageStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: display_name, percentage.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "display_name", "percentage"))
 		return
 	}
 	pct, _ := strconv.ParseFloat(percentageStr, 64)
@@ -213,7 +213,7 @@ func (h *Handler) GetTaxRate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	tr, ok := h.store.TaxRates.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_rate: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_rate: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, tr)
@@ -233,7 +233,7 @@ func (h *Handler) GetDispute(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	dp, ok := h.store.Disputes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, dp)
@@ -244,16 +244,16 @@ func (h *Handler) UpdateDispute(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	dp, ok := h.store.Disputes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
 		return
 	}
 	if dp.Status != "needs_response" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_not_updatable",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_not_updatable",
 			"Dispute status is "+dp.Status+", which cannot accept evidence.")
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -290,11 +290,11 @@ func (h *Handler) CloseDispute(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	dp, ok := h.store.Disputes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such dispute: "+id)
 		return
 	}
 	if dp.Status == "won" || dp.Status == "lost" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_already_closed",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "dispute_already_closed",
 			"Dispute has already been closed with status: "+dp.Status)
 		return
 	}

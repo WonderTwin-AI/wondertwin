@@ -11,26 +11,26 @@ import (
 
 func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	subID := r.FormValue("subscription")
 	priceID := r.FormValue("price")
 	if subID == "" || priceID == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: subscription, price.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "subscription", "price"))
 		return
 	}
 
 	sub, ok := h.store.Subscriptions.Get(subID)
 	if !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such subscription: "+subID)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such subscription: "+subID)
 		return
 	}
 
 	price, ok := h.store.Prices.Get(priceID)
 	if !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *Handler) GetSubscriptionItem(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, si)
@@ -82,11 +82,11 @@ func (h *Handler) UpdateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *Handler) DeleteSubscriptionItem(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 

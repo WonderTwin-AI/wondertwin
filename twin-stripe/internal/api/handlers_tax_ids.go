@@ -13,19 +13,19 @@ import (
 func (h *Handler) CreateTaxID(w http.ResponseWriter, r *http.Request) {
 	customerID := chi.URLParam(r, "customer_id")
 	if _, ok := h.store.Customers.Get(customerID); !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+customerID)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+customerID)
 		return
 	}
 
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	taxType := r.FormValue("type")
 	value := r.FormValue("value")
 	if taxType == "" || value == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: type, value.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "type", "value"))
 		return
 	}
 
@@ -52,12 +52,12 @@ func (h *Handler) GetCustomerTaxID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	taxID, ok := h.store.TaxIDs.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
 		return
 	}
 	customerID := chi.URLParam(r, "customer_id")
 	if taxID.Customer != customerID {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, taxID)
@@ -67,12 +67,12 @@ func (h *Handler) DeleteTaxID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	taxID, ok := h.store.TaxIDs.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
 		return
 	}
 	customerID := chi.URLParam(r, "customer_id")
 	if taxID.Customer != customerID {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
 		return
 	}
 	h.store.TaxIDs.Delete(id)
@@ -94,7 +94,7 @@ func (h *Handler) GetTaxID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	taxID, ok := h.store.TaxIDs.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_id: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, taxID)

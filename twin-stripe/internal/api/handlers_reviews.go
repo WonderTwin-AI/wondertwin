@@ -13,7 +13,7 @@ func (h *Handler) GetReview(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	rev, ok := h.store.Reviews.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such review: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such review: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, rev)
@@ -31,7 +31,7 @@ func (h *Handler) ApproveReview(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	rev, ok := h.store.Reviews.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such review: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such review: "+id)
 		return
 	}
 	rev.Status = "closed"

@@ -20,19 +20,19 @@ const (
 // CreatePayout handles POST /v1/payouts.
 func (h *Handler) CreatePayout(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	if amountStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: amount.")
 		return
 	}
 	amount, err := strconv.ParseInt(amountStr, 10, 64)
 	if err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Invalid integer: "+amountStr)
 		return
 	}
@@ -69,7 +69,7 @@ func (h *Handler) CreatePayout(w http.ResponseWriter, r *http.Request) {
 	// Debit balance if account specified
 	if accountID != "" {
 		if err := h.store.DebitBalance(accountID, currency, amount); err != nil {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "balance_insufficient",
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "balance_insufficient",
 				"You have insufficient funds in your Stripe account.")
 			return
 		}
@@ -93,7 +93,7 @@ func (h *Handler) GetPayout(w http.ResponseWriter, r *http.Request) {
 
 	payout, ok := h.store.Payouts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such payout: '"+id+"'")
 		return
@@ -131,11 +131,11 @@ func (h *Handler) CancelPayout(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	payout, ok := h.store.Payouts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payout: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payout: "+id)
 		return
 	}
 	if payout.Status != store.PayoutStatusPending {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payout_not_cancelable",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payout_not_cancelable",
 			"Payout status is "+payout.Status+". Only pending payouts can be canceled.")
 		return
 	}

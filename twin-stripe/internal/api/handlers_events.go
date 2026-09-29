@@ -45,7 +45,7 @@ func (h *Handler) GetEvent(w http.ResponseWriter, r *http.Request) {
 
 	evt, ok := h.store.Events.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such event: '"+id+"'")
 		return

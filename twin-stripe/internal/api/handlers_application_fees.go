@@ -16,7 +16,7 @@ func (h *Handler) GetApplicationFee(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	fee, ok := h.store.ApplicationFees.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such application fee: '"+id+"'")
 		return
@@ -43,14 +43,14 @@ func (h *Handler) ListApplicationFees(w http.ResponseWriter, r *http.Request) {
 // CreateApplicationFeeRefund handles POST /v1/application_fees/{fee_id}/refunds.
 func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	feeID := chi.URLParam(r, "fee_id")
 	fee, ok := h.store.ApplicationFees.Get(feeID)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such application fee: '"+feeID+"'")
 		return
@@ -62,12 +62,12 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 	if amtStr := r.FormValue("amount"); amtStr != "" {
 		parsed, err := strconv.ParseInt(amtStr, 10, 64)
 		if err != nil {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 				"Invalid integer: "+amtStr)
 			return
 		}
 		if parsed > remaining {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 				"Refund amount exceeds remaining refundable amount.")
 			return
 		}
@@ -75,7 +75,7 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 	}
 
 	if amount <= 0 {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Application fee has already been fully refunded.")
 		return
 	}
@@ -108,7 +108,7 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 func (h *Handler) GetApplicationFeeRefund(w http.ResponseWriter, r *http.Request) {
 	feeID := chi.URLParam(r, "fee_id")
 	if _, ok := h.store.ApplicationFees.Get(feeID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such application fee: '"+feeID+"'")
 		return
@@ -117,7 +117,7 @@ func (h *Handler) GetApplicationFeeRefund(w http.ResponseWriter, r *http.Request
 	id := chi.URLParam(r, "id")
 	refund, ok := h.store.ApplicationFeeRefunds.Get(id)
 	if !ok || refund.Fee != feeID {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such application fee refund: '"+id+"'")
 		return
@@ -129,7 +129,7 @@ func (h *Handler) GetApplicationFeeRefund(w http.ResponseWriter, r *http.Request
 func (h *Handler) ListApplicationFeeRefunds(w http.ResponseWriter, r *http.Request) {
 	feeID := chi.URLParam(r, "fee_id")
 	if _, ok := h.store.ApplicationFees.Get(feeID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such application fee: '"+feeID+"'")
 		return
