@@ -108,3 +108,23 @@ func TestVersion_V2NotServed(t *testing.T) {
 	_, tc := setupStripe(t)
 	stripeForm(t, tc, "GET", "/v2/core/event_destinations", nil, nil).assertStatus(404)
 }
+
+// --- Idempotency tests ---
+
+func TestIdempotency_ReplayAndMismatch(t *testing.T) {
+	_, tc := setupStripe(t)
+	key := map[string]string{"Idempotency-Key": "k-123"}
+	first := stripeForm(t, tc, "POST", "/v1/customers", url.Values{"email": {"retry@example.com"}}, key).assertStatus(200).json()
+	again := stripeForm(t, tc, "POST", "/v1/customers", url.Values{"email": {"retry@example.com"}}, key).assertStatus(200)
+	if again.json()["id"] != first["id"] || again.header.Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("expected an identical retry to replay the first response")
+	}
+	e := errorOf(t, stripeForm(t, tc, "POST", "/v1/customers", url.Values{"email": {"else@example.com"}}, key).assertStatus(400))
+	if e["type"] != "idempotency_error" {
+		t.Fatalf("expected idempotency_error, got %v", e)
+	}
+	list := stripeForm(t, tc, "GET", "/v1/customers", nil, nil).assertStatus(200).json()
+	if n := len(list["data"].([]any)); n != 1 {
+		t.Fatalf("expected one customer after the retries, got %d", n)
+	}
+}

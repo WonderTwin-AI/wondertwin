@@ -21,6 +21,8 @@ type Handler struct {
 	dispatcher EventPublisher
 	mw         *twincore.Middleware
 	apiVersion string
+
+	idempotency idempotencyFingerprints
 }
 
 // NewHandler creates a new API handler.
