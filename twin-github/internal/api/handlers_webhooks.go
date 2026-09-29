@@ -116,8 +116,9 @@ func (h *Handler) CreateWebhook(w http.ResponseWriter, r *http.Request) {
 		ghValidationErrors(w, "Validation Failed", map[string]any{"resource": "Hook", "code": "custom", "message": "Config content_type must be json or form"})
 		return
 	}
+	// Hooks may share a config only when their events do not overlap.
 	for _, other := range h.store.ListRepoWebhooks(owner, repo) {
-		if other.Config.URL == hk.Config.URL {
+		if other.Config.URL == hk.Config.URL && eventsOverlap(other.Events, hk.Events) {
 			ghValidationErrors(w, "Validation Failed", map[string]any{"resource": "Hook", "code": "custom", "message": "Hook already exists on this repository"})
 			return
 		}
@@ -125,6 +126,15 @@ func (h *Handler) CreateWebhook(w http.ResponseWriter, r *http.Request) {
 	h.store.Webhooks.Set(strconv.FormatInt(hk.ID, 10), hk)
 	h.ping(r, hk)
 	ghJSON(w, 201, h.rd(r).hook(hk))
+}
+
+func eventsOverlap(a, b []string) bool {
+	for _, e := range a {
+		if e == "*" || contains(b, e) || contains(b, "*") {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) ping(r *http.Request, hk store.Webhook) {

@@ -848,17 +848,22 @@ func TestWebhooks(t *testing.T) {
 		t.Error("the secret is never echoed back")
 	}
 	hookID := int64(hook["id"].(float64))
+	// The same config may be reused only for events that do not overlap.
+	ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{"events": []string{"push"}, "config": map[string]any{"url": recv.srv.URL}}).AssertStatus(422)
+	other := ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{"events": []string{"release"}, "config": map[string]any{"url": recv.srv.URL}}).AssertStatus(201).JSONMap()
+	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/hook-repo/hooks/%d", int64(other["id"].(float64)))).AssertStatus(204)
 
 	ghPost(tc, "/repos/twin-bot/hook-repo/issues", map[string]any{"title": "hooked"}).AssertStatus(201)
 	ghPut(tc, "/repos/twin-bot/hook-repo/contents/a.txt", map[string]any{"message": "a", "content": "YQo="}).AssertStatus(201)
 	testutil.NewAdminClient(tc).FlushWebhooks().AssertStatus(200)
 
-	if got := strings.Join(recv.events(), ","); got != "ping,issues.opened,push" {
-		t.Fatalf("expected ping, issues.opened and push in order, got %s", got)
+	// Two pings (one per hook created), then the issue and the push.
+	if got := strings.Join(recv.events(), ","); got != "ping,ping,issues.opened,push" {
+		t.Fatalf("expected two pings, issues.opened and push in order, got %s", got)
 	}
 	recv.mu.Lock()
-	req, body := recv.got[1], recv.body[1]
-	pushBody := recv.body[2]
+	req, body := recv.got[2], recv.body[2]
+	pushBody := recv.body[3]
 	recv.mu.Unlock()
 
 	// X-Hub-Signature-256 is GitHub's HMAC-SHA256 of the exact body.
