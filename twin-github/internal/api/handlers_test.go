@@ -1063,25 +1063,41 @@ func TestCreateFork(t *testing.T) {
 
 // --- Actions Workflow Tests ---
 
+func commitWorkflow(tc *testutil.TwinClient, repo, file, yaml string) {
+	ghPut(tc, "/repos/twin-bot/"+repo+"/contents/.github/workflows/"+file, map[string]any{
+		"message": "add " + file, "content": base64.StdEncoding.EncodeToString([]byte(yaml)),
+	}).AssertStatus(201)
+}
+
 func TestActionsWorkflowDispatch(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "actions-repo")
+	commitWorkflow(tc, "actions-repo", "deploy.yml", "name: Deploy\non:\n  workflow_dispatch:\n    inputs:\n      env:\n        type: string\n")
+	commitWorkflow(tc, "actions-repo", "ci.yml", "name: CI\non: [push]\n")
 
-	// Seed a workflow
-	tc.Post("/admin/state", json.RawMessage(`{"workflows":{"wf_001":{
-		"id":1,"name":"CI","path":".github/workflows/ci.yml","state":"active",
-		"repo_owner":"twin-bot","repo_name":"actions-repo"
-	}}}`)).AssertStatus(200)
+	wfs := ghGet(tc, "/repos/twin-bot/actions-repo/actions/workflows").AssertStatus(200).JSONMap()
+	if wfs["total_count"].(float64) != 2 {
+		t.Fatalf("committing workflow files registers them, got %v", wfs)
+	}
 
-	// Trigger it
-	resp := ghPost(tc, "/repos/twin-bot/actions-repo/actions/workflows/1/dispatches", map[string]any{
-		"ref": "main",
-	})
-	resp.AssertStatus(204)
+	base := "/repos/twin-bot/actions-repo/actions/workflows/"
+	ghPost(tc, base+"ci.yml/dispatches", map[string]any{"ref": "main"}).AssertStatus(422)
+	ghPost(tc, base+"deploy.yml/dispatches", map[string]any{"ref": "nope"}).AssertStatus(422)
+	ghPost(tc, base+"missing.yml/dispatches", map[string]any{"ref": "main"}).AssertStatus(404)
 
-	// List runs
-	resp = ghGet(tc, "/repos/twin-bot/actions-repo/actions/runs")
-	m := resp.JSONMap()
+	// 2026-03-10: 200 with the run's ID and URLs, not 204.
+	resp := ghPost(tc, base+"deploy.yml/dispatches", map[string]any{"ref": "main", "inputs": map[string]any{"env": "staging"}})
+	resp.AssertStatus(200)
+	d := resp.JSONMap()
+	assertRequired(t, "workflow-dispatch-response", d)
+
+	run := ghGet(tc, fmt.Sprintf("/repos/twin-bot/actions-repo/actions/runs/%d", int64(d["workflow_run_id"].(float64)))).AssertStatus(200).JSONMap()
+	assertRequired(t, "workflow-run", run)
+	if run["status"] != "completed" || run["conclusion"] != "success" || run["event"] != "workflow_dispatch" || run["head_sha"] != mainSHA(tc, "actions-repo") {
+		t.Errorf("a dispatched run completes at once on the ref's head, got %v %v %v", run["status"], run["conclusion"], run["event"])
+	}
+
+	m := ghGet(tc, base+"deploy.yml/runs").AssertStatus(200).JSONMap()
 	if m["total_count"].(float64) != 1 {
 		t.Errorf("expected 1 run, got %v", m["total_count"])
 	}
@@ -1090,27 +1106,15 @@ func TestActionsWorkflowDispatch(t *testing.T) {
 func TestActionsRunCancel(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "cancel-repo")
+	commitWorkflow(tc, "cancel-repo", "deploy.yml", "on: workflow_dispatch\n")
+	d := ghPost(tc, "/repos/twin-bot/cancel-repo/actions/workflows/deploy.yml/dispatches", map[string]any{"ref": "main"}).AssertStatus(200).JSONMap()
+	runPath := fmt.Sprintf("/repos/twin-bot/cancel-repo/actions/runs/%d", int64(d["workflow_run_id"].(float64)))
 
-	// Seed workflow + trigger
-	tc.Post("/admin/state", json.RawMessage(`{"workflows":{"wf_001":{
-		"id":1,"name":"CI","path":".github/workflows/ci.yml","state":"active",
-		"repo_owner":"twin-bot","repo_name":"cancel-repo"
-	}}}`)).AssertStatus(200)
-
-	ghPost(tc, "/repos/twin-bot/cancel-repo/actions/workflows/1/dispatches", map[string]any{"ref": "main"})
-
-	resp := ghGet(tc, "/repos/twin-bot/cancel-repo/actions/runs")
-	runs := resp.JSONMap()["workflow_runs"].([]any)
-	runID := int(runs[0].(map[string]any)["id"].(float64))
-
-	// Cancel
-	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/cancel-repo/actions/runs/%d/cancel", runID), nil)
-	resp.AssertStatus(202)
-
-	// Verify cancelled
-	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/cancel-repo/actions/runs/%d", runID))
-	if resp.JSONMap()["conclusion"] != "cancelled" {
-		t.Error("expected conclusion=cancelled")
+	// The run is already complete, so there is nothing to cancel.
+	ghPost(tc, runPath+"/cancel", nil).AssertStatus(409)
+	ghPost(tc, runPath+"/rerun", nil).AssertStatus(201)
+	if got := ghGet(tc, runPath).JSONMap()["run_attempt"]; got.(float64) != 2 {
+		t.Errorf("a rerun is a second attempt, got %v", got)
 	}
 }
 

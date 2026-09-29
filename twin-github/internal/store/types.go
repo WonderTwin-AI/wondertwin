@@ -440,8 +440,8 @@ type Workflow struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // WorkflowRun represents a single execution of a workflow.
@@ -460,9 +460,14 @@ type WorkflowRun struct {
 	Actor      User   `json:"actor"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
+	Path       string `json:"path,omitempty"`
+	StartedAt  string `json:"run_started_at,omitempty"`
+	SuiteID    int64  `json:"check_suite_id,omitempty"`
+	// Inputs are the workflow_dispatch inputs the run was started with.
+	Inputs map[string]any `json:"inputs,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // WorkflowJob represents a job within a workflow run.
