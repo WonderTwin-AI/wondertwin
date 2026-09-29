@@ -123,22 +123,13 @@ func (h *Handler) DetachPaymentMethod(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPaymentMethods(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
-	if customerFilter != "" {
-		items := h.store.PaymentMethods.Filter(func(_ string, pm store.PaymentMethod) bool {
-			return pm.Customer == customerFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object":   "list",
-			"url":      "/v1/payment_methods",
-			"has_more": false,
-			"data":     items,
-		})
-		return
-	}
-	page := h.store.PaymentMethods.Paginate(cursor, limit)
+	typeFilter := r.URL.Query().Get("type")
+	page := paginate(r, h.store.PaymentMethods, limit, func(pm store.PaymentMethod) bool {
+		return (customerFilter == "" || pm.Customer == customerFilter) &&
+			(typeFilter == "" || pm.Type == typeFilter)
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/payment_methods",

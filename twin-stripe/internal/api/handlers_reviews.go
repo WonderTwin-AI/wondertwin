@@ -20,9 +20,8 @@ func (h *Handler) GetReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListReviews(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Reviews.Paginate(cursor, limit)
+	page := paginate(r, h.store.Reviews, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/reviews", "has_more": page.HasMore, "data": page.Data,
 	})

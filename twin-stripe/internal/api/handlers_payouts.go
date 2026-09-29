@@ -108,7 +108,6 @@ func (h *Handler) GetPayout(w http.ResponseWriter, r *http.Request) {
 
 // ListPayouts handles GET /v1/payouts.
 func (h *Handler) ListPayouts(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := 10
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
@@ -117,7 +116,7 @@ func (h *Handler) ListPayouts(w http.ResponseWriter, r *http.Request) {
 	// Advance all payout states before listing
 	h.advanceAllPayoutStates()
 
-	page := h.store.Payouts.Paginate(cursor, limit)
+	page := paginate(r, h.store.Payouts, limit, nil)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

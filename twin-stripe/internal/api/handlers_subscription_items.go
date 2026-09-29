@@ -135,19 +135,11 @@ func (h *Handler) DeleteSubscriptionItem(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) ListSubscriptionItems(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	subFilter := r.URL.Query().Get("subscription")
-	if subFilter != "" {
-		items := h.store.SubItems.Filter(func(_ string, si store.SubscriptionItem) bool {
-			return si.Subscription == subFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object": "list", "url": "/v1/subscription_items", "has_more": false, "data": items,
-		})
-		return
-	}
-	page := h.store.SubItems.Paginate(cursor, limit)
+	page := paginate(r, h.store.SubItems, limit, func(si store.SubscriptionItem) bool {
+		return subFilter == "" || si.Subscription == subFilter
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscription_items", "has_more": page.HasMore, "data": page.Data,
 	})

@@ -108,13 +108,12 @@ func (h *Handler) GetTransfer(w http.ResponseWriter, r *http.Request) {
 
 // ListTransfers handles GET /v1/transfers.
 func (h *Handler) ListTransfers(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := 10
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
 	}
 
-	page := h.store.Transfers.Paginate(cursor, limit)
+	page := paginate(r, h.store.Transfers, limit, nil)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

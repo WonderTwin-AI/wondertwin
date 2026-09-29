@@ -152,9 +152,8 @@ func (h *Handler) CancelQuote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListQuotes(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Quotes.Paginate(cursor, limit)
+	page := paginate(r, h.store.Quotes, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/quotes", "has_more": page.HasMore, "data": page.Data,
 	})

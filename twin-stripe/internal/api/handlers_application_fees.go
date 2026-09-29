@@ -26,10 +26,9 @@ func (h *Handler) GetApplicationFee(w http.ResponseWriter, r *http.Request) {
 
 // ListApplicationFees handles GET /v1/application_fees.
 func (h *Handler) ListApplicationFees(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.ApplicationFees.Paginate(cursor, limit)
+	page := paginate(r, h.store.ApplicationFees, limit, nil)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
@@ -136,11 +135,10 @@ func (h *Handler) ListApplicationFeeRefunds(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
 	// Get all refunds and filter by fee
-	page := h.store.ApplicationFeeRefunds.Paginate(cursor, limit)
+	page := paginate(r, h.store.ApplicationFeeRefunds, limit, nil)
 	filtered := make([]store.ApplicationFeeRefund, 0)
 	for _, ref := range page.Data {
 		if ref.Fee == feeID {

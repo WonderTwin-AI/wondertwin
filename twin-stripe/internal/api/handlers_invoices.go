@@ -287,28 +287,16 @@ func (h *Handler) VoidInvoice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListInvoices(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
 	subFilter := r.URL.Query().Get("subscription")
 
-	if customerFilter != "" || subFilter != "" {
-		items := h.store.Invoices.Filter(func(_ string, inv store.Invoice) bool {
-			if customerFilter != "" && inv.Customer != customerFilter {
-				return false
-			}
-			if subFilter != "" && inv.Subscription != subFilter {
-				return false
-			}
-			return true
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object": "list", "url": "/v1/invoices", "has_more": false, "data": items,
-		})
-		return
-	}
-
-	page := h.store.Invoices.Paginate(cursor, limit)
+	statusFilter := r.URL.Query().Get("status")
+	page := paginate(r, h.store.Invoices, limit, func(inv store.Invoice) bool {
+		return (customerFilter == "" || inv.Customer == customerFilter) &&
+			(subFilter == "" || inv.Subscription == subFilter) &&
+			(statusFilter == "" || inv.Status == statusFilter)
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/invoices", "has_more": page.HasMore, "data": page.Data,
 	})

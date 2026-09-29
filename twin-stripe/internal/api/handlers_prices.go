@@ -109,25 +109,13 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPrices(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
 	// Optional product filter.
 	productFilter := r.URL.Query().Get("product")
-	if productFilter != "" {
-		items := h.store.Prices.Filter(func(_ string, p store.Price) bool {
-			return p.Product == productFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object":   "list",
-			"url":      "/v1/prices",
-			"has_more": false,
-			"data":     items,
-		})
-		return
-	}
-
-	page := h.store.Prices.Paginate(cursor, limit)
+	page := paginate(r, h.store.Prices, limit, func(p store.Price) bool {
+		return productFilter == "" || p.Product == productFilter
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/prices",

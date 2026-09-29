@@ -68,9 +68,8 @@ func (h *Handler) GetCreditNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListCreditNotes(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.CreditNotes.Paginate(cursor, limit)
+	page := paginate(r, h.store.CreditNotes, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/credit_notes", "has_more": page.HasMore, "data": page.Data,
 	})

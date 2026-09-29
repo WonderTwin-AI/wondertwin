@@ -95,9 +95,13 @@ func (h *Handler) GetCharge(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListCharges(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Charges.Paginate(cursor, limit)
+	customerFilter := r.URL.Query().Get("customer")
+	piFilter := r.URL.Query().Get("payment_intent")
+	page := paginate(r, h.store.Charges, limit, func(ch store.Charge) bool {
+		return (customerFilter == "" || ch.Customer == customerFilter) &&
+			(piFilter == "" || ch.PaymentIntent == piFilter)
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/charges",

@@ -120,10 +120,9 @@ func (h *Handler) ListTransferReversals(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.TransferReversals.Paginate(cursor, limit)
+	page := paginate(r, h.store.TransferReversals, limit, nil)
 	filtered := make([]store.TransferReversal, 0)
 	for _, rev := range page.Data {
 		if rev.Transfer == transferID {
@@ -329,10 +328,9 @@ func (h *Handler) ListPersons(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.Persons.Paginate(cursor, limit)
+	page := paginate(r, h.store.Persons, limit, nil)
 	filtered := make([]store.Person, 0)
 	for _, p := range page.Data {
 		if p.Account == accountID {
@@ -456,10 +454,9 @@ func (h *Handler) GetTopUp(w http.ResponseWriter, r *http.Request) {
 
 // ListTopUps handles GET /v1/topups.
 func (h *Handler) ListTopUps(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.TopUps.Paginate(cursor, limit)
+	page := paginate(r, h.store.TopUps, limit, nil)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

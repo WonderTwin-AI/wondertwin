@@ -134,9 +134,8 @@ func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Files.Paginate(cursor, limit)
+	page := paginate(r, h.store.Files, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/files", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -209,9 +208,8 @@ func (h *Handler) UpdateFileLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListFileLinks(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.FileLinks.Paginate(cursor, limit)
+	page := paginate(r, h.store.FileLinks, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/file_links", "has_more": page.HasMore, "data": page.Data,
 	})

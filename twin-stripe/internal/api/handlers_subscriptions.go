@@ -342,19 +342,34 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
-	if customerFilter != "" {
-		items := h.store.Subscriptions.Filter(func(_ string, s store.Subscription) bool {
-			return s.Customer == customerFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object": "list", "url": "/v1/subscriptions", "has_more": false, "data": items,
-		})
-		return
-	}
-	page := h.store.Subscriptions.Paginate(cursor, limit)
+	priceFilter := r.URL.Query().Get("price")
+	statusFilter := r.URL.Query().Get("status")
+	page := paginate(r, h.store.Subscriptions, limit, func(s store.Subscription) bool {
+		if customerFilter != "" && s.Customer != customerFilter {
+			return false
+		}
+		if statusFilter != "" && statusFilter != "all" && s.Status != statusFilter {
+			return false
+		}
+		if statusFilter == "" && s.Status == "canceled" {
+			// Stripe omits canceled subscriptions unless status is given.
+			return false
+		}
+		if priceFilter != "" {
+			found := false
+			if s.Items != nil {
+				for _, it := range s.Items.Data {
+					if it.Price.ID == priceFilter {
+						found = true
+					}
+				}
+			}
+			return found
+		}
+		return true
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscriptions", "has_more": page.HasMore, "data": page.Data,
 	})

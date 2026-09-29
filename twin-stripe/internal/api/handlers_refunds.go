@@ -95,9 +95,13 @@ func (h *Handler) GetRefund(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListRefunds(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Refunds.Paginate(cursor, limit)
+	chargeFilter := r.URL.Query().Get("charge")
+	piFilter := r.URL.Query().Get("payment_intent")
+	page := paginate(r, h.store.Refunds, limit, func(re store.Refund) bool {
+		return (chargeFilter == "" || re.Charge == chargeFilter) &&
+			(piFilter == "" || re.PaymentIntent == piFilter)
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/refunds",

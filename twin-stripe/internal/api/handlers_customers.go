@@ -109,9 +109,11 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListCustomers(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Customers.Paginate(cursor, limit)
+	emailFilter := r.URL.Query().Get("email")
+	page := paginate(r, h.store.Customers, limit, func(c store.Customer) bool {
+		return emailFilter == "" || c.Email == emailFilter
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/customers",

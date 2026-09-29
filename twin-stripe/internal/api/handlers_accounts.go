@@ -271,13 +271,12 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 
 // ListAccounts handles GET /v1/accounts.
 func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := 10
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
 	}
 
-	page := h.store.Accounts.Paginate(cursor, limit)
+	page := paginate(r, h.store.Accounts, limit, nil)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

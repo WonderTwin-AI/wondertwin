@@ -81,9 +81,8 @@ func (h *Handler) UpdateShippingRate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListShippingRates(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.ShippingRates.Paginate(cursor, limit)
+	page := paginate(r, h.store.ShippingRates, limit, nil)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/shipping_rates", "has_more": page.HasMore, "data": page.Data,
 	})

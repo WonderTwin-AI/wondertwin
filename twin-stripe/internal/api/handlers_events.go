@@ -1,8 +1,8 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
@@ -56,36 +56,37 @@ func (h *Handler) GetEvent(w http.ResponseWriter, r *http.Request) {
 
 // ListEvents handles GET /v1/events.
 func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	eventType := r.URL.Query().Get("type")
-	limit := 10
-	if l := r.URL.Query().Get("limit"); l != "" {
-		fmt.Sscanf(l, "%d", &limit)
-	}
-
-	if eventType != "" {
-		// Filter by event type
-		filtered := h.store.Events.Filter(func(id string, evt store.Event) bool {
-			return evt.Type == eventType
-		})
-		data := filtered
-		if len(data) > limit {
-			data = data[:limit]
+	_ = r.ParseForm()
+	types := r.Form["types[]"]
+	limit := parseLimit(r, 10)
+	page := paginate(r, h.store.Events, limit, func(evt store.Event) bool {
+		if eventType != "" && !eventTypeMatches(eventType, evt.Type) {
+			return false
 		}
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object":   "list",
-			"url":      "/v1/events",
-			"data":     data,
-			"has_more": len(filtered) > limit,
-		})
-		return
-	}
-
-	page := h.store.Events.Paginate(cursor, limit)
+		if len(types) > 0 {
+			for _, t := range types {
+				if t == evt.Type {
+					return true
+				}
+			}
+			return false
+		}
+		return true
+	})
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/events",
 		"data":     page.Data,
 		"has_more": page.HasMore,
 	})
+}
+
+// eventTypeMatches reports whether an event type matches a type filter,
+// which may end in a wildcard ("customer.*").
+func eventTypeMatches(filter, eventType string) bool {
+	if strings.HasSuffix(filter, "*") {
+		return strings.HasPrefix(eventType, strings.TrimSuffix(filter, "*"))
+	}
+	return filter == eventType
 }
