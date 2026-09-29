@@ -102,7 +102,10 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.Products, limit, nil)
+	page, ok := paginate(w, r, h.store.Products, "product", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/products",

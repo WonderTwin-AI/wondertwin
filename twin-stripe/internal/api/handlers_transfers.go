@@ -113,7 +113,10 @@ func (h *Handler) ListTransfers(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(l, "%d", &limit)
 	}
 
-	page := paginate(r, h.store.Transfers, limit, nil)
+	page, ok := paginate(w, r, h.store.Transfers, "transfer", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

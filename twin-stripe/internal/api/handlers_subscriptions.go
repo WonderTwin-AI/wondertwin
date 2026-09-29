@@ -105,21 +105,22 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		URL:     "/v1/subscription_items?subscription=" + id,
 	}
 
-	// Apply coupons: dahlia takes discounts[N][coupon]; the older top-level
-	// coupon parameter is still read for existing callers.
+	// Apply coupons: dahlia takes discounts[N][coupon]. Every coupon is
+	// looked up before any is redeemed, so a bad entry changes nothing.
 	sub.Discounts = []string{}
 	couponIDs := indexedFormValues(r, "discounts", "coupon")
-	if c := r.FormValue("coupon"); c != "" {
-		couponIDs = append(couponIDs, c)
-	}
+	coupons := make([]store.Coupon, 0, len(couponIDs))
 	for _, couponID := range couponIDs {
 		coup, ok := h.store.Coupons.Get(couponID)
 		if !ok {
 			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
 			return
 		}
+		coupons = append(coupons, coup)
+	}
+	for _, coup := range coupons {
 		coup.TimesRedeemed++
-		h.store.Coupons.Set(couponID, coup)
+		h.store.Coupons.Set(coup.ID, coup)
 		d := h.newDiscount(coup, customer, id, "")
 		sub.Discounts = append(sub.Discounts, d.ID)
 	}
@@ -346,7 +347,7 @@ func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 	customerFilter := r.URL.Query().Get("customer")
 	priceFilter := r.URL.Query().Get("price")
 	statusFilter := r.URL.Query().Get("status")
-	page := paginate(r, h.store.Subscriptions, limit, func(s store.Subscription) bool {
+	page, ok := paginate(w, r, h.store.Subscriptions, "subscription", limit, func(s store.Subscription) bool {
 		if customerFilter != "" && s.Customer != customerFilter {
 			return false
 		}
@@ -370,6 +371,9 @@ func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscriptions", "has_more": page.HasMore, "data": page.Data,
 	})

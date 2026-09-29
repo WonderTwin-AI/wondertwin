@@ -79,7 +79,10 @@ func (h *Handler) DeleteCoupon(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListCoupons(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.Coupons, limit, nil)
+	page, ok := paginate(w, r, h.store.Coupons, "coupon", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/coupons", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -167,7 +170,10 @@ func (h *Handler) CancelSetupIntent(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListSetupIntents(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.SetupIntents, limit, nil)
+	page, ok := paginate(w, r, h.store.SetupIntents, "setup_intent", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/setup_intents", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -221,7 +227,10 @@ func (h *Handler) GetTaxRate(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListTaxRates(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.TaxRates, limit, nil)
+	page, ok := paginate(w, r, h.store.TaxRates, "tax_rate", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/tax_rates", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -306,7 +315,10 @@ func (h *Handler) CloseDispute(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListDisputes(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.Disputes, limit, nil)
+	page, ok := paginate(w, r, h.store.Disputes, "dispute", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/disputes", "has_more": page.HasMore, "data": page.Data,
 	})

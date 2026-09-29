@@ -104,7 +104,7 @@ func TestSubscriptionWithCoupon(t *testing.T) {
 	custID := resp.JSONMap()["id"].(string)
 
 	// Create subscription with coupon.
-	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&coupon="+couponID, nil)
+	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&discounts[0][coupon]="+couponID, nil)
 	resp.AssertStatus(200)
 	sub := resp.JSONMap()
 
@@ -321,5 +321,42 @@ func TestSubscriptionWithTaxRate(t *testing.T) {
 	inv := resp.JSONMap()
 	if inv["total"].(float64) != 5400 {
 		t.Errorf("expected total=5400, got %v", inv["total"])
+	}
+}
+
+func TestSubscriptionBadSecondCouponRedeemsNothing(t *testing.T) {
+	_, tc := setupStripe(t)
+
+	resp := stripePost(tc, "/v1/coupons?duration=once&percent_off=50", nil)
+	resp.AssertStatus(200)
+	couponID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/products?name=Bad", nil)
+	prodID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/prices?unit_amount=4000&currency=usd&product="+prodID+"&recurring[interval]=month", nil)
+	priceID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/customers?name=Bad", nil)
+	custID := resp.JSONMap()["id"].(string)
+
+	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&discounts[0][coupon]="+couponID+"&discounts[1][coupon]=nope", nil)
+	resp.AssertStatus(400)
+
+	resp = stripeGet(tc, "/v1/coupons/"+couponID)
+	resp.AssertStatus(200)
+	if got := resp.JSONMap()["times_redeemed"]; got != float64(0) {
+		t.Errorf("expected times_redeemed=0, got %v", got)
+	}
+}
+
+func TestListUnknownCursorIsResourceMissing(t *testing.T) {
+	_, tc := setupStripe(t)
+	stripePost(tc, "/v1/customers?name=A", nil).AssertStatus(200)
+
+	for _, param := range []string{"starting_after", "ending_before"} {
+		resp := stripeGet(tc, "/v1/customers?"+param+"=cus_gone")
+		resp.AssertStatus(400)
+		e := resp.JSONMap()["error"].(map[string]any)
+		if e["code"] != "resource_missing" || e["param"] != param || e["message"] != "No such customer: 'cus_gone'" {
+			t.Errorf("%s: unexpected error %v", param, e)
+		}
 	}
 }

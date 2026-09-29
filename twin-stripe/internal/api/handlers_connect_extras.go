@@ -122,7 +122,10 @@ func (h *Handler) ListTransferReversals(w http.ResponseWriter, r *http.Request) 
 
 	limit := parseLimit(r, 10)
 
-	page := paginate(r, h.store.TransferReversals, limit, nil)
+	page, ok := paginate(w, r, h.store.TransferReversals, "transfer_reversal", limit, nil)
+	if !ok {
+		return
+	}
 	filtered := make([]store.TransferReversal, 0)
 	for _, rev := range page.Data {
 		if rev.Transfer == transferID {
@@ -330,7 +333,10 @@ func (h *Handler) ListPersons(w http.ResponseWriter, r *http.Request) {
 
 	limit := parseLimit(r, 10)
 
-	page := paginate(r, h.store.Persons, limit, nil)
+	page, ok := paginate(w, r, h.store.Persons, "person", limit, nil)
+	if !ok {
+		return
+	}
 	filtered := make([]store.Person, 0)
 	for _, p := range page.Data {
 		if p.Account == accountID {
@@ -456,7 +462,10 @@ func (h *Handler) GetTopUp(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListTopUps(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 
-	page := paginate(r, h.store.TopUps, limit, nil)
+	page, ok := paginate(w, r, h.store.TopUps, "topup", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

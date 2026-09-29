@@ -13,9 +13,12 @@ import (
 func (h *Handler) ListBalanceTransactions(w http.ResponseWriter, r *http.Request) {
 	filterType := r.URL.Query().Get("type")
 
-	page := paginate(r, h.store.BalanceTransactions, parseLimit(r, 10), func(bt store.BalanceTransaction) bool {
+	page, ok := paginate(w, r, h.store.BalanceTransactions, "balance_transaction", parseLimit(r, 10), func(bt store.BalanceTransaction) bool {
 		return filterType == "" || bt.Type == filterType
 	})
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

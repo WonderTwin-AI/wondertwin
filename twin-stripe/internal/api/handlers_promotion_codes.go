@@ -89,7 +89,10 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListPromotionCodes(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.PromotionCodes, limit, nil)
+	page, ok := paginate(w, r, h.store.PromotionCodes, "promotion_code", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/promotion_codes", "has_more": page.HasMore, "data": page.Data,
 	})

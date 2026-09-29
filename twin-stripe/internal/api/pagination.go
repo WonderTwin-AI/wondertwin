@@ -13,7 +13,7 @@ import (
 // starting_after pages towards older objects and ending_before towards newer
 // ones; keep, when non-nil, filters before the page is cut, so has_more and
 // the cursors refer to the filtered list.
-func paginate[T any](r *http.Request, s *pkgstate.Store[T], limit int, keep func(T) bool) pkgstate.Page[T] {
+func paginate[T any](w http.ResponseWriter, r *http.Request, s *pkgstate.Store[T], object string, limit int, keep func(T) bool) (pkgstate.Page[T], bool) {
 	ids := s.ListIDs()
 	type entry struct {
 		id   string
@@ -33,20 +33,33 @@ func paginate[T any](r *http.Request, s *pkgstate.Store[T], limit int, keep func
 
 	q := r.URL.Query()
 	start, end := 0, len(all)
-	if after := q.Get("starting_after"); after != "" {
+	cursorAt := func(param string) (int, bool) {
+		id := q.Get(param)
 		for i, e := range all {
-			if e.id == after {
-				start = i + 1
-				break
+			if e.id == id {
+				return i, true
 			}
 		}
-	} else if before := q.Get("ending_before"); before != "" {
-		for i, e := range all {
-			if e.id == before {
-				end = i
-				break
-			}
+		writeError(w, http.StatusBadRequest, apiError{
+			Type:    "invalid_request_error",
+			Code:    "resource_missing",
+			Message: "No such " + object + ": '" + id + "'",
+			Param:   param,
+		})
+		return 0, false
+	}
+	if q.Get("starting_after") != "" {
+		i, ok := cursorAt("starting_after")
+		if !ok {
+			return pkgstate.Page[T]{}, false
 		}
+		start = i + 1
+	} else if q.Get("ending_before") != "" {
+		i, ok := cursorAt("ending_before")
+		if !ok {
+			return pkgstate.Page[T]{}, false
+		}
+		end = i
 	}
 
 	hasMore := false
@@ -65,5 +78,5 @@ func paginate[T any](r *http.Request, s *pkgstate.Store[T], limit int, keep func
 		data = append(data, e.item)
 		cursor = e.id
 	}
-	return pkgstate.Page[T]{Data: data, HasMore: hasMore, Cursor: cursor, Total: len(all)}
+	return pkgstate.Page[T]{Data: data, HasMore: hasMore, Cursor: cursor, Total: len(all)}, true
 }

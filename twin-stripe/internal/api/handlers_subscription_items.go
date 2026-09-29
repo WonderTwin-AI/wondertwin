@@ -137,9 +137,12 @@ func (h *Handler) DeleteSubscriptionItem(w http.ResponseWriter, r *http.Request)
 func (h *Handler) ListSubscriptionItems(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 	subFilter := r.URL.Query().Get("subscription")
-	page := paginate(r, h.store.SubItems, limit, func(si store.SubscriptionItem) bool {
+	page, ok := paginate(w, r, h.store.SubItems, "subscription_item", limit, func(si store.SubscriptionItem) bool {
 		return subFilter == "" || si.Subscription == subFilter
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscription_items", "has_more": page.HasMore, "data": page.Data,
 	})

@@ -287,11 +287,14 @@ func (h *Handler) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	subFilter := r.URL.Query().Get("subscription")
 
 	statusFilter := r.URL.Query().Get("status")
-	page := paginate(r, h.store.Invoices, limit, func(inv store.Invoice) bool {
+	page, ok := paginate(w, r, h.store.Invoices, "invoice", limit, func(inv store.Invoice) bool {
 		return (customerFilter == "" || inv.Customer == customerFilter) &&
 			(subFilter == "" || inv.Subscription == subFilter) &&
 			(statusFilter == "" || inv.Status == statusFilter)
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/invoices", "has_more": page.HasMore, "data": page.Data,
 	})

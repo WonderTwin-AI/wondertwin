@@ -82,9 +82,12 @@ func (h *Handler) DeleteTaxID(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListCustomerTaxIDs(w http.ResponseWriter, r *http.Request) {
 	customerID := chi.URLParam(r, "customer_id")
-	page := paginate(r, h.store.TaxIDs, parseLimit(r, 10), func(t store.TaxID) bool {
+	page, ok := paginate(w, r, h.store.TaxIDs, "tax_id", parseLimit(r, 10), func(t store.TaxID) bool {
 		return t.Customer == customerID
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/customers/" + customerID + "/tax_ids", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -102,7 +105,10 @@ func (h *Handler) GetTaxID(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListTaxIDs(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.TaxIDs, limit, nil)
+	page, ok := paginate(w, r, h.store.TaxIDs, "tax_id", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/tax_ids", "has_more": page.HasMore, "data": page.Data,
 	})

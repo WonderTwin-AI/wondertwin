@@ -276,7 +276,10 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(l, "%d", &limit)
 	}
 
-	page := paginate(r, h.store.Accounts, limit, nil)
+	page, ok := paginate(w, r, h.store.Accounts, "account", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

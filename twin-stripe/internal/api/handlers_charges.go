@@ -110,10 +110,13 @@ func (h *Handler) ListCharges(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
 	piFilter := r.URL.Query().Get("payment_intent")
-	page := paginate(r, h.store.Charges, limit, func(ch store.Charge) bool {
+	page, ok := paginate(w, r, h.store.Charges, "charge", limit, func(ch store.Charge) bool {
 		return (customerFilter == "" || ch.Customer == customerFilter) &&
 			(piFilter == "" || ch.PaymentIntent == piFilter)
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/charges",

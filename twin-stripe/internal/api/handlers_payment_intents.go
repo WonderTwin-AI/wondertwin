@@ -292,9 +292,12 @@ func (h *Handler) CancelPaymentIntent(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListPaymentIntents(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
-	page := paginate(r, h.store.PaymentIntents, limit, func(pi store.PaymentIntent) bool {
+	page, ok := paginate(w, r, h.store.PaymentIntents, "payment_intent", limit, func(pi store.PaymentIntent) bool {
 		return customerFilter == "" || pi.Customer == customerFilter
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/payment_intents",

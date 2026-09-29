@@ -51,7 +51,7 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	types := r.Form["types[]"]
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.Events, limit, func(evt store.Event) bool {
+	page, ok := paginate(w, r, h.store.Events, "event", limit, func(evt store.Event) bool {
 		if eventType != "" && !eventTypeMatches(eventType, evt.Type) {
 			return false
 		}
@@ -65,6 +65,9 @@ func (h *Handler) ListEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/events",

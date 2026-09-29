@@ -116,7 +116,10 @@ func (h *Handler) ListPayouts(w http.ResponseWriter, r *http.Request) {
 	// Advance all payout states before listing
 	h.advanceAllPayoutStates()
 
-	page := paginate(r, h.store.Payouts, limit, nil)
+	page, ok := paginate(w, r, h.store.Payouts, "payout", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

@@ -113,9 +113,12 @@ func (h *Handler) ListPrices(w http.ResponseWriter, r *http.Request) {
 
 	// Optional product filter.
 	productFilter := r.URL.Query().Get("product")
-	page := paginate(r, h.store.Prices, limit, func(p store.Price) bool {
+	page, ok := paginate(w, r, h.store.Prices, "price", limit, func(p store.Price) bool {
 		return productFilter == "" || p.Product == productFilter
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/prices",

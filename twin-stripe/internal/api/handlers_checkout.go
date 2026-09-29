@@ -103,7 +103,10 @@ func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.CheckoutSessions, limit, nil)
+	page, ok := paginate(w, r, h.store.CheckoutSessions, "checkout.session", limit, nil)
+	if !ok {
+		return
+	}
 	withItems := expandRequested(r, "data.line_items")
 	data := make([]map[string]any, 0, len(page.Data))
 	for _, cs := range page.Data {
@@ -310,7 +313,10 @@ func (h *Handler) UpdatePaymentLink(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListPaymentLinks(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
-	page := paginate(r, h.store.PaymentLinks, limit, nil)
+	page, ok := paginate(w, r, h.store.PaymentLinks, "payment_link", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/payment_links",

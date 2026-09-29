@@ -133,10 +133,13 @@ func (h *Handler) ListPaymentMethods(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
 	typeFilter := r.URL.Query().Get("type")
-	page := paginate(r, h.store.PaymentMethods, limit, func(pm store.PaymentMethod) bool {
+	page, ok := paginate(w, r, h.store.PaymentMethods, "payment_method", limit, func(pm store.PaymentMethod) bool {
 		return (customerFilter == "" || pm.Customer == customerFilter) &&
 			(typeFilter == "" || pm.Type == typeFilter)
 	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/payment_methods",
