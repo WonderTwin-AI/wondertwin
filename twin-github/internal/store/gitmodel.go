@@ -54,7 +54,7 @@ func branchKey(owner, repo, name string) string { return RepoKey(owner, repo) + 
 func refKey(owner, repo, ref string) string     { return RepoKey(owner, repo) + "#" + ref }
 
 func gitHash(kind string, body []byte) (string, []byte) {
-	h := sha1.New() //nolint:gosec // G401: git object IDs are SHA-1 by definition
+	h := sha1.New() //nolint:gosec // nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1 -- git object IDs are SHA-1 by definition
 	_, _ = fmt.Fprintf(h, "%s %d\x00", kind, len(body))
 	h.Write(body)
 	sum := h.Sum(nil)
