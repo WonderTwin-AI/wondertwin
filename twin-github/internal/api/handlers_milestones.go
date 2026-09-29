@@ -15,7 +15,7 @@ func (h *Handler) ListMilestones(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	milestones := h.store.ListRepoMilestones(owner, repo)
-	ghJSON(w, 200, milestones)
+	ghJSON(w, 200, paginate(w, r, milestones))
 }
 
 // CreateMilestone handles POST /repos/{owner}/{repo}/milestones

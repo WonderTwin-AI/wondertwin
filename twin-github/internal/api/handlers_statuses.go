@@ -53,7 +53,7 @@ func (h *Handler) ListCommitStatuses(w http.ResponseWriter, r *http.Request) {
 	ref := chi.URLParam(r, "ref")
 
 	statuses := h.store.ListRepoStatuses(owner, repo, ref)
-	ghJSON(w, 200, statuses)
+	ghJSON(w, 200, paginate(w, r, statuses))
 }
 
 // GetCombinedStatus handles GET /repos/{owner}/{repo}/commits/{ref}/status
@@ -86,7 +86,7 @@ func (h *Handler) GetCombinedStatus(w http.ResponseWriter, r *http.Request) {
 
 	ghJSON(w, 200, map[string]any{
 		"state":       combined,
-		"statuses":    statuses,
+		"statuses":    paginate(w, r, statuses),
 		"sha":         ref,
 		"total_count": len(statuses),
 		"repository": map[string]any{
@@ -100,7 +100,7 @@ func (h *Handler) ListBranches(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	branches := h.store.ListRepoBranches(owner, repo)
-	ghJSON(w, 200, branches)
+	ghJSON(w, 200, paginate(w, r, branches))
 }
 
 // GetBranch handles GET /repos/{owner}/{repo}/branches/{branch}
@@ -124,7 +124,7 @@ func (h *Handler) ListReleases(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	releases := h.store.ListRepoReleases(owner, repo)
-	ghJSON(w, 200, releases)
+	ghJSON(w, 200, paginate(w, r, releases))
 }
 
 // CreateRelease handles POST /repos/{owner}/{repo}/releases

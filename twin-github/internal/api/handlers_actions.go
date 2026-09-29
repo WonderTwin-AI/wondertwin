@@ -17,7 +17,7 @@ func (h *Handler) ListWorkflows(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	wfs := h.store.ListRepoWorkflows(owner, repo)
-	ghJSON(w, 200, map[string]any{"total_count": len(wfs), "workflows": wfs})
+	ghJSON(w, 200, map[string]any{"total_count": len(wfs), "workflows": paginate(w, r, wfs)})
 }
 
 // GetWorkflow handles GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}
@@ -77,7 +77,7 @@ func (h *Handler) ListWorkflowRuns(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	runs := h.store.ListWorkflowRuns(owner, repo, 0)
-	ghJSON(w, 200, map[string]any{"total_count": len(runs), "workflow_runs": runs})
+	ghJSON(w, 200, map[string]any{"total_count": len(runs), "workflow_runs": paginate(w, r, runs)})
 }
 
 // ListWorkflowRunsForWorkflow handles GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs
@@ -86,7 +86,7 @@ func (h *Handler) ListWorkflowRunsForWorkflow(w http.ResponseWriter, r *http.Req
 	repo := chi.URLParam(r, "repo")
 	wfID, _ := strconv.ParseInt(chi.URLParam(r, "workflow_id"), 10, 64)
 	runs := h.store.ListWorkflowRuns(owner, repo, wfID)
-	ghJSON(w, 200, map[string]any{"total_count": len(runs), "workflow_runs": runs})
+	ghJSON(w, 200, map[string]any{"total_count": len(runs), "workflow_runs": paginate(w, r, runs)})
 }
 
 // GetWorkflowRun handles GET /repos/{owner}/{repo}/actions/runs/{run_id}
@@ -167,7 +167,7 @@ func (h *Handler) ListRunJobs(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "repo")
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
 	jobs := h.store.ListRunJobs(owner, repo, runID)
-	ghJSON(w, 200, map[string]any{"total_count": len(jobs), "jobs": jobs})
+	ghJSON(w, 200, map[string]any{"total_count": len(jobs), "jobs": paginate(w, r, jobs)})
 }
 
 // GetJob handles GET /repos/{owner}/{repo}/actions/jobs/{job_id}
@@ -191,7 +191,7 @@ func (h *Handler) ListRunArtifacts(w http.ResponseWriter, r *http.Request) {
 	repo := chi.URLParam(r, "repo")
 	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
 	arts := h.store.ListRunArtifacts(owner, repo, runID)
-	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": arts})
+	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": paginate(w, r, arts)})
 }
 
 // ListRepoArtifacts handles GET /repos/{owner}/{repo}/actions/artifacts
@@ -199,7 +199,7 @@ func (h *Handler) ListRepoArtifacts(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	arts := h.store.ListRepoArtifacts(owner, repo)
-	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": arts})
+	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": paginate(w, r, arts)})
 }
 
 // GetArtifact handles GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
@@ -236,7 +236,7 @@ func (h *Handler) ListRepoSecrets(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	secrets := h.store.ListRepoSecrets(owner, repo)
-	ghJSON(w, 200, map[string]any{"total_count": len(secrets), "secrets": secrets})
+	ghJSON(w, 200, map[string]any{"total_count": len(secrets), "secrets": paginate(w, r, secrets)})
 }
 
 // GetRepoSecret handles GET /repos/{owner}/{repo}/actions/secrets/{secret_name}

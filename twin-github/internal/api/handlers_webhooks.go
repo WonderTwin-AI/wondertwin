@@ -14,7 +14,7 @@ func (h *Handler) ListWebhooks(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	hooks := h.store.ListRepoWebhooks(owner, repo)
-	ghJSON(w, 200, hooks)
+	ghJSON(w, 200, paginate(w, r, hooks))
 }
 
 // CreateWebhook handles POST /repos/{owner}/{repo}/hooks

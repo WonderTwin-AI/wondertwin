@@ -174,7 +174,7 @@ func (h *Handler) ListCheckRunsInSuite(w http.ResponseWriter, r *http.Request) {
 	runs := h.store.CheckRuns.Filter(func(_ string, cr store.CheckRun) bool {
 		return cr.RepoOwner == owner && cr.RepoName == repo
 	})
-	ghJSON(w, 200, map[string]any{"total_count": len(runs), "check_runs": runs})
+	ghJSON(w, 200, map[string]any{"total_count": len(runs), "check_runs": paginate(w, r, runs)})
 }
 
 // ListCheckRunAnnotations handles GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations
@@ -436,7 +436,7 @@ func (h *Handler) ListPRCommentReactions(w http.ResponseWriter, r *http.Request)
 	repo := chi.URLParam(r, "repo")
 	commentID := chi.URLParam(r, "comment_id")
 	reactions := h.store.ListSubjectReactions(owner, repo, "pr_comment:"+commentID)
-	ghJSON(w, 200, reactions)
+	ghJSON(w, 200, paginate(w, r, reactions))
 }
 
 // CreatePRCommentReaction handles POST /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions

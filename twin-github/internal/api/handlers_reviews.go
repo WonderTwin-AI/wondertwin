@@ -17,7 +17,7 @@ func (h *Handler) ListPRReviews(w http.ResponseWriter, r *http.Request) {
 	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
 
 	reviews := h.store.ListPRReviews(owner, repo, num)
-	ghJSON(w, 200, reviews)
+	ghJSON(w, 200, paginate(w, r, reviews))
 }
 
 // CreatePRReview handles POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
@@ -112,7 +112,7 @@ func (h *Handler) ListPRReviewComments(w http.ResponseWriter, r *http.Request) {
 	comments := h.store.PRReviewComments.Filter(func(_ string, c store.PRReviewComment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo && c.PRNumber == num
 	})
-	ghJSON(w, 200, comments)
+	ghJSON(w, 200, paginate(w, r, comments))
 }
 
 // CreatePRReviewComment handles POST /repos/{owner}/{repo}/pulls/{pull_number}/comments

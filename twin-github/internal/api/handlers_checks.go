@@ -112,7 +112,7 @@ func (h *Handler) ListCheckRunsForRef(w http.ResponseWriter, r *http.Request) {
 	runs := h.store.ListCheckRunsForRef(owner, repo, ref)
 	ghJSON(w, 200, map[string]any{
 		"total_count": len(runs),
-		"check_runs":  runs,
+		"check_runs":  paginate(w, r, runs),
 	})
 }
 
@@ -172,6 +172,6 @@ func (h *Handler) ListCheckSuitesForRef(w http.ResponseWriter, r *http.Request) 
 	})
 	ghJSON(w, 200, map[string]any{
 		"total_count":  len(suites),
-		"check_suites": suites,
+		"check_suites": paginate(w, r, suites),
 	})
 }

@@ -305,6 +305,55 @@ func TestListIssues(t *testing.T) {
 	}
 }
 
+// --- Pagination Tests ---
+
+func TestIssuesPaginateWithLinkHeader(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "paged")
+	for i := 1; i <= 5; i++ {
+		ghPost(tc, "/repos/twin-bot/paged/issues", map[string]any{"title": fmt.Sprintf("issue %d", i)}).AssertStatus(201)
+	}
+
+	resp := ghGet(tc, "/repos/twin-bot/paged/issues?per_page=2&page=2")
+	resp.AssertStatus(200)
+	var page []map[string]any
+	resp.JSON(&page)
+	if len(page) != 2 {
+		t.Fatalf("expected 2 issues on page 2, got %d", len(page))
+	}
+	link := resp.Headers.Get("Link")
+	for _, want := range []string{`page=1&per_page=2>; rel="prev"`, `page=3&per_page=2>; rel="next"`, `page=3&per_page=2>; rel="last"`, `rel="first"`} {
+		if !strings.Contains(link, want) {
+			t.Errorf("Link %q lacks %s", link, want)
+		}
+	}
+	if !strings.HasPrefix(link, "<http://127.0.0.1:") {
+		t.Errorf("Link must point back at the emulator, got %q", link)
+	}
+
+	last := ghGet(tc, "/repos/twin-bot/paged/issues?per_page=2&page=3")
+	last.JSON(&page)
+	if len(page) != 1 || strings.Contains(last.Headers.Get("Link"), `rel="next"`) {
+		t.Errorf("last page should hold 1 issue and no next link, got %d and %q", len(page), last.Headers.Get("Link"))
+	}
+
+	all := ghGet(tc, "/repos/twin-bot/paged/issues")
+	all.JSON(&page)
+	if len(page) != 5 || all.Headers.Get("Link") != "" {
+		t.Errorf("one page of 5 needs no Link header, got %d items and %q", len(page), all.Headers.Get("Link"))
+	}
+}
+
+func TestEmptyListIsArray(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "empty-list")
+	resp := ghGet(tc, "/repos/twin-bot/empty-list/labels")
+	resp.AssertStatus(200)
+	if strings.TrimSpace(string(resp.Body)) != "[]" {
+		t.Errorf("expected [], got %s", resp.Body)
+	}
+}
+
 func TestCloseIssue(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "close-issue")

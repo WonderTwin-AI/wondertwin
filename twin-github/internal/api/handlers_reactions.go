@@ -17,7 +17,7 @@ func (h *Handler) ListIssueReactions(w http.ResponseWriter, r *http.Request) {
 	num := chi.URLParam(r, "issue_number")
 
 	reactions := h.store.ListSubjectReactions(owner, repo, "issue:"+num)
-	ghJSON(w, 200, reactions)
+	ghJSON(w, 200, paginate(w, r, reactions))
 }
 
 // CreateIssueReaction handles POST /repos/{owner}/{repo}/issues/{issue_number}/reactions
@@ -70,7 +70,7 @@ func (h *Handler) ListCommentReactions(w http.ResponseWriter, r *http.Request) {
 	commentID := chi.URLParam(r, "comment_id")
 
 	reactions := h.store.ListSubjectReactions(owner, repo, "comment:"+commentID)
-	ghJSON(w, 200, reactions)
+	ghJSON(w, 200, paginate(w, r, reactions))
 }
 
 // CreateCommentReaction handles POST /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions
@@ -240,7 +240,7 @@ func (h *Handler) ListReleaseAssets(w http.ResponseWriter, r *http.Request) {
 	releaseID, _ := strconv.ParseInt(chi.URLParam(r, "release_id"), 10, 64)
 
 	assets := h.store.ListReleaseAssets(owner, repo, releaseID)
-	ghJSON(w, 200, assets)
+	ghJSON(w, 200, paginate(w, r, assets))
 }
 
 // UploadReleaseAsset handles POST /repos/{owner}/{repo}/releases/{release_id}/assets

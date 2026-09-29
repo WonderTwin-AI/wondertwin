@@ -20,7 +20,7 @@ func (h *Handler) ListPullRequests(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prs := h.store.ListRepoPRs(owner, repo, state)
-	ghJSON(w, 200, prs)
+	ghJSON(w, 200, paginate(w, r, prs))
 }
 
 // CreatePullRequest handles POST /repos/{owner}/{repo}/pulls

@@ -14,7 +14,7 @@ func (h *Handler) ListDeployKeys(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	keys := h.store.ListRepoDeployKeys(owner, repo)
-	ghJSON(w, 200, keys)
+	ghJSON(w, 200, paginate(w, r, keys))
 }
 
 // CreateDeployKey handles POST /repos/{owner}/{repo}/keys
@@ -81,7 +81,7 @@ func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	deployments := h.store.ListRepoDeployments(owner, repo)
-	ghJSON(w, 200, deployments)
+	ghJSON(w, 200, paginate(w, r, deployments))
 }
 
 // CreateDeployment handles POST /repos/{owner}/{repo}/deployments
@@ -146,7 +146,7 @@ func (h *Handler) ListDeploymentStatuses(w http.ResponseWriter, r *http.Request)
 	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
 
 	statuses := h.store.ListDeploymentStatuses(owner, repo, deployID)
-	ghJSON(w, 200, statuses)
+	ghJSON(w, 200, paginate(w, r, statuses))
 }
 
 // CreateDeploymentStatus handles POST /repos/{owner}/{repo}/deployments/{deployment_id}/statuses

@@ -20,7 +20,7 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	issues := h.store.ListRepoIssues(owner, repo, state)
-	ghJSON(w, 200, issues)
+	ghJSON(w, 200, paginate(w, r, issues))
 }
 
 // CreateIssue handles POST /repos/{owner}/{repo}/issues
@@ -130,7 +130,7 @@ func (h *Handler) ListIssueComments(w http.ResponseWriter, r *http.Request) {
 	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
 
 	comments := h.store.ListIssueComments(owner, repo, num)
-	ghJSON(w, 200, comments)
+	ghJSON(w, 200, paginate(w, r, comments))
 }
 
 // CreateIssueComment handles POST /repos/{owner}/{repo}/issues/{issue_number}/comments
@@ -235,7 +235,7 @@ func (h *Handler) ListLabels(w http.ResponseWriter, r *http.Request) {
 	owner := chi.URLParam(r, "owner")
 	repo := chi.URLParam(r, "repo")
 	labels := h.store.ListRepoLabels(owner, repo)
-	ghJSON(w, 200, labels)
+	ghJSON(w, 200, paginate(w, r, labels))
 }
 
 // CreateLabel handles POST /repos/{owner}/{repo}/labels
@@ -344,7 +344,7 @@ func (h *Handler) ListIssueLabels(w http.ResponseWriter, r *http.Request) {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ghJSON(w, 200, issue.Labels)
+	ghJSON(w, 200, paginate(w, r, issue.Labels))
 }
 
 // AddIssueLabels handles POST /repos/{owner}/{repo}/issues/{issue_number}/labels

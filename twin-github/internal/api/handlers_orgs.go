@@ -38,14 +38,14 @@ func (h *Handler) ListOrgRepos(w http.ResponseWriter, r *http.Request) {
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Owner.Login == orgLogin
 	})
-	ghJSON(w, 200, repos)
+	ghJSON(w, 200, paginate(w, r, repos))
 }
 
 // ListOrgTeams handles GET /orgs/{org}/teams
 func (h *Handler) ListOrgTeams(w http.ResponseWriter, r *http.Request) {
 	orgLogin := chi.URLParam(r, "org")
 	teams := h.store.ListOrgTeams(orgLogin)
-	ghJSON(w, 200, teams)
+	ghJSON(w, 200, paginate(w, r, teams))
 }
 
 // CreateTeam handles POST /orgs/{org}/teams

@@ -13,7 +13,7 @@ func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Owner.Login == "twin-bot"
 	})
-	ghJSON(w, 200, repos)
+	ghJSON(w, 200, paginate(w, r, repos))
 }
 
 // ListUserReposByUsername handles GET /users/{username}/repos
@@ -22,7 +22,7 @@ func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Owner.Login == username
 	})
-	ghJSON(w, 200, repos)
+	ghJSON(w, 200, paginate(w, r, repos))
 }
 
 // CreateOrgRepo handles POST /orgs/{org}/repos
@@ -65,7 +65,7 @@ func (h *Handler) ListForks(w http.ResponseWriter, r *http.Request) {
 	forks := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Fork && rp.Name == repo && rp.Owner.Login != owner
 	})
-	ghJSON(w, 200, forks)
+	ghJSON(w, 200, paginate(w, r, forks))
 }
 
 // ListContributors handles GET /repos/{owner}/{repo}/contributors
@@ -119,7 +119,7 @@ func (h *Handler) CompareCommits(w http.ResponseWriter, r *http.Request) {
 // ListAllUsers handles GET /users
 func (h *Handler) ListAllUsers(w http.ResponseWriter, r *http.Request) {
 	users := h.store.Users.List()
-	ghJSON(w, 200, users)
+	ghJSON(w, 200, paginate(w, r, users))
 }
 
 // ListUserEmails handles GET /user/emails
@@ -137,13 +137,13 @@ func (h *Handler) ListUserKeys(w http.ResponseWriter, r *http.Request) {
 // ListUserOrgs handles GET /user/orgs
 func (h *Handler) ListUserOrgs(w http.ResponseWriter, r *http.Request) {
 	orgs := h.store.Orgs.List()
-	ghJSON(w, 200, orgs)
+	ghJSON(w, 200, paginate(w, r, orgs))
 }
 
 // ListAuthUserIssues handles GET /issues
 func (h *Handler) ListAuthUserIssues(w http.ResponseWriter, r *http.Request) {
 	issues := h.store.Issues.List()
-	ghJSON(w, 200, issues)
+	ghJSON(w, 200, paginate(w, r, issues))
 }
 
 // ListRepoIssueComments handles GET /repos/{owner}/{repo}/issues/comments (all comments in repo)
@@ -153,5 +153,5 @@ func (h *Handler) ListRepoIssueComments(w http.ResponseWriter, r *http.Request) 
 	comments := h.store.Comments.Filter(func(_ string, c store.Comment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo
 	})
-	ghJSON(w, 200, comments)
+	ghJSON(w, 200, paginate(w, r, comments))
 }

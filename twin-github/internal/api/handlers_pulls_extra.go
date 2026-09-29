@@ -199,7 +199,7 @@ func (h *Handler) ListAllPRReviewComments(w http.ResponseWriter, r *http.Request
 	comments := h.store.PRReviewComments.Filter(func(_ string, c store.PRReviewComment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo
 	})
-	ghJSON(w, 200, comments)
+	ghJSON(w, 200, paginate(w, r, comments))
 }
 
 // SetIssueLabels handles PUT /repos/{owner}/{repo}/issues/{issue_number}/labels
