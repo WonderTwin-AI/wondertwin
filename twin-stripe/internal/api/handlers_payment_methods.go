@@ -20,7 +20,7 @@ func (h *Handler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) {
 		pmType = "card"
 	}
 
-	id := h.store.PaymentMethods.NextID()
+	id := h.store.StripeID(h.store.PaymentMethods.NextID())
 	pm := store.PaymentMethod{
 		ID:       id,
 		Object:   "payment_method",

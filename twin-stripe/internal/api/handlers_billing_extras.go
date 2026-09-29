@@ -25,7 +25,7 @@ func (h *Handler) CreateCoupon(w http.ResponseWriter, r *http.Request) {
 
 	id := r.FormValue("id")
 	if id == "" {
-		id = h.store.Coupons.NextID()
+		id = h.store.StripeID(h.store.Coupons.NextID())
 	}
 
 	coup := store.Coupon{
@@ -93,7 +93,7 @@ func (h *Handler) CreateSetupIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.SetupIntents.NextID()
+	id := h.store.StripeID(h.store.SetupIntents.NextID())
 	si := store.SetupIntent{
 		ID:           id,
 		Object:       "setup_intent",
@@ -188,7 +188,7 @@ func (h *Handler) CreateTaxRate(w http.ResponseWriter, r *http.Request) {
 	}
 	pct, _ := strconv.ParseFloat(percentageStr, 64)
 
-	id := h.store.TaxRates.NextID()
+	id := h.store.StripeID(h.store.TaxRates.NextID())
 	tr := store.TaxRate{
 		ID:           id,
 		Object:       "tax_rate",

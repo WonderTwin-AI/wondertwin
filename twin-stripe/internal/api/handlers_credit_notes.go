@@ -34,7 +34,7 @@ func (h *Handler) CreateCreditNote(w http.ResponseWriter, r *http.Request) {
 		currency = "usd"
 	}
 
-	id := h.store.CreditNotes.NextID()
+	id := h.store.StripeID(h.store.CreditNotes.NextID())
 	cn := store.CreditNote{
 		ID:       id,
 		Object:   "credit_note",

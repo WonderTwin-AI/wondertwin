@@ -18,7 +18,7 @@ func (h *Handler) CreateQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Quotes.NextID()
+	id := h.store.StripeID(h.store.Quotes.NextID())
 	now := h.store.Now()
 
 	qt := store.Quote{
@@ -173,7 +173,7 @@ func (h *Handler) CreateBillingPortalSession(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	id := h.store.BillingPortalSessions.NextID()
+	id := h.store.StripeID(h.store.BillingPortalSessions.NextID())
 	bps := store.BillingPortalSession{
 		ID:        id,
 		Object:    "billing_portal.session",

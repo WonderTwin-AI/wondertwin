@@ -16,7 +16,7 @@ func (h *Handler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Customers.NextID()
+	id := h.store.StripeID(h.store.Customers.NextID())
 	cus := store.Customer{
 		ID:          id,
 		Object:      "customer",

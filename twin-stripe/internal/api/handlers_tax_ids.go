@@ -29,7 +29,7 @@ func (h *Handler) CreateTaxID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.TaxIDs.NextID()
+	id := h.store.StripeID(h.store.TaxIDs.NextID())
 	taxID := store.TaxID{
 		ID:       id,
 		Object:   "tax_id",

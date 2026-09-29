@@ -139,7 +139,7 @@ func (h *Handler) resolvePaymentMethod(id string) string {
 	if !ok {
 		return id
 	}
-	newID := h.store.PaymentMethods.NextID()
+	newID := h.store.StripeID(h.store.PaymentMethods.NextID())
 	h.store.PaymentMethods.Set(newID, store.PaymentMethod{
 		ID:     newID,
 		Object: "payment_method",

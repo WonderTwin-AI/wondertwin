@@ -18,7 +18,7 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Tokens.NextID()
+	id := h.store.StripeID(h.store.Tokens.NextID())
 
 	number := r.FormValue("card[number]")
 	expMonthStr := r.FormValue("card[exp_month]")
@@ -93,7 +93,7 @@ func (h *Handler) CreateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Sources.NextID()
+	id := h.store.StripeID(h.store.Sources.NextID())
 
 	amountStr := r.FormValue("amount")
 	var amount int64

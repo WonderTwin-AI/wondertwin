@@ -64,7 +64,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 	// Record balance transaction
 	btID := h.store.RecordBalanceTransaction("transfer_reversal", transferID, transfer.Currency, amount, 0)
 
-	id := h.store.TransferReversals.NextID()
+	id := h.store.StripeID(h.store.TransferReversals.NextID())
 	reversal := store.TransferReversal{
 		ID:                 id,
 		Object:             "transfer_reversal",
@@ -202,7 +202,7 @@ func (h *Handler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Persons.NextID()
+	id := h.store.StripeID(h.store.Persons.NextID())
 	person := store.Person{
 		ID:        id,
 		Object:    "person",
@@ -419,7 +419,7 @@ func (h *Handler) CreateTopUp(w http.ResponseWriter, r *http.Request) {
 	// Record balance transaction
 	btID := h.store.RecordBalanceTransaction("topup", "", currency, amount, 0)
 
-	id := h.store.TopUps.NextID()
+	id := h.store.StripeID(h.store.TopUps.NextID())
 	topup := store.TopUp{
 		ID:                 id,
 		Object:             "topup",

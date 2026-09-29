@@ -19,7 +19,7 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := h.store.CheckoutSessions.NextID()
+	id := h.store.StripeID(h.store.CheckoutSessions.NextID())
 	now := h.store.Now()
 
 	mode := r.FormValue("mode")
@@ -171,7 +171,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 			}
 		}
 
-		piID := h.store.PaymentIntents.NextID()
+		piID := h.store.StripeID(h.store.PaymentIntents.NextID())
 		pi := store.PaymentIntent{
 			ID:             piID,
 			Object:         "payment_intent",
@@ -198,7 +198,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 	case "subscription":
 		// Create subscription from line items.
 		if len(cs.LineItems) > 0 {
-			subID := h.store.Subscriptions.NextID()
+			subID := h.store.StripeID(h.store.Subscriptions.NextID())
 			var items []store.SubscriptionItem
 			now := h.store.Now()
 			for i, li := range cs.LineItems {
@@ -255,7 +255,7 @@ func (h *Handler) CreatePaymentLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.PaymentLinks.NextID()
+	id := h.store.StripeID(h.store.PaymentLinks.NextID())
 	now := h.store.Now()
 
 	pl := store.PaymentLink{
@@ -384,14 +384,14 @@ func (h *Handler) inlinePrice(r *http.Request, prefix string) string {
 	now := h.store.Now()
 	productID := r.FormValue(prefix + "[product]")
 	if name := r.FormValue(prefix + "[product_data][name]"); name != "" {
-		productID = h.store.Products.NextID()
+		productID = h.store.StripeID(h.store.Products.NextID())
 		h.store.Products.Set(productID, store.Product{
 			ID: productID, Object: "product", Name: name, Active: false,
 			Description: r.FormValue(prefix + "[product_data][description]"), Created: now, Updated: now,
 		})
 	}
 	unit, _ := strconv.ParseInt(r.FormValue(prefix+"[unit_amount]"), 10, 64)
-	priceID := h.store.Prices.NextID()
+	priceID := h.store.StripeID(h.store.Prices.NextID())
 	price := store.Price{
 		ID: priceID, Object: "price", Active: false, Currency: currency, Product: productID,
 		UnitAmount: unit, UnitAmountDecimal: strconv.FormatInt(unit, 10),

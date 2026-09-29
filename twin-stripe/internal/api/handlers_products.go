@@ -20,7 +20,7 @@ func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Products.NextID()
+	id := h.store.StripeID(h.store.Products.NextID())
 	prod := store.Product{
 		ID:          id,
 		Object:      "product",

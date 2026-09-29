@@ -54,7 +54,7 @@ func (h *Handler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Refunds.NextID()
+	id := h.store.StripeID(h.store.Refunds.NextID())
 	ref := store.Refund{
 		ID:            id,
 		Object:        "refund",

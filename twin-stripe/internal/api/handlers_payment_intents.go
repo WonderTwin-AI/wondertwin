@@ -23,7 +23,7 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
 
-	id := h.store.PaymentIntents.NextID()
+	id := h.store.StripeID(h.store.PaymentIntents.NextID())
 	captureMethod := r.FormValue("capture_method")
 	if captureMethod == "" {
 		captureMethod = "automatic"
@@ -304,7 +304,7 @@ func (h *Handler) ListPaymentIntents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createChargeForPI(pi *store.PaymentIntent) string {
-	id := h.store.Charges.NextID()
+	id := h.store.StripeID(h.store.Charges.NextID())
 	ch := store.Charge{
 		ID:            id,
 		Object:        "charge",
@@ -345,7 +345,7 @@ func (h *Handler) declinePayment(w http.ResponseWriter, pi *store.PaymentIntent,
 		pmObj = &pm
 	}
 
-	chargeID := h.store.Charges.NextID()
+	chargeID := h.store.StripeID(h.store.Charges.NextID())
 	ch := store.Charge{
 		ID:             chargeID,
 		Object:         "charge",

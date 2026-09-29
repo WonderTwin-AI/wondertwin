@@ -45,7 +45,7 @@ func (h *Handler) CreatePayout(w http.ResponseWriter, r *http.Request) {
 	// Get account from Stripe-Account header
 	accountID := stripeAccountFromRequest(r)
 
-	id := h.store.Payouts.NextID()
+	id := h.store.StripeID(h.store.Payouts.NextID())
 	now := h.store.Clock.Now().Unix()
 
 	payout := store.Payout{

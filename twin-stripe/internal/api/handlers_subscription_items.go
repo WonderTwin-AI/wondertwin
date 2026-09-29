@@ -41,7 +41,7 @@ func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	id := h.store.SubItems.NextID()
+	id := h.store.StripeID(h.store.SubItems.NextID())
 	si := store.SubscriptionItem{
 		ID:           id,
 		Object:       "subscription_item",

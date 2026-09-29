@@ -26,7 +26,7 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := h.store.ExternalAccts.NextID()
+	id := h.store.StripeID(h.store.ExternalAccts.NextID())
 
 	routingNumber := r.FormValue("external_account[routing_number]")
 	if routingNumber == "" {

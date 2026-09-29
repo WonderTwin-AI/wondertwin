@@ -26,7 +26,7 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Clock.Now()
-	id := h.store.Subscriptions.NextID()
+	id := h.store.StripeID(h.store.Subscriptions.NextID())
 
 	sub := store.Subscription{
 		ID:                   id,
@@ -249,7 +249,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 
 		// Generate a proration invoice if there's a net difference.
 		if prorationAmount != 0 {
-			invID := h.store.Invoices.NextID()
+			invID := h.store.StripeID(h.store.Invoices.NextID())
 			currency := "usd"
 			if len(newItems) > 0 {
 				currency = newItems[0].Price.Currency
@@ -376,7 +376,7 @@ func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []store.SubscriptionItem) string {
-	id := h.store.Invoices.NextID()
+	id := h.store.StripeID(h.store.Invoices.NextID())
 	var total int64
 	var lines []store.InvoiceLine
 	for i, item := range items {

@@ -22,7 +22,7 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Invoices.NextID()
+	id := h.store.StripeID(h.store.Invoices.NextID())
 	inv := store.Invoice{
 		ID:               id,
 		Object:           "invoice",
@@ -228,7 +228,7 @@ func (h *Handler) PayInvoice(w http.ResponseWriter, r *http.Request) {
 
 	// Create a PaymentIntent + Charge for the invoice amount.
 	if inv.Total > 0 {
-		piID := h.store.PaymentIntents.NextID()
+		piID := h.store.StripeID(h.store.PaymentIntents.NextID())
 		pi := store.PaymentIntent{
 			ID:             piID,
 			Object:         "payment_intent",
@@ -311,7 +311,7 @@ func (h *Handler) CreateInvoiceItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.InvoiceItems.NextID()
+	id := h.store.StripeID(h.store.InvoiceItems.NextID())
 	ii := store.InvoiceItem{
 		ID:          id,
 		Object:      "invoiceitem",
@@ -371,7 +371,7 @@ func (h *Handler) DeleteInvoiceItem(w http.ResponseWriter, r *http.Request) {
 // invoice, and returns it. Dahlia subscriptions and invoices reference their
 // discounts by ID in discounts[], expandable to these objects.
 func (h *Handler) newDiscount(coup store.Coupon, customer, subscription, invoice string) store.Discount {
-	id := h.store.Discounts.NextID()
+	id := h.store.StripeID(h.store.Discounts.NextID())
 	d := store.Discount{
 		ID:           id,
 		Object:       "discount",

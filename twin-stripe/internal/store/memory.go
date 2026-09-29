@@ -244,7 +244,7 @@ func (s *MemoryStore) DebitBalance(accountID string, currency string, amount int
 
 // RecordBalanceTransaction creates and stores a balance transaction ledger entry.
 func (s *MemoryStore) RecordBalanceTransaction(txType, source, currency string, amount, fee int64) string {
-	id := s.BalanceTransactions.NextID()
+	id := s.StripeID(s.BalanceTransactions.NextID())
 	bt := BalanceTransaction{
 		ID:       id,
 		Object:   "balance_transaction",

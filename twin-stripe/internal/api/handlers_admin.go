@@ -209,7 +209,7 @@ func (h *Handler) AdminCreateDispute(w http.ResponseWriter, r *http.Request) {
 		reason = "fraudulent"
 	}
 
-	id := h.store.Disputes.NextID()
+	id := h.store.StripeID(h.store.Disputes.NextID())
 	dp := store.Dispute{
 		ID:            id,
 		Object:        "dispute",

@@ -19,7 +19,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Accounts.NextID()
+	id := h.store.StripeID(h.store.Accounts.NextID())
 	now := h.store.Now()
 
 	acctType := r.FormValue("type")

@@ -21,7 +21,7 @@ func (h *Handler) CreateShippingRate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.ShippingRates.NextID()
+	id := h.store.StripeID(h.store.ShippingRates.NextID())
 	sr := store.ShippingRate{
 		ID:          id,
 		Object:      "shipping_rate",

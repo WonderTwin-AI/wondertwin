@@ -36,7 +36,7 @@ func (h *Handler) CreateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := h.store.WebhookEndpoints.NextID()
+	id := h.store.StripeID(h.store.WebhookEndpoints.NextID())
 	we := store.WebhookEndpoint{
 		ID:            id,
 		Object:        "webhook_endpoint",

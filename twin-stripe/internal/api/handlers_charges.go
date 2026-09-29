@@ -27,7 +27,7 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	// Check card behavior if source is a payment method.
 	if source := r.FormValue("source"); source != "" {
 		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.Code != "" {
-			chargeID := h.store.Charges.NextID()
+			chargeID := h.store.StripeID(h.store.Charges.NextID())
 			ch := store.Charge{
 				ID: chargeID, Object: "charge", Amount: amount, Currency: currency,
 				Customer: r.FormValue("customer"), PaymentMethod: source, Status: "failed",
@@ -44,7 +44,7 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	id := h.store.Charges.NextID()
+	id := h.store.StripeID(h.store.Charges.NextID())
 	ch := store.Charge{
 		ID:            id,
 		Object:        "charge",

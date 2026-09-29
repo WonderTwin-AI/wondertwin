@@ -52,7 +52,7 @@ func (h *Handler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 		currency = "usd"
 	}
 
-	id := h.store.Transfers.NextID()
+	id := h.store.StripeID(h.store.Transfers.NextID())
 	transfer := store.Transfer{
 		ID:                id,
 		Object:            "transfer",

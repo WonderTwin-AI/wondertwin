@@ -86,7 +86,7 @@ func (h *Handler) CreateFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Files.NextID()
+	id := h.store.StripeID(h.store.Files.NextID())
 
 	var filename string
 	var size int64
@@ -155,7 +155,7 @@ func (h *Handler) CreateFileLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.FileLinks.NextID()
+	id := h.store.StripeID(h.store.FileLinks.NextID())
 	fl := store.FileLink{
 		ID:       id,
 		Object:   "file_link",

@@ -80,7 +80,7 @@ func (h *Handler) CreateApplicationFeeRefund(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	id := h.store.ApplicationFeeRefunds.NextID()
+	id := h.store.StripeID(h.store.ApplicationFeeRefunds.NextID())
 	refund := store.ApplicationFeeRefund{
 		ID:       id,
 		Object:   "fee_refund",

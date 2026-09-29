@@ -22,7 +22,7 @@ func (h *Handler) CreatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := h.store.Prices.NextID()
+	id := h.store.StripeID(h.store.Prices.NextID())
 	price := store.Price{
 		ID:            id,
 		Object:        "price",

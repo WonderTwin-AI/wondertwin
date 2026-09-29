@@ -27,7 +27,7 @@ func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 		code = strings.ToUpper(h.randomHex(4))
 	}
 
-	id := h.store.PromotionCodes.NextID()
+	id := h.store.StripeID(h.store.PromotionCodes.NextID())
 	pc := store.PromotionCode{
 		ID:       id,
 		Object:   "promotion_code",
