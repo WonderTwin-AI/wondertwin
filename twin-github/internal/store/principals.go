@@ -41,7 +41,8 @@ func LooksLikeJWT(tok string) bool {
 }
 
 // seedDefaults puts the state every fresh emulator starts with: the default
-// user. It runs from New and after Reset.
+// user and a GitHub App installed on its account. It runs from New, after
+// Reset and after a state load.
 func (s *MemoryStore) seedDefaults() {
 	if _, ok := s.Users.Get(DefaultLogin); !ok {
 		s.Users.Set(DefaultLogin, User{
@@ -52,4 +53,6 @@ func (s *MemoryStore) seedDefaults() {
 			Email: "bot@wondertwin.dev",
 		})
 	}
+	s.seedApp()
+	s.ensureBots()
 }

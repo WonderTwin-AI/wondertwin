@@ -63,6 +63,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/app", h.GetApp)
 		r.Get("/app/installations", h.ListAppInstallations)
 		r.Post("/app/installations/{installation_id}/access_tokens", h.CreateInstallationAccessToken)
+		r.Get("/app/installations/{installation_id}", h.GetAppInstallation)
+		r.Get("/installation/repositories", h.ListInstallationRepos)
 
 		// Repos
 		r.Get("/repos/{owner}/{repo}", h.GetRepo)

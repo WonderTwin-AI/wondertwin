@@ -1,11 +1,13 @@
 package api_test
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
@@ -137,6 +139,72 @@ func TestSeededTokenAuthenticatesAsItsUser(t *testing.T) {
 	if ghGet(tc, "/user").AssertStatus(200).JSONMap()["login"] != "twin-bot" {
 		t.Error("an unregistered well-formed token is the default user")
 	}
+}
+
+// --- GitHub App Tests ---
+
+// appJWT builds the JWT a GitHub App signs. The emulator checks the claims,
+// not the signature, so the signature segment is a placeholder.
+func appJWT(iss any, exp time.Time) string {
+	enc := func(v any) string {
+		b, _ := json.Marshal(v)
+		return base64.RawURLEncoding.EncodeToString(b)
+	}
+	return enc(map[string]string{"alg": "RS256", "typ": "JWT"}) + "." +
+		enc(map[string]any{"iat": time.Now().Add(-30 * time.Second).Unix(), "exp": exp.Unix(), "iss": iss}) + ".c2lnbmF0dXJl"
+}
+
+func bearer(tok string) map[string]string { return map[string]string{"Authorization": "Bearer " + tok} }
+
+func TestAppInstallationTokenFlow(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "installed")
+
+	// The JWT's iss is the app's ID; find it with a client-id JWT first.
+	app := tc.DoWithHeaders("GET", "/app", nil, bearer(appJWT("1000001", time.Now().Add(9*time.Minute)))).AssertStatus(200).JSONMap()
+	assertRequired(t, "integration", app)
+	jwt := appJWT(app["id"], time.Now().Add(9*time.Minute))
+	if tc.DoWithHeaders("GET", "/app", nil, bearer(appJWT(app["client_id"], time.Now().Add(9*time.Minute)))).StatusCode != 200 {
+		t.Error("the client ID is also a valid issuer")
+	}
+
+	var installs []map[string]any
+	tc.DoWithHeaders("GET", "/app/installations", nil, bearer(jwt)).AssertStatus(200).JSON(&installs)
+	if len(installs) != 1 || installs[0]["app_id"] != app["id"] {
+		t.Fatalf("expected one installation of the app, got %v", installs)
+	}
+	assertRequired(t, "installation", installs[0])
+
+	tokPath := fmt.Sprintf("/app/installations/%d/access_tokens", int64(installs[0]["id"].(float64)))
+	minted := tc.DoWithHeaders("POST", tokPath, nil, bearer(jwt)).AssertStatus(201).JSONMap()
+	assertRequired(t, "installation-token", minted)
+	tok := minted["token"].(string)
+	if !strings.HasPrefix(tok, "ghs_") || len(tok) != 40 {
+		t.Errorf("unexpected token format %q", tok)
+	}
+
+	repos := tc.DoWithHeaders("GET", "/installation/repositories", nil, bearer(tok)).AssertStatus(200).JSONMap()
+	if repos["total_count"].(float64) != 1 || repos["repository_selection"] != "all" {
+		t.Errorf("unexpected installation repositories %v", repos)
+	}
+	issue := tc.DoWithHeaders("POST", "/repos/twin-bot/installed/issues", map[string]any{"title": "from the app"}, bearer(tok)).AssertStatus(201).JSONMap()
+	if u := issue["user"].(map[string]any); u["login"] != "wondertwin-app[bot]" || u["type"] != "Bot" {
+		t.Errorf("an installation token acts as the app's bot, got %v", u)
+	}
+
+	// Wrong credential for each route.
+	ghGet(tc, "/installation/repositories").AssertStatus(403)
+	ghGet(tc, "/app").AssertStatus(401)
+	tc.DoWithHeaders("GET", "/user", nil, bearer(jwt)).AssertStatus(403)
+	tc.DoWithHeaders("GET", "/app", nil, bearer(appJWT(app["id"], time.Now().Add(-time.Minute)))).AssertStatus(401)
+	tc.DoWithHeaders("GET", "/app", nil, bearer(appJWT(app["id"], time.Now().Add(time.Hour)))).AssertStatus(401)
+	tc.DoWithHeaders("GET", "/app", nil, bearer(appJWT("999", time.Now().Add(time.Minute)))).AssertStatus(401)
+	tc.DoWithHeaders("POST", "/app/installations/1/access_tokens", nil, bearer(jwt)).AssertStatus(404)
+	tc.DoWithHeaders("GET", "/installation/repositories", nil, bearer("ghs_notMintedByTheEmulator000000000000")).AssertStatus(401)
+
+	// Installation tokens expire after an hour.
+	testutil.NewAdminClient(tc).AdvanceTime("61m").AssertStatus(200)
+	tc.DoWithHeaders("GET", "/installation/repositories", nil, bearer(tok)).AssertStatus(401)
 }
 
 // --- API Version Tests ---

@@ -46,6 +46,8 @@ type MemoryStore struct {
 	Tokens           *pkgstate.Store[Token]
 	Commits          *pkgstate.Store[Commit]
 	Blobs            *pkgstate.Store[Blob]
+	Apps             *pkgstate.Store[App]
+	Installations    *pkgstate.Store[Installation]
 	Clock            *pkgstate.Clock
 
 	ids        *idAllocator
@@ -90,6 +92,8 @@ func New() *MemoryStore {
 		Tokens:           pkgstate.New[Token]("token"),
 		Commits:          pkgstate.New[Commit]("commit"),
 		Blobs:            pkgstate.New[Blob]("blob"),
+		Apps:             pkgstate.New[App]("app"),
+		Installations:    pkgstate.New[Installation]("installation"),
 		Clock:            pkgstate.NewClock(),
 		ids:              newIDAllocator(),
 	}
@@ -239,40 +243,44 @@ func MakeSHA(input string) string {
 }
 
 type stateSnapshot struct {
-	Repos        map[string]Repository   `json:"repos,omitempty"`
-	Issues       map[string]Issue        `json:"issues,omitempty"`
-	PullRequests map[string]PullRequest  `json:"pull_requests,omitempty"`
-	Comments     map[string]Comment      `json:"comments,omitempty"`
-	Labels       map[string]Label        `json:"labels,omitempty"`
-	Milestones   map[string]Milestone    `json:"milestones,omitempty"`
-	Users        map[string]User         `json:"users,omitempty"`
-	Webhooks     map[string]Webhook      `json:"webhooks,omitempty"`
-	Statuses     map[string]CommitStatus `json:"statuses,omitempty"`
-	Releases     map[string]Release      `json:"releases,omitempty"`
-	Branches     map[string]Branch       `json:"branches,omitempty"`
-	Tokens       map[string]Token        `json:"tokens,omitempty"`
-	Commits      map[string]Commit       `json:"commits,omitempty"`
-	Blobs        map[string]Blob         `json:"blobs,omitempty"`
-	GitRefs      map[string]GitRef       `json:"git_refs,omitempty"`
+	Repos         map[string]Repository   `json:"repos,omitempty"`
+	Issues        map[string]Issue        `json:"issues,omitempty"`
+	PullRequests  map[string]PullRequest  `json:"pull_requests,omitempty"`
+	Comments      map[string]Comment      `json:"comments,omitempty"`
+	Labels        map[string]Label        `json:"labels,omitempty"`
+	Milestones    map[string]Milestone    `json:"milestones,omitempty"`
+	Users         map[string]User         `json:"users,omitempty"`
+	Webhooks      map[string]Webhook      `json:"webhooks,omitempty"`
+	Statuses      map[string]CommitStatus `json:"statuses,omitempty"`
+	Releases      map[string]Release      `json:"releases,omitempty"`
+	Branches      map[string]Branch       `json:"branches,omitempty"`
+	Tokens        map[string]Token        `json:"tokens,omitempty"`
+	Commits       map[string]Commit       `json:"commits,omitempty"`
+	Blobs         map[string]Blob         `json:"blobs,omitempty"`
+	GitRefs       map[string]GitRef       `json:"git_refs,omitempty"`
+	Apps          map[string]App          `json:"apps,omitempty"`
+	Installations map[string]Installation `json:"installations,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
-		Repos:        s.Repos.Snapshot(),
-		Issues:       s.Issues.Snapshot(),
-		PullRequests: s.PullRequests.Snapshot(),
-		Comments:     s.Comments.Snapshot(),
-		Labels:       s.Labels.Snapshot(),
-		Milestones:   s.Milestones.Snapshot(),
-		Users:        s.Users.Snapshot(),
-		Webhooks:     s.Webhooks.Snapshot(),
-		Statuses:     s.Statuses.Snapshot(),
-		Releases:     s.Releases.Snapshot(),
-		Branches:     s.Branches.Snapshot(),
-		Tokens:       s.Tokens.Snapshot(),
-		Commits:      s.Commits.Snapshot(),
-		Blobs:        s.Blobs.Snapshot(),
-		GitRefs:      s.GitRefs.Snapshot(),
+		Repos:         s.Repos.Snapshot(),
+		Issues:        s.Issues.Snapshot(),
+		PullRequests:  s.PullRequests.Snapshot(),
+		Comments:      s.Comments.Snapshot(),
+		Labels:        s.Labels.Snapshot(),
+		Milestones:    s.Milestones.Snapshot(),
+		Users:         s.Users.Snapshot(),
+		Webhooks:      s.Webhooks.Snapshot(),
+		Statuses:      s.Statuses.Snapshot(),
+		Releases:      s.Releases.Snapshot(),
+		Branches:      s.Branches.Snapshot(),
+		Tokens:        s.Tokens.Snapshot(),
+		Commits:       s.Commits.Snapshot(),
+		Blobs:         s.Blobs.Snapshot(),
+		GitRefs:       s.GitRefs.Snapshot(),
+		Apps:          s.Apps.Snapshot(),
+		Installations: s.Installations.Snapshot(),
 	}
 }
 
@@ -326,6 +334,12 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.GitRefs != nil {
 		s.GitRefs.LoadSnapshot(snap.GitRefs)
 	}
+	if snap.Apps != nil {
+		s.Apps.LoadSnapshot(snap.Apps)
+	}
+	if snap.Installations != nil {
+		s.Installations.LoadSnapshot(snap.Installations)
+	}
 	s.observeLoaded()
 	s.seedDefaults()
 	return nil
@@ -364,6 +378,12 @@ func (s *MemoryStore) observeLoaded() {
 	}
 	for _, r := range s.Releases.List() {
 		s.ids.observe(KindRelease, r.ID)
+	}
+	for _, a := range s.Apps.List() {
+		s.ids.observe(KindApp, a.ID)
+	}
+	for _, i := range s.Installations.List() {
+		s.ids.observe(KindInstallation, i.ID)
 	}
 }
 
@@ -466,6 +486,8 @@ func (s *MemoryStore) Reset() {
 	s.Tokens.Reset()
 	s.Commits.Reset()
 	s.Blobs.Reset()
+	s.Apps.Reset()
+	s.Installations.Reset()
 	s.Clock.Reset()
 	s.ids.reset()
 	s.runCounter.Store(0)

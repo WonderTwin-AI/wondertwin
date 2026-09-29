@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -476,43 +475,6 @@ func (h *Handler) DeletePRCommentReaction(w http.ResponseWriter, r *http.Request
 	}
 	h.store.Reactions.Delete(ids[0])
 	w.WriteHeader(204)
-}
-
-// --- GitHub App endpoints ---
-
-// GetApp handles GET /app
-func (h *Handler) GetApp(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, map[string]any{
-		"id":    1,
-		"slug":  "wondertwin-app",
-		"name":  "WonderTwin App",
-		"owner": store.User{ID: 1, Login: "twin-bot", Type: "User"},
-	})
-}
-
-// ListAppInstallations handles GET /app/installations
-func (h *Handler) ListAppInstallations(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []map[string]any{
-		{
-			"id":          1,
-			"app_id":      1,
-			"target_type": "Organization",
-			"account":     store.User{ID: 1, Login: "twin-bot", Type: "Organization"},
-		},
-	})
-}
-
-// CreateInstallationAccessToken handles POST /app/installations/{installation_id}/access_tokens
-func (h *Handler) CreateInstallationAccessToken(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 201, map[string]any{
-		"token":      fmt.Sprintf("ghs_%s", store.MakeSHA(h.store.Now())[:20]),
-		"expires_at": "2099-01-01T00:00:00Z",
-		"permissions": map[string]any{
-			"issues":        "write",
-			"pull_requests": "write",
-			"contents":      "read",
-		},
-	})
 }
 
 // --- Misc ---

@@ -108,6 +108,13 @@ func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// A JSON web token only authenticates the App's own routes.
+		if p.Kind == principalApp && r.URL.Path != "/app" && !strings.HasPrefix(r.URL.Path, "/app/") {
+			rateHeaders(w, 5000)
+			ghError(w, http.StatusForbidden, "Resource not accessible by integration")
+			return
+		}
+
 		if p.Kind == principalAnonymous {
 			rateHeaders(w, 60)
 			if owner, repo, ok := repoFromPath(r.URL.Path); ok {
