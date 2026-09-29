@@ -28,6 +28,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v1", func(r chi.Router) {
 		// Auth middleware for all v1 routes
 		r.Use(h.authMiddleware)
+		// Accept name[N] array parameters, as the official SDKs send them
+		r.Use(h.arrayParamsMiddleware)
 		// Idempotency key caching for POST requests
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
