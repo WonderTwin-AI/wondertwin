@@ -57,6 +57,7 @@ type MemoryStore struct {
 	TransferReversals     *pkgstate.Store[TransferReversal]
 	Persons               *pkgstate.Store[Person]
 	TopUps                *pkgstate.Store[TopUp]
+	Discounts             *pkgstate.Store[Discount]
 
 	// Per-account balances (account ID -> balance)
 	Balances map[string]*AccountBalance
@@ -134,6 +135,7 @@ func New() *MemoryStore {
 		TransferReversals:     pkgstate.New[TransferReversal]("trr"),
 		Persons:               pkgstate.New[Person]("person"),
 		TopUps:                pkgstate.New[TopUp]("tu"),
+		Discounts:             pkgstate.New[Discount]("di"),
 		Balances:              make(map[string]*AccountBalance),
 		PlatformBalance:       NewAccountBalance(),
 		Clock:                 pkgstate.NewClock(),
@@ -303,6 +305,7 @@ type stateSnapshot struct {
 	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
 	Persons               map[string]Person               `json:"persons"`
 	TopUps                map[string]TopUp                `json:"topups"`
+	Discounts             map[string]Discount             `json:"discounts"`
 	Balances              map[string]*AccountBalance      `json:"balances"`
 	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
 }
@@ -352,6 +355,7 @@ func (s *MemoryStore) Snapshot() any {
 		TransferReversals:     s.TransferReversals.Snapshot(),
 		Persons:               s.Persons.Snapshot(),
 		TopUps:                s.TopUps.Snapshot(),
+		Discounts:             s.Discounts.Snapshot(),
 		Balances:              s.snapshotBalances(),
 		PlatformBalance:       s.PlatformBalance,
 	}
@@ -416,6 +420,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.TransferReversals.LoadSnapshot(snap.TransferReversals)
 	s.Persons.LoadSnapshot(snap.Persons)
 	s.TopUps.LoadSnapshot(snap.TopUps)
+	s.Discounts.LoadSnapshot(snap.Discounts)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -472,6 +477,7 @@ func (s *MemoryStore) Reset() {
 	s.TransferReversals.Reset()
 	s.Persons.Reset()
 	s.TopUps.Reset()
+	s.Discounts.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

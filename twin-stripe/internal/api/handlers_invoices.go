@@ -86,14 +86,9 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 		coup.TimesRedeemed++
 		h.store.Coupons.Set(couponID, coup)
 
-		discountID := "di_" + id
-		inv.Discount = &store.Discount{
-			ID:       discountID,
-			Object:   "discount",
-			Coupon:   &coup,
-			Customer: customer,
-		}
-		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discountID}}
+		d := h.newDiscount(coup, customer, "", id)
+		inv.Discounts = []string{d.ID}
+		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: d.ID}}
 	}
 
 	// Apply default tax rates if provided.
@@ -370,4 +365,44 @@ func (h *Handler) DeleteInvoiceItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "invoiceitem", "deleted": true})
+}
+
+// newDiscount records a discount for coupon, applied to a subscription or an
+// invoice, and returns it. Dahlia subscriptions and invoices reference their
+// discounts by ID in discounts[], expandable to these objects.
+func (h *Handler) newDiscount(coup store.Coupon, customer, subscription, invoice string) store.Discount {
+	id := h.store.Discounts.NextID()
+	d := store.Discount{
+		ID:           id,
+		Object:       "discount",
+		Coupon:       &coup,
+		Customer:     customer,
+		Subscription: subscription,
+		Invoice:      invoice,
+		Start:        h.store.Now(),
+	}
+	h.store.Discounts.Set(id, d)
+	return d
+}
+
+// firstCoupon returns the coupon of the first known discount in ids.
+func (h *Handler) firstCoupon(ids []string) (*store.Coupon, string) {
+	for _, id := range ids {
+		if d, ok := h.store.Discounts.Get(id); ok && d.Coupon != nil {
+			return d.Coupon, id
+		}
+	}
+	return nil, ""
+}
+
+// indexedFormValues reads name[0][field], name[1][field], ... in order.
+func indexedFormValues(r *http.Request, name, field string) []string {
+	var out []string
+	for i := 0; ; i++ {
+		v := r.FormValue(name + "[" + strconv.Itoa(i) + "][" + field + "]")
+		if v == "" {
+			return out
+		}
+		out = append(out, v)
+	}
 }

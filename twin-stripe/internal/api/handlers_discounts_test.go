@@ -35,10 +35,19 @@ func TestPercentOffCouponOnInvoice(t *testing.T) {
 		t.Errorf("expected amount_due=7500, got %v", inv["amount_due"])
 	}
 
-	// Verify discount is attached.
-	disc, ok := inv["discount"].(map[string]any)
+	// Dahlia has no singular discount: discounts[] holds IDs, expandable.
+	if _, singular := inv["discount"]; singular {
+		t.Fatal("expected no singular discount field on a dahlia invoice")
+	}
+	ids, _ := inv["discounts"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("expected one discount ID, got %v", inv["discounts"])
+	}
+	resp = stripeGet(tc, "/v1/invoices/"+inv["id"].(string)+"?expand[]=discounts")
+	resp.AssertStatus(200)
+	disc, ok := resp.JSONMap()["discounts"].([]any)[0].(map[string]any)
 	if !ok {
-		t.Fatal("expected discount object on invoice")
+		t.Fatal("expected discounts[0] to expand to a discount object")
 	}
 	coup, ok := disc["coupon"].(map[string]any)
 	if !ok {
@@ -99,10 +108,16 @@ func TestSubscriptionWithCoupon(t *testing.T) {
 	resp.AssertStatus(200)
 	sub := resp.JSONMap()
 
-	// Verify discount is on subscription.
-	disc, ok := sub["discount"].(map[string]any)
+	// Verify the discount is on the subscription, by ID, and expands.
+	ids, _ := sub["discounts"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("expected one discount ID on subscription, got %v", sub["discounts"])
+	}
+	resp = stripeGet(tc, "/v1/subscriptions/"+sub["id"].(string)+"?expand[0]=discounts")
+	resp.AssertStatus(200)
+	disc, ok := resp.JSONMap()["discounts"].([]any)[0].(map[string]any)
 	if !ok {
-		t.Fatal("expected discount on subscription")
+		t.Fatal("expected discounts[0] to expand to a discount object")
 	}
 	if disc["subscription"] != sub["id"] {
 		t.Errorf("expected discount.subscription=%v, got %v", sub["id"], disc["subscription"])

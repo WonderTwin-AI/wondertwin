@@ -323,7 +323,7 @@ type Subscription struct {
 	TrialEnd             int64              `json:"trial_end,omitempty"`
 	Items                *SubscriptionItems `json:"items"`
 	LatestInvoice        string             `json:"latest_invoice,omitempty"`
-	Discount             *Discount          `json:"discount,omitempty"`
+	Discounts            []string           `json:"discounts"`
 	DefaultTaxRates      []TaxRate          `json:"default_tax_rates,omitempty"`
 	DefaultPaymentMethod string             `json:"default_payment_method,omitempty"`
 	CollectionMethod     string             `json:"collection_method"` // charge_automatically or send_invoice
@@ -358,6 +358,7 @@ type Discount struct {
 	Coupon       *Coupon `json:"coupon"`
 	Customer     string  `json:"customer,omitempty"`
 	Subscription string  `json:"subscription,omitempty"`
+	Invoice      string  `json:"invoice,omitempty"`
 	Start        int64   `json:"start,omitempty"`
 	End          int64   `json:"end,omitempty"`
 }
@@ -385,7 +386,7 @@ type Invoice struct {
 	Number               string            `json:"number,omitempty"`
 	TotalDiscountAmounts []DiscountAmount  `json:"total_discount_amounts,omitempty"`
 	TotalTaxAmounts      []TaxAmount       `json:"total_tax_amounts,omitempty"`
-	Discount             *Discount         `json:"discount,omitempty"`
+	Discounts            []string          `json:"discounts"`
 	DefaultTaxRates      []TaxRate         `json:"default_tax_rates,omitempty"`
 	DueDate              int64             `json:"due_date,omitempty"`
 	PeriodStart          int64             `json:"period_start,omitempty"`

@@ -105,8 +105,14 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		URL:     "/v1/subscription_items?subscription=" + id,
 	}
 
-	// Apply coupon if provided.
-	if couponID := r.FormValue("coupon"); couponID != "" {
+	// Apply coupons: dahlia takes discounts[N][coupon]; the older top-level
+	// coupon parameter is still read for existing callers.
+	sub.Discounts = []string{}
+	couponIDs := indexedFormValues(r, "discounts", "coupon")
+	if c := r.FormValue("coupon"); c != "" {
+		couponIDs = append(couponIDs, c)
+	}
+	for _, couponID := range couponIDs {
 		coup, ok := h.store.Coupons.Get(couponID)
 		if !ok {
 			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
@@ -114,14 +120,8 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		}
 		coup.TimesRedeemed++
 		h.store.Coupons.Set(couponID, coup)
-		sub.Discount = &store.Discount{
-			ID:           "di_" + id,
-			Object:       "discount",
-			Coupon:       &coup,
-			Customer:     customer,
-			Subscription: id,
-			Start:        now.Unix(),
-		}
+		d := h.newDiscount(coup, customer, id, "")
+		sub.Discounts = append(sub.Discounts, d.ID)
 	}
 
 	// Parse default tax rates.
@@ -404,9 +404,9 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 
 	// Apply discount from subscription.
 	var discountAmount int64
-	var discount *store.Discount
-	if sub.Discount != nil && sub.Discount.Coupon != nil {
-		coup := sub.Discount.Coupon
+	var discountIDs []string
+	var totalDiscounts []store.DiscountAmount
+	if coup, discountID := h.firstCoupon(sub.Discounts); coup != nil {
 		if coup.PercentOff > 0 {
 			discountAmount = int64(float64(total) * coup.PercentOff / 100)
 		} else if coup.AmountOff > 0 {
@@ -415,7 +415,8 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 				discountAmount = total
 			}
 		}
-		discount = sub.Discount
+		discountIDs = []string{discountID}
+		totalDiscounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discountID}}
 	}
 
 	// Apply tax rates from subscription.
@@ -437,22 +438,23 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 	invoiceTotal := total - discountAmount + taxAmount
 
 	inv := store.Invoice{
-		ID:               id,
-		Object:           "invoice",
-		Customer:         sub.Customer,
-		Subscription:     sub.ID,
-		Status:           "paid", // auto-paid for charge_automatically
-		AmountDue:        invoiceTotal,
-		AmountPaid:       invoiceTotal,
-		AmountRemaining:  0,
-		Total:            invoiceTotal,
-		Subtotal:         total,
-		Currency:         currency,
-		CollectionMethod: sub.CollectionMethod,
-		Paid:             true,
-		Discount:         discount,
-		DefaultTaxRates:  sub.DefaultTaxRates,
-		TotalTaxAmounts:  taxAmounts,
+		ID:                   id,
+		Object:               "invoice",
+		Customer:             sub.Customer,
+		Subscription:         sub.ID,
+		Status:               "paid", // auto-paid for charge_automatically
+		AmountDue:            invoiceTotal,
+		AmountPaid:           invoiceTotal,
+		AmountRemaining:      0,
+		Total:                invoiceTotal,
+		Subtotal:             total,
+		Currency:             currency,
+		CollectionMethod:     sub.CollectionMethod,
+		Paid:                 true,
+		Discounts:            discountIDs,
+		TotalDiscountAmounts: totalDiscounts,
+		DefaultTaxRates:      sub.DefaultTaxRates,
+		TotalTaxAmounts:      taxAmounts,
 		Lines: &store.InvoiceLines{
 			Object:  "list",
 			Data:    lines,
@@ -464,10 +466,6 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		PeriodEnd:   sub.CurrentPeriodEnd,
 		Livemode:    false,
 		Created:     h.store.Now(),
-	}
-
-	if discountAmount > 0 {
-		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discount.ID}}
 	}
 
 	if sub.CollectionMethod == "send_invoice" {
