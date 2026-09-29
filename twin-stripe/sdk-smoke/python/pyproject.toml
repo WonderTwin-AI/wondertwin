@@ -7,3 +7,4 @@ dependencies = ["stripe==15.6.1"]
 
 [tool.uv]
 package = false
+exclude-newer = "7 days"
