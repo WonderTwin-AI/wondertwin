@@ -775,6 +775,16 @@ func TestReleasePublishAndLatest(t *testing.T) {
 	if latest["tag_name"] != "v1.0.0" {
 		t.Errorf("drafts and prereleases are never latest, got %v", latest["tag_name"])
 	}
+	// latest sorts by the date of the release's commit, not of the release:
+	// a release made later for an older commit does not become latest.
+	admin.AdvanceTime("1m").AssertStatus(200)
+	ghPut(tc, "/repos/twin-bot/rel/contents/NEWS.md", map[string]any{"message": "news", "content": "eAo="}).AssertStatus(201)
+	ghPost(tc, path, map[string]any{"tag_name": "v1.1.0"}).AssertStatus(201)
+	admin.AdvanceTime("1m").AssertStatus(200)
+	ghPost(tc, path, map[string]any{"tag_name": "v0.9.0", "target_commitish": tag["object"].(map[string]any)["sha"]}).AssertStatus(201)
+	if got := ghGet(tc, path+"/latest").JSONMap()["tag_name"]; got != "v1.1.0" {
+		t.Errorf("latest follows the newest commit, got %v", got)
+	}
 	if got := ghGet(tc, path+"/tags/v1.0.0").AssertStatus(200).JSONMap()["id"]; got != v1["id"] {
 		t.Errorf("tag lookup returned %v", got)
 	}
@@ -786,7 +796,7 @@ func TestReleasePublishAndLatest(t *testing.T) {
 	}
 	asset := ghPost(tc, strings.TrimPrefix(upload, tc.BaseURL)+"?name=app.tar.gz", "binary").AssertStatus(201).JSONMap()
 	assertRequired(t, "release-asset", asset)
-	if len(ghGet(tc, path+"/latest").JSONMap()["assets"].([]any)) != 1 {
+	if len(ghGet(tc, fmt.Sprintf("%s/%d", path, int64(v1["id"].(float64)))).JSONMap()["assets"].([]any)) != 1 {
 		t.Error("the asset is listed on its release")
 	}
 }

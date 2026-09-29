@@ -173,10 +173,20 @@ func (h *Handler) CreateRelease(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Now()
+	// GitHub's created_at for a release is the date of its commit, not of
+	// the release; latest sorts by it.
+	created := now
+	if t, ok := h.store.GetTagRef(owner, repo, "refs/tags/"+*req.TagName); ok {
+		if c, found := h.store.GetCommit(owner, repo, t.Object.SHA); found {
+			created = c.CommitterDate
+		}
+	} else if c, found := h.store.ResolveRef(owner, repo, target); found {
+		created = c.CommitterDate
+	}
 	rel := store.Release{
 		ID: h.store.NewID(store.KindRelease), TagName: *req.TagName, TargetCommitish: target,
 		Draft: req.Draft != nil && *req.Draft, Prerelease: req.Prerelease != nil && *req.Prerelease,
-		Author: h.userRef(actor(r)), CreatedAt: now, UpdatedAt: now, RepoOwner: owner, RepoName: repo,
+		Author: h.userRef(actor(r)), CreatedAt: created, UpdatedAt: now, RepoOwner: owner, RepoName: repo,
 	}
 	if req.Name != nil {
 		rel.Name, rel.NameSet = *req.Name, true
