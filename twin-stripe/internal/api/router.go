@@ -16,6 +16,7 @@ type Handler struct {
 	store      *store.MemoryStore
 	dispatcher *webhook.Dispatcher
 	mw         *twincore.Middleware
+	apiVersion string
 }
 
 // NewHandler creates a new API handler.
@@ -30,6 +31,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.MethodNotAllowed(unrecognizedURL)
 		// Auth middleware for all v1 routes
 		r.Use(h.authMiddleware)
+		// Only dahlia Stripe-Version values are served
+		r.Use(h.versionMiddleware)
 		// Accept name[N] array parameters, as the official SDKs send them
 		r.Use(h.arrayParamsMiddleware)
 		// Idempotency key caching for POST requests
@@ -294,6 +297,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/topups/{id}", h.GetTopUp)
 		r.Get("/topups", h.ListTopUps)
 	})
+
+	// The /v2 namespace is not served; answer it as Stripe answers an unknown URL.
+	r.HandleFunc("/v2/*", unrecognizedURL)
 
 	// Stripe-specific admin endpoints (outside /v1, no auth)
 	r.Post("/admin/payouts/{id}/fail", h.AdminFailPayout)

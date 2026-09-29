@@ -20,15 +20,31 @@ func (h *Handler) CreateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	enabled := r.Form["enabled_events[]"]
+	if len(enabled) == 0 {
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: enabled_events.")
+		return
+	}
+	apiVersion := r.FormValue("api_version")
+	if apiVersion != "" && !IsServedVersion(apiVersion) {
+		writeError(w, http.StatusBadRequest, apiError{
+			Type:    "invalid_request_error",
+			Code:    "parameter_invalid",
+			Param:   "api_version",
+			Message: "Invalid api_version: " + apiVersion + ". This app emulator renders events in the dahlia release (" + servedRange() + ") only.",
+		})
+		return
+	}
+
 	id := h.store.WebhookEndpoints.NextID()
 	we := store.WebhookEndpoint{
 		ID:            id,
 		Object:        "webhook_endpoint",
 		URL:           url,
 		Status:        "enabled",
-		EnabledEvents: r.Form["enabled_events[]"],
+		EnabledEvents: enabled,
 		Secret:        "whsec_" + h.randomHex(16),
-		APIVersion:    r.FormValue("api_version"),
+		APIVersion:    apiVersion,
 		Description:   r.FormValue("description"),
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
