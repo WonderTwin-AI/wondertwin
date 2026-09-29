@@ -2,9 +2,6 @@
 package api
 
 import (
-	"net/http"
-	"strings"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -29,6 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 	// Meta routes GitHub serves without a token.
 	r.Group(func(r chi.Router) {
 		r.Use(commonHeaders)
+		r.Use(h.bearerAuthMiddleware)
 		r.Use(versionMiddleware)
 		r.Use(h.mw.FaultInjection)
 
@@ -348,27 +346,4 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/repos", h.AdminListRepos)
 	r.Get("/admin/issues", h.AdminListIssues)
 	r.Get("/admin/pulls", h.AdminListPRs)
-}
-
-// bearerAuthMiddleware validates GitHub-style Bearer token auth.
-func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			ghError(w, http.StatusUnauthorized, "Requires authentication")
-			return
-		}
-
-		// Accept "Bearer <token>" or legacy "token <token>"
-		token := strings.TrimPrefix(auth, "Bearer ")
-		if token == auth {
-			token = strings.TrimPrefix(auth, "token ")
-		}
-		if token == auth || token == "" {
-			ghError(w, http.StatusUnauthorized, "Bad credentials")
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

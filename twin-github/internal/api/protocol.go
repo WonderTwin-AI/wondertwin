@@ -69,9 +69,6 @@ func origin(r *http.Request) string {
 // ghJSON writes a successful JSON response with GitHub-standard headers.
 func ghJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("X-RateLimit-Limit", "5000")
-	w.Header().Set("X-RateLimit-Remaining", "4999")
-	w.Header().Set("X-RateLimit-Used", "1")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }

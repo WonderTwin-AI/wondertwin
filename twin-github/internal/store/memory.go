@@ -43,6 +43,7 @@ type MemoryStore struct {
 	GitTrees         *pkgstate.Store[GitTree]
 	GitBlobs         *pkgstate.Store[GitBlob]
 	GitTags          *pkgstate.Store[GitTag]
+	Tokens           *pkgstate.Store[Token]
 	Clock            *pkgstate.Clock
 
 	ids        *idAllocator
@@ -51,7 +52,7 @@ type MemoryStore struct {
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
-	return &MemoryStore{
+	s := &MemoryStore{
 		Repos:            pkgstate.New[Repository]("repo"),
 		Issues:           pkgstate.New[Issue]("issue"),
 		PullRequests:     pkgstate.New[PullRequest]("pr"),
@@ -85,9 +86,12 @@ func New() *MemoryStore {
 		GitTrees:         pkgstate.New[GitTree]("gt"),
 		GitBlobs:         pkgstate.New[GitBlob]("gb"),
 		GitTags:          pkgstate.New[GitTag]("gtag"),
+		Tokens:           pkgstate.New[Token]("token"),
 		Clock:            pkgstate.NewClock(),
 		ids:              newIDAllocator(),
 	}
+	s.seedDefaults()
+	return s
 }
 
 // RepoKey builds a lookup key for owner/repo.
@@ -242,6 +246,7 @@ type stateSnapshot struct {
 	Statuses     map[string]CommitStatus `json:"statuses,omitempty"`
 	Releases     map[string]Release      `json:"releases,omitempty"`
 	Branches     map[string]Branch       `json:"branches,omitempty"`
+	Tokens       map[string]Token        `json:"tokens,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -257,6 +262,7 @@ func (s *MemoryStore) Snapshot() any {
 		Statuses:     s.Statuses.Snapshot(),
 		Releases:     s.Releases.Snapshot(),
 		Branches:     s.Branches.Snapshot(),
+		Tokens:       s.Tokens.Snapshot(),
 	}
 }
 
@@ -298,7 +304,11 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Branches != nil {
 		s.Branches.LoadSnapshot(snap.Branches)
 	}
+	if snap.Tokens != nil {
+		s.Tokens.LoadSnapshot(snap.Tokens)
+	}
 	s.observeLoaded()
+	s.seedDefaults()
 	return nil
 }
 
@@ -442,9 +452,11 @@ func (s *MemoryStore) Reset() {
 	s.GitTrees.Reset()
 	s.GitBlobs.Reset()
 	s.GitTags.Reset()
+	s.Tokens.Reset()
 	s.Clock.Reset()
 	s.ids.reset()
 	s.runCounter.Store(0)
+	s.seedDefaults()
 }
 
 // NextRunNumber returns the next workflow run number.

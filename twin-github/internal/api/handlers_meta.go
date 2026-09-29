@@ -14,12 +14,16 @@ import (
 // "rate" object (changeset remove_rate_limit_rate); resources.core replaces it.
 func (h *Handler) RateLimit(w http.ResponseWriter, r *http.Request) {
 	reset := h.store.Clock.Now().Add(time.Hour).Unix()
+	core := 5000
+	if principalFrom(r).Kind == principalAnonymous {
+		core = 60
+	}
 	bucket := func(limit, used int) map[string]any {
 		return map[string]any{"limit": limit, "remaining": limit - used, "reset": reset, "used": used}
 	}
 	ghJSON(w, 200, map[string]any{
 		"resources": map[string]any{
-			"core":                        bucket(5000, 1),
+			"core":                        bucket(core, 1),
 			"search":                      bucket(30, 0),
 			"graphql":                     bucket(5000, 0),
 			"code_search":                 bucket(10, 0),
@@ -108,13 +112,17 @@ func (h *Handler) GetRoot(w http.ResponseWriter, r *http.Request) {
 
 // GetAuthenticatedUser handles GET /user
 func (h *Handler) GetAuthenticatedUser(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, store.User{
-		ID:    1,
-		Login: "twin-bot",
-		Type:  "User",
-		Name:  "Twin Bot",
-		Email: "bot@wondertwin.dev",
-	})
+	p := principalFrom(r)
+	if p.Kind != principalUser {
+		ghError(w, http.StatusForbidden, "Resource not accessible by integration")
+		return
+	}
+	u, ok := h.store.Users.Get(p.Login)
+	if !ok {
+		u = store.User{ID: h.store.NewID(store.KindUser), Login: p.Login, Type: "User"}
+		h.store.Users.Set(p.Login, u)
+	}
+	ghJSON(w, 200, u)
 }
 
 // UpdateAuthenticatedUser handles PATCH /user

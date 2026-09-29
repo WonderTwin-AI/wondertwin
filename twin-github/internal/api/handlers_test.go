@@ -89,6 +89,56 @@ func TestRateLimit(t *testing.T) {
 	}
 }
 
+func TestBadCredentials(t *testing.T) {
+	_, tc := setupGitHub(t)
+	for _, auth := range []string{"Bearer not-a-github-token", "token nope", "Basic abc"} {
+		resp := tc.DoWithHeaders("GET", "/user", nil, map[string]string{"Authorization": auth})
+		resp.AssertStatus(401)
+		if m := resp.JSONMap(); m["message"] != "Bad credentials" || m["status"] != "401" {
+			t.Errorf("%s: unexpected body %v", auth, m)
+		}
+	}
+}
+
+func TestPublicReadsWithoutToken(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "open-source")
+	resp := tc.Get("/repos/twin-bot/open-source")
+	resp.AssertStatus(200)
+	if resp.Headers.Get("X-RateLimit-Limit") != "60" {
+		t.Errorf("unauthenticated callers get the 60/hour limit, got %q", resp.Headers.Get("X-RateLimit-Limit"))
+	}
+	core := tc.Get("/rate_limit").AssertStatus(200).JSONMap()["resources"].(map[string]any)["core"].(map[string]any)
+	if core["limit"].(float64) != 60 {
+		t.Errorf("expected core limit 60 unauthenticated, got %v", core["limit"])
+	}
+	tc.Post("/repos/twin-bot/open-source/issues", map[string]any{"title": "x"}).AssertStatus(401)
+	tc.Get("/repos/twin-bot/open-source/hooks").AssertStatus(401)
+}
+
+func TestPrivateRepoHiddenWithoutToken(t *testing.T) {
+	_, tc := setupGitHub(t)
+	ghPost(tc, "/user/repos", map[string]any{"name": "secret", "private": true}).AssertStatus(201)
+	tc.Get("/repos/twin-bot/secret").AssertStatus(404)
+	ghGet(tc, "/repos/twin-bot/secret").AssertStatus(200)
+}
+
+func TestSeededTokenAuthenticatesAsItsUser(t *testing.T) {
+	_, tc := setupGitHub(t)
+	admin := testutil.NewAdminClient(tc)
+	admin.LoadState(map[string]any{
+		"users":  map[string]any{"reviewer": map[string]any{"id": 190000500, "login": "reviewer", "type": "User"}},
+		"tokens": map[string]any{"reviewer-token": map[string]any{"token": "reviewer-token", "login": "reviewer", "kind": "user"}},
+	}).AssertStatus(200)
+	u := tc.DoWithHeaders("GET", "/user", nil, map[string]string{"Authorization": "Bearer reviewer-token"}).AssertStatus(200).JSONMap()
+	if u["login"] != "reviewer" {
+		t.Errorf("expected reviewer, got %v", u["login"])
+	}
+	if ghGet(tc, "/user").AssertStatus(200).JSONMap()["login"] != "twin-bot" {
+		t.Error("an unregistered well-formed token is the default user")
+	}
+}
+
 // --- API Version Tests ---
 
 func withHeaders(extra map[string]string) map[string]string {
