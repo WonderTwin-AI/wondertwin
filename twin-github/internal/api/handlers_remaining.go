@@ -2,116 +2,13 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // --- Releases extra ---
-
-// UpdateRelease handles PATCH /repos/{owner}/{repo}/releases/{release_id}
-func (h *Handler) UpdateRelease(w http.ResponseWriter, r *http.Request) {
-	releaseID, _ := strconv.ParseInt(chi.URLParam(r, "release_id"), 10, 64)
-
-	ids, releases := h.store.Releases.FilterWithIDs(func(_ string, rel store.Release) bool {
-		return rel.ID == releaseID
-	})
-	if len(ids) == 0 {
-		ghError(w, 404, "Not Found")
-		return
-	}
-
-	var req map[string]any
-	json.NewDecoder(r.Body).Decode(&req)
-
-	rel := releases[0]
-	if name, ok := req["name"].(string); ok {
-		rel.Name = name
-	}
-	if body, ok := req["body"].(string); ok {
-		rel.Body = body
-	}
-	if draft, ok := req["draft"].(bool); ok {
-		rel.Draft = draft
-	}
-	if pre, ok := req["prerelease"].(bool); ok {
-		rel.Prerelease = pre
-	}
-
-	h.store.Releases.Set(ids[0], rel)
-	ghJSON(w, 200, rel)
-}
-
-// GetReleaseByTag handles GET /repos/{owner}/{repo}/releases/tags/{tag}
-func (h *Handler) GetReleaseByTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	tag := chi.URLParam(r, "tag")
-
-	releases := h.store.ListRepoReleases(owner, repo)
-	for _, rel := range releases {
-		if rel.TagName == tag {
-			ghJSON(w, 200, rel)
-			return
-		}
-	}
-	ghError(w, 404, "Not Found")
-}
-
-// GetReleaseAsset handles GET /repos/{owner}/{repo}/releases/assets/{asset_id}
-func (h *Handler) GetReleaseAsset(w http.ResponseWriter, r *http.Request) {
-	assetID, _ := strconv.ParseInt(chi.URLParam(r, "asset_id"), 10, 64)
-	_, assets := h.store.ReleaseAssets.FilterWithIDs(func(_ string, a store.ReleaseAsset) bool {
-		return a.ID == assetID
-	})
-	if len(assets) == 0 {
-		ghError(w, 404, "Not Found")
-		return
-	}
-	ghJSON(w, 200, assets[0])
-}
-
-// UpdateReleaseAsset handles PATCH /repos/{owner}/{repo}/releases/assets/{asset_id}
-func (h *Handler) UpdateReleaseAsset(w http.ResponseWriter, r *http.Request) {
-	assetID, _ := strconv.ParseInt(chi.URLParam(r, "asset_id"), 10, 64)
-	ids, assets := h.store.ReleaseAssets.FilterWithIDs(func(_ string, a store.ReleaseAsset) bool {
-		return a.ID == assetID
-	})
-	if len(ids) == 0 {
-		ghError(w, 404, "Not Found")
-		return
-	}
-
-	var req map[string]any
-	json.NewDecoder(r.Body).Decode(&req)
-
-	a := assets[0]
-	if name, ok := req["name"].(string); ok {
-		a.Name = name
-	}
-	if label, ok := req["label"].(string); ok {
-		a.Label = label
-	}
-	h.store.ReleaseAssets.Set(ids[0], a)
-	ghJSON(w, 200, a)
-}
-
-// DeleteReleaseAsset handles DELETE /repos/{owner}/{repo}/releases/assets/{asset_id}
-func (h *Handler) DeleteReleaseAsset(w http.ResponseWriter, r *http.Request) {
-	assetID, _ := strconv.ParseInt(chi.URLParam(r, "asset_id"), 10, 64)
-	ids, _ := h.store.ReleaseAssets.FilterWithIDs(func(_ string, a store.ReleaseAsset) bool {
-		return a.ID == assetID
-	})
-	if len(ids) == 0 {
-		ghError(w, 404, "Not Found")
-		return
-	}
-	h.store.ReleaseAssets.Delete(ids[0])
-	w.WriteHeader(204)
-}
 
 // --- Branches extra ---
 
@@ -142,55 +39,35 @@ func (h *Handler) DeleteBranchProtection(w http.ResponseWriter, r *http.Request)
 
 // RenameBranch handles POST /repos/{owner}/{repo}/branches/{branch}/rename
 func (h *Handler) RenameBranch(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	oldName := chi.URLParam(r, "branch")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	oldName := param(r, "branch")
 
 	var req struct {
 		NewName string `json:"new_name"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
-	ids, branches := h.store.Branches.FilterWithIDs(func(_ string, b store.Branch) bool {
-		return b.RepoOwner == owner && b.RepoName == repo && b.Name == oldName
-	})
-	if len(ids) > 0 {
-		b := branches[0]
-		b.Name = req.NewName
-		h.store.Branches.Set(ids[0], b)
-		ghJSON(w, 201, b)
+	b, ok := h.store.GetBranch(owner, repo, oldName)
+	if !ok {
+		ghError(w, 404, "Branch not found")
 		return
 	}
-	ghJSON(w, 201, store.Branch{Name: req.NewName, Commit: store.BranchCommit{SHA: store.DefaultSHA()}})
+	if _, taken := h.store.GetBranch(owner, repo, req.NewName); taken || req.NewName == "" {
+		ghValidationErrors(w, "Validation Failed")
+		return
+	}
+	h.store.DeleteBranch(owner, repo, oldName)
+	h.store.SetBranch(owner, repo, req.NewName, b.Commit.SHA)
+	if rp, found := h.store.GetRepo(owner, repo); found && rp.DefaultBranch == oldName {
+		rp.DefaultBranch = req.NewName
+		h.store.Repos.Set(store.RepoKey(owner, repo), *rp)
+	}
+	nb, _ := h.store.GetBranch(owner, repo, req.NewName)
+	ghJSON(w, 201, h.rd(r).branch(nb))
 }
 
 // --- Check Runs/Suites extra ---
-
-// ListCheckRunsInSuite handles GET /repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs
-func (h *Handler) ListCheckRunsInSuite(w http.ResponseWriter, r *http.Request) {
-	// Simplified: return all check runs for the repo
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	runs := h.store.CheckRuns.Filter(func(_ string, cr store.CheckRun) bool {
-		return cr.RepoOwner == owner && cr.RepoName == repo
-	})
-	ghJSON(w, 200, map[string]any{"total_count": len(runs), "check_runs": runs})
-}
-
-// ListCheckRunAnnotations handles GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations
-func (h *Handler) ListCheckRunAnnotations(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []any{})
-}
-
-// RerequestCheckRun handles POST /repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest
-func (h *Handler) RerequestCheckRun(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(201)
-}
-
-// RerequestCheckSuite handles POST /repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest
-func (h *Handler) RerequestCheckSuite(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(201)
-}
 
 // UpdateCheckSuitePreferences handles PATCH /repos/{owner}/{repo}/check-suites/preferences
 func (h *Handler) UpdateCheckSuitePreferences(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +78,7 @@ func (h *Handler) UpdateCheckSuitePreferences(w http.ResponseWriter, r *http.Req
 
 // GetReadmeForDir handles GET /repos/{owner}/{repo}/readme/{dir}
 func (h *Handler) GetReadmeForDir(w http.ResponseWriter, r *http.Request) {
-	h.GetReadme(w, r) // Simplified: same as readme
+	h.readme(w, r, param(r, "dir"))
 }
 
 // DownloadTarball handles GET /repos/{owner}/{repo}/tarball/{ref}
@@ -220,29 +97,14 @@ func (h *Handler) DownloadZipball(w http.ResponseWriter, r *http.Request) {
 
 // --- Webhooks extra ---
 
-// PingWebhook handles POST /repos/{owner}/{repo}/hooks/{hook_id}/pings
-func (h *Handler) PingWebhook(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(204)
-}
-
-// TestWebhook handles POST /repos/{owner}/{repo}/hooks/{hook_id}/tests
-func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(204)
-}
-
-// ListWebhookDeliveries handles GET /repos/{owner}/{repo}/hooks/{hook_id}/deliveries
-func (h *Handler) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []any{})
-}
-
 // --- Orgs extra ---
 
 // UpdateOrg handles PATCH /orgs/{org}
 func (h *Handler) UpdateOrg(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 	org, ok := h.store.Orgs.Get(orgLogin)
 	if !ok {
-		org = store.Organization{ID: h.store.NextID(), Login: orgLogin, Type: "Organization"}
+		org = store.Organization{ID: h.store.NewID(store.KindOrg), Login: orgLogin, Type: "Organization"}
 	}
 
 	var req map[string]any
@@ -301,7 +163,7 @@ func (h *Handler) CheckCollaborator(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDeployment handles DELETE /repos/{owner}/{repo}/deployments/{deployment_id}
 func (h *Handler) DeleteDeployment(w http.ResponseWriter, r *http.Request) {
-	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
+	deployID, _ := strconv.ParseInt(param(r, "deployment_id"), 10, 64)
 	ids, _ := h.store.Deployments.FilterWithIDs(func(_ string, d store.Deployment) bool {
 		return d.ID == deployID
 	})
@@ -315,7 +177,7 @@ func (h *Handler) DeleteDeployment(w http.ResponseWriter, r *http.Request) {
 
 // GetDeploymentStatus handles GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses/{status_id}
 func (h *Handler) GetDeploymentStatus(w http.ResponseWriter, r *http.Request) {
-	statusID, _ := strconv.ParseInt(chi.URLParam(r, "status_id"), 10, 64)
+	statusID, _ := strconv.ParseInt(param(r, "status_id"), 10, 64)
 	_, statuses := h.store.DeployStatuses.FilterWithIDs(func(_ string, ds store.DeploymentStatus) bool {
 		return ds.ID == statusID
 	})
@@ -388,7 +250,7 @@ func (h *Handler) GetOrgPublicKey(w http.ResponseWriter, r *http.Request) {
 
 // GetOrgSecret handles GET /orgs/{org}/actions/secrets/{secret_name}
 func (h *Handler) GetOrgSecret(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "secret_name")
+	name := param(r, "secret_name")
 	ghJSON(w, 200, map[string]any{
 		"name":       name,
 		"created_at": h.store.Now(),
@@ -432,18 +294,18 @@ func (h *Handler) SearchLabels(w http.ResponseWriter, r *http.Request) {
 
 // ListPRCommentReactions handles GET /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions
 func (h *Handler) ListPRCommentReactions(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	commentID := chi.URLParam(r, "comment_id")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	commentID := param(r, "comment_id")
 	reactions := h.store.ListSubjectReactions(owner, repo, "pr_comment:"+commentID)
-	ghJSON(w, 200, reactions)
+	ghJSON(w, 200, paginate(w, r, reactions))
 }
 
 // CreatePRCommentReaction handles POST /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions
 func (h *Handler) CreatePRCommentReaction(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	commentID := chi.URLParam(r, "comment_id")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	commentID := param(r, "comment_id")
 
 	var req struct {
 		Content string `json:"content"`
@@ -462,7 +324,7 @@ func (h *Handler) CreatePRCommentReaction(w http.ResponseWriter, r *http.Request
 
 // DeletePRCommentReaction handles DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions/{reaction_id}
 func (h *Handler) DeletePRCommentReaction(w http.ResponseWriter, r *http.Request) {
-	reactionID, _ := strconv.ParseInt(chi.URLParam(r, "reaction_id"), 10, 64)
+	reactionID, _ := strconv.ParseInt(param(r, "reaction_id"), 10, 64)
 	ids, _ := h.store.Reactions.FilterWithIDs(func(_ string, rx store.Reaction) bool { return rx.ID == reactionID })
 	if len(ids) == 0 {
 		ghError(w, 404, "Not Found")
@@ -470,43 +332,6 @@ func (h *Handler) DeletePRCommentReaction(w http.ResponseWriter, r *http.Request
 	}
 	h.store.Reactions.Delete(ids[0])
 	w.WriteHeader(204)
-}
-
-// --- GitHub App endpoints ---
-
-// GetApp handles GET /app
-func (h *Handler) GetApp(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, map[string]any{
-		"id":    1,
-		"slug":  "wondertwin-app",
-		"name":  "WonderTwin App",
-		"owner": store.User{ID: 1, Login: "twin-bot", Type: "User"},
-	})
-}
-
-// ListAppInstallations handles GET /app/installations
-func (h *Handler) ListAppInstallations(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []map[string]any{
-		{
-			"id":          1,
-			"app_id":      1,
-			"target_type": "Organization",
-			"account":     store.User{ID: 1, Login: "twin-bot", Type: "Organization"},
-		},
-	})
-}
-
-// CreateInstallationAccessToken handles POST /app/installations/{installation_id}/access_tokens
-func (h *Handler) CreateInstallationAccessToken(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 201, map[string]any{
-		"token":      fmt.Sprintf("ghs_%s", store.MakeSHA(h.store.Now())[:20]),
-		"expires_at": "2099-01-01T00:00:00Z",
-		"permissions": map[string]any{
-			"issues":        "write",
-			"pull_requests": "write",
-			"contents":      "read",
-		},
-	})
 }
 
 // --- Misc ---

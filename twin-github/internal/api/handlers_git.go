@@ -1,43 +1,82 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
+// refTarget looks a fully qualified ref up in the git model.
+func (h *Handler) refTarget(owner, repo, ref string) (string, bool) {
+	if name, isBranch := strings.CutPrefix(ref, "refs/heads/"); isBranch {
+		b, ok := h.store.GetBranch(owner, repo, name)
+		return b.Commit.SHA, ok
+	}
+	t, ok := h.store.GetTagRef(owner, repo, ref)
+	return t.Object.SHA, ok
+}
+
+// allRefs lists every ref of a repository, sorted by name.
+func (h *Handler) allRefs(owner, repo string) [][2]string {
+	var out [][2]string
+	for _, b := range h.store.ListRepoBranches(owner, repo) {
+		out = append(out, [2]string{"refs/heads/" + b.Name, b.Commit.SHA})
+	}
+	for _, t := range h.store.ListRepoGitRefs(owner, repo, "") {
+		out = append(out, [2]string{t.Ref, t.Object.SHA})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
+	return out
+}
+
 // GetGitRef handles GET /repos/{owner}/{repo}/git/ref/{ref}
 func (h *Handler) GetGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
-
-	refs := h.store.ListRepoGitRefs(owner, repo, ref)
-	if len(refs) == 0 {
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
+	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ghJSON(w, 200, refs[0])
+	if !h.store.HasCommits(owner, repo) {
+		ghError(w, 409, "Git Repository is empty.")
+		return
+	}
+	sha, ok := h.refTarget(owner, repo, ref)
+	if !ok {
+		ghError(w, 404, "Not Found")
+		return
+	}
+	ghJSON(w, 200, h.rd(r).gitRef(owner, repo, ref, sha))
 }
 
 // ListMatchingRefs handles GET /repos/{owner}/{repo}/git/matching-refs/{ref}
 func (h *Handler) ListMatchingRefs(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	prefix := "refs/" + chi.URLParam(r, "*")
-
-	refs := h.store.ListRepoGitRefs(owner, repo, prefix)
-	ghJSON(w, 200, refs)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	prefix := "refs/" + param(r, "*")
+	x := h.rd(r)
+	out := []map[string]any{}
+	for _, ref := range h.allRefs(owner, repo) {
+		if strings.HasPrefix(ref[0], prefix) {
+			out = append(out, x.gitRef(owner, repo, ref[0], ref[1]))
+		}
+	}
+	ghJSON(w, 200, out)
 }
 
 // CreateGitRef handles POST /repos/{owner}/{repo}/git/refs
 func (h *Handler) CreateGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	if _, ok := h.store.GetRepo(owner, repo); !ok {
+		ghError(w, 404, "Not Found")
+		return
+	}
 
 	var req struct {
 		Ref string `json:"ref"`
@@ -47,222 +86,280 @@ func (h *Handler) CreateGitRef(w http.ResponseWriter, r *http.Request) {
 		ghError(w, 400, "Problems parsing JSON")
 		return
 	}
-
-	gitRef := store.GitRef{
-		Ref:    req.Ref,
-		NodeID: store.MakeSHA(req.Ref)[:20],
-		URL:    fmt.Sprintf("%s/repos/%s/%s/git/%s", h.store.APIURL(), owner, repo, req.Ref),
-		Object: store.GitObject{
-			Type: "commit",
-			SHA:  req.SHA,
-			URL:  fmt.Sprintf("%s/repos/%s/%s/git/commits/%s", h.store.APIURL(), owner, repo, req.SHA),
-		},
-		RepoOwner: owner,
-		RepoName:  repo,
+	if !strings.HasPrefix(req.Ref, "refs/") || strings.Count(req.Ref, "/") < 2 {
+		ghValidationErrors(w, "Reference name is not valid")
+		return
 	}
-
-	id := h.store.GitRefs.NextID()
-	h.store.GitRefs.Set(id, gitRef)
-	ghJSON(w, 201, gitRef)
+	if _, exists := h.refTarget(owner, repo, req.Ref); exists {
+		ghValidationErrors(w, "Reference already exists")
+		return
+	}
+	c, ok := h.store.GetCommit(owner, repo, req.SHA)
+	if !ok {
+		ghValidationErrors(w, "Object does not exist")
+		return
+	}
+	if name, isBranch := strings.CutPrefix(req.Ref, "refs/heads/"); isBranch {
+		h.store.SetBranch(owner, repo, name, c.SHA)
+	} else {
+		h.store.SetTagRef(owner, repo, req.Ref, c.SHA)
+	}
+	h.onRefCreated(r, owner, repo, req.Ref, c.SHA)
+	ghJSON(w, 201, h.rd(r).gitRef(owner, repo, req.Ref, c.SHA))
 }
 
 // UpdateGitRef handles PATCH /repos/{owner}/{repo}/git/refs/{ref}
 func (h *Handler) UpdateGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
 
 	var req struct {
 		SHA   string `json:"sha"`
 		Force bool   `json:"force"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	ids, refs := h.store.GitRefs.FilterWithIDs(func(_ string, gr store.GitRef) bool {
-		return gr.RepoOwner == owner && gr.RepoName == repo && gr.Ref == ref
-	})
-	if len(ids) == 0 {
-		ghError(w, 404, "Not Found")
+	old, ok := h.refTarget(owner, repo, ref)
+	if !ok {
+		ghValidationErrors(w, "Reference does not exist")
 		return
 	}
-
-	gr := refs[0]
-	gr.Object.SHA = req.SHA
-	h.store.GitRefs.Set(ids[0], gr)
-	ghJSON(w, 200, gr)
+	c, ok := h.store.GetCommit(owner, repo, req.SHA)
+	if !ok {
+		ghValidationErrors(w, "Object does not exist")
+		return
+	}
+	if !req.Force && !h.store.IsAncestor(owner, repo, old, c.SHA) {
+		ghValidationErrors(w, "Update is not a fast forward")
+		return
+	}
+	if name, isBranch := strings.CutPrefix(ref, "refs/heads/"); isBranch {
+		h.store.SetBranch(owner, repo, name, c.SHA)
+	} else {
+		h.store.SetTagRef(owner, repo, ref, c.SHA)
+	}
+	h.onRefUpdated(r, owner, repo, ref, old, c.SHA, req.Force)
+	ghJSON(w, 200, h.rd(r).gitRef(owner, repo, ref, c.SHA))
 }
 
 // DeleteGitRef handles DELETE /repos/{owner}/{repo}/git/refs/{ref}
 func (h *Handler) DeleteGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
 
-	ids, _ := h.store.GitRefs.FilterWithIDs(func(_ string, gr store.GitRef) bool {
-		return gr.RepoOwner == owner && gr.RepoName == repo && gr.Ref == ref
-	})
-	if len(ids) == 0 {
-		ghError(w, 404, "Not Found")
+	var deleted bool
+	if name, isBranch := strings.CutPrefix(ref, "refs/heads/"); isBranch {
+		deleted = h.store.DeleteBranch(owner, repo, name)
+	} else {
+		deleted = h.store.DeleteTagRef(owner, repo, ref)
+	}
+	if !deleted {
+		ghValidationErrors(w, "Reference does not exist")
 		return
 	}
-	h.store.GitRefs.Delete(ids[0])
 	w.WriteHeader(204)
 }
 
 // GetGitCommit handles GET /repos/{owner}/{repo}/git/commits/{commit_sha}
 func (h *Handler) GetGitCommit(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "commit_sha")
-
-	_, commits := h.store.GitCommits.FilterWithIDs(func(_ string, gc store.GitCommit) bool {
-		return gc.RepoOwner == owner && gc.RepoName == repo && gc.SHA == sha
-	})
-	if len(commits) == 0 {
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	c, ok := h.store.GetCommit(owner, repo, param(r, "commit_sha"))
+	if !ok {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ghJSON(w, 200, commits[0])
+	ghJSON(w, 200, h.rd(r).gitCommit(c))
 }
 
 // CreateGitCommit handles POST /repos/{owner}/{repo}/git/commits
 func (h *Handler) CreateGitCommit(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Message string   `json:"message"`
 		Tree    string   `json:"tree"`
-		Parents []string `json:"parents,omitempty"`
+		Parents []string `json:"parents"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	sha := store.MakeSHA(req.Message + req.Tree)
-	var parents []store.GitTreeRef
-	for _, p := range req.Parents {
-		parents = append(parents, store.GitTreeRef{SHA: p})
-	}
-
-	gc := store.GitCommit{
-		SHA:     sha,
-		Message: req.Message,
-		Tree:    store.GitTreeRef{SHA: req.Tree},
-		Parents: parents,
-		Author: store.GitSignature{
-			Name:  "twin-bot",
-			Email: "bot@wondertwin.dev",
-			Date:  h.store.Now(),
-		},
-		HTMLURL:   fmt.Sprintf("%s/%s/%s/commit/%s", h.store.BaseURL(), owner, repo, sha),
-		RepoOwner: owner,
-		RepoName:  repo,
-	}
-
-	id := h.store.GitCommits.NextID()
-	h.store.GitCommits.Set(id, gc)
-	ghJSON(w, 201, gc)
-}
-
-// GetGitTree handles GET /repos/{owner}/{repo}/git/trees/{tree_sha}
-func (h *Handler) GetGitTree(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "tree_sha")
-
-	_, trees := h.store.GitTrees.FilterWithIDs(func(_ string, gt store.GitTree) bool {
-		return gt.RepoOwner == owner && gt.RepoName == repo && gt.SHA == sha
-	})
-	if len(trees) == 0 {
-		ghError(w, 404, "Not Found")
+	tree, ok := h.store.GitTrees.Get(store.RepoKey(owner, repo) + "@" + req.Tree)
+	if !ok {
+		ghValidationErrors(w, "Tree SHA does not exist")
 		return
 	}
-	ghJSON(w, 200, trees[0])
+	files := map[string]string{}
+	for _, e := range tree.Tree {
+		if e.Type == "blob" {
+			files[e.Path] = e.SHA
+		}
+	}
+	for _, p := range req.Parents {
+		if _, found := h.store.GetCommit(owner, repo, p); !found {
+			ghValidationErrors(w, "Parent SHA does not exist or is not a commit object")
+			return
+		}
+	}
+	sig := h.signature(r, contentsRequest{})
+	c := h.store.PutCommit(store.Commit{
+		Message: req.Message, Parents: req.Parents, Files: files,
+		AuthorName: sig.Name, AuthorEmail: sig.Email, AuthorDate: sig.Date,
+		Login: sig.Login, RepoOwner: owner, RepoName: repo,
+	})
+	ghJSON(w, 201, h.rd(r).gitCommit(c))
+}
+
+func (x renderer) gitTree(owner, repo string, t store.GitTree) map[string]any {
+	entries := make([]map[string]any, 0, len(t.Tree))
+	for _, e := range t.Tree {
+		entry := map[string]any{"path": e.Path, "mode": e.Mode, "type": e.Type, "sha": e.SHA,
+			"url": x.api("/repos/%s/%s/git/%ss/%s", owner, repo, e.Type, e.SHA)}
+		if e.Type == "blob" {
+			entry["size"] = e.Size
+		}
+		entries = append(entries, entry)
+	}
+	return map[string]any{"sha": t.SHA, "url": x.api("/repos/%s/%s/git/trees/%s", owner, repo, t.SHA),
+		"tree": entries, "truncated": false}
+}
+
+// GetGitTree handles GET /repos/{owner}/{repo}/git/trees/{tree_sha}. Trees
+// are listed flat (as with ?recursive=1).
+func (h *Handler) GetGitTree(w http.ResponseWriter, r *http.Request) {
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "tree_sha")
+
+	if t, ok := h.store.GitTrees.Get(store.RepoKey(owner, repo) + "@" + sha); ok {
+		ghJSON(w, 200, h.rd(r).gitTree(owner, repo, t))
+		return
+	}
+	// A tree of a commit made through the contents API.
+	if c, ok := h.commitByTree(owner, repo, sha); ok {
+		ghJSON(w, 200, h.rd(r).gitTree(owner, repo, h.treeOf(owner, repo, c)))
+		return
+	}
+	ghError(w, 404, "Not Found")
+}
+
+func (h *Handler) commitByTree(owner, repo, treeSHA string) (store.Commit, bool) {
+	cs := h.store.Commits.Filter(func(_ string, c store.Commit) bool {
+		return c.RepoOwner == owner && c.RepoName == repo && c.TreeSHA == treeSHA
+	})
+	if len(cs) == 0 {
+		return store.Commit{}, false
+	}
+	return cs[0], true
+}
+
+func (h *Handler) treeOf(owner, repo string, c store.Commit) store.GitTree {
+	paths := make([]string, 0, len(c.Files))
+	for p := range c.Files {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	t := store.GitTree{SHA: c.TreeSHA}
+	for _, p := range paths {
+		content, _ := h.store.GetBlob(owner, repo, c.Files[p])
+		t.Tree = append(t.Tree, store.GitTreeEntry{Path: p, Mode: "100644", Type: "blob", SHA: c.Files[p], Size: len(content)})
+	}
+	return t
 }
 
 // CreateGitTree handles POST /repos/{owner}/{repo}/git/trees
 func (h *Handler) CreateGitTree(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
-		BaseTree string               `json:"base_tree,omitempty"`
-		Tree     []store.GitTreeEntry `json:"tree"`
+		BaseTree string `json:"base_tree"`
+		Tree     []struct {
+			Path    string  `json:"path"`
+			Mode    string  `json:"mode"`
+			Type    string  `json:"type"`
+			SHA     *string `json:"sha"`
+			Content *string `json:"content"`
+		} `json:"tree"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	// Generate SHA from tree content
-	var parts []string
+	files := map[string]string{}
+	if req.BaseTree != "" {
+		if base, ok := h.store.GitTrees.Get(store.RepoKey(owner, repo) + "@" + req.BaseTree); ok {
+			for _, e := range base.Tree {
+				files[e.Path] = e.SHA
+			}
+		} else if c, found := h.commitByTree(owner, repo, req.BaseTree); found {
+			for p, s := range c.Files {
+				files[p] = s
+			}
+		}
+	}
 	for _, e := range req.Tree {
-		parts = append(parts, e.Path+e.SHA)
+		switch {
+		case e.Content != nil:
+			files[e.Path] = h.store.PutBlob(owner, repo, []byte(*e.Content))
+		case e.SHA == nil:
+			delete(files, e.Path)
+		default:
+			files[e.Path] = *e.SHA
+		}
 	}
-	sha := store.MakeSHA(strings.Join(parts, ""))
-
-	gt := store.GitTree{
-		SHA:       sha,
-		Tree:      req.Tree,
-		Truncated: false,
-		URL:       fmt.Sprintf("%s/repos/%s/%s/git/trees/%s", h.store.APIURL(), owner, repo, sha),
-		RepoOwner: owner,
-		RepoName:  repo,
-	}
-
-	id := h.store.GitTrees.NextID()
-	h.store.GitTrees.Set(id, gt)
-	ghJSON(w, 201, gt)
+	t := h.treeOf(owner, repo, store.Commit{Files: files, TreeSHA: store.TreeSHA(files)})
+	h.store.GitTrees.Set(store.RepoKey(owner, repo)+"@"+t.SHA, t)
+	ghJSON(w, 201, h.rd(r).gitTree(owner, repo, t))
 }
 
 // GetGitBlob handles GET /repos/{owner}/{repo}/git/blobs/{file_sha}
 func (h *Handler) GetGitBlob(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "file_sha")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "file_sha")
 
-	_, blobs := h.store.GitBlobs.FilterWithIDs(func(_ string, gb store.GitBlob) bool {
-		return gb.RepoOwner == owner && gb.RepoName == repo && gb.SHA == sha
-	})
-	if len(blobs) == 0 {
+	content, ok := h.store.GetBlob(owner, repo, sha)
+	if !ok {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ghJSON(w, 200, blobs[0])
+	ghJSON(w, 200, map[string]any{
+		"sha": sha, "node_id": "B_" + store.MakeSHA("blob:" + sha)[:20], "size": len(content),
+		"url":     h.rd(r).api("/repos/%s/%s/git/blobs/%s", owner, repo, sha),
+		"content": wrapBase64(content), "encoding": "base64",
+	})
 }
 
 // CreateGitBlob handles POST /repos/{owner}/{repo}/git/blobs
 func (h *Handler) CreateGitBlob(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	if req.Encoding == "" {
-		req.Encoding = "utf-8"
+	content := []byte(req.Content)
+	if req.Encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(req.Content, "\n", ""))
+		if err != nil {
+			ghValidationErrors(w, "content is not valid Base64")
+			return
+		}
+		content = decoded
 	}
-
-	sha := store.MakeSHA(req.Content)
-	gb := store.GitBlob{
-		SHA:       sha,
-		Size:      len(req.Content),
-		Content:   req.Content,
-		Encoding:  req.Encoding,
-		URL:       fmt.Sprintf("%s/repos/%s/%s/git/blobs/%s", h.store.APIURL(), owner, repo, sha),
-		RepoOwner: owner,
-		RepoName:  repo,
-	}
-
-	id := h.store.GitBlobs.NextID()
-	h.store.GitBlobs.Set(id, gb)
-	ghJSON(w, 201, gb)
+	sha := h.store.PutBlob(owner, repo, content)
+	ghJSON(w, 201, map[string]any{"sha": sha, "url": h.rd(r).api("/repos/%s/%s/git/blobs/%s", owner, repo, sha)})
 }
 
 // GetGitTag handles GET /repos/{owner}/{repo}/git/tags/{tag_sha}
 func (h *Handler) GetGitTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "tag_sha")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "tag_sha")
 
 	_, tags := h.store.GitTags.FilterWithIDs(func(_ string, gt store.GitTag) bool {
 		return gt.RepoOwner == owner && gt.RepoName == repo && gt.SHA == sha
@@ -276,8 +373,8 @@ func (h *Handler) GetGitTag(w http.ResponseWriter, r *http.Request) {
 
 // CreateGitTag handles POST /repos/{owner}/{repo}/git/tags
 func (h *Handler) CreateGitTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Tag     string `json:"tag"`
@@ -285,23 +382,25 @@ func (h *Handler) CreateGitTag(w http.ResponseWriter, r *http.Request) {
 		Object  string `json:"object"`
 		Type    string `json:"type"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	sha := store.MakeSHA(req.Tag + req.Object)
+	x := h.rd(r)
 	gt := store.GitTag{
 		Tag:     req.Tag,
 		SHA:     sha,
 		Message: req.Message,
 		Tagger: store.GitSignature{
-			Name:  "twin-bot",
-			Email: "bot@wondertwin.dev",
+			Name:  actor(r),
+			Email: actor(r) + "@users.noreply.github.com",
 			Date:  h.store.Now(),
 		},
 		Object: store.GitObject{
 			Type: req.Type,
 			SHA:  req.Object,
+			URL:  x.api("/repos/%s/%s/git/commits/%s", owner, repo, req.Object),
 		},
-		URL:       fmt.Sprintf("%s/repos/%s/%s/git/tags/%s", h.store.APIURL(), owner, repo, sha),
+		URL:       x.api("/repos/%s/%s/git/tags/%s", owner, repo, sha),
 		RepoOwner: owner,
 		RepoName:  repo,
 	}

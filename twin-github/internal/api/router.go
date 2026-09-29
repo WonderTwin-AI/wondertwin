@@ -2,10 +2,6 @@
 package api
 
 import (
-	"encoding/json"
-	"net/http"
-	"strings"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -15,17 +11,37 @@ import (
 type Handler struct {
 	store *store.MemoryStore
 	mw    *twincore.Middleware
+	hooks *hookBus
 }
 
 // NewHandler creates a new GitHub API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw}
+	h.hooks = newHookBus(h)
+	return h
 }
 
 // Routes mounts the GitHub REST API-compatible routes.
 func (h *Handler) Routes(r chi.Router) {
+	r.NotFound(notFound)
+	r.MethodNotAllowed(notFound)
+
+	// Meta routes GitHub serves without a token.
 	r.Group(func(r chi.Router) {
+		r.Use(commonHeaders)
 		r.Use(h.bearerAuthMiddleware)
+		r.Use(versionMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.GetRoot)
+		r.Get("/versions", h.ListVersions)
+		r.Get("/zen", h.GetZen)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(commonHeaders)
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(versionMiddleware)
 		r.Use(h.mw.FaultInjection)
 
 		// Meta
@@ -50,6 +66,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/app", h.GetApp)
 		r.Get("/app/installations", h.ListAppInstallations)
 		r.Post("/app/installations/{installation_id}/access_tokens", h.CreateInstallationAccessToken)
+		r.Get("/app/installations/{installation_id}", h.GetAppInstallation)
+		r.Get("/installation/repositories", h.ListInstallationRepos)
 
 		// Repos
 		r.Get("/repos/{owner}/{repo}", h.GetRepo)
@@ -138,7 +156,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.ListPRReviews)
 		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.CreatePRReview)
 		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.GetPRReview)
-		r.Patch("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.UpdatePRReview)
+		r.Put("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.UpdatePRReview)
 		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events", h.SubmitPRReview)
 		r.Put("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", h.DismissPRReview)
 
@@ -168,6 +186,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Patch("/repos/{owner}/{repo}/check-suites/preferences", h.UpdateCheckSuitePreferences)
 
 		// Contents
+		r.Get("/repos/{owner}/{repo}/contents", h.GetContents)
 		r.Get("/repos/{owner}/{repo}/contents/*", h.GetContents)
 		r.Put("/repos/{owner}/{repo}/contents/*", h.CreateOrUpdateContents)
 		r.Delete("/repos/{owner}/{repo}/contents/*", h.DeleteContents)
@@ -333,60 +352,4 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/repos", h.AdminListRepos)
 	r.Get("/admin/issues", h.AdminListIssues)
 	r.Get("/admin/pulls", h.AdminListPRs)
-}
-
-// bearerAuthMiddleware validates GitHub-style Bearer token auth.
-func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			ghError(w, http.StatusUnauthorized, "Requires authentication")
-			return
-		}
-
-		// Accept "Bearer <token>" or legacy "token <token>"
-		token := strings.TrimPrefix(auth, "Bearer ")
-		if token == auth {
-			token = strings.TrimPrefix(auth, "token ")
-		}
-		if token == auth || token == "" {
-			ghError(w, http.StatusUnauthorized, "Bad credentials")
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// ghJSON writes a successful JSON response with GitHub-standard headers.
-func ghJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("X-RateLimit-Limit", "5000")
-	w.Header().Set("X-RateLimit-Remaining", "4999")
-	w.Header().Set("X-RateLimit-Used", "1")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-// ghError writes a GitHub-style error response.
-func ghError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]any{
-		"message":           message,
-		"documentation_url": "https://docs.github.com/rest",
-	})
-}
-
-// ghValidationError writes a 422 validation error.
-func ghValidationError(w http.ResponseWriter, resource, field, code string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusUnprocessableEntity)
-	json.NewEncoder(w).Encode(map[string]any{
-		"message":           "Validation Failed",
-		"documentation_url": "https://docs.github.com/rest",
-		"errors": []map[string]any{
-			{"resource": resource, "field": field, "code": code},
-		},
-	})
 }

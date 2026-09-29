@@ -2,8 +2,10 @@ package webhook
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -406,4 +408,79 @@ func TestReset(t *testing.T) {
 	if evt.ID != "evt_000001" {
 		t.Errorf("expected evt_000001 after reset, got %s", evt.ID)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Encode, Headers and Timeout options
+// ---------------------------------------------------------------------------
+
+func TestEncodeReplacesEnvelopeAndIsSigned(t *testing.T) {
+	var gotBody []byte
+	var gotSig string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotBody, _ = io.ReadAll(r.Body)
+		gotSig = r.Header.Get("X-Body-Len")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(Config{
+		URL:    srv.URL,
+		Secret: "s",
+		Signer: lenSigner{},
+		Encode: func(evt Event) ([]byte, error) { return json.Marshal(evt.Payload) },
+	})
+	d.Enqueue("issues", map[string]any{"action": "opened"})
+	if err := d.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	if string(gotBody) != `{"action":"opened"}` {
+		t.Errorf("expected raw payload body, got %s", gotBody)
+	}
+	if gotSig != strconv.Itoa(len(gotBody)) {
+		t.Errorf("signer saw %s bytes, body has %d", gotSig, len(gotBody))
+	}
+}
+
+func TestHeadersSentWithoutSecret(t *testing.T) {
+	var gotEvent, gotType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotEvent = r.Header.Get("X-Event")
+		gotType = r.Header.Get("Content-Type")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(Config{
+		URL: srv.URL,
+		Headers: func(evt Event) map[string]string {
+			return map[string]string{"X-Event": evt.Type, "Content-Type": "application/x-www-form-urlencoded"}
+		},
+	})
+	d.Enqueue("push", map[string]any{})
+	if err := d.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if gotEvent != "push" {
+		t.Errorf("expected X-Event=push, got %q", gotEvent)
+	}
+	if gotType != "application/x-www-form-urlencoded" {
+		t.Errorf("expected Headers to override Content-Type, got %q", gotType)
+	}
+}
+
+func TestTimeoutOption(t *testing.T) {
+	if d := NewDispatcher(Config{}); d.client.Timeout != 30*time.Second {
+		t.Errorf("expected default timeout 30s, got %v", d.client.Timeout)
+	}
+	if d := NewDispatcher(Config{Timeout: 10 * time.Second}); d.client.Timeout != 10*time.Second {
+		t.Errorf("expected timeout 10s, got %v", d.client.Timeout)
+	}
+}
+
+type lenSigner struct{}
+
+func (lenSigner) Sign(payload []byte, _ string) map[string]string {
+	return map[string]string{"X-Body-Len": strconv.Itoa(len(payload))}
 }

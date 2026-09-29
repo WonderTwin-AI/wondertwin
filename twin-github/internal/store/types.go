@@ -28,6 +28,13 @@ type Repository struct {
 	UpdatedAt     string   `json:"updated_at"`
 	PushedAt      string   `json:"pushed_at"`
 	Topics        []string `json:"topics,omitempty"`
+	Homepage      string   `json:"homepage,omitempty"`
+	IsTemplate    bool     `json:"is_template,omitempty"`
+	// Merge settings; nil means GitHub's default.
+	AllowSquashMerge    *bool `json:"allow_squash_merge,omitempty"`
+	AllowMergeCommit    *bool `json:"allow_merge_commit,omitempty"`
+	AllowRebaseMerge    *bool `json:"allow_rebase_merge,omitempty"`
+	DeleteBranchOnMerge bool  `json:"delete_branch_on_merge,omitempty"`
 }
 
 // Issue represents a GitHub issue.
@@ -47,10 +54,13 @@ type Issue struct {
 	CreatedAt string     `json:"created_at"`
 	UpdatedAt string     `json:"updated_at"`
 	ClosedAt  string     `json:"closed_at,omitempty"`
+	// StateReason is completed, not_planned, reopened or duplicate.
+	StateReason string `json:"state_reason,omitempty"`
+	ClosedBy    string `json:"closed_by,omitempty"`
 
-	// Internal: which repo this belongs to
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	// Which repo this belongs to.
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // PullRequest represents a GitHub pull request.
@@ -80,9 +90,14 @@ type PullRequest struct {
 	UpdatedAt      string  `json:"updated_at"`
 	ClosedAt       string  `json:"closed_at,omitempty"`
 	MergedAt       string  `json:"merged_at,omitempty"`
+	MergedBy       string  `json:"merged_by,omitempty"`
+	// MergeBase is the commit the head branch forked from the base.
+	MergeBase           string   `json:"merge_base,omitempty"`
+	RequestedReviewers  []string `json:"requested_reviewers,omitempty"`
+	MaintainerCanModify bool     `json:"maintainer_can_modify,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // PRRef represents the head or base of a pull request.
@@ -101,9 +116,9 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 
-	RepoOwner   string `json:"-"`
-	RepoName    string `json:"-"`
-	IssueNumber int    `json:"-"`
+	RepoOwner   string `json:"repo_owner"`
+	RepoName    string `json:"repo_name"`
+	IssueNumber int    `json:"issue_number"`
 }
 
 // Label represents a GitHub label.
@@ -114,8 +129,8 @@ type Label struct {
 	Color       string `json:"color"`
 	Default     bool   `json:"default"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner,omitempty"`
+	RepoName  string `json:"repo_name,omitempty"`
 }
 
 // Milestone represents a GitHub milestone.
@@ -157,9 +172,35 @@ type Webhook struct {
 	Config    WebhookConfig `json:"config"`
 	CreatedAt string        `json:"created_at"`
 	UpdatedAt string        `json:"updated_at"`
+	// LastResponse is the outcome of the most recent delivery.
+	LastResponse *HookResponse `json:"last_response,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+}
+
+// HookResponse summarises a delivery attempt.
+type HookResponse struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+// HookDelivery records one webhook delivery.
+type HookDelivery struct {
+	ID             int64             `json:"id"`
+	GUID           string            `json:"guid"`
+	HookID         int64             `json:"hook_id"`
+	DeliveredAt    string            `json:"delivered_at"`
+	Duration       float64           `json:"duration"`
+	Status         string            `json:"status"`
+	StatusCode     int               `json:"status_code"`
+	Event          string            `json:"event"`
+	Action         string            `json:"action,omitempty"`
+	InstallationID int64             `json:"installation_id,omitempty"`
+	RepositoryID   int64             `json:"repository_id,omitempty"`
+	RequestHeaders map[string]string `json:"request_headers,omitempty"`
+	RequestBody    string            `json:"request_body,omitempty"`
 }
 
 // WebhookConfig holds webhook delivery configuration.
@@ -181,9 +222,9 @@ type CommitStatus struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	SHA       string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	SHA       string `json:"sha"`
 }
 
 // Release represents a GitHub release.
@@ -199,9 +240,14 @@ type Release struct {
 	Author          User   `json:"author"`
 	CreatedAt       string `json:"created_at"`
 	PublishedAt     string `json:"published_at,omitempty"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+	// MakeLatest is "true", "false" or "legacy", as the API accepts it.
+	MakeLatest string `json:"make_latest,omitempty"`
+	// NameSet records whether a name was given; GitHub returns null when not.
+	NameSet bool `json:"name_set,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // Branch represents a Git branch.
@@ -210,8 +256,8 @@ type Branch struct {
 	Protected bool         `json:"protected"`
 	Commit    BranchCommit `json:"commit"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // BranchCommit is the head commit of a branch.
@@ -243,9 +289,9 @@ type PRReview struct {
 	CommitID    string `json:"commit_id"`
 	SubmittedAt string `json:"submitted_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	PRNumber  int    `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	PRNumber  int    `json:"pr_number"`
 }
 
 // PRReviewComment represents an inline/diff comment on a PR.
@@ -284,9 +330,12 @@ type CheckRun struct {
 	DetailsURL  string          `json:"details_url,omitempty"`
 	ExternalID  string          `json:"external_id,omitempty"`
 	Output      *CheckRunOutput `json:"output,omitempty"`
+	AppID       int64           `json:"app_id,omitempty"`
+	SuiteID     int64           `json:"check_suite_id,omitempty"`
+	Annotations int             `json:"annotations_count,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // CheckRunOutput holds check run output details.
@@ -305,25 +354,10 @@ type CheckSuite struct {
 	Conclusion string `json:"conclusion,omitempty"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
+	AppID      int64  `json:"app_id,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-}
-
-// Content represents a file or directory in a repository.
-type Content struct {
-	Type        string `json:"type"` // "file", "dir", "symlink", "submodule"
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	SHA         string `json:"sha"`
-	Size        int    `json:"size"`
-	HTMLURL     string `json:"html_url"`
-	DownloadURL string `json:"download_url,omitempty"`
-	Content     string `json:"content,omitempty"`  // base64-encoded for files
-	Encoding    string `json:"encoding,omitempty"` // "base64"
-
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // Organization represents a GitHub organization.
@@ -412,10 +446,11 @@ type ReleaseAsset struct {
 	CreatedAt          string `json:"created_at"`
 	UpdatedAt          string `json:"updated_at"`
 	Uploader           User   `json:"uploader"`
+	Digest             string `json:"digest,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	ReleaseID int64  `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	ReleaseID int64  `json:"release_id"`
 }
 
 // --- Actions types ---
@@ -431,8 +466,8 @@ type Workflow struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // WorkflowRun represents a single execution of a workflow.
@@ -451,9 +486,14 @@ type WorkflowRun struct {
 	Actor      User   `json:"actor"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
+	Path       string `json:"path,omitempty"`
+	StartedAt  string `json:"run_started_at,omitempty"`
+	SuiteID    int64  `json:"check_suite_id,omitempty"`
+	// Inputs are the workflow_dispatch inputs the run was started with.
+	Inputs map[string]any `json:"inputs,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // WorkflowJob represents a job within a workflow run.
@@ -517,8 +557,8 @@ type GitRef struct {
 	URL    string    `json:"url"`
 	Object GitObject `json:"object"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // GitObject represents the object a ref points to.

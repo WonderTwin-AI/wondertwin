@@ -3,32 +3,53 @@
   "vendor_domain": "github.com",
   "tier": "community",
   "category": "workspace",
-  "description": "Simulates the GitHub REST API: repos, issues, PRs, reviews, checks, labels, milestones, contents, deployments, orgs, teams, reactions, search, webhooks, Actions, and Git data.",
+  "description": "Emulates the GitHub REST API at calendar version 2026-03-10 for eight use cases: repository bootstrap, issue triage, pull request lifecycle, CI statuses and check runs, GitHub App installation tokens, release publishing, API version negotiation (2026-03-10 only) and workflow dispatch, plus signed webhook delivery for issues, pull_request, push and check_run.",
   "sdk_target": {
     "primary": {
-      "package": "github.com/google/go-github",
-      "language": "go",
-      "version": "v60",
-      "repo_url": "https://github.com/google/go-github",
-      "docs_url": "https://docs.github.com/rest"
+      "package": "@octokit/plugin-rest-endpoint-methods",
+      "language": "typescript",
+      "version": "17.0.0",
+      "repo_url": "https://github.com/octokit/plugin-rest-endpoint-methods.js",
+      "docs_url": "https://docs.github.com/rest/using-the-rest-api/libraries-for-the-rest-api",
+      "api_version": "2026-03-10"
     },
     "additional": [
       {
-        "package": "@octokit/rest",
+        "package": "octokit",
         "language": "typescript",
-        "version": "latest",
-        "repo_url": "https://github.com/octokit/rest.js"
+        "version": "5.0.5",
+        "repo_url": "https://github.com/octokit/octokit.js",
+        "compatibility": "tested",
+        "last_validated": "2026-09-28",
+        "validation_method": "scenario_suite",
+        "known_gaps": [
+          "Octokit sends no X-GitHub-Api-Version header; this app emulator serves such requests as 2026-03-10 where GitHub serves 2022-11-28."
+        ]
+      },
+      {
+        "package": "github.com/google/go-github/v92",
+        "language": "go",
+        "version": "v92.0.0",
+        "repo_url": "https://github.com/google/go-github",
+        "compatibility": "tested",
+        "last_validated": "2026-09-28",
+        "validation_method": "scenario_suite",
+        "known_gaps": [
+          "Third-party SDK, not maintained by GitHub.",
+          "Sends X-GitHub-Api-Version: 2022-11-28 by default, which this app emulator refuses with 400; clients must send 2026-03-10."
+        ]
       }
     ]
   },
   "service_surface": {
     "openapi_spec": {
       "available": true,
-      "url": "https://github.com/github/rest-api-description"
+      "origin": "vendor_published",
+      "url": "https://raw.githubusercontent.com/github/rest-api-description/2f44eacae7f376f1ed158829fbe008cc4eae5815/descriptions/api.github.com/api.github.com.2026-03-10.json"
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 38
+    "resource_count": 42
   },
   "coverage": {
     "resources_implemented": [
@@ -68,16 +89,27 @@
       "git_commits",
       "git_trees",
       "git_blobs",
-      "git_tags"
+      "git_tags",
+      "apps",
+      "installations",
+      "installation_tokens",
+      "webhook_deliveries",
+      "api_versions"
     ],
-    "resources_not_implemented": [],
-    "estimated_coverage_pct": 100
+    "resources_not_implemented": [
+      "api_version_2022_11_28",
+      "graphql",
+      "enterprise_server",
+      "enterprise_cloud_admin",
+      "webhook_redelivery",
+      "workflow_execution"
+    ]
   },
   "generation": {
     "method": "manual",
     "sources_used": {
       "deepwiki": false,
-      "openapi": false,
+      "openapi": true,
       "manual_docs": true
     }
   },
@@ -86,5 +118,6 @@
   "twin_id": "twin-github",
   "vendor_certification": {
     "status": "none"
-  }
+  },
+  "vendor_api_version": "2026-03-10"
 }

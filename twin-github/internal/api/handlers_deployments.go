@@ -5,22 +5,21 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // ListDeployKeys handles GET /repos/{owner}/{repo}/keys
 func (h *Handler) ListDeployKeys(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	keys := h.store.ListRepoDeployKeys(owner, repo)
-	ghJSON(w, 200, keys)
+	ghJSON(w, 200, paginate(w, r, keys))
 }
 
 // CreateDeployKey handles POST /repos/{owner}/{repo}/keys
 func (h *Handler) CreateDeployKey(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Title    string `json:"title"`
@@ -49,7 +48,7 @@ func (h *Handler) CreateDeployKey(w http.ResponseWriter, r *http.Request) {
 
 // GetDeployKey handles GET /repos/{owner}/{repo}/keys/{key_id}
 func (h *Handler) GetDeployKey(w http.ResponseWriter, r *http.Request) {
-	keyID, _ := strconv.ParseInt(chi.URLParam(r, "key_id"), 10, 64)
+	keyID, _ := strconv.ParseInt(param(r, "key_id"), 10, 64)
 
 	_, keys := h.store.DeployKeys.FilterWithIDs(func(_ string, dk store.DeployKey) bool {
 		return dk.ID == keyID
@@ -63,7 +62,7 @@ func (h *Handler) GetDeployKey(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDeployKey handles DELETE /repos/{owner}/{repo}/keys/{key_id}
 func (h *Handler) DeleteDeployKey(w http.ResponseWriter, r *http.Request) {
-	keyID, _ := strconv.ParseInt(chi.URLParam(r, "key_id"), 10, 64)
+	keyID, _ := strconv.ParseInt(param(r, "key_id"), 10, 64)
 
 	ids, _ := h.store.DeployKeys.FilterWithIDs(func(_ string, dk store.DeployKey) bool {
 		return dk.ID == keyID
@@ -78,16 +77,16 @@ func (h *Handler) DeleteDeployKey(w http.ResponseWriter, r *http.Request) {
 
 // ListDeployments handles GET /repos/{owner}/{repo}/deployments
 func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	deployments := h.store.ListRepoDeployments(owner, repo)
-	ghJSON(w, 200, deployments)
+	ghJSON(w, 200, paginate(w, r, deployments))
 }
 
 // CreateDeployment handles POST /repos/{owner}/{repo}/deployments
 func (h *Handler) CreateDeployment(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Ref         string `json:"ref"`
@@ -127,7 +126,7 @@ func (h *Handler) CreateDeployment(w http.ResponseWriter, r *http.Request) {
 
 // GetDeployment handles GET /repos/{owner}/{repo}/deployments/{deployment_id}
 func (h *Handler) GetDeployment(w http.ResponseWriter, r *http.Request) {
-	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
+	deployID, _ := strconv.ParseInt(param(r, "deployment_id"), 10, 64)
 
 	_, deps := h.store.Deployments.FilterWithIDs(func(_ string, d store.Deployment) bool {
 		return d.ID == deployID
@@ -141,19 +140,19 @@ func (h *Handler) GetDeployment(w http.ResponseWriter, r *http.Request) {
 
 // ListDeploymentStatuses handles GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses
 func (h *Handler) ListDeploymentStatuses(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	deployID, _ := strconv.ParseInt(param(r, "deployment_id"), 10, 64)
 
 	statuses := h.store.ListDeploymentStatuses(owner, repo, deployID)
-	ghJSON(w, 200, statuses)
+	ghJSON(w, 200, paginate(w, r, statuses))
 }
 
 // CreateDeploymentStatus handles POST /repos/{owner}/{repo}/deployments/{deployment_id}/statuses
 func (h *Handler) CreateDeploymentStatus(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	deployID, _ := strconv.ParseInt(param(r, "deployment_id"), 10, 64)
 
 	var req struct {
 		State          string `json:"state"`

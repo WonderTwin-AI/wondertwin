@@ -1,8 +1,9 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sync/atomic"
 
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -26,7 +27,6 @@ type MemoryStore struct {
 	PRReviewComments *pkgstate.Store[PRReviewComment]
 	CheckRuns        *pkgstate.Store[CheckRun]
 	CheckSuites      *pkgstate.Store[CheckSuite]
-	Contents         *pkgstate.Store[Content]
 	Orgs             *pkgstate.Store[Organization]
 	Teams            *pkgstate.Store[Team]
 	DeployKeys       *pkgstate.Store[DeployKey]
@@ -43,17 +43,21 @@ type MemoryStore struct {
 	GitTrees         *pkgstate.Store[GitTree]
 	GitBlobs         *pkgstate.Store[GitBlob]
 	GitTags          *pkgstate.Store[GitTag]
+	Tokens           *pkgstate.Store[Token]
+	Commits          *pkgstate.Store[Commit]
+	Blobs            *pkgstate.Store[Blob]
+	Apps             *pkgstate.Store[App]
+	Installations    *pkgstate.Store[Installation]
+	HookDeliveries   *pkgstate.Store[HookDelivery]
 	Clock            *pkgstate.Clock
 
-	// Monotonic counters
-	issueCounter atomic.Int64
-	idCounter    atomic.Int64
-	runCounter   atomic.Int64
+	ids        *idAllocator
+	runCounter atomic.Int64
 }
 
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
-	return &MemoryStore{
+	s := &MemoryStore{
 		Repos:            pkgstate.New[Repository]("repo"),
 		Issues:           pkgstate.New[Issue]("issue"),
 		PullRequests:     pkgstate.New[PullRequest]("pr"),
@@ -70,7 +74,6 @@ func New() *MemoryStore {
 		PRReviewComments: pkgstate.New[PRReviewComment]("rc"),
 		CheckRuns:        pkgstate.New[CheckRun]("cr"),
 		CheckSuites:      pkgstate.New[CheckSuite]("cs"),
-		Contents:         pkgstate.New[Content]("content"),
 		Orgs:             pkgstate.New[Organization]("org"),
 		Teams:            pkgstate.New[Team]("team"),
 		DeployKeys:       pkgstate.New[DeployKey]("dk"),
@@ -87,18 +90,17 @@ func New() *MemoryStore {
 		GitTrees:         pkgstate.New[GitTree]("gt"),
 		GitBlobs:         pkgstate.New[GitBlob]("gb"),
 		GitTags:          pkgstate.New[GitTag]("gtag"),
+		Tokens:           pkgstate.New[Token]("token"),
+		Commits:          pkgstate.New[Commit]("commit"),
+		Blobs:            pkgstate.New[Blob]("blob"),
+		Apps:             pkgstate.New[App]("app"),
+		Installations:    pkgstate.New[Installation]("installation"),
+		HookDeliveries:   pkgstate.New[HookDelivery]("delivery"),
 		Clock:            pkgstate.NewClock(),
+		ids:              newIDAllocator(),
 	}
-}
-
-// NextID returns a monotonically increasing numeric ID.
-func (s *MemoryStore) NextID() int64 {
-	return s.idCounter.Add(1)
-}
-
-// NextIssueNumber returns the next issue/PR number for a repo.
-func (s *MemoryStore) NextIssueNumber() int {
-	return int(s.issueCounter.Add(1))
+	s.seedDefaults()
+	return s
 }
 
 // RepoKey builds a lookup key for owner/repo.
@@ -236,38 +238,65 @@ func DefaultSHA() string {
 	return "abc1234567890def1234567890abcdef12345678"
 }
 
-// MakeSHA generates a deterministic SHA from a string.
+// MakeSHA derives a deterministic 40-character hex identifier from a string.
 func MakeSHA(input string) string {
-	return fmt.Sprintf("%040x", []byte(input))[:40]
+	sum := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(sum[:])[:40]
 }
 
 type stateSnapshot struct {
-	Repos        map[string]Repository   `json:"repos,omitempty"`
-	Issues       map[string]Issue        `json:"issues,omitempty"`
-	PullRequests map[string]PullRequest  `json:"pull_requests,omitempty"`
-	Comments     map[string]Comment      `json:"comments,omitempty"`
-	Labels       map[string]Label        `json:"labels,omitempty"`
-	Milestones   map[string]Milestone    `json:"milestones,omitempty"`
-	Users        map[string]User         `json:"users,omitempty"`
-	Webhooks     map[string]Webhook      `json:"webhooks,omitempty"`
-	Statuses     map[string]CommitStatus `json:"statuses,omitempty"`
-	Releases     map[string]Release      `json:"releases,omitempty"`
-	Branches     map[string]Branch       `json:"branches,omitempty"`
+	Repos         map[string]Repository   `json:"repos,omitempty"`
+	Issues        map[string]Issue        `json:"issues,omitempty"`
+	PullRequests  map[string]PullRequest  `json:"pull_requests,omitempty"`
+	Comments      map[string]Comment      `json:"comments,omitempty"`
+	Labels        map[string]Label        `json:"labels,omitempty"`
+	Milestones    map[string]Milestone    `json:"milestones,omitempty"`
+	Users         map[string]User         `json:"users,omitempty"`
+	Webhooks      map[string]Webhook      `json:"webhooks,omitempty"`
+	Statuses      map[string]CommitStatus `json:"statuses,omitempty"`
+	Releases      map[string]Release      `json:"releases,omitempty"`
+	Branches      map[string]Branch       `json:"branches,omitempty"`
+	Tokens        map[string]Token        `json:"tokens,omitempty"`
+	Commits       map[string]Commit       `json:"commits,omitempty"`
+	Blobs         map[string]Blob         `json:"blobs,omitempty"`
+	GitRefs       map[string]GitRef       `json:"git_refs,omitempty"`
+	Apps          map[string]App          `json:"apps,omitempty"`
+	Installations map[string]Installation `json:"installations,omitempty"`
+	Workflows     map[string]Workflow     `json:"workflows,omitempty"`
+	WorkflowRuns  map[string]WorkflowRun  `json:"workflow_runs,omitempty"`
+	CheckRuns     map[string]CheckRun     `json:"check_runs,omitempty"`
+	CheckSuites   map[string]CheckSuite   `json:"check_suites,omitempty"`
+	PRReviews     map[string]PRReview     `json:"pr_reviews,omitempty"`
+	ReleaseAssets map[string]ReleaseAsset `json:"release_assets,omitempty"`
+	Orgs          map[string]Organization `json:"orgs,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
-		Repos:        s.Repos.Snapshot(),
-		Issues:       s.Issues.Snapshot(),
-		PullRequests: s.PullRequests.Snapshot(),
-		Comments:     s.Comments.Snapshot(),
-		Labels:       s.Labels.Snapshot(),
-		Milestones:   s.Milestones.Snapshot(),
-		Users:        s.Users.Snapshot(),
-		Webhooks:     s.Webhooks.Snapshot(),
-		Statuses:     s.Statuses.Snapshot(),
-		Releases:     s.Releases.Snapshot(),
-		Branches:     s.Branches.Snapshot(),
+		Repos:         s.Repos.Snapshot(),
+		Issues:        s.Issues.Snapshot(),
+		PullRequests:  s.PullRequests.Snapshot(),
+		Comments:      s.Comments.Snapshot(),
+		Labels:        s.Labels.Snapshot(),
+		Milestones:    s.Milestones.Snapshot(),
+		Users:         s.Users.Snapshot(),
+		Webhooks:      s.Webhooks.Snapshot(),
+		Statuses:      s.Statuses.Snapshot(),
+		Releases:      s.Releases.Snapshot(),
+		Branches:      s.Branches.Snapshot(),
+		Tokens:        s.Tokens.Snapshot(),
+		Commits:       s.Commits.Snapshot(),
+		Blobs:         s.Blobs.Snapshot(),
+		GitRefs:       s.GitRefs.Snapshot(),
+		Apps:          s.Apps.Snapshot(),
+		Installations: s.Installations.Snapshot(),
+		Workflows:     s.Workflows.Snapshot(),
+		WorkflowRuns:  s.WorkflowRuns.Snapshot(),
+		CheckRuns:     s.CheckRuns.Snapshot(),
+		CheckSuites:   s.CheckSuites.Snapshot(),
+		PRReviews:     s.PRReviews.Snapshot(),
+		ReleaseAssets: s.ReleaseAssets.Snapshot(),
+		Orgs:          s.Orgs.Snapshot(),
 	}
 }
 
@@ -309,7 +338,111 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Branches != nil {
 		s.Branches.LoadSnapshot(snap.Branches)
 	}
+	if snap.Tokens != nil {
+		s.Tokens.LoadSnapshot(snap.Tokens)
+	}
+	if snap.Commits != nil {
+		s.Commits.LoadSnapshot(snap.Commits)
+	}
+	if snap.Blobs != nil {
+		s.Blobs.LoadSnapshot(snap.Blobs)
+	}
+	if snap.GitRefs != nil {
+		s.GitRefs.LoadSnapshot(snap.GitRefs)
+	}
+	if snap.Apps != nil {
+		s.Apps.LoadSnapshot(snap.Apps)
+	}
+	if snap.Installations != nil {
+		s.Installations.LoadSnapshot(snap.Installations)
+	}
+	if snap.Workflows != nil {
+		s.Workflows.LoadSnapshot(snap.Workflows)
+	}
+	if snap.WorkflowRuns != nil {
+		s.WorkflowRuns.LoadSnapshot(snap.WorkflowRuns)
+	}
+	if snap.CheckRuns != nil {
+		s.CheckRuns.LoadSnapshot(snap.CheckRuns)
+	}
+	if snap.CheckSuites != nil {
+		s.CheckSuites.LoadSnapshot(snap.CheckSuites)
+	}
+	if snap.PRReviews != nil {
+		s.PRReviews.LoadSnapshot(snap.PRReviews)
+	}
+	if snap.ReleaseAssets != nil {
+		s.ReleaseAssets.LoadSnapshot(snap.ReleaseAssets)
+	}
+	if snap.Orgs != nil {
+		s.Orgs.LoadSnapshot(snap.Orgs)
+	}
+	s.observeLoaded()
+	s.seedDefaults()
 	return nil
+}
+
+// observeLoaded moves the ID and number sequences past everything loaded.
+func (s *MemoryStore) observeLoaded() {
+	for _, r := range s.Repos.List() {
+		s.ids.observe(KindRepo, r.ID)
+	}
+	for _, u := range s.Users.List() {
+		s.ids.observe(KindUser, u.ID)
+	}
+	for _, i := range s.Issues.List() {
+		s.ids.observe(KindIssue, i.ID)
+		s.ids.observeNumber(RepoKey(i.RepoOwner, i.RepoName), i.Number)
+	}
+	for _, p := range s.PullRequests.List() {
+		s.ids.observe(KindPull, p.ID)
+		s.ids.observeNumber(RepoKey(p.RepoOwner, p.RepoName), p.Number)
+	}
+	for _, c := range s.Comments.List() {
+		s.ids.observe(KindComment, c.ID)
+	}
+	for _, l := range s.Labels.List() {
+		s.ids.observe(KindLabel, l.ID)
+	}
+	for _, m := range s.Milestones.List() {
+		s.ids.observe(KindMilestone, m.ID)
+	}
+	for _, w := range s.Webhooks.List() {
+		s.ids.observe(KindHook, w.ID)
+	}
+	for _, st := range s.Statuses.List() {
+		s.ids.observe(KindStatus, st.ID)
+	}
+	for _, r := range s.Releases.List() {
+		s.ids.observe(KindRelease, r.ID)
+	}
+	for _, a := range s.Apps.List() {
+		s.ids.observe(KindApp, a.ID)
+	}
+	for _, i := range s.Installations.List() {
+		s.ids.observe(KindInstallation, i.ID)
+	}
+	for _, wf := range s.Workflows.List() {
+		s.ids.observe(KindWorkflow, wf.ID)
+	}
+	for _, run := range s.WorkflowRuns.List() {
+		s.ids.observe(KindRun, run.ID)
+	}
+	for _, cr := range s.CheckRuns.List() {
+		s.ids.observe(KindCheckRun, cr.ID)
+	}
+	for _, cs := range s.CheckSuites.List() {
+		s.ids.observe(KindCheckSuite, cs.ID)
+	}
+	for _, rv := range s.PRReviews.List() {
+		s.ids.observe(KindReview, rv.ID)
+	}
+	for _, a := range s.ReleaseAssets.List() {
+		s.ids.observe(KindAsset, a.ID)
+	}
+	for _, o := range s.Orgs.List() {
+		s.ids.observe(KindOrg, o.ID)
+	}
 }
 
 // ListPRReviews returns reviews for a pull request.
@@ -323,13 +456,6 @@ func (s *MemoryStore) ListPRReviews(owner, repo string, prNumber int) []PRReview
 func (s *MemoryStore) ListCheckRunsForRef(owner, repo, sha string) []CheckRun {
 	return s.CheckRuns.Filter(func(_ string, cr CheckRun) bool {
 		return cr.RepoOwner == owner && cr.RepoName == repo && cr.HeadSHA == sha
-	})
-}
-
-// ListRepoContents returns contents at a path.
-func (s *MemoryStore) ListRepoContents(owner, repo, path string) []Content {
-	return s.Contents.Filter(func(_ string, c Content) bool {
-		return c.RepoOwner == owner && c.RepoName == repo && c.Path == path
 	})
 }
 
@@ -399,7 +525,6 @@ func (s *MemoryStore) Reset() {
 	s.PRReviewComments.Reset()
 	s.CheckRuns.Reset()
 	s.CheckSuites.Reset()
-	s.Contents.Reset()
 	s.Orgs.Reset()
 	s.Teams.Reset()
 	s.DeployKeys.Reset()
@@ -416,10 +541,16 @@ func (s *MemoryStore) Reset() {
 	s.GitTrees.Reset()
 	s.GitBlobs.Reset()
 	s.GitTags.Reset()
+	s.Tokens.Reset()
+	s.Commits.Reset()
+	s.Blobs.Reset()
+	s.Apps.Reset()
+	s.Installations.Reset()
+	s.HookDeliveries.Reset()
 	s.Clock.Reset()
-	s.issueCounter.Store(0)
-	s.idCounter.Store(0)
+	s.ids.reset()
 	s.runCounter.Store(0)
+	s.seedDefaults()
 }
 
 // NextRunNumber returns the next workflow run number.

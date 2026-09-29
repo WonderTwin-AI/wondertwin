@@ -67,6 +67,8 @@ type Dispatcher struct {
 	counter          int
 	autoDeliver      bool
 	endpointProvider EndpointProvider
+	encode           func(Event) ([]byte, error)
+	headers          func(Event) map[string]string
 }
 
 // Config configures the webhook dispatcher.
@@ -79,6 +81,20 @@ type Config struct {
 	RetryDelay  time.Duration
 	EventPrefix string // e.g., "evt" for Stripe-style events
 	AutoDeliver bool   // automatically deliver events when queued
+
+	// Encode builds the request body for an event. When nil, the body is the
+	// JSON-encoded Event envelope. Vendors that deliver the payload itself,
+	// rather than an envelope around it, set this. The signer signs exactly
+	// the bytes Encode returns.
+	Encode func(evt Event) ([]byte, error)
+
+	// Headers returns extra request headers for an event. They are sent on
+	// every attempt whether or not a secret is configured, after
+	// Content-Type (so they may override it) and before any signer headers.
+	Headers func(evt Event) map[string]string
+
+	// Timeout bounds each delivery attempt. Zero keeps the 30 second default.
+	Timeout time.Duration
 }
 
 // NewDispatcher creates a new webhook dispatcher.
@@ -95,6 +111,9 @@ func NewDispatcher(cfg Config) *Dispatcher {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 30 * time.Second
+	}
 
 	return &Dispatcher{
 		url:         cfg.URL,
@@ -105,9 +124,11 @@ func NewDispatcher(cfg Config) *Dispatcher {
 		deliveries:  make([]Delivery, 0),
 		maxRetries:  cfg.MaxRetries,
 		retryDelay:  cfg.RetryDelay,
-		client:      &http.Client{Timeout: 30 * time.Second},
+		client:      &http.Client{Timeout: cfg.Timeout},
 		eventPrefix: cfg.EventPrefix,
 		autoDeliver: cfg.AutoDeliver,
+		encode:      cfg.Encode,
+		headers:     cfg.Headers,
 	}
 }
 
@@ -230,7 +251,13 @@ func endpointMatchesEvent(enabledEvents []string, eventType string) bool {
 }
 
 func (d *Dispatcher) deliverToURL(evt Event, url, secret string, signer Signer) error {
-	payload, err := json.Marshal(evt)
+	var payload []byte
+	var err error
+	if d.encode != nil {
+		payload, err = d.encode(evt)
+	} else {
+		payload, err = json.Marshal(evt)
+	}
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
@@ -242,6 +269,11 @@ func (d *Dispatcher) deliverToURL(evt Event, url, secret string, signer Signer) 
 			return fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		if d.headers != nil {
+			for k, v := range d.headers(evt) {
+				req.Header.Set(k, v)
+			}
+		}
 
 		if signer != nil && secret != "" {
 			for k, v := range signer.Sign(payload, secret) {

@@ -6,18 +6,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // GetOrg handles GET /orgs/{org}
 func (h *Handler) GetOrg(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 	org, ok := h.store.Orgs.Get(orgLogin)
 	if !ok {
 		// Generate a default org
 		org = store.Organization{
-			ID:      h.store.NextID(),
+			ID:      h.store.NewID(store.KindOrg),
 			Login:   orgLogin,
 			Type:    "Organization",
 			HTMLURL: h.store.BaseURL() + "/" + orgLogin,
@@ -34,23 +33,23 @@ func (h *Handler) ListOrgMembers(w http.ResponseWriter, r *http.Request) {
 
 // ListOrgRepos handles GET /orgs/{org}/repos
 func (h *Handler) ListOrgRepos(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Owner.Login == orgLogin
+		return rp.Owner.Login == orgLogin && !hiddenFrom(r, rp)
 	})
-	ghJSON(w, 200, repos)
+	h.writeRepos(w, r, repos)
 }
 
 // ListOrgTeams handles GET /orgs/{org}/teams
 func (h *Handler) ListOrgTeams(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 	teams := h.store.ListOrgTeams(orgLogin)
-	ghJSON(w, 200, teams)
+	ghJSON(w, 200, paginate(w, r, teams))
 }
 
 // CreateTeam handles POST /orgs/{org}/teams
 func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 
 	var req struct {
 		Name        string `json:"name"`
@@ -87,8 +86,8 @@ func (h *Handler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 
 // GetTeam handles GET /orgs/{org}/teams/{team_slug}
 func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
-	slug := chi.URLParam(r, "team_slug")
+	orgLogin := param(r, "org")
+	slug := param(r, "team_slug")
 
 	teams := h.store.Teams.Filter(func(_ string, t store.Team) bool {
 		return t.OrgLogin == orgLogin && t.Slug == slug
@@ -102,8 +101,8 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 
 // UpdateTeam handles PATCH /orgs/{org}/teams/{team_slug}
 func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
-	slug := chi.URLParam(r, "team_slug")
+	orgLogin := param(r, "org")
+	slug := param(r, "team_slug")
 
 	ids, teams := h.store.Teams.FilterWithIDs(func(_ string, t store.Team) bool {
 		return t.OrgLogin == orgLogin && t.Slug == slug
@@ -131,8 +130,8 @@ func (h *Handler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 
 // DeleteTeam handles DELETE /orgs/{org}/teams/{team_slug}
 func (h *Handler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
-	slug := chi.URLParam(r, "team_slug")
+	orgLogin := param(r, "org")
+	slug := param(r, "team_slug")
 
 	ids, _ := h.store.Teams.FilterWithIDs(func(_ string, t store.Team) bool {
 		return t.OrgLogin == orgLogin && t.Slug == slug

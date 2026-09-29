@@ -1,9 +1,12 @@
-// twin-github is a WonderTwin twin that simulates the GitHub REST API.
-// It handles repos, issues, pull requests, labels, comments, commit statuses,
-// releases, branches, webhooks, and more.
+// twin-github is the community app emulator for the GitHub REST API at
+// calendar version 2026-03-10. It serves repositories, contents and git data,
+// issues, pull requests and reviews, commit statuses and check runs, GitHub
+// App installation tokens, releases, workflow dispatch and signed webhook
+// delivery.
 //
-// SDK compatibility target: github.com/google/go-github, @octokit/rest
-// Integration method: Override base URL
+// SDK targets: Octokit.js (@octokit/plugin-rest-endpoint-methods 17.0.0) and
+// google/go-github v92 (third party). Clients reach it by overriding the base
+// URL; under lstk it is http://github.localhost.localstack.cloud:4566.
 package main
 
 import (
@@ -30,6 +33,7 @@ func main() {
 
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetFlusher(apiHandler)
 	adminHandler.Routes(twin.Router)
 
 	if cfg.SeedFile != "" {
