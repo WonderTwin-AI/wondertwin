@@ -1055,7 +1055,10 @@ func TestCheckRuns(t *testing.T) {
 	}
 	crID := int64(cr["id"].(float64))
 
-	done := tc.DoWithHeaders("PATCH", fmt.Sprintf("%s/%d", path, crID), map[string]any{"conclusion": "success"}, app).AssertStatus(200).JSONMap()
+	done := tc.DoWithHeaders("PATCH", fmt.Sprintf("%s/%d", path, crID), map[string]any{"name": "", "conclusion": "success"}, app).AssertStatus(200).JSONMap()
+	if done["name"] != "ci/test" {
+		t.Errorf("an empty name on update keeps the name, got %v", done["name"])
+	}
 	if done["status"] != "completed" || done["completed_at"] == nil {
 		t.Errorf("a conclusion completes the run, got %v %v", done["status"], done["completed_at"])
 	}

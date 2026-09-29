@@ -329,7 +329,8 @@ type checkRunRequest struct {
 // applyCheckRun applies a create or update request. A conclusion completes
 // the run; a completed run needs a conclusion.
 func (h *Handler) applyCheckRun(w http.ResponseWriter, cr *store.CheckRun, req checkRunRequest) bool {
-	if req.Name != nil {
+	// go-github always sends name on update; an empty one keeps the name.
+	if req.Name != nil && *req.Name != "" {
 		cr.Name = *req.Name
 	}
 	if req.DetailsURL != nil {
