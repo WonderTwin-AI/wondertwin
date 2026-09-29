@@ -12,27 +12,39 @@ import (
 // CreateCharge handles POST /v1/charges (direct charge creation).
 func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	currency := r.FormValue("currency")
 	if amountStr == "" || currency == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: amount, currency.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "amount", "currency"))
 		return
 	}
 	amount, _ := strconv.ParseInt(amountStr, 10, 64)
 
 	// Check card behavior if source is a payment method.
 	if source := r.FormValue("source"); source != "" {
-		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.DeclineCode != "" {
-			twincore.StripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.Code != "" {
+			chargeID := h.store.StripeID(h.store.Charges.NextID())
+			ch := store.Charge{
+				ID: chargeID, Object: "charge", Amount: amount, Currency: currency,
+				Customer: r.FormValue("customer"), PaymentMethod: source, Status: "failed",
+				FailureCode: behavior.Code, FailureMessage: behavior.Message,
+				Metadata: parseMetadata(r), Created: h.store.Now(),
+			}
+			h.store.Charges.Set(chargeID, ch)
+			h.emitEvent("charge.failed", mapFromJSON(ch))
+			writeError(w, http.StatusPaymentRequired, apiError{
+				Type: "card_error", Code: behavior.Code, DeclineCode: behavior.DeclineCode,
+				Message: behavior.Message, Charge: chargeID,
+			})
 			return
 		}
 	}
 
-	id := h.store.Charges.NextID()
+	id := h.store.StripeID(h.store.Charges.NextID())
 	ch := store.Charge{
 		ID:            id,
 		Object:        "charge",
@@ -61,11 +73,11 @@ func (h *Handler) UpdateCharge(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ch, ok := h.store.Charges.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -88,16 +100,23 @@ func (h *Handler) GetCharge(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ch, ok := h.store.Charges.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such charge: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, ch)
 }
 
 func (h *Handler) ListCharges(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Charges.Paginate(cursor, limit)
+	customerFilter := r.URL.Query().Get("customer")
+	piFilter := r.URL.Query().Get("payment_intent")
+	page, ok := paginate(w, r, h.store.Charges, "charge", limit, func(ch store.Charge) bool {
+		return (customerFilter == "" || ch.Customer == customerFilter) &&
+			(piFilter == "" || ch.PaymentIntent == piFilter)
+	})
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/charges",

@@ -12,13 +12,13 @@ import (
 
 func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	coupon := r.FormValue("coupon")
 	if coupon == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: coupon.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: coupon.")
 		return
 	}
 
@@ -27,7 +27,7 @@ func (h *Handler) CreatePromotionCode(w http.ResponseWriter, r *http.Request) {
 		code = strings.ToUpper(h.randomHex(4))
 	}
 
-	id := h.store.PromotionCodes.NextID()
+	id := h.store.StripeID(h.store.PromotionCodes.NextID())
 	pc := store.PromotionCode{
 		ID:       id,
 		Object:   "promotion_code",
@@ -55,7 +55,7 @@ func (h *Handler) GetPromotionCode(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pc, ok := h.store.PromotionCodes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such promotion code: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such promotion code: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, pc)
@@ -65,11 +65,11 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pc, ok := h.store.PromotionCodes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such promotion code: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such promotion code: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -88,9 +88,11 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPromotionCodes(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.PromotionCodes.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.PromotionCodes, "promotion_code", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/promotion_codes", "has_more": page.HasMore, "data": page.Data,
 	})

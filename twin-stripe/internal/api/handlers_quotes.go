@@ -14,11 +14,11 @@ import (
 
 func (h *Handler) CreateQuote(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
-	id := h.store.Quotes.NextID()
+	id := h.store.StripeID(h.store.Quotes.NextID())
 	now := h.store.Now()
 
 	qt := store.Quote{
@@ -54,7 +54,7 @@ func (h *Handler) GetQuote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	qt, ok := h.store.Quotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, qt)
@@ -64,15 +64,15 @@ func (h *Handler) UpdateQuote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	qt, ok := h.store.Quotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
 		return
 	}
 	if qt.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be updated in draft status.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be updated in draft status.")
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -100,11 +100,11 @@ func (h *Handler) FinalizeQuote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	qt, ok := h.store.Quotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
 		return
 	}
 	if qt.Status != "draft" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be finalized from draft status.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be finalized from draft status.")
 		return
 	}
 
@@ -119,11 +119,11 @@ func (h *Handler) AcceptQuote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	qt, ok := h.store.Quotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
 		return
 	}
 	if qt.Status != "open" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be accepted from open status.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be accepted from open status.")
 		return
 	}
 
@@ -137,11 +137,11 @@ func (h *Handler) CancelQuote(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	qt, ok := h.store.Quotes.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such quote: "+id)
 		return
 	}
 	if qt.Status != "draft" && qt.Status != "open" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be canceled from draft or open status.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invalid_operation", "Quote can only be canceled from draft or open status.")
 		return
 	}
 
@@ -152,9 +152,11 @@ func (h *Handler) CancelQuote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListQuotes(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Quotes.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.Quotes, "quote", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/quotes", "has_more": page.HasMore, "data": page.Data,
 	})
@@ -164,17 +166,17 @@ func (h *Handler) ListQuotes(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) CreateBillingPortalSession(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	customer := r.FormValue("customer")
 	if customer == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
 
-	id := h.store.BillingPortalSessions.NextID()
+	id := h.store.StripeID(h.store.BillingPortalSessions.NextID())
 	bps := store.BillingPortalSession{
 		ID:        id,
 		Object:    "billing_portal.session",

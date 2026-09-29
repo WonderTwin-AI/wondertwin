@@ -10,17 +10,17 @@ import (
 
 func (h *Handler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	name := r.FormValue("name")
 	if name == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: name.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: name.")
 		return
 	}
 
-	id := h.store.Products.NextID()
+	id := h.store.StripeID(h.store.Products.NextID())
 	prod := store.Product{
 		ID:          id,
 		Object:      "product",
@@ -42,7 +42,7 @@ func (h *Handler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	prod, ok := h.store.Products.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, prod)
@@ -52,11 +52,11 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	prod, ok := h.store.Products.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if !h.store.Products.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such product: "+id)
 		return
 	}
 
@@ -101,9 +101,11 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.Products.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.Products, "product", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/products",

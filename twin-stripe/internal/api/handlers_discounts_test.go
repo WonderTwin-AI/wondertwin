@@ -35,10 +35,19 @@ func TestPercentOffCouponOnInvoice(t *testing.T) {
 		t.Errorf("expected amount_due=7500, got %v", inv["amount_due"])
 	}
 
-	// Verify discount is attached.
-	disc, ok := inv["discount"].(map[string]any)
+	// Dahlia has no singular discount: discounts[] holds IDs, expandable.
+	if _, singular := inv["discount"]; singular {
+		t.Fatal("expected no singular discount field on a dahlia invoice")
+	}
+	ids, _ := inv["discounts"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("expected one discount ID, got %v", inv["discounts"])
+	}
+	resp = stripeGet(tc, "/v1/invoices/"+inv["id"].(string)+"?expand[]=discounts")
+	resp.AssertStatus(200)
+	disc, ok := resp.JSONMap()["discounts"].([]any)[0].(map[string]any)
 	if !ok {
-		t.Fatal("expected discount object on invoice")
+		t.Fatal("expected discounts[0] to expand to a discount object")
 	}
 	coup, ok := disc["coupon"].(map[string]any)
 	if !ok {
@@ -95,14 +104,20 @@ func TestSubscriptionWithCoupon(t *testing.T) {
 	custID := resp.JSONMap()["id"].(string)
 
 	// Create subscription with coupon.
-	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&coupon="+couponID, nil)
+	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&discounts[0][coupon]="+couponID, nil)
 	resp.AssertStatus(200)
 	sub := resp.JSONMap()
 
-	// Verify discount is on subscription.
-	disc, ok := sub["discount"].(map[string]any)
+	// Verify the discount is on the subscription, by ID, and expands.
+	ids, _ := sub["discounts"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("expected one discount ID on subscription, got %v", sub["discounts"])
+	}
+	resp = stripeGet(tc, "/v1/subscriptions/"+sub["id"].(string)+"?expand[0]=discounts")
+	resp.AssertStatus(200)
+	disc, ok := resp.JSONMap()["discounts"].([]any)[0].(map[string]any)
 	if !ok {
-		t.Fatal("expected discount on subscription")
+		t.Fatal("expected discounts[0] to expand to a discount object")
 	}
 	if disc["subscription"] != sub["id"] {
 		t.Errorf("expected discount.subscription=%v, got %v", sub["id"], disc["subscription"])
@@ -306,5 +321,42 @@ func TestSubscriptionWithTaxRate(t *testing.T) {
 	inv := resp.JSONMap()
 	if inv["total"].(float64) != 5400 {
 		t.Errorf("expected total=5400, got %v", inv["total"])
+	}
+}
+
+func TestSubscriptionBadSecondCouponRedeemsNothing(t *testing.T) {
+	_, tc := setupStripe(t)
+
+	resp := stripePost(tc, "/v1/coupons?duration=once&percent_off=50", nil)
+	resp.AssertStatus(200)
+	couponID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/products?name=Bad", nil)
+	prodID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/prices?unit_amount=4000&currency=usd&product="+prodID+"&recurring[interval]=month", nil)
+	priceID := resp.JSONMap()["id"].(string)
+	resp = stripePost(tc, "/v1/customers?name=Bad", nil)
+	custID := resp.JSONMap()["id"].(string)
+
+	resp = stripePost(tc, "/v1/subscriptions?customer="+custID+"&items[0][price]="+priceID+"&discounts[0][coupon]="+couponID+"&discounts[1][coupon]=nope", nil)
+	resp.AssertStatus(400)
+
+	resp = stripeGet(tc, "/v1/coupons/"+couponID)
+	resp.AssertStatus(200)
+	if got := resp.JSONMap()["times_redeemed"]; got != float64(0) {
+		t.Errorf("expected times_redeemed=0, got %v", got)
+	}
+}
+
+func TestListUnknownCursorIsResourceMissing(t *testing.T) {
+	_, tc := setupStripe(t)
+	stripePost(tc, "/v1/customers?name=A", nil).AssertStatus(200)
+
+	for _, param := range []string{"starting_after", "ending_before"} {
+		resp := stripeGet(tc, "/v1/customers?"+param+"=cus_gone")
+		resp.AssertStatus(400)
+		e := resp.JSONMap()["error"].(map[string]any)
+		if e["code"] != "resource_missing" || e["param"] != param || e["message"] != "No such customer: 'cus_gone'" {
+			t.Errorf("%s: unexpected error %v", param, e)
+		}
 	}
 }

@@ -1,0 +1,71 @@
+{
+  "app_emulator": "twin-stripe",
+  "references": {
+    "openapi": "stripe/openapi v2524 latest/openapi.spec3.json (2026-08-26.dahlia)",
+    "docs": "docs.stripe.com as served 2026-09-28",
+    "sdks": ["stripe-go v86.4.2", "stripe-node v22.6.2", "stripe-python v15.6.1"]
+  },
+  "status": "Declared under the operator's standing rules; the version decisions await sign-off.",
+  "divergences": [
+    {
+      "route": "any /v1 route, Stripe-Version header",
+      "stripe": "Serves every selectable version, 2011-01-01 to 2026-08-26.dahlia, each in its own shape",
+      "app_emulator": "Serves the dahlia release only (2026-03-25.dahlia to 2026-08-26.dahlia) in the 2026-08-26.dahlia shape; any other value, including .preview and endive, gets 400 invalid_request_error",
+      "reason": "Monthly versions inside a release name are additive, so one shape serves the whole name faithfully; serving an older release the dahlia shape silently would be harder to diagnose than a 400"
+    },
+    {
+      "route": "POST /v1/webhook_endpoints, api_version",
+      "stripe": "Accepts any selectable version",
+      "app_emulator": "Accepts dahlia versions only; others get 400 parameter_invalid on api_version",
+      "reason": "Events are rendered in the dahlia shape only; a label from another release would misdescribe the payload"
+    },
+    {
+      "route": "account default API version",
+      "stripe": "Set by the account's first request, changed in Workbench",
+      "app_emulator": "Configuration: STRIPE_API_VERSION, a dahlia version, default 2026-08-26.dahlia",
+      "reason": "The emulated account exists before any request"
+    },
+    {
+      "route": "/v2/*",
+      "stripe": "The v2 namespace (event destinations, thin events, v2 accounts, meter event streams)",
+      "app_emulator": "Not served: 404 Unrecognized request URL",
+      "reason": "Needs a second request encoding, page-token pagination and thin events; out of this target"
+    },
+    {
+      "route": "any /v1 route, API key",
+      "stripe": "Verifies the key exists on an account; an unknown key gets 401 Invalid API Key provided",
+      "app_emulator": "Accepts any test-mode secret or restricted key (sk_test_, rk_test_); any other key gets the same 401",
+      "reason": "The app emulator issues no keys"
+    },
+    {
+      "route": "expand",
+      "stripe": "Refuses a field outside the resource's expandable fields",
+      "app_emulator": "Enforces the documented four-level depth only; any field whose value is a known object ID is expanded, and an unknown field is ignored",
+      "reason": "Field-level expansion rules are not modelled in this build"
+    },
+    {
+      "route": "Idempotency-Key",
+      "stripe": "Saves a result only once the endpoint begins executing; a request that fails parameter validation is not saved",
+      "app_emulator": "Saves the first response for a key whatever its status",
+      "reason": "Validation and execution are not separated in the handlers"
+    },
+    {
+      "route": "webhook delivery",
+      "stripe": "Retries failed deliveries with exponential backoff for up to three days",
+      "app_emulator": "Up to three attempts, a few hundred milliseconds apart",
+      "reason": "Local and CI runs need prompt, bounded delivery"
+    },
+    {
+      "route": "POST /v1/files",
+      "stripe": "Refuses files over Stripe's per-file size limit",
+      "app_emulator": "Does not enforce the per-file limit",
+      "reason": "Unchanged in this build; recorded so the gap is visible"
+    },
+    {
+      "route": "/admin/*",
+      "stripe": "No equivalent",
+      "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes)",
+      "reason": "Lets tests drive outcomes that Stripe produces asynchronously or from the Dashboard"
+    }
+  ]
+}

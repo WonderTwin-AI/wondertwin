@@ -2,14 +2,15 @@ package api_test
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
+	stripewh "github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
@@ -21,7 +22,7 @@ func setupStripe(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	// callers (whsec_, client_secret, promo codes) produce stable
 	// output across runs.
 	memStore.Rand = twin.Rand
-	dispatcher := webhook.NewDispatcher(webhook.Config{})
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{Endpoints: memStore, Clock: memStore.Clock})
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
@@ -68,7 +69,11 @@ func TestStripeAuthRequired(t *testing.T) {
 	// No auth header → 401
 	resp := tc.Get("/v1/accounts")
 	resp.AssertStatus(401)
-	resp.AssertBodyContains("api_key_required")
+	// Stripe's missing-key error carries no code.
+	resp.AssertBodyContains("You did not provide an API key.")
+	if strings.Contains(string(resp.Body), `"code"`) {
+		t.Errorf("expected no code on the missing-key error, got %s", resp.Body)
+	}
 }
 
 func TestCreateAndGetAccount(t *testing.T) {

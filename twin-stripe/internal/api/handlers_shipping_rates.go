@@ -11,17 +11,17 @@ import (
 
 func (h *Handler) CreateShippingRate(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	displayName := r.FormValue("display_name")
 	if displayName == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: display_name.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: display_name.")
 		return
 	}
 
-	id := h.store.ShippingRates.NextID()
+	id := h.store.StripeID(h.store.ShippingRates.NextID())
 	sr := store.ShippingRate{
 		ID:          id,
 		Object:      "shipping_rate",
@@ -49,7 +49,7 @@ func (h *Handler) GetShippingRate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sr, ok := h.store.ShippingRates.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such shipping_rate: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such shipping_rate: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, sr)
@@ -59,11 +59,11 @@ func (h *Handler) UpdateShippingRate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sr, ok := h.store.ShippingRates.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such shipping_rate: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such shipping_rate: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -81,9 +81,11 @@ func (h *Handler) UpdateShippingRate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListShippingRates(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
-	page := h.store.ShippingRates.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.ShippingRates, "shipping_rate", limit, nil)
+	if !ok {
+		return
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/shipping_rates", "has_more": page.HasMore, "data": page.Data,
 	})

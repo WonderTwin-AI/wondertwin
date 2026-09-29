@@ -15,11 +15,11 @@ import (
 // Stripe SDK: account.New(params)
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
-	id := h.store.Accounts.NextID()
+	id := h.store.StripeID(h.store.Accounts.NextID())
 	now := h.store.Now()
 
 	acctType := r.FormValue("type")
@@ -108,7 +108,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	acct, ok := h.store.Accounts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+id+"'")
 		return
@@ -127,14 +127,14 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 
 	acct, ok := h.store.Accounts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+id+"'")
 		return
 	}
 
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
@@ -256,7 +256,7 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	if !h.store.Accounts.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+id+"'")
 		return
@@ -271,13 +271,15 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 
 // ListAccounts handles GET /v1/accounts.
 func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := 10
 	if l := r.URL.Query().Get("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
 	}
 
-	page := h.store.Accounts.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.Accounts, "account", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

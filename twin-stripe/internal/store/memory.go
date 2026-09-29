@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // MemoryStore holds all Stripe twin state in memory.
@@ -57,6 +57,7 @@ type MemoryStore struct {
 	TransferReversals     *pkgstate.Store[TransferReversal]
 	Persons               *pkgstate.Store[Person]
 	TopUps                *pkgstate.Store[TopUp]
+	Discounts             *pkgstate.Store[Discount]
 
 	// Per-account balances (account ID -> balance)
 	Balances map[string]*AccountBalance
@@ -134,14 +135,16 @@ func New() *MemoryStore {
 		TransferReversals:     pkgstate.New[TransferReversal]("trr"),
 		Persons:               pkgstate.New[Person]("person"),
 		TopUps:                pkgstate.New[TopUp]("tu"),
+		Discounts:             pkgstate.New[Discount]("di"),
 		Balances:              make(map[string]*AccountBalance),
 		PlatformBalance:       NewAccountBalance(),
 		Clock:                 pkgstate.NewClock(),
 	}
 }
 
-// ActiveEndpoints returns all enabled webhook endpoints, implementing webhook.EndpointProvider.
-func (s *MemoryStore) ActiveEndpoints() []webhook.Endpoint {
+// StripeEndpoints returns the enabled webhook endpoints, implementing
+// webhook.EndpointSource.
+func (s *MemoryStore) StripeEndpoints() []webhook.Endpoint {
 	all := s.WebhookEndpoints.Filter(func(_ string, we WebhookEndpoint) bool {
 		return we.Status == "enabled"
 	})
@@ -150,8 +153,8 @@ func (s *MemoryStore) ActiveEndpoints() []webhook.Endpoint {
 		endpoints = append(endpoints, webhook.Endpoint{
 			URL:           we.URL,
 			Secret:        we.Secret,
+			APIVersion:    we.APIVersion,
 			EnabledEvents: we.EnabledEvents,
-			Enabled:       true,
 		})
 	}
 	return endpoints
@@ -241,7 +244,7 @@ func (s *MemoryStore) DebitBalance(accountID string, currency string, amount int
 
 // RecordBalanceTransaction creates and stores a balance transaction ledger entry.
 func (s *MemoryStore) RecordBalanceTransaction(txType, source, currency string, amount, fee int64) string {
-	id := s.BalanceTransactions.NextID()
+	id := s.StripeID(s.BalanceTransactions.NextID())
 	bt := BalanceTransaction{
 		ID:       id,
 		Object:   "balance_transaction",
@@ -302,6 +305,7 @@ type stateSnapshot struct {
 	TransferReversals     map[string]TransferReversal     `json:"transfer_reversals"`
 	Persons               map[string]Person               `json:"persons"`
 	TopUps                map[string]TopUp                `json:"topups"`
+	Discounts             map[string]Discount             `json:"discounts"`
 	Balances              map[string]*AccountBalance      `json:"balances"`
 	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
 }
@@ -351,6 +355,7 @@ func (s *MemoryStore) Snapshot() any {
 		TransferReversals:     s.TransferReversals.Snapshot(),
 		Persons:               s.Persons.Snapshot(),
 		TopUps:                s.TopUps.Snapshot(),
+		Discounts:             s.Discounts.Snapshot(),
 		Balances:              s.snapshotBalances(),
 		PlatformBalance:       s.PlatformBalance,
 	}
@@ -415,6 +420,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.TransferReversals.LoadSnapshot(snap.TransferReversals)
 	s.Persons.LoadSnapshot(snap.Persons)
 	s.TopUps.LoadSnapshot(snap.TopUps)
+	s.Discounts.LoadSnapshot(snap.Discounts)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -471,6 +477,7 @@ func (s *MemoryStore) Reset() {
 	s.TransferReversals.Reset()
 	s.Persons.Reset()
 	s.TopUps.Reset()
+	s.Discounts.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

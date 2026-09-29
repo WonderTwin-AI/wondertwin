@@ -15,18 +15,18 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 	accountID := chi.URLParam(r, "account_id")
 
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
 	}
 
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
-	id := h.store.ExternalAccts.NextID()
+	id := h.store.StripeID(h.store.ExternalAccts.NextID())
 
 	routingNumber := r.FormValue("external_account[routing_number]")
 	if routingNumber == "" {
@@ -86,7 +86,7 @@ func (h *Handler) GetExternalAccount(w http.ResponseWriter, r *http.Request) {
 
 	ea, ok := h.store.ExternalAccts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such external account: '"+id+"'")
 		return
@@ -101,14 +101,14 @@ func (h *Handler) UpdateExternalAccount(w http.ResponseWriter, r *http.Request) 
 
 	ea, ok := h.store.ExternalAccts.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such external account: '"+id+"'")
 		return
 	}
 
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *Handler) DeleteExternalAccount(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 
 	if !h.store.ExternalAccts.Delete(id) {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such external account: '"+id+"'")
 		return

@@ -107,6 +107,8 @@ func (s *MemoryStore) Resolve(id string) (map[string]any, bool) {
 		return resolveFrom(s.Persons, id)
 	case "tu":
 		return resolveFrom(s.TopUps, id)
+	case "di":
+		return resolveFrom(s.Discounts, id)
 	default:
 		return nil, false
 	}

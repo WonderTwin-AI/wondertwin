@@ -11,18 +11,18 @@ import (
 
 func (h *Handler) CreatePrice(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	currency := r.FormValue("currency")
 	product := r.FormValue("product")
 	if currency == "" || product == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: currency, product.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "currency", "product"))
 		return
 	}
 
-	id := h.store.Prices.NextID()
+	id := h.store.StripeID(h.store.Prices.NextID())
 	price := store.Price{
 		ID:            id,
 		Object:        "price",
@@ -73,7 +73,7 @@ func (h *Handler) GetPrice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	price, ok := h.store.Prices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such price: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such price: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, price)
@@ -83,11 +83,11 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	price, ok := h.store.Prices.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such price: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such price: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -109,25 +109,16 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPrices(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
 	// Optional product filter.
 	productFilter := r.URL.Query().Get("product")
-	if productFilter != "" {
-		items := h.store.Prices.Filter(func(_ string, p store.Price) bool {
-			return p.Product == productFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object":   "list",
-			"url":      "/v1/prices",
-			"has_more": false,
-			"data":     items,
-		})
+	page, ok := paginate(w, r, h.store.Prices, "price", limit, func(p store.Price) bool {
+		return productFilter == "" || p.Product == productFilter
+	})
+	if !ok {
 		return
 	}
-
-	page := h.store.Prices.Paginate(cursor, limit)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/prices",

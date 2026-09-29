@@ -1,0 +1,10 @@
+[project]
+name = "twin-stripe-sdk-smoke-python"
+version = "0.0.0"
+description = "Runs the Stripe app emulator's MVP use cases through the official stripe-python SDK."
+requires-python = ">=3.10"
+dependencies = ["stripe==15.6.1"]
+
+[tool.uv]
+package = false
+exclude-newer = "7 days"

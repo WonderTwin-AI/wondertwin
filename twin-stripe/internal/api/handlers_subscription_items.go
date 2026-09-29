@@ -11,26 +11,26 @@ import (
 
 func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	subID := r.FormValue("subscription")
 	priceID := r.FormValue("price")
 	if subID == "" || priceID == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required params: subscription, price.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", missingParamMessage(r, "subscription", "price"))
 		return
 	}
 
 	sub, ok := h.store.Subscriptions.Get(subID)
 	if !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such subscription: "+subID)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such subscription: "+subID)
 		return
 	}
 
 	price, ok := h.store.Prices.Get(priceID)
 	if !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *Handler) CreateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	id := h.store.SubItems.NextID()
+	id := h.store.StripeID(h.store.SubItems.NextID())
 	si := store.SubscriptionItem{
 		ID:           id,
 		Object:       "subscription_item",
@@ -72,7 +72,7 @@ func (h *Handler) GetSubscriptionItem(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, si)
@@ -82,11 +82,11 @@ func (h *Handler) UpdateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *Handler) DeleteSubscriptionItem(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	si, ok := h.store.SubItems.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription item: "+id)
 		return
 	}
 
@@ -135,19 +135,14 @@ func (h *Handler) DeleteSubscriptionItem(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) ListSubscriptionItems(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	subFilter := r.URL.Query().Get("subscription")
-	if subFilter != "" {
-		items := h.store.SubItems.Filter(func(_ string, si store.SubscriptionItem) bool {
-			return si.Subscription == subFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object": "list", "url": "/v1/subscription_items", "has_more": false, "data": items,
-		})
+	page, ok := paginate(w, r, h.store.SubItems, "subscription_item", limit, func(si store.SubscriptionItem) bool {
+		return subFilter == "" || si.Subscription == subFilter
+	})
+	if !ok {
 		return
 	}
-	page := h.store.SubItems.Paginate(cursor, limit)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscription_items", "has_more": page.HasMore, "data": page.Data,
 	})

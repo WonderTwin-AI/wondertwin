@@ -1,8 +1,8 @@
 package api
 
 import (
+	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"net/http"
-	"sort"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -13,29 +13,18 @@ import (
 func (h *Handler) ListBalanceTransactions(w http.ResponseWriter, r *http.Request) {
 	filterType := r.URL.Query().Get("type")
 
-	all := h.store.BalanceTransactions.List()
-
-	// Sort by created descending (most recent first)
-	sort.Slice(all, func(i, j int) bool {
-		return all[i].Created > all[j].Created
+	page, ok := paginate(w, r, h.store.BalanceTransactions, "balance_transaction", parseLimit(r, 10), func(bt store.BalanceTransaction) bool {
+		return filterType == "" || bt.Type == filterType
 	})
-
-	// Filter by type if specified
-	if filterType != "" {
-		filtered := all[:0]
-		for _, bt := range all {
-			if bt.Type == filterType {
-				filtered = append(filtered, bt)
-			}
-		}
-		all = filtered
+	if !ok {
+		return
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/balance_transactions",
-		"data":     all,
-		"has_more": false,
+		"data":     page.Data,
+		"has_more": page.HasMore,
 	})
 }
 
@@ -45,7 +34,7 @@ func (h *Handler) GetBalanceTransaction(w http.ResponseWriter, r *http.Request) 
 
 	bt, ok := h.store.BalanceTransactions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such balance transaction: '"+id+"'")
 		return

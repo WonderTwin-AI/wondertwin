@@ -8,26 +8,39 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
+
+// EventPublisher delivers a Stripe event object to webhook endpoints.
+type EventPublisher interface {
+	Publish(event map[string]any)
+}
 
 // Handler holds all API handler state.
 type Handler struct {
 	store      *store.MemoryStore
-	dispatcher *webhook.Dispatcher
+	dispatcher EventPublisher
 	mw         *twincore.Middleware
+	apiVersion string
+
+	idempotency idempotencyFingerprints
 }
 
 // NewHandler creates a new API handler.
-func NewHandler(s *store.MemoryStore, d *webhook.Dispatcher, mw *twincore.Middleware) *Handler {
+func NewHandler(s *store.MemoryStore, d EventPublisher, mw *twincore.Middleware) *Handler {
 	return &Handler{store: s, dispatcher: d, mw: mw}
 }
 
 // Routes mounts the Stripe v1 API routes.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/v1", func(r chi.Router) {
+		r.NotFound(unrecognizedURL)
+		r.MethodNotAllowed(unrecognizedURL)
 		// Auth middleware for all v1 routes
 		r.Use(h.authMiddleware)
+		// Only dahlia Stripe-Version values are served
+		r.Use(h.versionMiddleware)
+		// Accept name[N] array parameters, as the official SDKs send them
+		r.Use(h.arrayParamsMiddleware)
 		// Idempotency key caching for POST requests
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
@@ -168,6 +181,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/checkout/sessions/{id}", h.GetCheckoutSession)
 		r.Get("/checkout/sessions", h.ListCheckoutSessions)
 		r.Post("/checkout/sessions/{id}/expire", h.ExpireCheckoutSession)
+		r.Get("/checkout/sessions/{id}/line_items", h.ListCheckoutSessionLineItems)
 
 		// Payment Links
 		r.Post("/payment_links", h.CreatePaymentLink)
@@ -291,6 +305,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/topups", h.ListTopUps)
 	})
 
+	// The /v2 namespace is not served; answer it as Stripe answers an unknown URL.
+	r.HandleFunc("/v2/*", unrecognizedURL)
+
 	// Stripe-specific admin endpoints (outside /v1, no auth)
 	r.Post("/admin/payouts/{id}/fail", h.AdminFailPayout)
 	r.Post("/admin/accounts/{id}/fund", h.AdminFundAccount)
@@ -301,31 +318,73 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/admin/disputes/{id}/resolve", h.AdminResolveDispute)
 }
 
-// authMiddleware validates Stripe-style Bearer token authentication.
+// authMiddleware validates the API key the way Stripe does: Bearer or HTTP
+// Basic (key as the user name). The app emulator issues no keys, so any
+// test-mode secret or restricted key (sk_test_, rk_test_) is accepted and
+// anything else is refused as Stripe refuses an unknown key (declared
+// divergence: Stripe checks the key exists, not just its shape).
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			twincore.StripeError(w, http.StatusUnauthorized,
-				"invalid_request_error", "api_key_required",
-				"You did not provide an API key.")
-			return
-		}
-
-		// Accept "Bearer sk_test_*" or "Bearer sk_sim_*" or just "Bearer <anything>"
-		key := strings.TrimPrefix(auth, "Bearer ")
-		if key == auth {
-			// No "Bearer " prefix, also check for raw key
-			key = auth
-		}
+		key := apiKeyFromRequest(r)
 		if key == "" {
-			twincore.StripeError(w, http.StatusUnauthorized,
-				"invalid_request_error", "api_key_required",
-				"You did not provide an API key.")
+			w.Header().Set("Www-Authenticate", `Basic realm="Stripe"`)
+			writeError(w, http.StatusUnauthorized, apiError{
+				Type: "invalid_request_error",
+				Message: "You did not provide an API key. You need to provide your API key in the " +
+					"Authorization header, using Bearer auth (e.g. 'Authorization: Bearer YOUR_SECRET_KEY'). " +
+					"See https://stripe.com/docs/api#authentication for details, or we can help at https://support.stripe.com/.",
+			})
 			return
 		}
-
+		if !strings.HasPrefix(key, "sk_test_") && !strings.HasPrefix(key, "rk_test_") {
+			w.Header().Set("Www-Authenticate", `Basic realm="Stripe"`)
+			writeError(w, http.StatusUnauthorized, apiError{
+				Type:    "invalid_request_error",
+				Message: "Invalid API Key provided: " + maskAPIKey(key),
+			})
+			return
+		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// apiKeyFromRequest reads the key from a Bearer or Basic Authorization header.
+func apiKeyFromRequest(r *http.Request) string {
+	auth := strings.TrimSpace(r.Header.Get("Authorization"))
+	if auth == "" {
+		return ""
+	}
+	if user, _, ok := r.BasicAuth(); ok {
+		return user
+	}
+	if rest, ok := strings.CutPrefix(auth, "Bearer "); ok {
+		return strings.TrimSpace(rest)
+	}
+	return auth
+}
+
+// maskAPIKey renders a key as Stripe does in its invalid-key message: the
+// prefix up to the mode, six asterisks, and the last four characters.
+func maskAPIKey(key string) string {
+	prefix := ""
+	if i := strings.Index(key, "_"); i >= 0 {
+		if j := strings.Index(key[i+1:], "_"); j >= 0 {
+			prefix = key[:i+1+j+1]
+		}
+	}
+	last := key
+	if len(key) > 4 {
+		last = key[len(key)-4:]
+	}
+	return prefix + "******" + last
+}
+
+// unrecognizedURL answers an unknown /v1 path or method as Stripe does.
+func unrecognizedURL(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotFound, apiError{
+		Type: "invalid_request_error",
+		Message: "Unrecognized request URL (" + r.Method + ": " + r.URL.Path + "). " +
+			"Please see https://stripe.com/docs or we can help at https://support.stripe.com/.",
 	})
 }
 

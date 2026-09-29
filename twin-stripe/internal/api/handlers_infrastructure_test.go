@@ -68,7 +68,7 @@ func TestListAndDeleteWebhookEndpoints(t *testing.T) {
 
 	// Create two webhook endpoints
 	for _, u := range []string{"https://example.com/wh1", "https://example.com/wh2"} {
-		formBody := "url=" + u
+		formBody := "url=" + u + "&enabled_events[]=*"
 		r, _ := http.NewRequest("POST", srv.URL+"/v1/webhook_endpoints", strings.NewReader(formBody))
 		r.Header.Set("Authorization", "Bearer sk_test_sim_123")
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")

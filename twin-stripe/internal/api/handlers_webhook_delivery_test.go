@@ -16,7 +16,6 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
-	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // webhookReceiver collects incoming webhook deliveries for assertions.
@@ -61,14 +60,12 @@ func setupStripeWithWebhooks(t *testing.T, receiver *webhookReceiver) (*httptest
 	whServer := httptest.NewServer(receiver.handler())
 	t.Cleanup(whServer.Close)
 
-	dispatcher := webhook.NewDispatcher(webhook.Config{
-		URL:         whServer.URL,
-		Secret:      "whsec_test_secret",
-		Signer:      stripewh.NewStripeSigner(memStore.Clock),
-		EventPrefix: "evt",
-		AutoDeliver: true,
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{
+		URL:       whServer.URL,
+		Secret:    "whsec_test_secret",
+		Clock:     memStore.Clock,
+		Endpoints: memStore,
 	})
-	dispatcher.SetEndpointProvider(memStore)
 
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
@@ -90,13 +87,11 @@ func TestWebhookDeliveryToRegisteredEndpoint(t *testing.T) {
 	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
-	dispatcher := webhook.NewDispatcher(webhook.Config{
-		Secret:      "whsec_fallback",
-		Signer:      stripewh.NewStripeSigner(memStore.Clock),
-		EventPrefix: "evt",
-		AutoDeliver: true,
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{
+		Secret:    "whsec_fallback",
+		Clock:     memStore.Clock,
+		Endpoints: memStore,
 	})
-	dispatcher.SetEndpointProvider(memStore)
 
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
@@ -152,12 +147,10 @@ func TestWebhookFilteringByEnabledEvents(t *testing.T) {
 	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
-	dispatcher := webhook.NewDispatcher(webhook.Config{
-		Signer:      stripewh.NewStripeSigner(memStore.Clock),
-		EventPrefix: "evt",
-		AutoDeliver: true,
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{
+		Clock:     memStore.Clock,
+		Endpoints: memStore,
 	})
-	dispatcher.SetEndpointProvider(memStore)
 
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)
@@ -216,12 +209,10 @@ func TestWebhookWildcardEnabledEvents(t *testing.T) {
 	memStore := store.New()
 	cfg := &twincore.Config{Name: "twin-stripe-test"}
 	twin := twincore.New(cfg)
-	dispatcher := webhook.NewDispatcher(webhook.Config{
-		Signer:      stripewh.NewStripeSigner(memStore.Clock),
-		EventPrefix: "evt",
-		AutoDeliver: true,
+	dispatcher := stripewh.NewDeliverer(stripewh.Config{
+		Clock:     memStore.Clock,
+		Endpoints: memStore,
 	})
-	dispatcher.SetEndpointProvider(memStore)
 
 	handler := api.NewHandler(memStore, dispatcher, twin.Middleware())
 	handler.Routes(twin.Router)

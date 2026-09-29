@@ -16,14 +16,14 @@ import (
 // CreateTransferReversal handles POST /v1/transfers/{transfer_id}/reversals.
 func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	transferID := chi.URLParam(r, "transfer_id")
 	transfer, ok := h.store.Transfers.Get(transferID)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such transfer: '"+transferID+"'")
 		return
@@ -35,12 +35,12 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 	if amtStr := r.FormValue("amount"); amtStr != "" {
 		parsed, err := strconv.ParseInt(amtStr, 10, 64)
 		if err != nil {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 				"Invalid integer: "+amtStr)
 			return
 		}
 		if parsed > remaining {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 				"Reversal amount exceeds remaining reversible amount.")
 			return
 		}
@@ -48,7 +48,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 	}
 
 	if amount <= 0 {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Transfer has already been fully reversed.")
 		return
 	}
@@ -64,7 +64,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 	// Record balance transaction
 	btID := h.store.RecordBalanceTransaction("transfer_reversal", transferID, transfer.Currency, amount, 0)
 
-	id := h.store.TransferReversals.NextID()
+	id := h.store.StripeID(h.store.TransferReversals.NextID())
 	reversal := store.TransferReversal{
 		ID:                 id,
 		Object:             "transfer_reversal",
@@ -93,7 +93,7 @@ func (h *Handler) CreateTransferReversal(w http.ResponseWriter, r *http.Request)
 func (h *Handler) GetTransferReversal(w http.ResponseWriter, r *http.Request) {
 	transferID := chi.URLParam(r, "transfer_id")
 	if _, ok := h.store.Transfers.Get(transferID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such transfer: '"+transferID+"'")
 		return
@@ -102,7 +102,7 @@ func (h *Handler) GetTransferReversal(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	reversal, ok := h.store.TransferReversals.Get(id)
 	if !ok || reversal.Transfer != transferID {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such transfer reversal: '"+id+"'")
 		return
@@ -114,16 +114,18 @@ func (h *Handler) GetTransferReversal(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListTransferReversals(w http.ResponseWriter, r *http.Request) {
 	transferID := chi.URLParam(r, "transfer_id")
 	if _, ok := h.store.Transfers.Get(transferID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such transfer: '"+transferID+"'")
 		return
 	}
 
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.TransferReversals.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.TransferReversals, "transfer_reversal", limit, nil)
+	if !ok {
+		return
+	}
 	filtered := make([]store.TransferReversal, 0)
 	for _, rev := range page.Data {
 		if rev.Transfer == transferID {
@@ -144,32 +146,32 @@ func (h *Handler) ListTransferReversals(w http.ResponseWriter, r *http.Request) 
 // CreateAccountLink handles POST /v1/account_links.
 func (h *Handler) CreateAccountLink(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	account := r.FormValue("account")
 	if account == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: account.")
 		return
 	}
 
 	linkType := r.FormValue("type")
 	if linkType == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: type.")
 		return
 	}
 	if linkType != "account_onboarding" && linkType != "account_update" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Invalid type: must be 'account_onboarding' or 'account_update'.")
 		return
 	}
 
 	// Verify account exists
 	if _, ok := h.store.Accounts.Get(account); !ok {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing",
 			"No such account: '"+account+"'")
 		return
 	}
@@ -191,19 +193,19 @@ func (h *Handler) CreateAccountLink(w http.ResponseWriter, r *http.Request) {
 // CreatePerson handles POST /v1/accounts/{account_id}/persons.
 func (h *Handler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	accountID := chi.URLParam(r, "account_id")
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
 	}
 
-	id := h.store.Persons.NextID()
+	id := h.store.StripeID(h.store.Persons.NextID())
 	person := store.Person{
 		ID:        id,
 		Object:    "person",
@@ -228,7 +230,7 @@ func (h *Handler) CreatePerson(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPerson(w http.ResponseWriter, r *http.Request) {
 	accountID := chi.URLParam(r, "account_id")
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
@@ -237,7 +239,7 @@ func (h *Handler) GetPerson(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	person, ok := h.store.Persons.Get(id)
 	if !ok || person.Account != accountID {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such person: '"+id+"'")
 		return
@@ -248,13 +250,13 @@ func (h *Handler) GetPerson(w http.ResponseWriter, r *http.Request) {
 // UpdatePerson handles POST /v1/accounts/{account_id}/persons/{id}.
 func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	accountID := chi.URLParam(r, "account_id")
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
@@ -263,7 +265,7 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	person, ok := h.store.Persons.Get(id)
 	if !ok || person.Account != accountID {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such person: '"+id+"'")
 		return
@@ -294,7 +296,7 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeletePerson(w http.ResponseWriter, r *http.Request) {
 	accountID := chi.URLParam(r, "account_id")
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
@@ -303,7 +305,7 @@ func (h *Handler) DeletePerson(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	person, ok := h.store.Persons.Get(id)
 	if !ok || person.Account != accountID {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such person: '"+id+"'")
 		return
@@ -323,16 +325,18 @@ func (h *Handler) DeletePerson(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListPersons(w http.ResponseWriter, r *http.Request) {
 	accountID := chi.URLParam(r, "account_id")
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
 	}
 
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.Persons.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.Persons, "person", limit, nil)
+	if !ok {
+		return
+	}
 	filtered := make([]store.Person, 0)
 	for _, p := range page.Data {
 		if p.Account == accountID {
@@ -391,26 +395,26 @@ func parsePersonRelationship(r *http.Request) *store.PersonRelationship {
 // CreateTopUp handles POST /v1/topups.
 func (h *Handler) CreateTopUp(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	amountStr := r.FormValue("amount")
 	if amountStr == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: amount.")
 		return
 	}
 	amount, err := strconv.ParseInt(amountStr, 10, 64)
 	if err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_invalid",
 			"Invalid integer: "+amountStr)
 		return
 	}
 
 	currency := r.FormValue("currency")
 	if currency == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
 			"Missing required param: currency.")
 		return
 	}
@@ -421,7 +425,7 @@ func (h *Handler) CreateTopUp(w http.ResponseWriter, r *http.Request) {
 	// Record balance transaction
 	btID := h.store.RecordBalanceTransaction("topup", "", currency, amount, 0)
 
-	id := h.store.TopUps.NextID()
+	id := h.store.StripeID(h.store.TopUps.NextID())
 	topup := store.TopUp{
 		ID:                 id,
 		Object:             "topup",
@@ -446,7 +450,7 @@ func (h *Handler) GetTopUp(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	topup, ok := h.store.TopUps.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such topup: '"+id+"'")
 		return
@@ -456,10 +460,12 @@ func (h *Handler) GetTopUp(w http.ResponseWriter, r *http.Request) {
 
 // ListTopUps handles GET /v1/topups.
 func (h *Handler) ListTopUps(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 
-	page := h.store.TopUps.Paginate(cursor, limit)
+	page, ok := paginate(w, r, h.store.TopUps, "topup", limit, nil)
+	if !ok {
+		return
+	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",

@@ -11,7 +11,7 @@ import (
 
 func (h *Handler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -20,7 +20,7 @@ func (h *Handler) CreatePaymentMethod(w http.ResponseWriter, r *http.Request) {
 		pmType = "card"
 	}
 
-	id := h.store.PaymentMethods.NextID()
+	id := h.store.StripeID(h.store.PaymentMethods.NextID())
 	pm := store.PaymentMethod{
 		ID:       id,
 		Object:   "payment_method",
@@ -79,7 +79,7 @@ func (h *Handler) GetPaymentMethod(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pm, ok := h.store.PaymentMethods.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, pm)
@@ -87,22 +87,29 @@ func (h *Handler) GetPaymentMethod(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AttachPaymentMethod(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if b := h.checkCardBehavior(id); b.AttachFails {
+		writeError(w, http.StatusPaymentRequired, apiError{
+			Type: "card_error", Code: b.Code, DeclineCode: b.DeclineCode, Message: b.Message,
+		})
+		return
+	}
+	id = h.resolvePaymentMethod(id)
 	pm, ok := h.store.PaymentMethods.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 	customer := r.FormValue("customer")
 	if customer == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
 	if _, exists := h.store.Customers.Get(customer); !exists {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
 		return
 	}
 	pm.Customer = customer
@@ -114,7 +121,7 @@ func (h *Handler) DetachPaymentMethod(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	pm, ok := h.store.PaymentMethods.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)
 		return
 	}
 	pm.Customer = ""
@@ -123,22 +130,16 @@ func (h *Handler) DetachPaymentMethod(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPaymentMethods(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
-	if customerFilter != "" {
-		items := h.store.PaymentMethods.Filter(func(_ string, pm store.PaymentMethod) bool {
-			return pm.Customer == customerFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object":   "list",
-			"url":      "/v1/payment_methods",
-			"has_more": false,
-			"data":     items,
-		})
+	typeFilter := r.URL.Query().Get("type")
+	page, ok := paginate(w, r, h.store.PaymentMethods, "payment_method", limit, func(pm store.PaymentMethod) bool {
+		return (customerFilter == "" || pm.Customer == customerFilter) &&
+			(typeFilter == "" || pm.Type == typeFilter)
+	})
+	if !ok {
 		return
 	}
-	page := h.store.PaymentMethods.Paginate(cursor, limit)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/payment_methods",

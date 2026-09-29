@@ -142,3 +142,11 @@ func TestExpand_UnknownPathLeftHarmless(t *testing.T) {
 		t.Errorf("expected charge response unaffected by unresolvable expand paths, got %v", resp.JSONMap())
 	}
 }
+
+func TestExpand_DepthLimitIsFour(t *testing.T) {
+	_, tc := setupStripe(t)
+	stripeGet(tc, "/v1/charges?expand[0]=data.payment_intent.customer.default_source").AssertStatus(200)
+	resp := stripeGet(tc, "/v1/charges?expand[0]=data.payment_intent.customer.default_source.customer")
+	resp.AssertStatus(400)
+	resp.AssertBodyContains(`"param":"expand"`)
+}

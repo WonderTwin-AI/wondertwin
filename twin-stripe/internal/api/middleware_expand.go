@@ -10,6 +10,9 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/expand"
 )
 
+// maxExpandDepth is the deepest expansion Stripe allows.
+const maxExpandDepth = 4
+
 // expandBuffer captures a handler's response without writing it through, so
 // expandMiddleware can rewrite the body before it reaches the client.
 type expandBuffer struct {
@@ -46,6 +49,19 @@ func (h *Handler) expandMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Stripe documents a maximum depth of four properties per expand
+		// string (api/expanding_objects). Which fields may be expanded is
+		// not checked here; see the package comment in twinkit/expand.
+		for _, p := range paths {
+			if strings.Count(p, ".") >= maxExpandDepth {
+				writeError(w, http.StatusBadRequest, apiError{
+					Type:    "invalid_request_error",
+					Param:   "expand",
+					Message: "You cannot expand more than " + strconv.Itoa(maxExpandDepth) + " levels of a property. Property: " + p,
+				})
+				return
+			}
+		}
 
 		buf := newExpandBuffer()
 		next.ServeHTTP(buf, r)
@@ -66,6 +82,7 @@ func (h *Handler) expandMiddleware(next http.Handler) http.Handler {
 		}
 
 		expand.Apply(body, paths, h.store)
+		expandIDArrays(body, paths, h.store)
 
 		encoded, err := json.Marshal(body)
 		if err != nil {
@@ -81,6 +98,18 @@ func (h *Handler) expandMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// expandRequested reports whether path was requested in expand[] (either
+// array form; see arrayParamsMiddleware).
+func expandRequested(r *http.Request, path string) bool {
+	_ = r.ParseForm()
+	for _, p := range r.Form["expand[]"] {
+		if p == path {
+			return true
+		}
+	}
+	return false
+}
+
 func flushBuffer(w http.ResponseWriter, buf *expandBuffer) {
 	copyHeader(w.Header(), buf.header)
 	w.WriteHeader(buf.statusCode)
@@ -90,5 +119,40 @@ func flushBuffer(w http.ResponseWriter, buf *expandBuffer) {
 func copyHeader(dst, src http.Header) {
 	for k, v := range src {
 		dst[k] = v
+	}
+}
+
+// expandIDArrays expands fields that hold an array of IDs, such as dahlia's
+// discounts, which the kit's expander (single ID fields only) leaves alone.
+// It handles a top-level field and the "data.<field>" list form.
+func expandIDArrays(body map[string]any, paths []string, resolver expand.Resolver) {
+	for _, p := range paths {
+		if field, ok := strings.CutPrefix(p, "data."); ok && !strings.Contains(field, ".") {
+			if data, ok := body["data"].([]any); ok {
+				for _, item := range data {
+					if m, ok := item.(map[string]any); ok {
+						resolveIDArray(m, field, resolver)
+					}
+				}
+			}
+			continue
+		}
+		if !strings.Contains(p, ".") {
+			resolveIDArray(body, p, resolver)
+		}
+	}
+}
+
+func resolveIDArray(obj map[string]any, field string, resolver expand.Resolver) {
+	arr, ok := obj[field].([]any)
+	if !ok {
+		return
+	}
+	for i, v := range arr {
+		if id, ok := v.(string); ok {
+			if resolved, ok := resolver.Resolve(id); ok {
+				arr[i] = resolved
+			}
+		}
 	}
 }

@@ -130,7 +130,7 @@ Works with any test framework. Go, Python, Node, Rust, Java — if it speaks HTT
 
 | Twin | Coverage | Default Port |
 |------|----------|-------------|
-| **Stripe** | Accounts, Balance, Transfers, Payouts, External Accounts, Events, Webhooks | 4111 |
+| **Stripe** | Payments, Refunds, Subscriptions, Invoices, Checkout Sessions, Connect, Events, Webhook delivery (see `twin-stripe/twin-manifest.json`) | 4111 |
 | **Twilio** | Messages, Verify (OTP send/check) | 4112 |
 | **Resend** | Email send, delivery status | 4113 |
 | **PostHog** | Event capture, batch ingestion, feature flag evaluation | 4114 |
@@ -141,7 +141,11 @@ twin, for example, answers `401 invalid_api_key` on `/capture`, `/e`, `/batch`,
 `/decide` and `/flags` when no project key is present — in the body, the
 `X-PostHog-Api-Key` or `Authorization` header, the `?api_key` query param, or
 `properties.$token`. Any non-empty key is accepted; twins check that a
-credential was sent, not that it is the right one.
+credential was sent, not that it is the right one. The Stripe app emulator is
+stricter about the key's shape: it accepts any `sk_test_` or `rk_test_` key and
+answers `401` to anything else. It also serves the Stripe API on the dahlia
+release only; other `Stripe-Version` values get a `400`. The declared
+differences from real Stripe are listed in `twin-stripe/divergences.json`.
 
 More twins coming. [Request a twin →](https://github.com/wondertwin-ai/wondertwin/issues/new?template=twin-request.yml)
 

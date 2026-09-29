@@ -22,7 +22,7 @@ func (h *Handler) AdminFundAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Verify account exists
 	if _, ok := h.store.Accounts.Get(accountID); !ok {
-		twincore.StripeError(w, http.StatusNotFound,
+		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
 		return
@@ -69,7 +69,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 		if sub.Status == "trialing" && sub.TrialEnd > 0 && now >= sub.TrialEnd {
 			sub.Status = "active"
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 		}
 
 		// Active + cancel_at_period_end + past period_end → Canceled.
@@ -77,7 +77,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 			sub.Status = "canceled"
 			sub.CanceledAt = now
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.deleted", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.deleted", mapFromJSON(sub))
 		}
 
 		// Active + past period_end → Renew (advance period, create invoice).
@@ -97,7 +97,7 @@ func (h *Handler) AdminAdvanceSubscriptions(w http.ResponseWriter, r *http.Reque
 			}
 
 			changed = true
-			h.dispatcher.Enqueue("customer.subscription.updated", mapFromJSON(sub))
+			h.emitEvent("customer.subscription.updated", mapFromJSON(sub))
 		}
 
 		if changed {
@@ -118,11 +118,11 @@ func (h *Handler) AdminAuthenticatePaymentIntent(w http.ResponseWriter, r *http.
 	id := chi.URLParam(r, "id")
 	pi, ok := h.store.PaymentIntents.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_intent: "+id)
 		return
 	}
 	if pi.Status != "requires_action" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
 			"This PaymentIntent's status is "+pi.Status+". Only requires_action can be authenticated.")
 		return
 	}
@@ -209,7 +209,7 @@ func (h *Handler) AdminCreateDispute(w http.ResponseWriter, r *http.Request) {
 		reason = "fraudulent"
 	}
 
-	id := h.store.Disputes.NextID()
+	id := h.store.StripeID(h.store.Disputes.NextID())
 	dp := store.Dispute{
 		ID:            id,
 		Object:        "dispute",

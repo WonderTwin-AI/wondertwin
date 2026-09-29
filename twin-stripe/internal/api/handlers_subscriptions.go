@@ -11,22 +11,22 @@ import (
 
 func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
 	customer := r.FormValue("customer")
 	if customer == "" {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
 	if _, exists := h.store.Customers.Get(customer); !exists {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
 		return
 	}
 
 	now := h.store.Clock.Now()
-	id := h.store.Subscriptions.NextID()
+	id := h.store.StripeID(h.store.Subscriptions.NextID())
 
 	sub := store.Subscription{
 		ID:                   id,
@@ -64,7 +64,7 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		}
 		price, ok := h.store.Prices.Get(priceID)
 		if !ok {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
 			return
 		}
 		qty := int64(1)
@@ -105,23 +105,24 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		URL:     "/v1/subscription_items?subscription=" + id,
 	}
 
-	// Apply coupon if provided.
-	if couponID := r.FormValue("coupon"); couponID != "" {
+	// Apply coupons: dahlia takes discounts[N][coupon]. Every coupon is
+	// looked up before any is redeemed, so a bad entry changes nothing.
+	sub.Discounts = []string{}
+	couponIDs := indexedFormValues(r, "discounts", "coupon")
+	coupons := make([]store.Coupon, 0, len(couponIDs))
+	for _, couponID := range couponIDs {
 		coup, ok := h.store.Coupons.Get(couponID)
 		if !ok {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such coupon: "+couponID)
 			return
 		}
+		coupons = append(coupons, coup)
+	}
+	for _, coup := range coupons {
 		coup.TimesRedeemed++
-		h.store.Coupons.Set(couponID, coup)
-		sub.Discount = &store.Discount{
-			ID:           "di_" + id,
-			Object:       "discount",
-			Coupon:       &coup,
-			Customer:     customer,
-			Subscription: id,
-			Start:        now.Unix(),
-		}
+		h.store.Coupons.Set(coup.ID, coup)
+		d := h.newDiscount(coup, customer, id, "")
+		sub.Discounts = append(sub.Discounts, d.ID)
 	}
 
 	// Parse default tax rates.
@@ -151,7 +152,7 @@ func (h *Handler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sub, ok := h.store.Subscriptions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, sub)
@@ -161,11 +162,11 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sub, ok := h.store.Subscriptions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
 		return
 	}
 	if err := parseFormOrJSON(r); err != nil {
-		twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
 
@@ -200,7 +201,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		hasItemChanges = true
 		price, ok := h.store.Prices.Get(priceID)
 		if !ok {
-			twincore.StripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
 			return
 		}
 		qty := int64(1)
@@ -249,7 +250,7 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 
 		// Generate a proration invoice if there's a net difference.
 		if prorationAmount != 0 {
-			invID := h.store.Invoices.NextID()
+			invID := h.store.StripeID(h.store.Invoices.NextID())
 			currency := "usd"
 			if len(newItems) > 0 {
 				currency = newItems[0].Price.Currency
@@ -330,7 +331,7 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sub, ok := h.store.Subscriptions.Get(id)
 	if !ok {
-		twincore.StripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such subscription: "+id)
 		return
 	}
 
@@ -342,26 +343,44 @@ func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
-	cursor := r.URL.Query().Get("starting_after")
 	limit := parseLimit(r, 10)
 	customerFilter := r.URL.Query().Get("customer")
-	if customerFilter != "" {
-		items := h.store.Subscriptions.Filter(func(_ string, s store.Subscription) bool {
-			return s.Customer == customerFilter
-		})
-		twincore.JSON(w, http.StatusOK, map[string]any{
-			"object": "list", "url": "/v1/subscriptions", "has_more": false, "data": items,
-		})
+	priceFilter := r.URL.Query().Get("price")
+	statusFilter := r.URL.Query().Get("status")
+	page, ok := paginate(w, r, h.store.Subscriptions, "subscription", limit, func(s store.Subscription) bool {
+		if customerFilter != "" && s.Customer != customerFilter {
+			return false
+		}
+		if statusFilter != "" && statusFilter != "all" && s.Status != statusFilter {
+			return false
+		}
+		if statusFilter == "" && s.Status == "canceled" {
+			// Stripe omits canceled subscriptions unless status is given.
+			return false
+		}
+		if priceFilter != "" {
+			found := false
+			if s.Items != nil {
+				for _, it := range s.Items.Data {
+					if it.Price.ID == priceFilter {
+						found = true
+					}
+				}
+			}
+			return found
+		}
+		return true
+	})
+	if !ok {
 		return
 	}
-	page := h.store.Subscriptions.Paginate(cursor, limit)
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object": "list", "url": "/v1/subscriptions", "has_more": page.HasMore, "data": page.Data,
 	})
 }
 
 func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []store.SubscriptionItem) string {
-	id := h.store.Invoices.NextID()
+	id := h.store.StripeID(h.store.Invoices.NextID())
 	var total int64
 	var lines []store.InvoiceLine
 	for i, item := range items {
@@ -389,9 +408,9 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 
 	// Apply discount from subscription.
 	var discountAmount int64
-	var discount *store.Discount
-	if sub.Discount != nil && sub.Discount.Coupon != nil {
-		coup := sub.Discount.Coupon
+	var discountIDs []string
+	var totalDiscounts []store.DiscountAmount
+	if coup, discountID := h.firstCoupon(sub.Discounts); coup != nil {
 		if coup.PercentOff > 0 {
 			discountAmount = int64(float64(total) * coup.PercentOff / 100)
 		} else if coup.AmountOff > 0 {
@@ -400,7 +419,8 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 				discountAmount = total
 			}
 		}
-		discount = sub.Discount
+		discountIDs = []string{discountID}
+		totalDiscounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discountID}}
 	}
 
 	// Apply tax rates from subscription.
@@ -422,22 +442,23 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 	invoiceTotal := total - discountAmount + taxAmount
 
 	inv := store.Invoice{
-		ID:               id,
-		Object:           "invoice",
-		Customer:         sub.Customer,
-		Subscription:     sub.ID,
-		Status:           "paid", // auto-paid for charge_automatically
-		AmountDue:        invoiceTotal,
-		AmountPaid:       invoiceTotal,
-		AmountRemaining:  0,
-		Total:            invoiceTotal,
-		Subtotal:         total,
-		Currency:         currency,
-		CollectionMethod: sub.CollectionMethod,
-		Paid:             true,
-		Discount:         discount,
-		DefaultTaxRates:  sub.DefaultTaxRates,
-		TotalTaxAmounts:  taxAmounts,
+		ID:                   id,
+		Object:               "invoice",
+		Customer:             sub.Customer,
+		Subscription:         sub.ID,
+		Status:               "paid", // auto-paid for charge_automatically
+		AmountDue:            invoiceTotal,
+		AmountPaid:           invoiceTotal,
+		AmountRemaining:      0,
+		Total:                invoiceTotal,
+		Subtotal:             total,
+		Currency:             currency,
+		CollectionMethod:     sub.CollectionMethod,
+		Paid:                 true,
+		Discounts:            discountIDs,
+		TotalDiscountAmounts: totalDiscounts,
+		DefaultTaxRates:      sub.DefaultTaxRates,
+		TotalTaxAmounts:      taxAmounts,
 		Lines: &store.InvoiceLines{
 			Object:  "list",
 			Data:    lines,
@@ -449,10 +470,6 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		PeriodEnd:   sub.CurrentPeriodEnd,
 		Livemode:    false,
 		Created:     h.store.Now(),
-	}
-
-	if discountAmount > 0 {
-		inv.TotalDiscountAmounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discount.ID}}
 	}
 
 	if sub.CollectionMethod == "send_invoice" {
