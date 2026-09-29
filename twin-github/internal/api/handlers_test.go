@@ -522,31 +522,105 @@ func TestLabels(t *testing.T) {
 
 // --- PR Tests ---
 
+// openPR branches feature from main, commits a file to it and opens a pull
+// request, the way a client has to on GitHub.
+func openPR(t *testing.T, tc *testutil.TwinClient, repo, title string) int {
+	t.Helper()
+	ghPost(tc, "/repos/twin-bot/"+repo+"/git/refs", map[string]any{"ref": "refs/heads/feature", "sha": mainSHA(tc, repo)}).AssertStatus(201)
+	ghPut(tc, "/repos/twin-bot/"+repo+"/contents/CHANGELOG.md", map[string]any{
+		"message": "add changelog", "content": "IyBDaGFuZ2Vsb2cK", "branch": "feature",
+	}).AssertStatus(201)
+	resp := ghPost(tc, "/repos/twin-bot/"+repo+"/pulls", map[string]any{"title": title, "head": "feature", "base": "main"})
+	resp.AssertStatus(201)
+	return int(resp.JSONMap()["number"].(float64))
+}
+
+func reviewerHeaders(tc *testutil.TwinClient) map[string]string {
+	testutil.NewAdminClient(tc).LoadState(map[string]any{
+		"tokens": map[string]any{"ghp_reviewer": map[string]any{"token": "ghp_reviewer", "login": "reviewer", "kind": "user"}},
+	}).AssertStatus(200)
+	return map[string]string{"Authorization": "Bearer ghp_reviewer"}
+}
+
 func TestCreateAndMergePR(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "pr-repo")
 
-	resp := ghPost(tc, "/repos/twin-bot/pr-repo/pulls", map[string]any{
-		"title": "Add feature",
-		"head":  "feature",
-		"base":  "main",
-	})
-	resp.AssertStatus(201)
-	pr := resp.JSONMap()
-	num := int(pr["number"].(float64))
-	if pr["state"] != "open" {
-		t.Error("expected state=open")
+	// A branch with nothing new cannot be proposed.
+	ghPost(tc, "/repos/twin-bot/pr-repo/pulls", map[string]any{"title": "x", "head": "main", "base": "main"}).AssertStatus(422)
+	ghPost(tc, "/repos/twin-bot/pr-repo/pulls", map[string]any{"title": "x", "head": "nope", "base": "main"}).AssertStatus(422)
+
+	num := openPR(t, tc, "pr-repo", "Add feature")
+	pr := ghGet(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d", num)).AssertStatus(200).JSONMap()
+	assertRequired(t, "pull-request", pr)
+	if _, ok := pr["merge_commit_sha"]; ok {
+		t.Error("2026-03-10 removes merge_commit_sha")
+	}
+	if pr["state"] != "open" || pr["commits"].(float64) != 1 || pr["changed_files"].(float64) != 1 || pr["mergeable"] != true {
+		t.Errorf("unexpected pull request %v %v %v %v", pr["state"], pr["commits"], pr["changed_files"], pr["mergeable"])
+	}
+	headSHA := pr["head"].(map[string]any)["sha"].(string)
+
+	var list []map[string]any
+	ghGet(tc, "/repos/twin-bot/pr-repo/pulls").JSON(&list)
+	assertRequired(t, "pull-request-simple", list[0])
+
+	// The issues API lists the pull request in its issue form.
+	var issues []map[string]any
+	ghGet(tc, "/repos/twin-bot/pr-repo/issues").JSON(&issues)
+	if len(issues) != 1 || issues[0]["pull_request"] == nil {
+		t.Errorf("expected the pull request among issues, got %v", issues)
 	}
 
-	// Merge
-	resp = ghPut(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d/merge", num), nil)
+	ghPost(tc, "/repos/twin-bot/pr-repo/pulls", map[string]any{"title": "again", "head": "feature", "base": "main"}).AssertStatus(422)
+	ghPut(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d/merge", num), map[string]any{"sha": "0000000000000000000000000000000000000000"}).AssertStatus(409)
+
+	resp := ghPut(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d/merge", num), map[string]any{"merge_method": "squash", "sha": headSHA})
 	resp.AssertStatus(200)
-	if resp.JSONMap()["merged"] != true {
+	merge := resp.JSONMap()
+	if merge["merged"] != true {
 		t.Error("expected merged=true")
 	}
-
-	// Check merged
+	if mainSHA(tc, "pr-repo") != merge["sha"] {
+		t.Error("the merge commit becomes the head of main")
+	}
+	ghGet(tc, "/repos/twin-bot/pr-repo/contents/CHANGELOG.md").AssertStatus(200)
 	ghGet(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d/merge", num)).AssertStatus(204)
+	after := ghGet(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d", num)).JSONMap()
+	if after["state"] != "closed" || after["merged"] != true || after["merged_by"] == nil {
+		t.Errorf("unexpected merged pull request %v %v %v", after["state"], after["merged"], after["merged_by"])
+	}
+	ghPut(tc, fmt.Sprintf("/repos/twin-bot/pr-repo/pulls/%d/merge", num), nil).AssertStatus(405)
+}
+
+func TestMergeMethodsKeepHistory(t *testing.T) {
+	for _, method := range []string{"merge", "rebase"} {
+		_, tc := setupGitHub(t)
+		createRepo(tc, "m")
+		base := mainSHA(tc, "m")
+		num := openPR(t, tc, "m", method)
+		merged := ghPut(tc, fmt.Sprintf("/repos/twin-bot/m/pulls/%d/merge", num), map[string]any{"merge_method": method}).AssertStatus(200).JSONMap()
+		c := ghGet(tc, "/repos/twin-bot/m/git/commits/"+merged["sha"].(string)).AssertStatus(200).JSONMap()
+		parents := c["parents"].([]any)
+		if method == "merge" && len(parents) != 2 {
+			t.Errorf("a merge commit has two parents, got %d", len(parents))
+		}
+		if method == "rebase" && (len(parents) != 1 || parents[0].(map[string]any)["sha"] != base) {
+			t.Errorf("a rebased commit sits on the old main, got %v", parents)
+		}
+	}
+}
+
+func TestMergeConflictIsRefused(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "conflict")
+	num := openPR(t, tc, "conflict", "Conflicts")
+	ghPut(tc, "/repos/twin-bot/conflict/contents/CHANGELOG.md", map[string]any{"message": "main edit", "content": "eAo="}).AssertStatus(201)
+	pr := ghGet(tc, fmt.Sprintf("/repos/twin-bot/conflict/pulls/%d", num)).JSONMap()
+	if pr["mergeable"] != false || pr["mergeable_state"] != "dirty" {
+		t.Errorf("expected a dirty pull request, got %v %v", pr["mergeable"], pr["mergeable_state"])
+	}
+	ghPut(tc, fmt.Sprintf("/repos/twin-bot/conflict/pulls/%d/merge", num), nil).AssertStatus(405)
 }
 
 // --- Commit Status Tests ---
@@ -649,27 +723,31 @@ func TestMilestones(t *testing.T) {
 func TestPRReviews(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "review-repo")
+	num := openPR(t, tc, "review-repo", "Review me")
+	path := fmt.Sprintf("/repos/twin-bot/review-repo/pulls/%d/reviews", num)
 
-	resp := ghPost(tc, "/repos/twin-bot/review-repo/pulls", map[string]any{
-		"title": "Review me", "head": "feature", "base": "main",
-	})
-	num := int(resp.JSONMap()["number"].(float64))
-
-	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/review-repo/pulls/%d/reviews", num), map[string]any{
-		"body":  "LGTM",
-		"event": "APPROVE",
-	})
-	resp.AssertStatus(200)
-	if resp.JSONMap()["state"] != "APPROVED" {
-		t.Error("expected state=APPROVED")
+	own := ghPost(tc, path, map[string]any{"body": "LGTM", "event": "APPROVE"})
+	own.AssertStatus(422)
+	if errs := own.JSONMap()["errors"].([]any); errs[0] != "Can not approve your own pull request" {
+		t.Errorf("unexpected refusal %v", errs)
 	}
 
-	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/review-repo/pulls/%d/reviews", num))
+	resp := tc.DoWithHeaders("POST", path, map[string]any{"body": "LGTM", "event": "APPROVE"}, reviewerHeaders(tc))
+	resp.AssertStatus(200)
+	review := resp.JSONMap()
+	assertRequired(t, "pull-request-review", review)
+	if review["state"] != "APPROVED" || review["user"].(map[string]any)["login"] != "reviewer" {
+		t.Errorf("unexpected review %v by %v", review["state"], review["user"])
+	}
+
 	var reviews []map[string]any
-	json.Unmarshal(resp.Body, &reviews)
+	json.Unmarshal(ghGet(tc, path).Body, &reviews)
 	if len(reviews) != 1 {
 		t.Errorf("expected 1 review, got %d", len(reviews))
 	}
+	id := int64(review["id"].(float64))
+	ghPut(tc, fmt.Sprintf("%s/%d", path, id), map[string]any{"body": "Still good"}).AssertStatus(200)
+	ghPatch(tc, fmt.Sprintf("%s/%d", path, id), map[string]any{"body": "x"}).AssertStatus(404)
 }
 
 // --- PR Review Comment Tests ---
@@ -678,12 +756,9 @@ func TestPRReviewComments(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "rc-repo")
 
-	resp := ghPost(tc, "/repos/twin-bot/rc-repo/pulls", map[string]any{
-		"title": "Comment me", "head": "feature", "base": "main",
-	})
-	num := int(resp.JSONMap()["number"].(float64))
+	num := openPR(t, tc, "rc-repo", "Comment me")
 
-	resp = ghPost(tc, fmt.Sprintf("/repos/twin-bot/rc-repo/pulls/%d/comments", num), map[string]any{
+	resp := ghPost(tc, fmt.Sprintf("/repos/twin-bot/rc-repo/pulls/%d/comments", num), map[string]any{
 		"body": "Nitpick here",
 		"path": "main.go",
 	})

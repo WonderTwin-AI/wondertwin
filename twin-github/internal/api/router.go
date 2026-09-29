@@ -151,7 +151,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.ListPRReviews)
 		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/reviews", h.CreatePRReview)
 		r.Get("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.GetPRReview)
-		r.Patch("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.UpdatePRReview)
+		r.Put("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}", h.UpdatePRReview)
 		r.Post("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/events", h.SubmitPRReview)
 		r.Put("/repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals", h.DismissPRReview)
 

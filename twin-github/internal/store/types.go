@@ -90,9 +90,14 @@ type PullRequest struct {
 	UpdatedAt      string  `json:"updated_at"`
 	ClosedAt       string  `json:"closed_at,omitempty"`
 	MergedAt       string  `json:"merged_at,omitempty"`
+	MergedBy       string  `json:"merged_by,omitempty"`
+	// MergeBase is the commit the head branch forked from the base.
+	MergeBase           string   `json:"merge_base,omitempty"`
+	RequestedReviewers  []string `json:"requested_reviewers,omitempty"`
+	MaintainerCanModify bool     `json:"maintainer_can_modify,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // PRRef represents the head or base of a pull request.
@@ -253,9 +258,9 @@ type PRReview struct {
 	CommitID    string `json:"commit_id"`
 	SubmittedAt string `json:"submitted_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	PRNumber  int    `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	PRNumber  int    `json:"pr_number"`
 }
 
 // PRReviewComment represents an inline/diff comment on a PR.
