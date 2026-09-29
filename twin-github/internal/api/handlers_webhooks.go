@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -32,7 +31,7 @@ func (x renderer) hook(hk store.Webhook) map[string]any {
 
 // ListWebhooks handles GET /repos/{owner}/{repo}/hooks
 func (h *Handler) ListWebhooks(w http.ResponseWriter, r *http.Request) {
-	owner, repo := chi.URLParam(r, "owner"), chi.URLParam(r, "repo")
+	owner, repo := param(r, "owner"), param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -94,7 +93,7 @@ func (req hookRequest) apply(hk *store.Webhook) {
 // CreateWebhook handles POST /repos/{owner}/{repo}/hooks. GitHub defaults
 // events to push and content_type to form, and sends a ping on creation.
 func (h *Handler) CreateWebhook(w http.ResponseWriter, r *http.Request) {
-	owner, repo := chi.URLParam(r, "owner"), chi.URLParam(r, "repo")
+	owner, repo := param(r, "owner"), param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -133,8 +132,8 @@ func (h *Handler) ping(r *http.Request, hk store.Webhook) {
 }
 
 func (h *Handler) hookFromPath(w http.ResponseWriter, r *http.Request) (store.Webhook, bool) {
-	hk, ok := h.store.Webhooks.Get(chi.URLParam(r, "hook_id"))
-	if !ok || hk.RepoOwner != chi.URLParam(r, "owner") || hk.RepoName != chi.URLParam(r, "repo") {
+	hk, ok := h.store.Webhooks.Get(param(r, "hook_id"))
+	if !ok || hk.RepoOwner != param(r, "owner") || hk.RepoName != param(r, "repo") {
 		ghError(w, 404, "Not Found")
 		return hk, false
 	}

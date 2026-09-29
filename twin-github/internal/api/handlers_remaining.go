@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -40,9 +39,9 @@ func (h *Handler) DeleteBranchProtection(w http.ResponseWriter, r *http.Request)
 
 // RenameBranch handles POST /repos/{owner}/{repo}/branches/{branch}/rename
 func (h *Handler) RenameBranch(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	oldName := chi.URLParam(r, "branch")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	oldName := param(r, "branch")
 
 	var req struct {
 		NewName string `json:"new_name"`
@@ -79,7 +78,7 @@ func (h *Handler) UpdateCheckSuitePreferences(w http.ResponseWriter, r *http.Req
 
 // GetReadmeForDir handles GET /repos/{owner}/{repo}/readme/{dir}
 func (h *Handler) GetReadmeForDir(w http.ResponseWriter, r *http.Request) {
-	h.readme(w, r, chi.URLParam(r, "dir"))
+	h.readme(w, r, param(r, "dir"))
 }
 
 // DownloadTarball handles GET /repos/{owner}/{repo}/tarball/{ref}
@@ -102,7 +101,7 @@ func (h *Handler) DownloadZipball(w http.ResponseWriter, r *http.Request) {
 
 // UpdateOrg handles PATCH /orgs/{org}
 func (h *Handler) UpdateOrg(w http.ResponseWriter, r *http.Request) {
-	orgLogin := chi.URLParam(r, "org")
+	orgLogin := param(r, "org")
 	org, ok := h.store.Orgs.Get(orgLogin)
 	if !ok {
 		org = store.Organization{ID: h.store.NewID(store.KindOrg), Login: orgLogin, Type: "Organization"}
@@ -164,7 +163,7 @@ func (h *Handler) CheckCollaborator(w http.ResponseWriter, r *http.Request) {
 
 // DeleteDeployment handles DELETE /repos/{owner}/{repo}/deployments/{deployment_id}
 func (h *Handler) DeleteDeployment(w http.ResponseWriter, r *http.Request) {
-	deployID, _ := strconv.ParseInt(chi.URLParam(r, "deployment_id"), 10, 64)
+	deployID, _ := strconv.ParseInt(param(r, "deployment_id"), 10, 64)
 	ids, _ := h.store.Deployments.FilterWithIDs(func(_ string, d store.Deployment) bool {
 		return d.ID == deployID
 	})
@@ -178,7 +177,7 @@ func (h *Handler) DeleteDeployment(w http.ResponseWriter, r *http.Request) {
 
 // GetDeploymentStatus handles GET /repos/{owner}/{repo}/deployments/{deployment_id}/statuses/{status_id}
 func (h *Handler) GetDeploymentStatus(w http.ResponseWriter, r *http.Request) {
-	statusID, _ := strconv.ParseInt(chi.URLParam(r, "status_id"), 10, 64)
+	statusID, _ := strconv.ParseInt(param(r, "status_id"), 10, 64)
 	_, statuses := h.store.DeployStatuses.FilterWithIDs(func(_ string, ds store.DeploymentStatus) bool {
 		return ds.ID == statusID
 	})
@@ -251,7 +250,7 @@ func (h *Handler) GetOrgPublicKey(w http.ResponseWriter, r *http.Request) {
 
 // GetOrgSecret handles GET /orgs/{org}/actions/secrets/{secret_name}
 func (h *Handler) GetOrgSecret(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "secret_name")
+	name := param(r, "secret_name")
 	ghJSON(w, 200, map[string]any{
 		"name":       name,
 		"created_at": h.store.Now(),
@@ -295,18 +294,18 @@ func (h *Handler) SearchLabels(w http.ResponseWriter, r *http.Request) {
 
 // ListPRCommentReactions handles GET /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions
 func (h *Handler) ListPRCommentReactions(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	commentID := chi.URLParam(r, "comment_id")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	commentID := param(r, "comment_id")
 	reactions := h.store.ListSubjectReactions(owner, repo, "pr_comment:"+commentID)
 	ghJSON(w, 200, paginate(w, r, reactions))
 }
 
 // CreatePRCommentReaction handles POST /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions
 func (h *Handler) CreatePRCommentReaction(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	commentID := chi.URLParam(r, "comment_id")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	commentID := param(r, "comment_id")
 
 	var req struct {
 		Content string `json:"content"`
@@ -325,7 +324,7 @@ func (h *Handler) CreatePRCommentReaction(w http.ResponseWriter, r *http.Request
 
 // DeletePRCommentReaction handles DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions/{reaction_id}
 func (h *Handler) DeletePRCommentReaction(w http.ResponseWriter, r *http.Request) {
-	reactionID, _ := strconv.ParseInt(chi.URLParam(r, "reaction_id"), 10, 64)
+	reactionID, _ := strconv.ParseInt(param(r, "reaction_id"), 10, 64)
 	ids, _ := h.store.Reactions.FilterWithIDs(func(_ string, rx store.Reaction) bool { return rx.ID == reactionID })
 	if len(ids) == 0 {
 		ghError(w, 404, "Not Found")

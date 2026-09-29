@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -36,9 +35,9 @@ func (h *Handler) allRefs(owner, repo string) [][2]string {
 
 // GetGitRef handles GET /repos/{owner}/{repo}/git/ref/{ref}
 func (h *Handler) GetGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -57,9 +56,9 @@ func (h *Handler) GetGitRef(w http.ResponseWriter, r *http.Request) {
 
 // ListMatchingRefs handles GET /repos/{owner}/{repo}/git/matching-refs/{ref}
 func (h *Handler) ListMatchingRefs(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	prefix := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	prefix := "refs/" + param(r, "*")
 	x := h.rd(r)
 	out := []map[string]any{}
 	for _, ref := range h.allRefs(owner, repo) {
@@ -72,8 +71,8 @@ func (h *Handler) ListMatchingRefs(w http.ResponseWriter, r *http.Request) {
 
 // CreateGitRef handles POST /repos/{owner}/{repo}/git/refs
 func (h *Handler) CreateGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -111,9 +110,9 @@ func (h *Handler) CreateGitRef(w http.ResponseWriter, r *http.Request) {
 
 // UpdateGitRef handles PATCH /repos/{owner}/{repo}/git/refs/{ref}
 func (h *Handler) UpdateGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
 
 	var req struct {
 		SHA   string `json:"sha"`
@@ -146,9 +145,9 @@ func (h *Handler) UpdateGitRef(w http.ResponseWriter, r *http.Request) {
 
 // DeleteGitRef handles DELETE /repos/{owner}/{repo}/git/refs/{ref}
 func (h *Handler) DeleteGitRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := "refs/" + chi.URLParam(r, "*")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := "refs/" + param(r, "*")
 
 	var deleted bool
 	if name, isBranch := strings.CutPrefix(ref, "refs/heads/"); isBranch {
@@ -165,9 +164,9 @@ func (h *Handler) DeleteGitRef(w http.ResponseWriter, r *http.Request) {
 
 // GetGitCommit handles GET /repos/{owner}/{repo}/git/commits/{commit_sha}
 func (h *Handler) GetGitCommit(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	c, ok := h.store.GetCommit(owner, repo, chi.URLParam(r, "commit_sha"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	c, ok := h.store.GetCommit(owner, repo, param(r, "commit_sha"))
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -177,8 +176,8 @@ func (h *Handler) GetGitCommit(w http.ResponseWriter, r *http.Request) {
 
 // CreateGitCommit handles POST /repos/{owner}/{repo}/git/commits
 func (h *Handler) CreateGitCommit(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Message string   `json:"message"`
@@ -230,9 +229,9 @@ func (x renderer) gitTree(owner, repo string, t store.GitTree) map[string]any {
 // GetGitTree handles GET /repos/{owner}/{repo}/git/trees/{tree_sha}. Trees
 // are listed flat (as with ?recursive=1).
 func (h *Handler) GetGitTree(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "tree_sha")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "tree_sha")
 
 	if t, ok := h.store.GitTrees.Get(store.RepoKey(owner, repo) + "@" + sha); ok {
 		ghJSON(w, 200, h.rd(r).gitTree(owner, repo, t))
@@ -272,8 +271,8 @@ func (h *Handler) treeOf(owner, repo string, c store.Commit) store.GitTree {
 
 // CreateGitTree handles POST /repos/{owner}/{repo}/git/trees
 func (h *Handler) CreateGitTree(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		BaseTree string `json:"base_tree"`
@@ -316,9 +315,9 @@ func (h *Handler) CreateGitTree(w http.ResponseWriter, r *http.Request) {
 
 // GetGitBlob handles GET /repos/{owner}/{repo}/git/blobs/{file_sha}
 func (h *Handler) GetGitBlob(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "file_sha")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "file_sha")
 
 	content, ok := h.store.GetBlob(owner, repo, sha)
 	if !ok {
@@ -334,8 +333,8 @@ func (h *Handler) GetGitBlob(w http.ResponseWriter, r *http.Request) {
 
 // CreateGitBlob handles POST /repos/{owner}/{repo}/git/blobs
 func (h *Handler) CreateGitBlob(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Content  string `json:"content"`
@@ -358,9 +357,9 @@ func (h *Handler) CreateGitBlob(w http.ResponseWriter, r *http.Request) {
 
 // GetGitTag handles GET /repos/{owner}/{repo}/git/tags/{tag_sha}
 func (h *Handler) GetGitTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	sha := chi.URLParam(r, "tag_sha")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	sha := param(r, "tag_sha")
 
 	_, tags := h.store.GitTags.FilterWithIDs(func(_ string, gt store.GitTag) bool {
 		return gt.RepoOwner == owner && gt.RepoName == repo && gt.SHA == sha
@@ -374,8 +373,8 @@ func (h *Handler) GetGitTag(w http.ResponseWriter, r *http.Request) {
 
 // CreateGitTag handles POST /repos/{owner}/{repo}/git/tags
 func (h *Handler) CreateGitTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	var req struct {
 		Tag     string `json:"tag"`

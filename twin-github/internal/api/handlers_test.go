@@ -1307,6 +1307,18 @@ func TestGitRefs(t *testing.T) {
 	ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature").AssertStatus(404)
 }
 
+func TestEscapedSlashesInPathParameters(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "escaped")
+	// Octokit escapes the slash inside {ref} and {path}.
+	ghGet(tc, "/repos/twin-bot/escaped/git/ref/heads%2Fmain").AssertStatus(200)
+	ghPut(tc, "/repos/twin-bot/escaped/contents/docs%2Fguide.md", map[string]any{"message": "doc", "content": "eAo="}).AssertStatus(201)
+	file := ghGet(tc, "/repos/twin-bot/escaped/contents/docs/guide.md").AssertStatus(200).JSONMap()
+	if file["path"] != "docs/guide.md" {
+		t.Errorf("the escaped path is stored decoded, got %v", file["path"])
+	}
+}
+
 func TestEmptyRepoRefIs409(t *testing.T) {
 	_, tc := setupGitHub(t)
 	ghPost(tc, "/user/repos", map[string]any{"name": "blank"}).AssertStatus(201)

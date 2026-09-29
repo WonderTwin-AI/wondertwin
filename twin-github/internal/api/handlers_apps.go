@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -142,7 +141,7 @@ func (h *Handler) appInstallation(w http.ResponseWriter, r *http.Request) (store
 	if !ok {
 		return app, store.Installation{}, false
 	}
-	id, _ := strconv.ParseInt(chi.URLParam(r, "installation_id"), 10, 64)
+	id, _ := strconv.ParseInt(param(r, "installation_id"), 10, 64)
 	inst, found := h.store.GetInstallation(id)
 	if !found || inst.AppID != app.ID {
 		ghError(w, 404, "Not Found")

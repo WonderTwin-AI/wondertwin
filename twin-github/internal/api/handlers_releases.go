@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -94,8 +93,8 @@ func (h *Handler) releasesNewestFirst(owner, repo string) []store.Release {
 
 // ListReleases handles GET /repos/{owner}/{repo}/releases
 func (h *Handler) ListReleases(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -141,8 +140,8 @@ func (h *Handler) publishTag(r *http.Request, rel store.Release) {
 
 // CreateRelease handles POST /repos/{owner}/{repo}/releases
 func (h *Handler) CreateRelease(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -197,8 +196,8 @@ func (h *Handler) CreateRelease(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) releaseFromPath(w http.ResponseWriter, r *http.Request) (store.Release, bool) {
-	rel, ok := h.store.Releases.Get(chi.URLParam(r, "release_id"))
-	if !ok || rel.RepoOwner != chi.URLParam(r, "owner") || rel.RepoName != chi.URLParam(r, "repo") ||
+	rel, ok := h.store.Releases.Get(param(r, "release_id"))
+	if !ok || rel.RepoOwner != param(r, "owner") || rel.RepoName != param(r, "repo") ||
 		(rel.Draft && principalFrom(r).Kind == principalAnonymous) {
 		ghError(w, 404, "Not Found")
 		return rel, false
@@ -217,8 +216,8 @@ func (h *Handler) GetRelease(w http.ResponseWriter, r *http.Request) {
 // newest published release that is neither a prerelease nor opted out with
 // make_latest=false.
 func (h *Handler) GetLatestRelease(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	for _, rel := range h.releasesNewestFirst(owner, repo) {
 		if !rel.Draft && !rel.Prerelease && rel.MakeLatest != "false" {
 			ghJSON(w, 200, h.rd(r).release(rel))
@@ -230,9 +229,9 @@ func (h *Handler) GetLatestRelease(w http.ResponseWriter, r *http.Request) {
 
 // GetReleaseByTag handles GET /repos/{owner}/{repo}/releases/tags/{tag}
 func (h *Handler) GetReleaseByTag(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	tag := chi.URLParam(r, "tag")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	tag := param(r, "tag")
 	for _, rel := range h.store.ListRepoReleases(owner, repo) {
 		if rel.TagName == tag && !rel.Draft {
 			ghJSON(w, 200, h.rd(r).release(rel))
@@ -345,8 +344,8 @@ func (h *Handler) UploadReleaseAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) assetFromPath(w http.ResponseWriter, r *http.Request) (store.ReleaseAsset, bool) {
-	a, ok := h.store.ReleaseAssets.Get(chi.URLParam(r, "asset_id"))
-	if !ok || a.RepoOwner != chi.URLParam(r, "owner") || a.RepoName != chi.URLParam(r, "repo") {
+	a, ok := h.store.ReleaseAssets.Get(param(r, "asset_id"))
+	if !ok || a.RepoOwner != param(r, "owner") || a.RepoName != param(r, "repo") {
 		ghError(w, 404, "Not Found")
 		return a, false
 	}

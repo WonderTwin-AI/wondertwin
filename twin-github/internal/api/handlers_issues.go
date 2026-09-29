@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -69,8 +68,8 @@ func (h *Handler) usersNamed(logins []string) []store.User {
 // ListIssues handles GET /repos/{owner}/{repo}/issues. GitHub lists pull
 // requests here too, and sorts by creation time, newest first, by default.
 func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -207,8 +206,8 @@ func (h *Handler) milestoneFor(owner, repo string, raw *json.RawMessage) (*store
 // CreateIssue handles POST /repos/{owner}/{repo}/issues. The 2026-03-10
 // version has no singular assignee parameter; assignees is the only form.
 func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
@@ -264,9 +263,9 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 // GetIssue handles GET /repos/{owner}/{repo}/issues/{issue_number}. A pull
 // request number returns the pull request in its issue form.
 func (h *Handler) GetIssue(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 
 	if issue, _, ok := h.store.GetIssue(owner, repo, num); ok {
 		ghJSON(w, 200, h.rd(r).issue(*issue))
@@ -281,9 +280,9 @@ func (h *Handler) GetIssue(w http.ResponseWriter, r *http.Request) {
 
 // UpdateIssue handles PATCH /repos/{owner}/{repo}/issues/{issue_number}
 func (h *Handler) UpdateIssue(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 
 	issue, id, ok := h.store.GetIssue(owner, repo, num)
 	if !ok {
@@ -370,9 +369,9 @@ func dedupe(s []string) []string {
 
 // ListIssueComments handles GET /repos/{owner}/{repo}/issues/{issue_number}/comments
 func (h *Handler) ListIssueComments(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 
 	if !h.issueOrPRExists(owner, repo, num) {
 		ghError(w, 404, "Not Found")
@@ -396,9 +395,9 @@ func (h *Handler) issueOrPRExists(owner, repo string, num int) bool {
 
 // CreateIssueComment handles POST /repos/{owner}/{repo}/issues/{issue_number}/comments
 func (h *Handler) CreateIssueComment(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 
 	if !h.issueOrPRExists(owner, repo, num) {
 		ghError(w, 404, "Not Found")
@@ -451,7 +450,7 @@ func (h *Handler) findComment(id int64) (store.Comment, string, bool) {
 
 // GetIssueComment handles GET /repos/{owner}/{repo}/issues/comments/{comment_id}
 func (h *Handler) GetIssueComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 	c, _, ok := h.findComment(commentID)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -462,7 +461,7 @@ func (h *Handler) GetIssueComment(w http.ResponseWriter, r *http.Request) {
 
 // UpdateIssueComment handles PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}
 func (h *Handler) UpdateIssueComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 	c, id, ok := h.findComment(commentID)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -484,7 +483,7 @@ func (h *Handler) UpdateIssueComment(w http.ResponseWriter, r *http.Request) {
 
 // DeleteIssueComment handles DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}
 func (h *Handler) DeleteIssueComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 	c, id, ok := h.findComment(commentID)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -500,8 +499,8 @@ func (h *Handler) DeleteIssueComment(w http.ResponseWriter, r *http.Request) {
 
 // ListLabels handles GET /repos/{owner}/{repo}/labels
 func (h *Handler) ListLabels(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -511,8 +510,8 @@ func (h *Handler) ListLabels(w http.ResponseWriter, r *http.Request) {
 
 // CreateLabel handles POST /repos/{owner}/{repo}/labels
 func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -554,9 +553,9 @@ func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 
 // GetLabel handles GET /repos/{owner}/{repo}/labels/{name}
 func (h *Handler) GetLabel(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	label, _, ok := h.store.GetLabel(owner, repo, chi.URLParam(r, "name"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	label, _, ok := h.store.GetLabel(owner, repo, param(r, "name"))
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -566,9 +565,9 @@ func (h *Handler) GetLabel(w http.ResponseWriter, r *http.Request) {
 
 // UpdateLabel handles PATCH /repos/{owner}/{repo}/labels/{name}
 func (h *Handler) UpdateLabel(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	label, id, ok := h.store.GetLabel(owner, repo, chi.URLParam(r, "name"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	label, id, ok := h.store.GetLabel(owner, repo, param(r, "name"))
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -591,9 +590,9 @@ func (h *Handler) UpdateLabel(w http.ResponseWriter, r *http.Request) {
 
 // DeleteLabel handles DELETE /repos/{owner}/{repo}/labels/{name}
 func (h *Handler) DeleteLabel(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	_, id, ok := h.store.GetLabel(owner, repo, chi.URLParam(r, "name"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	_, id, ok := h.store.GetLabel(owner, repo, param(r, "name"))
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -640,9 +639,9 @@ func decodeLabelBody(r *http.Request) []string {
 
 // ListIssueLabels handles GET /repos/{owner}/{repo}/issues/{issue_number}/labels
 func (h *Handler) ListIssueLabels(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 	labels, _, ok := h.issueLabels(owner, repo, num)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -653,9 +652,9 @@ func (h *Handler) ListIssueLabels(w http.ResponseWriter, r *http.Request) {
 
 // AddIssueLabels handles POST /repos/{owner}/{repo}/issues/{issue_number}/labels
 func (h *Handler) AddIssueLabels(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 	labels, set, ok := h.issueLabels(owner, repo, num)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -671,9 +670,9 @@ func (h *Handler) AddIssueLabels(w http.ResponseWriter, r *http.Request) {
 
 // SetIssueLabels handles PUT /repos/{owner}/{repo}/issues/{issue_number}/labels
 func (h *Handler) SetIssueLabels(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 	_, set, ok := h.issueLabels(owner, repo, num)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -686,9 +685,9 @@ func (h *Handler) SetIssueLabels(w http.ResponseWriter, r *http.Request) {
 
 // RemoveAllIssueLabels handles DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels
 func (h *Handler) RemoveAllIssueLabels(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
 	_, set, ok := h.issueLabels(owner, repo, num)
 	if !ok {
 		ghError(w, 404, "Not Found")
@@ -700,10 +699,10 @@ func (h *Handler) RemoveAllIssueLabels(w http.ResponseWriter, r *http.Request) {
 
 // RemoveIssueLabel handles DELETE /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}
 func (h *Handler) RemoveIssueLabel(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "issue_number"))
-	name := chi.URLParam(r, "name")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "issue_number"))
+	name := param(r, "name")
 
 	labels, set, ok := h.issueLabels(owner, repo, num)
 	if !ok {

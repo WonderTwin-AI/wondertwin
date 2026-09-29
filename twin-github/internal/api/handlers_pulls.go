@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -23,8 +22,8 @@ func ghErrorList(w http.ResponseWriter, status int, message string, errs ...stri
 }
 
 func (h *Handler) pullFromPath(w http.ResponseWriter, r *http.Request) (*store.PullRequest, string, bool) {
-	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
-	pr, id, ok := h.store.GetPR(chi.URLParam(r, "owner"), chi.URLParam(r, "repo"), num)
+	num, _ := strconv.Atoi(param(r, "pull_number"))
+	pr, id, ok := h.store.GetPR(param(r, "owner"), param(r, "repo"), num)
 	if !ok {
 		ghError(w, 404, "Not Found")
 	}
@@ -43,8 +42,8 @@ func (h *Handler) mergeBase(owner, repo, base, head string) string {
 
 // ListPullRequests handles GET /repos/{owner}/{repo}/pulls
 func (h *Handler) ListPullRequests(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -88,8 +87,8 @@ func (h *Handler) ListPullRequests(w http.ResponseWriter, r *http.Request) {
 // must be branches of the repository, head must have commits base lacks,
 // and only one open pull request may exist per head and base.
 func (h *Handler) CreatePullRequest(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -612,10 +611,10 @@ func (h *Handler) CreatePRReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) reviewFromPath(w http.ResponseWriter, r *http.Request) (store.PRReview, string, bool) {
-	reviewID, _ := strconv.ParseInt(chi.URLParam(r, "review_id"), 10, 64)
-	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
+	reviewID, _ := strconv.ParseInt(param(r, "review_id"), 10, 64)
+	num, _ := strconv.Atoi(param(r, "pull_number"))
 	ids, reviews := h.store.PRReviews.FilterWithIDs(func(_ string, rv store.PRReview) bool {
-		return rv.ID == reviewID && rv.PRNumber == num && rv.RepoOwner == chi.URLParam(r, "owner") && rv.RepoName == chi.URLParam(r, "repo")
+		return rv.ID == reviewID && rv.PRNumber == num && rv.RepoOwner == param(r, "owner") && rv.RepoName == param(r, "repo")
 	})
 	if len(ids) == 0 {
 		ghError(w, 404, "Not Found")

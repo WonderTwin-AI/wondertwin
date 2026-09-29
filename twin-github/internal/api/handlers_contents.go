@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -54,9 +53,9 @@ func wrapBase64(b []byte) string {
 
 // GetContents handles GET /repos/{owner}/{repo}/contents/{path}
 func (h *Handler) GetContents(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	path := strings.Trim(chi.URLParam(r, "*"), "/")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	path := strings.Trim(param(r, "*"), "/")
 	h.serveContents(w, r, owner, repo, path)
 }
 
@@ -171,9 +170,9 @@ func (h *Handler) signature(r *http.Request, req contentsRequest) store.Signatur
 // It commits the file to the branch (the default branch unless one is
 // named), creating the branch's first commit on an empty repository.
 func (h *Handler) CreateOrUpdateContents(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	path := strings.Trim(chi.URLParam(r, "*"), "/")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	path := strings.Trim(param(r, "*"), "/")
 
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
@@ -237,9 +236,9 @@ func (h *Handler) CreateOrUpdateContents(w http.ResponseWriter, r *http.Request)
 
 // DeleteContents handles DELETE /repos/{owner}/{repo}/contents/{path}
 func (h *Handler) DeleteContents(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	path := strings.Trim(chi.URLParam(r, "*"), "/")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	path := strings.Trim(param(r, "*"), "/")
 
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
@@ -282,8 +281,8 @@ func (h *Handler) GetReadme(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) readme(w http.ResponseWriter, r *http.Request, dir string) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	c, ok := h.store.ResolveRef(owner, repo, r.URL.Query().Get("ref"))
 	if !ok {
 		ghError(w, 404, "Not Found")

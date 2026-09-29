@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -12,7 +11,7 @@ import (
 
 // DeleteWorkflowRun handles DELETE /repos/{owner}/{repo}/actions/runs/{run_id}
 func (h *Handler) DeleteWorkflowRun(w http.ResponseWriter, r *http.Request) {
-	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
+	runID, _ := strconv.ParseInt(param(r, "run_id"), 10, 64)
 	ids, _ := h.store.WorkflowRuns.FilterWithIDs(func(_ string, run store.WorkflowRun) bool {
 		return run.ID == runID
 	})
@@ -34,16 +33,16 @@ func (h *Handler) RerunFailedJobs(w http.ResponseWriter, r *http.Request) {
 
 // ListRunJobs handles GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
 func (h *Handler) ListRunJobs(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	runID, _ := strconv.ParseInt(param(r, "run_id"), 10, 64)
 	jobs := h.store.ListRunJobs(owner, repo, runID)
 	ghJSON(w, 200, map[string]any{"total_count": len(jobs), "jobs": paginate(w, r, jobs)})
 }
 
 // GetJob handles GET /repos/{owner}/{repo}/actions/jobs/{job_id}
 func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
-	jobID, _ := strconv.ParseInt(chi.URLParam(r, "job_id"), 10, 64)
+	jobID, _ := strconv.ParseInt(param(r, "job_id"), 10, 64)
 	_, jobs := h.store.WorkflowJobs.FilterWithIDs(func(_ string, j store.WorkflowJob) bool {
 		return j.ID == jobID
 	})
@@ -58,24 +57,24 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 
 // ListRunArtifacts handles GET /repos/{owner}/{repo}/actions/runs/{run_id}/artifacts
 func (h *Handler) ListRunArtifacts(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	runID, _ := strconv.ParseInt(param(r, "run_id"), 10, 64)
 	arts := h.store.ListRunArtifacts(owner, repo, runID)
 	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": paginate(w, r, arts)})
 }
 
 // ListRepoArtifacts handles GET /repos/{owner}/{repo}/actions/artifacts
 func (h *Handler) ListRepoArtifacts(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	arts := h.store.ListRepoArtifacts(owner, repo)
 	ghJSON(w, 200, map[string]any{"total_count": len(arts), "artifacts": paginate(w, r, arts)})
 }
 
 // GetArtifact handles GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
 func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request) {
-	artID, _ := strconv.ParseInt(chi.URLParam(r, "artifact_id"), 10, 64)
+	artID, _ := strconv.ParseInt(param(r, "artifact_id"), 10, 64)
 	_, arts := h.store.Artifacts.FilterWithIDs(func(_ string, a store.Artifact) bool {
 		return a.ID == artID
 	})
@@ -88,7 +87,7 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request) {
 
 // DeleteArtifact handles DELETE /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
 func (h *Handler) DeleteArtifact(w http.ResponseWriter, r *http.Request) {
-	artID, _ := strconv.ParseInt(chi.URLParam(r, "artifact_id"), 10, 64)
+	artID, _ := strconv.ParseInt(param(r, "artifact_id"), 10, 64)
 	ids, _ := h.store.Artifacts.FilterWithIDs(func(_ string, a store.Artifact) bool {
 		return a.ID == artID
 	})
@@ -104,17 +103,17 @@ func (h *Handler) DeleteArtifact(w http.ResponseWriter, r *http.Request) {
 
 // ListRepoSecrets handles GET /repos/{owner}/{repo}/actions/secrets
 func (h *Handler) ListRepoSecrets(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	secrets := h.store.ListRepoSecrets(owner, repo)
 	ghJSON(w, 200, map[string]any{"total_count": len(secrets), "secrets": paginate(w, r, secrets)})
 }
 
 // GetRepoSecret handles GET /repos/{owner}/{repo}/actions/secrets/{secret_name}
 func (h *Handler) GetRepoSecret(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	name := chi.URLParam(r, "secret_name")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	name := param(r, "secret_name")
 
 	secrets := h.store.Secrets.Filter(func(_ string, s store.Secret) bool {
 		return s.RepoOwner == owner && s.RepoName == repo && s.Name == name
@@ -128,9 +127,9 @@ func (h *Handler) GetRepoSecret(w http.ResponseWriter, r *http.Request) {
 
 // CreateOrUpdateRepoSecret handles PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}
 func (h *Handler) CreateOrUpdateRepoSecret(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	name := chi.URLParam(r, "secret_name")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	name := param(r, "secret_name")
 
 	now := h.store.Now()
 
@@ -159,9 +158,9 @@ func (h *Handler) CreateOrUpdateRepoSecret(w http.ResponseWriter, r *http.Reques
 
 // DeleteRepoSecret handles DELETE /repos/{owner}/{repo}/actions/secrets/{secret_name}
 func (h *Handler) DeleteRepoSecret(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	name := chi.URLParam(r, "secret_name")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	name := param(r, "secret_name")
 
 	ids, _ := h.store.Secrets.FilterWithIDs(func(_ string, s store.Secret) bool {
 		return s.RepoOwner == owner && s.RepoName == repo && s.Name == name

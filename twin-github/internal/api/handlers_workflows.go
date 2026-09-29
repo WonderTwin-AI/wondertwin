@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -54,9 +53,9 @@ func (h *Handler) syncWorkflows(owner, repo string) {
 // workflowFromPath resolves {workflow_id}, which may be the numeric ID or
 // the workflow's file name.
 func (h *Handler) workflowFromPath(w http.ResponseWriter, r *http.Request) (store.Workflow, bool) {
-	owner, repo := chi.URLParam(r, "owner"), chi.URLParam(r, "repo")
+	owner, repo := param(r, "owner"), param(r, "repo")
 	h.syncWorkflows(owner, repo)
-	ref := chi.URLParam(r, "workflow_id")
+	ref := param(r, "workflow_id")
 	for _, wf := range h.store.ListRepoWorkflows(owner, repo) {
 		if strconv.FormatInt(wf.ID, 10) == ref || pathBase(wf.Path) == ref {
 			return wf, true
@@ -141,7 +140,7 @@ func (x renderer) workflowRun(run store.WorkflowRun) map[string]any {
 
 // ListWorkflows handles GET /repos/{owner}/{repo}/actions/workflows
 func (h *Handler) ListWorkflows(w http.ResponseWriter, r *http.Request) {
-	owner, repo := chi.URLParam(r, "owner"), chi.URLParam(r, "repo")
+	owner, repo := param(r, "owner"), param(r, "repo")
 	h.syncWorkflows(owner, repo)
 	wfs := h.store.ListRepoWorkflows(owner, repo)
 	sort.Slice(wfs, func(i, j int) bool { return wfs[i].ID < wfs[j].ID })
@@ -166,7 +165,7 @@ func (h *Handler) GetWorkflow(w http.ResponseWriter, r *http.Request) {
 // app emulator does not execute workflows: the run it creates is already
 // completed with conclusion success.
 func (h *Handler) TriggerWorkflow(w http.ResponseWriter, r *http.Request) {
-	owner, repo := chi.URLParam(r, "owner"), chi.URLParam(r, "repo")
+	owner, repo := param(r, "owner"), param(r, "repo")
 	wf, ok := h.workflowFromPath(w, r)
 	if !ok {
 		return
@@ -241,7 +240,7 @@ func (h *Handler) writeRuns(w http.ResponseWriter, r *http.Request, runs []store
 
 // ListWorkflowRuns handles GET /repos/{owner}/{repo}/actions/runs
 func (h *Handler) ListWorkflowRuns(w http.ResponseWriter, r *http.Request) {
-	h.writeRuns(w, r, h.store.ListWorkflowRuns(chi.URLParam(r, "owner"), chi.URLParam(r, "repo"), 0))
+	h.writeRuns(w, r, h.store.ListWorkflowRuns(param(r, "owner"), param(r, "repo"), 0))
 }
 
 // ListWorkflowRunsForWorkflow handles GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs
@@ -254,9 +253,9 @@ func (h *Handler) ListWorkflowRunsForWorkflow(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handler) runFromPath(w http.ResponseWriter, r *http.Request) (store.WorkflowRun, string, bool) {
-	runID, _ := strconv.ParseInt(chi.URLParam(r, "run_id"), 10, 64)
+	runID, _ := strconv.ParseInt(param(r, "run_id"), 10, 64)
 	ids, runs := h.store.WorkflowRuns.FilterWithIDs(func(_ string, run store.WorkflowRun) bool {
-		return run.ID == runID && run.RepoOwner == chi.URLParam(r, "owner") && run.RepoName == chi.URLParam(r, "repo")
+		return run.ID == runID && run.RepoOwner == param(r, "owner") && run.RepoName == param(r, "repo")
 	})
 	if len(ids) == 0 {
 		ghError(w, 404, "Not Found")

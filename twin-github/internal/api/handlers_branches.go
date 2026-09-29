@@ -3,14 +3,13 @@ package api
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // ListBranches handles GET /repos/{owner}/{repo}/branches
 func (h *Handler) ListBranches(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	branches := h.store.ListRepoBranches(owner, repo)
 	if r.URL.Query().Get("protected") == "true" {
 		var protected []store.Branch
@@ -31,9 +30,9 @@ func (h *Handler) ListBranches(w http.ResponseWriter, r *http.Request) {
 
 // GetBranch handles GET /repos/{owner}/{repo}/branches/{branch}
 func (h *Handler) GetBranch(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	branchName := chi.URLParam(r, "branch")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	branchName := param(r, "branch")
 
 	b, ok := h.store.GetBranch(owner, repo, branchName)
 	if !ok {

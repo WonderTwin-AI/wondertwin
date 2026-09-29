@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -166,7 +165,7 @@ func (h *Handler) UpdateAuthenticatedUser(w http.ResponseWriter, r *http.Request
 
 // GetUser handles GET /users/{username}
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
-	username := chi.URLParam(r, "username")
+	username := param(r, "username")
 	if org, ok := h.store.Orgs.Get(username); ok {
 		ghJSON(w, 200, h.publicUser(r, store.User{ID: org.ID, Login: org.Login, Type: "Organization", Name: org.Name}))
 		return
@@ -181,8 +180,8 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // GetRepo handles GET /repos/{owner}/{repo}
 func (h *Handler) GetRepo(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
@@ -266,8 +265,8 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 
 // UpdateRepo handles PATCH /repos/{owner}/{repo}
 func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
@@ -328,8 +327,8 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 
 // DeleteRepo handles DELETE /repos/{owner}/{repo}
 func (h *Handler) DeleteRepo(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 
 	key := store.RepoKey(owner, repo)
 	if _, ok := h.store.Repos.Get(key); !ok {

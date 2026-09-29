@@ -6,15 +6,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // ListPRReviewComments handles GET /repos/{owner}/{repo}/pulls/{pull_number}/comments
 func (h *Handler) ListPRReviewComments(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "pull_number"))
 
 	comments := h.store.PRReviewComments.Filter(func(_ string, c store.PRReviewComment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo && c.PRNumber == num
@@ -24,9 +23,9 @@ func (h *Handler) ListPRReviewComments(w http.ResponseWriter, r *http.Request) {
 
 // CreatePRReviewComment handles POST /repos/{owner}/{repo}/pulls/{pull_number}/comments
 func (h *Handler) CreatePRReviewComment(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "pull_number"))
 
 	pr, _, ok := h.store.GetPR(owner, repo, num)
 	if !ok {
@@ -79,7 +78,7 @@ func (h *Handler) CreatePRReviewComment(w http.ResponseWriter, r *http.Request) 
 
 // GetPRReviewComment handles GET /repos/{owner}/{repo}/pulls/comments/{comment_id}
 func (h *Handler) GetPRReviewComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 
 	_, comments := h.store.PRReviewComments.FilterWithIDs(func(_ string, c store.PRReviewComment) bool {
 		return c.ID == commentID
@@ -93,7 +92,7 @@ func (h *Handler) GetPRReviewComment(w http.ResponseWriter, r *http.Request) {
 
 // UpdatePRReviewComment handles PATCH /repos/{owner}/{repo}/pulls/comments/{comment_id}
 func (h *Handler) UpdatePRReviewComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 
 	ids, comments := h.store.PRReviewComments.FilterWithIDs(func(_ string, c store.PRReviewComment) bool {
 		return c.ID == commentID
@@ -117,7 +116,7 @@ func (h *Handler) UpdatePRReviewComment(w http.ResponseWriter, r *http.Request) 
 
 // DeletePRReviewComment handles DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}
 func (h *Handler) DeletePRReviewComment(w http.ResponseWriter, r *http.Request) {
-	commentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	commentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 
 	ids, _ := h.store.PRReviewComments.FilterWithIDs(func(_ string, c store.PRReviewComment) bool {
 		return c.ID == commentID

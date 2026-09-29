@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -44,8 +43,8 @@ func (h *Handler) resolveSHA(w http.ResponseWriter, owner, repo, ref string) (st
 
 // CreateCommitStatus handles POST /repos/{owner}/{repo}/statuses/{sha}
 func (h *Handler) CreateCommitStatus(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -66,7 +65,7 @@ func (h *Handler) CreateCommitStatus(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	sha, ok := h.resolveSHA(w, owner, repo, chi.URLParam(r, "sha"))
+	sha, ok := h.resolveSHA(w, owner, repo, param(r, "sha"))
 	if !ok {
 		return
 	}
@@ -94,9 +93,9 @@ func (h *Handler) statusesNewestFirst(owner, repo, sha string) []store.CommitSta
 
 // ListCommitStatuses handles GET /repos/{owner}/{repo}/commits/{ref}/statuses
 func (h *Handler) ListCommitStatuses(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	c, ok := h.store.ResolveRef(owner, repo, chi.URLParam(r, "ref"))
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	c, ok := h.store.ResolveRef(owner, repo, param(r, "ref"))
 	out := []map[string]any{}
 	if ok {
 		x := h.rd(r)
@@ -112,14 +111,14 @@ func (h *Handler) ListCommitStatuses(w http.ResponseWriter, r *http.Request) {
 // if any is error or failure, pending if any is pending or there are none,
 // and success otherwise.
 func (h *Handler) GetCombinedStatus(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	rp, ok := h.store.GetRepo(owner, repo)
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ref := chi.URLParam(r, "ref")
+	ref := param(r, "ref")
 	c, ok := h.store.ResolveRef(owner, repo, ref)
 	if !ok {
 		ghError(w, 404, "No commit found for SHA: "+ref)
@@ -376,8 +375,8 @@ func (h *Handler) applyCheckRun(w http.ResponseWriter, cr *store.CheckRun, req c
 
 // CreateCheckRun handles POST /repos/{owner}/{repo}/check-runs
 func (h *Handler) CreateCheckRun(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -418,8 +417,8 @@ func (h *Handler) CreateCheckRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) checkRunFromPath(w http.ResponseWriter, r *http.Request) (store.CheckRun, bool) {
-	cr, ok := h.store.CheckRuns.Get(chi.URLParam(r, "check_run_id"))
-	if !ok || cr.RepoOwner != chi.URLParam(r, "owner") || cr.RepoName != chi.URLParam(r, "repo") {
+	cr, ok := h.store.CheckRuns.Get(param(r, "check_run_id"))
+	if !ok || cr.RepoOwner != param(r, "owner") || cr.RepoName != param(r, "repo") {
 		ghError(w, 404, "Not Found")
 		return cr, false
 	}
@@ -497,9 +496,9 @@ func (h *Handler) writeCheckRuns(w http.ResponseWriter, r *http.Request, runs []
 
 // ListCheckRunsForRef handles GET /repos/{owner}/{repo}/commits/{ref}/check-runs
 func (h *Handler) ListCheckRunsForRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := chi.URLParam(r, "ref")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := param(r, "ref")
 	c, ok := h.store.ResolveRef(owner, repo, ref)
 	if !ok {
 		ghValidationErrors(w, "No commit found for SHA: "+ref)
@@ -510,7 +509,7 @@ func (h *Handler) ListCheckRunsForRef(w http.ResponseWriter, r *http.Request) {
 
 // ListCheckRunsInSuite handles GET /repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs
 func (h *Handler) ListCheckRunsInSuite(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "check_suite_id"), 10, 64)
+	id, _ := strconv.ParseInt(param(r, "check_suite_id"), 10, 64)
 	h.writeCheckRuns(w, r, h.store.CheckRuns.Filter(func(_ string, cr store.CheckRun) bool { return cr.SuiteID == id }))
 }
 
@@ -530,8 +529,8 @@ func (h *Handler) RerequestCheckRun(w http.ResponseWriter, r *http.Request) {
 
 // CreateCheckSuite handles POST /repos/{owner}/{repo}/check-suites
 func (h *Handler) CreateCheckSuite(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	app, ok := h.checkApp(w, r)
 	if !ok {
 		return
@@ -560,7 +559,7 @@ func (h *Handler) CreateCheckSuite(w http.ResponseWriter, r *http.Request) {
 
 // GetCheckSuite handles GET /repos/{owner}/{repo}/check-suites/{check_suite_id}
 func (h *Handler) GetCheckSuite(w http.ResponseWriter, r *http.Request) {
-	cs, ok := h.store.CheckSuites.Get(chi.URLParam(r, "check_suite_id"))
+	cs, ok := h.store.CheckSuites.Get(param(r, "check_suite_id"))
 	if !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -570,7 +569,7 @@ func (h *Handler) GetCheckSuite(w http.ResponseWriter, r *http.Request) {
 
 // RerequestCheckSuite handles POST /repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest
 func (h *Handler) RerequestCheckSuite(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.store.CheckSuites.Get(chi.URLParam(r, "check_suite_id")); !ok {
+	if _, ok := h.store.CheckSuites.Get(param(r, "check_suite_id")); !ok {
 		ghError(w, 404, "Not Found")
 		return
 	}
@@ -579,9 +578,9 @@ func (h *Handler) RerequestCheckSuite(w http.ResponseWriter, r *http.Request) {
 
 // ListCheckSuitesForRef handles GET /repos/{owner}/{repo}/commits/{ref}/check-suites
 func (h *Handler) ListCheckSuitesForRef(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := chi.URLParam(r, "ref")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := param(r, "ref")
 	c, ok := h.store.ResolveRef(owner, repo, ref)
 	if !ok {
 		ghValidationErrors(w, "No commit found for SHA: "+ref)

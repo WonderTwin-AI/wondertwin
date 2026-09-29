@@ -5,16 +5,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
 // ReplyToPRReviewComment handles POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies
 func (h *Handler) ReplyToPRReviewComment(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	num, _ := strconv.Atoi(chi.URLParam(r, "pull_number"))
-	parentID, _ := strconv.ParseInt(chi.URLParam(r, "comment_id"), 10, 64)
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	num, _ := strconv.Atoi(param(r, "pull_number"))
+	parentID, _ := strconv.ParseInt(param(r, "comment_id"), 10, 64)
 
 	var req struct {
 		Body string `json:"body"`
@@ -40,8 +39,8 @@ func (h *Handler) ReplyToPRReviewComment(w http.ResponseWriter, r *http.Request)
 
 // ListAllPRReviewComments handles GET /repos/{owner}/{repo}/pulls/comments (all in repo)
 func (h *Handler) ListAllPRReviewComments(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	comments := h.store.PRReviewComments.Filter(func(_ string, c store.PRReviewComment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo
 	})

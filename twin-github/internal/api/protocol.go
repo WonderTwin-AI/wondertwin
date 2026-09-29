@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // APIVersion is the only REST API calendar version this community app
@@ -134,3 +137,15 @@ func repoExists(w http.ResponseWriter, doc string) {
 
 func itoa(n int) string     { return strconv.Itoa(n) }
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }
+
+// param returns a path parameter with percent-escapes decoded. Clients
+// escape slashes inside a parameter (Octokit sends heads%2Fmain for a ref
+// and .github%2Fworkflows%2Fci.yml for a contents path), and routing keeps
+// the escaped form so the slash does not split the route.
+func param(r *http.Request, name string) string {
+	v := chi.URLParam(r, name)
+	if u, err := url.PathUnescape(v); err == nil {
+		return u
+	}
+	return v
+}

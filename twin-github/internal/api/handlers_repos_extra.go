@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
@@ -19,7 +18,7 @@ func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
 
 // ListUserReposByUsername handles GET /users/{username}/repos
 func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request) {
-	username := chi.URLParam(r, "username")
+	username := param(r, "username")
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Owner.Login == username && (!rp.Private || viewer(r) == username)
 	})
@@ -28,7 +27,7 @@ func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request
 
 // CreateOrgRepo handles POST /orgs/{org}/repos
 func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
-	org := chi.URLParam(r, "org")
+	org := param(r, "org")
 
 	var req struct {
 		Name        string `json:"name"`
@@ -74,8 +73,8 @@ func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 
 // ListForks handles GET /repos/{owner}/{repo}/forks
 func (h *Handler) ListForks(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	forks := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Fork && rp.Name == repo && rp.Owner.Login != owner
 	})
@@ -102,8 +101,8 @@ func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 // ListCommits handles GET /repos/{owner}/{repo}/commits: the history of sha
 // (a branch, tag or SHA; the default branch when absent), newest first.
 func (h *Handler) ListCommits(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	if _, ok := h.store.GetRepo(owner, repo); !ok {
 		ghError(w, 404, "Not Found")
 		return
@@ -127,9 +126,9 @@ func (h *Handler) ListCommits(w http.ResponseWriter, r *http.Request) {
 
 // GetCommit handles GET /repos/{owner}/{repo}/commits/{ref} (high-level)
 func (h *Handler) GetCommit(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	ref := chi.URLParam(r, "ref")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
+	ref := param(r, "ref")
 	c, ok := h.store.ResolveRef(owner, repo, ref)
 	if !ok {
 		ghValidationErrors(w, "No commit found for SHA: "+ref)
@@ -201,8 +200,8 @@ func (h *Handler) ListAuthUserIssues(w http.ResponseWriter, r *http.Request) {
 
 // ListRepoIssueComments handles GET /repos/{owner}/{repo}/issues/comments (all comments in repo)
 func (h *Handler) ListRepoIssueComments(w http.ResponseWriter, r *http.Request) {
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
+	owner := param(r, "owner")
+	repo := param(r, "repo")
 	comments := h.store.Comments.Filter(func(_ string, c store.Comment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo
 	})
