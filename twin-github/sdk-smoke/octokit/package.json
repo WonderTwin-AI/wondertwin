@@ -1,0 +1,14 @@
+{
+  "name": "twin-github-sdk-smoke-octokit",
+  "private": true,
+  "description": "Octokit smoke suite for the GitHub app emulator (test-only).",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 smoke.test.mjs"
+  },
+  "dependencies": {
+    "@octokit/webhooks-methods": "6.0.0",
+    "octokit": "5.0.5"
+  }
+}
