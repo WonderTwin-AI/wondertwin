@@ -112,6 +112,10 @@ var requiredFields = map[string][]string{
 		"id", "node_id", "author", "html_url", "name", "prerelease", "tag_name", "target_commitish",
 		"assets", "url",
 	},
+	"release-asset": {
+		"id", "name", "content_type", "size", "digest", "state", "url", "node_id", "download_count",
+		"label", "uploader", "browser_download_url", "created_at", "updated_at",
+	},
 	"workflow-run": {
 		"id", "node_id", "head_branch", "run_number", "display_title", "event", "status", "conclusion",
 		"head_sha", "path", "workflow_id", "url", "html_url", "created_at", "updated_at", "head_commit",
@@ -141,6 +145,17 @@ var requiredFields = map[string][]string{
 	},
 	"commit": {
 		"url", "sha", "node_id", "html_url", "comments_url", "commit", "author", "committer", "parents",
+	},
+	"file-commit": {
+		"content", "commit",
+	},
+	"private-user": {
+		"avatar_url", "events_url", "followers_url", "following_url", "gists_url", "gravatar_id",
+		"html_url", "id", "node_id", "login", "organizations_url", "received_events_url", "repos_url",
+		"site_admin", "starred_url", "subscriptions_url", "type", "url", "bio", "blog", "company",
+		"email", "followers", "following", "hireable", "location", "name", "public_gists",
+		"public_repos", "created_at", "updated_at", "collaborators", "disk_usage", "owned_private_repos",
+		"private_gists", "total_private_repos", "two_factor_authentication",
 	},
 }
 

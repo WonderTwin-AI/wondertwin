@@ -741,6 +741,47 @@ func TestReleases(t *testing.T) {
 	}
 }
 
+func TestReleasePublishAndLatest(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "rel")
+	path := "/repos/twin-bot/rel/releases"
+	admin := testutil.NewAdminClient(tc)
+
+	v1 := ghPost(tc, path, map[string]any{"tag_name": "v1.0.0", "name": "v1.0.0", "body": "first"}).AssertStatus(201).JSONMap()
+	assertRequired(t, "release", v1)
+	ghPost(tc, path, map[string]any{"tag_name": "v1.0.0"}).AssertStatus(422)
+	ghPost(tc, path, map[string]any{"name": "no tag"}).AssertStatus(422)
+
+	// Publishing creates the tag at the target.
+	tag := ghGet(tc, "/repos/twin-bot/rel/git/ref/tags/v1.0.0").AssertStatus(200).JSONMap()
+	if tag["object"].(map[string]any)["sha"] != mainSHA(tc, "rel") {
+		t.Errorf("the tag points at main, got %v", tag["object"])
+	}
+
+	admin.AdvanceTime("1m").AssertStatus(200)
+	ghPost(tc, path, map[string]any{"tag_name": "v2.0.0-rc1", "prerelease": true}).AssertStatus(201)
+	ghPost(tc, path, map[string]any{"tag_name": "v2.0.0", "draft": true}).AssertStatus(201)
+
+	latest := ghGet(tc, path+"/latest").AssertStatus(200).JSONMap()
+	if latest["tag_name"] != "v1.0.0" {
+		t.Errorf("drafts and prereleases are never latest, got %v", latest["tag_name"])
+	}
+	if got := ghGet(tc, path+"/tags/v1.0.0").AssertStatus(200).JSONMap()["id"]; got != v1["id"] {
+		t.Errorf("tag lookup returned %v", got)
+	}
+
+	// The upload URL points at the emulator and accepts the file body.
+	upload := strings.TrimSuffix(v1["upload_url"].(string), "{?name,label}")
+	if !strings.HasPrefix(upload, "http://127.0.0.1:") {
+		t.Fatalf("upload_url should point at the emulator, got %s", upload)
+	}
+	asset := ghPost(tc, strings.TrimPrefix(upload, tc.BaseURL)+"?name=app.tar.gz", "binary").AssertStatus(201).JSONMap()
+	assertRequired(t, "release-asset", asset)
+	if len(ghGet(tc, path+"/latest").JSONMap()["assets"].([]any)) != 1 {
+		t.Error("the asset is listed on its release")
+	}
+}
+
 // --- Webhook Tests ---
 
 func TestWebhooks(t *testing.T) {

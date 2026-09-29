@@ -214,9 +214,14 @@ type Release struct {
 	Author          User   `json:"author"`
 	CreatedAt       string `json:"created_at"`
 	PublishedAt     string `json:"published_at,omitempty"`
+	UpdatedAt       string `json:"updated_at,omitempty"`
+	// MakeLatest is "true", "false" or "legacy", as the API accepts it.
+	MakeLatest string `json:"make_latest,omitempty"`
+	// NameSet records whether a name was given; GitHub returns null when not.
+	NameSet bool `json:"name_set,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // Branch represents a Git branch.
@@ -415,10 +420,11 @@ type ReleaseAsset struct {
 	CreatedAt          string `json:"created_at"`
 	UpdatedAt          string `json:"updated_at"`
 	Uploader           User   `json:"uploader"`
+	Digest             string `json:"digest,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	ReleaseID int64  `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	ReleaseID int64  `json:"release_id"`
 }
 
 // --- Actions types ---
