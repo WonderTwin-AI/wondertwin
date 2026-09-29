@@ -1,20 +1,53 @@
 {
   "twin": "github",
   "sdk_target": {
-    "package": "github.com/google/go-github",
-    "language": "go",
-    "version": "v60"
+    "package": "@octokit/plugin-rest-endpoint-methods",
+    "language": "typescript",
+    "version": "17.0.0"
   },
-  "build": 1,
-  "generated_at": "2026-04-02T00:00:00Z",
+  "build": 2,
+  "generated_at": "2026-09-28T00:00:00Z",
   "sources": {
     "openapi": {
       "origin": "vendor_published",
-      "url": "https://github.com/github/rest-api-description"
+      "url": "https://raw.githubusercontent.com/github/rest-api-description/2f44eacae7f376f1ed158829fbe008cc4eae5815/descriptions/api.github.com/api.github.com.2026-03-10.json",
+      "retrieved_at": "2026-09-28T00:00:00Z",
+      "sha256": "40f15dd8353ac412387b8ccc7b701e38e950d620b8c727e48ccd489a317eb78e",
+      "api_version": "2026-03-10"
     },
     "sdk_analysis": {
-      "method": "manual",
-      "repo": "https://github.com/google/go-github"
+      "method": "direct_repo",
+      "repo": "https://github.com/octokit/plugin-rest-endpoint-methods.js",
+      "repo_ref": "v17.0.0",
+      "retrieved_at": "2026-09-28T00:00:00Z"
     }
+  },
+  "api_version": "2026-03-10",
+  "twinkit_packages": [
+    "admin",
+    "state",
+    "twincore",
+    "webhook"
+  ],
+  "scope": {
+    "implemented": [
+      "Repository bootstrap: create a repository, commit through the contents API, list branches, read the file back",
+      "Issue triage: labels, issues, issue labels and comments, paginated issue lists, closing with a state reason",
+      "Pull request lifecycle: branch through git refs, commit, open, review (no self-approval), merge by merge, squash or rebase",
+      "CI status and checks: commit statuses and the combined status; check runs written by a GitHub App installation",
+      "GitHub App installation token: JWT claims checked, installation listed, ghs_ token minted and used",
+      "Release publish: create a release (tagging its target), fetch it by tag and as latest, upload assets",
+      "API version negotiation: GET /versions, 2026-03-10 served and echoed, every other version refused with 400",
+      "Workflow dispatch: workflows discovered from committed files; dispatch returns a run that is already completed",
+      "Webhook delivery: issues, pull_request, push and check_run (and ping), signed with X-Hub-Signature-256"
+    ],
+    "not_implemented": [
+      "API version 2022-11-28 (a later commercial target)",
+      "GitHub Enterprise Server and Enterprise Cloud editions, enterprise administration",
+      "GraphQL API",
+      "Search beyond the existing thin handlers",
+      "Webhook redelivery, and signature verification of App JWTs",
+      "Workflow execution: runs never progress over time"
+    ]
   }
 }

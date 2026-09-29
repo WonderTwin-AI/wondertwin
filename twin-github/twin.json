@@ -1,10 +1,10 @@
 {
   "name": "github",
-  "description": "Simulates the GitHub REST API including repos, issues, pull requests, labels, comments, commit statuses, releases, branches, and webhooks.",
+  "description": "Emulates the GitHub REST API at calendar version 2026-03-10: repositories, contents and git data, issues, pull requests and reviews, commit statuses and check runs, GitHub App installation tokens, releases, workflow dispatch, and signed webhook delivery.",
   "category": "vcs",
   "sdk": {
-    "package": "github.com/google/go-github",
-    "version": "v60"
+    "package": "@octokit/plugin-rest-endpoint-methods",
+    "version": "17.0.0"
   },
   "default_port": 4119
 }
