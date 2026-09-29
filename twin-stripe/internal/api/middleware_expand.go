@@ -10,6 +10,9 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/expand"
 )
 
+// maxExpandDepth is the deepest expansion Stripe allows.
+const maxExpandDepth = 4
+
 // expandBuffer captures a handler's response without writing it through, so
 // expandMiddleware can rewrite the body before it reaches the client.
 type expandBuffer struct {
@@ -45,6 +48,19 @@ func (h *Handler) expandMiddleware(next http.Handler) http.Handler {
 		if len(paths) == 0 {
 			next.ServeHTTP(w, r)
 			return
+		}
+		// Stripe documents a maximum depth of four properties per expand
+		// string (api/expanding_objects). Which fields may be expanded is
+		// not checked here; see the package comment in twinkit/expand.
+		for _, p := range paths {
+			if strings.Count(p, ".") >= maxExpandDepth {
+				writeError(w, http.StatusBadRequest, apiError{
+					Type:    "invalid_request_error",
+					Param:   "expand",
+					Message: "You cannot expand more than " + strconv.Itoa(maxExpandDepth) + " levels of a property. Property: " + p,
+				})
+				return
+			}
 		}
 
 		buf := newExpandBuffer()
