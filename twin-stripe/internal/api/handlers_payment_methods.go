@@ -87,6 +87,13 @@ func (h *Handler) GetPaymentMethod(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AttachPaymentMethod(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if b := h.checkCardBehavior(id); b.AttachFails {
+		writeError(w, http.StatusPaymentRequired, apiError{
+			Type: "card_error", Code: b.Code, DeclineCode: b.DeclineCode, Message: b.Message,
+		})
+		return
+	}
+	id = h.resolvePaymentMethod(id)
 	pm, ok := h.store.PaymentMethods.Get(id)
 	if !ok {
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such payment_method: "+id)

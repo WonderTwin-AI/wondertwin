@@ -53,14 +53,17 @@ func (h *Handler) CreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	pm := r.FormValue("payment_method")
 	confirm := r.FormValue("confirm")
 	if pm != "" {
+		pm = h.resolvePaymentMethod(pm)
 		pi.PaymentMethod = pm
 		pi.Status = "requires_confirmation"
 	}
 	if confirm == "true" && pm != "" {
 		// Check card behavior for test cards.
 		behavior := h.checkCardBehavior(pm)
-		if !behavior.Succeed && behavior.DeclineCode != "" {
-			stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		if !behavior.Succeed && behavior.Code != "" {
+			h.store.PaymentIntents.Set(id, pi)
+			h.emitEvent("payment_intent.created", mapFromJSON(pi))
+			h.declinePayment(w, &pi, behavior)
 			return
 		}
 		if behavior.RequiresAction {
@@ -125,7 +128,7 @@ func (h *Handler) UpdatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		pi.Description = v
 	}
 	if v := r.FormValue("payment_method"); v != "" {
-		pi.PaymentMethod = v
+		pi.PaymentMethod = h.resolvePaymentMethod(v)
 		if pi.Status == "requires_payment_method" {
 			pi.Status = "requires_confirmation"
 		}
@@ -164,14 +167,19 @@ func (h *Handler) ConfirmPaymentIntent(w http.ResponseWriter, r *http.Request) {
 
 	if err := parseFormOrJSON(r); err == nil {
 		if pm := r.FormValue("payment_method"); pm != "" {
-			pi.PaymentMethod = pm
+			pi.PaymentMethod = h.resolvePaymentMethod(pm)
 		}
+	}
+	if pi.PaymentMethod == "" {
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "payment_intent_unexpected_state",
+			"You cannot confirm this PaymentIntent because it's missing a payment method. To confirm the PaymentIntent with "+pi.ID+", specify a payment method attached to this customer along with the customer ID.")
+		return
 	}
 
 	// Check card behavior for test cards.
 	behavior := h.checkCardBehavior(pi.PaymentMethod)
-	if !behavior.Succeed && behavior.DeclineCode != "" {
-		stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+	if !behavior.Succeed && behavior.Code != "" {
+		h.declinePayment(w, &pi, behavior)
 		return
 	}
 	if behavior.RequiresAction {
@@ -325,4 +333,64 @@ func (h *Handler) createChargeForPI(pi *store.PaymentIntent) string {
 // webhook secret values.
 func (h *Handler) randomHex(n int) string {
 	return h.store.RandHex(n)
+}
+
+// declinePayment records a declined confirmation the way Stripe does: a
+// failed charge, the intent back to requires_payment_method with the decline
+// as last_payment_error, and a 402 card_error carrying the charge, the intent
+// and the payment method.
+func (h *Handler) declinePayment(w http.ResponseWriter, pi *store.PaymentIntent, b cardBehavior) {
+	var pmObj *store.PaymentMethod
+	if pm, ok := h.store.PaymentMethods.Get(pi.PaymentMethod); ok {
+		pmObj = &pm
+	}
+
+	chargeID := h.store.Charges.NextID()
+	ch := store.Charge{
+		ID:             chargeID,
+		Object:         "charge",
+		Amount:         pi.Amount,
+		Currency:       pi.Currency,
+		Customer:       pi.Customer,
+		Description:    pi.Description,
+		PaymentIntent:  pi.ID,
+		PaymentMethod:  pi.PaymentMethod,
+		Status:         "failed",
+		FailureCode:    b.Code,
+		FailureMessage: b.Message,
+		Metadata:       pi.Metadata,
+		Created:        h.store.Now(),
+	}
+	h.store.Charges.Set(chargeID, ch)
+	h.emitEvent("charge.failed", mapFromJSON(ch))
+
+	docURL := ""
+	if _, ok := documentedErrorCodes[b.Code]; ok {
+		docURL = errorDocURL(b.Code)
+	}
+	pi.Status = "requires_payment_method"
+	pi.LatestCharge = chargeID
+	pi.PaymentMethod = ""
+	pi.LastPaymentError = &store.PaymentError{
+		Type:          "card_error",
+		Code:          b.Code,
+		DeclineCode:   b.DeclineCode,
+		Message:       b.Message,
+		DocURL:        docURL,
+		Charge:        chargeID,
+		PaymentMethod: pmObj,
+	}
+	h.store.PaymentIntents.Set(pi.ID, *pi)
+	h.emitEvent("payment_intent.payment_failed", mapFromJSON(pi))
+
+	writeError(w, http.StatusPaymentRequired, apiError{
+		Type:          "card_error",
+		Code:          b.Code,
+		DeclineCode:   b.DeclineCode,
+		Message:       b.Message,
+		DocURL:        docURL,
+		Charge:        chargeID,
+		PaymentIntent: pi,
+		PaymentMethod: pmObj,
+	})
 }

@@ -26,8 +26,20 @@ func (h *Handler) CreateCharge(w http.ResponseWriter, r *http.Request) {
 
 	// Check card behavior if source is a payment method.
 	if source := r.FormValue("source"); source != "" {
-		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.DeclineCode != "" {
-			stripeError(w, http.StatusPaymentRequired, "card_error", behavior.DeclineCode, behavior.Message)
+		if behavior := h.checkCardBehavior(source); !behavior.Succeed && behavior.Code != "" {
+			chargeID := h.store.Charges.NextID()
+			ch := store.Charge{
+				ID: chargeID, Object: "charge", Amount: amount, Currency: currency,
+				Customer: r.FormValue("customer"), PaymentMethod: source, Status: "failed",
+				FailureCode: behavior.Code, FailureMessage: behavior.Message,
+				Metadata: parseMetadata(r), Created: h.store.Now(),
+			}
+			h.store.Charges.Set(chargeID, ch)
+			h.emitEvent("charge.failed", mapFromJSON(ch))
+			writeError(w, http.StatusPaymentRequired, apiError{
+				Type: "card_error", Code: behavior.Code, DeclineCode: behavior.DeclineCode,
+				Message: behavior.Message, Charge: chargeID,
+			})
 			return
 		}
 	}

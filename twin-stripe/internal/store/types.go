@@ -221,11 +221,23 @@ type PaymentIntent struct {
 	ConfirmationMethod string            `json:"confirmation_method"` // automatic or manual
 	ClientSecret       string            `json:"client_secret"`
 	LatestCharge       string            `json:"latest_charge,omitempty"`
+	LastPaymentError   *PaymentError     `json:"last_payment_error,omitempty"`
 	CanceledAt         int64             `json:"canceled_at,omitempty"`
 	CancellationReason string            `json:"cancellation_reason,omitempty"`
 	Livemode           bool              `json:"livemode"`
 	Metadata           map[string]string `json:"metadata,omitempty"`
 	Created            int64             `json:"created"`
+}
+
+// PaymentError is a PaymentIntent's last_payment_error.
+type PaymentError struct {
+	Type          string         `json:"type"`
+	Code          string         `json:"code,omitempty"`
+	DeclineCode   string         `json:"decline_code,omitempty"`
+	Message       string         `json:"message,omitempty"`
+	DocURL        string         `json:"doc_url,omitempty"`
+	Charge        string         `json:"charge,omitempty"`
+	PaymentMethod *PaymentMethod `json:"payment_method,omitempty"`
 }
 
 // PaymentMethod represents a Stripe payment method.
@@ -271,6 +283,8 @@ type Charge struct {
 	PaymentIntent  string            `json:"payment_intent,omitempty"`
 	PaymentMethod  string            `json:"payment_method,omitempty"`
 	Status         string            `json:"status"` // succeeded, pending, failed
+	FailureCode    string            `json:"failure_code,omitempty"`
+	FailureMessage string            `json:"failure_message,omitempty"`
 	Captured       bool              `json:"captured"`
 	Refunded       bool              `json:"refunded"`
 	Paid           bool              `json:"paid"`
