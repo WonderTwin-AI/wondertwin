@@ -1,0 +1,15 @@
+{
+  "name": "twin-stripe-sdk-smoke-node",
+  "private": true,
+  "description": "Runs the Stripe app emulator's MVP use cases through the official stripe-node SDK.",
+  "type": "module",
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "stripe": "22.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
