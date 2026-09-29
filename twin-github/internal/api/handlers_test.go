@@ -254,6 +254,93 @@ func TestDuplicateRepoIs422(t *testing.T) {
 	}
 }
 
+// --- 2026-03-10 Shape Tests ---
+
+func TestRepoCarriesFullRepositoryFields(t *testing.T) {
+	_, tc := setupGitHub(t)
+	repo := ghPost(tc, "/user/repos", map[string]any{"name": "shape", "auto_init": true}).AssertStatus(201).JSONMap()
+	assertRequired(t, "full-repository", repo)
+	assertRequired(t, "simple-user", repo["owner"].(map[string]any))
+	for _, gone := range []string{"has_downloads", "use_squash_pr_title_as_default", "master_branch"} {
+		if _, ok := repo[gone]; ok {
+			t.Errorf("2026-03-10 removes %s", gone)
+		}
+	}
+	if !strings.HasPrefix(repo["node_id"].(string), "R_") {
+		t.Errorf("unexpected node_id %v", repo["node_id"])
+	}
+	if !strings.HasPrefix(repo["url"].(string), "http://127.0.0.1:") {
+		t.Errorf("API URLs point at the emulator, got %v", repo["url"])
+	}
+	var list []map[string]any
+	ghGet(tc, "/user/repos").AssertStatus(200).JSON(&list)
+	assertRequired(t, "repository", list[0])
+}
+
+func TestIssueCarriesIssueFields(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "issue-shape")
+	issue := ghPost(tc, "/repos/twin-bot/issue-shape/issues", map[string]any{
+		"title": "Broken", "labels": []string{"bug"}, "assignees": []string{"twin-bot"},
+	}).AssertStatus(201).JSONMap()
+	assertRequired(t, "issue", issue)
+	if _, ok := issue["assignee"]; ok {
+		t.Error("2026-03-10 removes the singular assignee")
+	}
+	labels := issue["labels"].([]any)
+	if len(labels) != 1 {
+		t.Fatalf("expected the bug label, got %v", labels)
+	}
+	assertRequired(t, "label", labels[0].(map[string]any))
+	if issue["author_association"] != "OWNER" {
+		t.Errorf("expected OWNER, got %v", issue["author_association"])
+	}
+	// Labelling with a new name creates the label, as GitHub does.
+	ghGet(tc, "/repos/twin-bot/issue-shape/labels/bug").AssertStatus(200)
+
+	comment := ghPost(tc, "/repos/twin-bot/issue-shape/issues/1/comments", map[string]any{"body": "seen"}).AssertStatus(201).JSONMap()
+	assertRequired(t, "issue-comment", comment)
+
+	closed := ghPatch(tc, "/repos/twin-bot/issue-shape/issues/1", map[string]any{"state": "closed", "state_reason": "not_planned"}).AssertStatus(200).JSONMap()
+	if closed["state_reason"] != "not_planned" || closed["closed_by"] == nil || closed["closed_at"] == nil {
+		t.Errorf("unexpected closed issue %v %v %v", closed["state_reason"], closed["closed_by"], closed["closed_at"])
+	}
+}
+
+func TestDuplicateLabelIsAlreadyExists(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "labels-dup")
+	ghPost(tc, "/repos/twin-bot/labels-dup/labels", map[string]any{"name": "triage", "color": "#fbca04"}).AssertStatus(201)
+	resp := ghPost(tc, "/repos/twin-bot/labels-dup/labels", map[string]any{"name": "triage"})
+	resp.AssertStatus(422)
+	errs := resp.JSONMap()["errors"].([]any)
+	if errs[0].(map[string]any)["code"] != "already_exists" {
+		t.Errorf("expected already_exists, got %v", errs)
+	}
+	if c := ghGet(tc, "/repos/twin-bot/labels-dup/labels/triage").JSONMap()["color"]; c != "fbca04" {
+		t.Errorf("a leading # is dropped from the colour, got %v", c)
+	}
+}
+
+func TestIssuesListNewestFirst(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "order")
+	admin := testutil.NewAdminClient(tc)
+	for _, title := range []string{"first", "second"} {
+		ghPost(tc, "/repos/twin-bot/order/issues", map[string]any{"title": title}).AssertStatus(201)
+		admin.AdvanceTime("1m").AssertStatus(200)
+	}
+	var list []map[string]any
+	ghGet(tc, "/repos/twin-bot/order/issues").JSON(&list)
+	if list[0]["title"] != "second" {
+		t.Errorf("default sort is created desc, got %v first", list[0]["title"])
+	}
+	ghGet(tc, "/repos/twin-bot/order/issues?direction=asc").JSON(&list)
+	if list[0]["title"] != "first" {
+		t.Errorf("direction=asc puts the oldest first, got %v", list[0]["title"])
+	}
+}
+
 func TestRepoNotFound(t *testing.T) {
 	_, tc := setupGitHub(t)
 	resp := ghGet(tc, "/repos/nobody/nothing")

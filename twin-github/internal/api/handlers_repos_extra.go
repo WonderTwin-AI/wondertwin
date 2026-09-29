@@ -10,19 +10,20 @@ import (
 
 // ListUserRepos handles GET /user/repos
 func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
+	me := actor(r)
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Owner.Login == "twin-bot"
+		return rp.Owner.Login == me
 	})
-	ghJSON(w, 200, paginate(w, r, repos))
+	h.writeRepos(w, r, repos)
 }
 
 // ListUserReposByUsername handles GET /users/{username}/repos
 func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Owner.Login == username
+		return rp.Owner.Login == username && (!rp.Private || viewer(r) == username)
 	})
-	ghJSON(w, 200, paginate(w, r, repos))
+	h.writeRepos(w, r, repos)
 }
 
 // CreateOrgRepo handles POST /orgs/{org}/repos
@@ -48,6 +49,10 @@ func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, known := h.store.Orgs.Get(org); !known {
+		h.store.Orgs.Set(org, store.Organization{ID: h.store.NewID(store.KindOrg), Login: org, Type: "Organization"})
+	}
+
 	now := h.store.Now()
 	rp := store.Repository{
 		ID:            h.store.NewID(store.KindRepo),
@@ -64,7 +69,7 @@ func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 		PushedAt:      now,
 	}
 	h.store.Repos.Set(store.RepoKey(org, req.Name), rp)
-	ghJSON(w, 201, rp)
+	ghJSON(w, 201, h.rd(r).repoFull(rp, actor(r)))
 }
 
 // ListForks handles GET /repos/{owner}/{repo}/forks
@@ -171,8 +176,27 @@ func (h *Handler) ListUserOrgs(w http.ResponseWriter, r *http.Request) {
 
 // ListAuthUserIssues handles GET /issues
 func (h *Handler) ListAuthUserIssues(w http.ResponseWriter, r *http.Request) {
-	issues := h.store.Issues.List()
-	ghJSON(w, 200, paginate(w, r, issues))
+	me := actor(r)
+	x := h.rd(r)
+	out := []map[string]any{}
+	for _, i := range paginate(w, r, h.store.Issues.Filter(func(_ string, i store.Issue) bool {
+		if i.State != "open" {
+			return false
+		}
+		for _, a := range i.Assignees {
+			if a.Login == me {
+				return true
+			}
+		}
+		return false
+	})) {
+		m := x.issue(i)
+		if rp, ok := h.store.GetRepo(i.RepoOwner, i.RepoName); ok {
+			m["repository"] = x.repo(*rp, me)
+		}
+		out = append(out, m)
+	}
+	ghJSON(w, 200, out)
 }
 
 // ListRepoIssueComments handles GET /repos/{owner}/{repo}/issues/comments (all comments in repo)
@@ -182,5 +206,20 @@ func (h *Handler) ListRepoIssueComments(w http.ResponseWriter, r *http.Request) 
 	comments := h.store.Comments.Filter(func(_ string, c store.Comment) bool {
 		return c.RepoOwner == owner && c.RepoName == repo
 	})
-	ghJSON(w, 200, paginate(w, r, comments))
+	x := h.rd(r)
+	out := []map[string]any{}
+	for _, c := range paginate(w, r, comments) {
+		out = append(out, x.comment(c))
+	}
+	ghJSON(w, 200, out)
+}
+
+// writeRepos renders a page of repositories.
+func (h *Handler) writeRepos(w http.ResponseWriter, r *http.Request, repos []store.Repository) {
+	x := h.rd(r)
+	out := []map[string]any{}
+	for _, rp := range paginate(w, r, repos) {
+		out = append(out, x.repo(rp, viewer(r)))
+	}
+	ghJSON(w, 200, out)
 }

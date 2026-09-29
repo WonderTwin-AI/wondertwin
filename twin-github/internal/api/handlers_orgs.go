@@ -38,7 +38,7 @@ func (h *Handler) ListOrgRepos(w http.ResponseWriter, r *http.Request) {
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
 		return rp.Owner.Login == orgLogin
 	})
-	ghJSON(w, 200, paginate(w, r, repos))
+	h.writeRepos(w, r, repos)
 }
 
 // ListOrgTeams handles GET /orgs/{org}/teams

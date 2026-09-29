@@ -28,6 +28,13 @@ type Repository struct {
 	UpdatedAt     string   `json:"updated_at"`
 	PushedAt      string   `json:"pushed_at"`
 	Topics        []string `json:"topics,omitempty"`
+	Homepage      string   `json:"homepage,omitempty"`
+	IsTemplate    bool     `json:"is_template,omitempty"`
+	// Merge settings; nil means GitHub's default.
+	AllowSquashMerge    *bool `json:"allow_squash_merge,omitempty"`
+	AllowMergeCommit    *bool `json:"allow_merge_commit,omitempty"`
+	AllowRebaseMerge    *bool `json:"allow_rebase_merge,omitempty"`
+	DeleteBranchOnMerge bool  `json:"delete_branch_on_merge,omitempty"`
 }
 
 // Issue represents a GitHub issue.
@@ -47,10 +54,13 @@ type Issue struct {
 	CreatedAt string     `json:"created_at"`
 	UpdatedAt string     `json:"updated_at"`
 	ClosedAt  string     `json:"closed_at,omitempty"`
+	// StateReason is completed, not_planned, reopened or duplicate.
+	StateReason string `json:"state_reason,omitempty"`
+	ClosedBy    string `json:"closed_by,omitempty"`
 
-	// Internal: which repo this belongs to
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	// Which repo this belongs to.
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // PullRequest represents a GitHub pull request.
@@ -101,9 +111,9 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 
-	RepoOwner   string `json:"-"`
-	RepoName    string `json:"-"`
-	IssueNumber int    `json:"-"`
+	RepoOwner   string `json:"repo_owner"`
+	RepoName    string `json:"repo_name"`
+	IssueNumber int    `json:"issue_number"`
 }
 
 // Label represents a GitHub label.
@@ -114,8 +124,8 @@ type Label struct {
 	Color       string `json:"color"`
 	Default     bool   `json:"default"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner,omitempty"`
+	RepoName  string `json:"repo_name,omitempty"`
 }
 
 // Milestone represents a GitHub milestone.

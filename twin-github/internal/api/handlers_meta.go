@@ -117,12 +117,42 @@ func (h *Handler) GetAuthenticatedUser(w http.ResponseWriter, r *http.Request) {
 		ghError(w, http.StatusForbidden, "Resource not accessible by integration")
 		return
 	}
-	u, ok := h.store.Users.Get(p.Login)
-	if !ok {
-		u = store.User{ID: h.store.NewID(store.KindUser), Login: p.Login, Type: "User"}
-		h.store.Users.Set(p.Login, u)
+	m := h.publicUser(r, h.userRef(p.Login))
+	m["user_view_type"] = "private"
+	m["collaborators"] = 0
+	m["disk_usage"] = 0
+	m["owned_private_repos"] = 0
+	m["private_gists"] = 0
+	m["total_private_repos"] = 0
+	m["two_factor_authentication"] = true
+	m["plan"] = map[string]any{"name": "free", "space": 976562499, "private_repos": 10000, "collaborators": 0}
+	ghJSON(w, 200, m)
+}
+
+// publicUser renders the public-user schema.
+func (h *Handler) publicUser(r *http.Request, u store.User) map[string]any {
+	m := h.rd(r).userObj(u)
+	repos := 0
+	for _, rp := range h.store.Repos.List() {
+		if rp.Owner.Login == u.Login && !rp.Private {
+			repos++
+		}
 	}
-	ghJSON(w, 200, u)
+	m["name"] = nullable(u.Name)
+	m["company"] = nullable(u.Company)
+	m["blog"] = ""
+	m["location"] = nullable(u.Location)
+	m["email"] = nullable(u.Email)
+	m["hireable"] = nil
+	m["bio"] = nullable(u.Bio)
+	m["twitter_username"] = nil
+	m["public_repos"] = repos
+	m["public_gists"] = 0
+	m["followers"] = 0
+	m["following"] = 0
+	m["created_at"] = "2020-01-01T00:00:00Z"
+	m["updated_at"] = "2020-01-01T00:00:00Z"
+	return m
 }
 
 // UpdateAuthenticatedUser handles PATCH /user
@@ -137,17 +167,16 @@ func (h *Handler) UpdateAuthenticatedUser(w http.ResponseWriter, r *http.Request
 // GetUser handles GET /users/{username}
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
+	if org, ok := h.store.Orgs.Get(username); ok {
+		ghJSON(w, 200, h.publicUser(r, store.User{ID: org.ID, Login: org.Login, Type: "Organization", Name: org.Name}))
+		return
+	}
 	u, ok := h.store.Users.Get(username)
 	if !ok {
-		// Return a generated user
-		u = store.User{
-			ID:      h.store.NewID(store.KindUser),
-			Login:   username,
-			Type:    "User",
-			HTMLURL: h.store.BaseURL() + "/" + username,
-		}
+		ghError(w, 404, "Not Found")
+		return
 	}
-	ghJSON(w, 200, u)
+	ghJSON(w, 200, h.publicUser(r, u))
 }
 
 // GetRepo handles GET /repos/{owner}/{repo}
@@ -160,7 +189,16 @@ func (h *Handler) GetRepo(w http.ResponseWriter, r *http.Request) {
 		ghError(w, 404, "Not Found")
 		return
 	}
-	ghJSON(w, 200, rp)
+	ghJSON(w, 200, h.rd(r).repoFull(*rp, viewer(r)))
+}
+
+// viewer is the login whose permissions a response describes; empty when
+// the caller is anonymous.
+func viewer(r *http.Request) string {
+	if p := principalFrom(r); p.Kind != principalAnonymous {
+		return actor(r)
+	}
+	return ""
 }
 
 // CreateRepo handles POST /user/repos
@@ -168,7 +206,13 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Homepage    string `json:"homepage"`
 		Private     bool   `json:"private"`
+		Visibility  string `json:"visibility"`
+		HasIssues   *bool  `json:"has_issues"`
+		HasProjects *bool  `json:"has_projects"`
+		HasWiki     *bool  `json:"has_wiki"`
+		IsTemplate  bool   `json:"is_template"`
 		AutoInit    bool   `json:"auto_init"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -191,11 +235,13 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		Name:          req.Name,
 		FullName:      owner + "/" + req.Name,
 		Description:   req.Description,
-		Private:       req.Private,
+		Homepage:      req.Homepage,
+		Private:       req.Private || req.Visibility == "private",
+		IsTemplate:    req.IsTemplate,
 		DefaultBranch: "main",
-		HasIssues:     true,
-		HasProjects:   true,
-		HasWiki:       true,
+		HasIssues:     boolOr(req.HasIssues, true),
+		HasProjects:   boolOr(req.HasProjects, true),
+		HasWiki:       boolOr(req.HasWiki, true),
 		Owner:         h.userRef(owner),
 		HTMLURL:       fmt.Sprintf("%s/%s/%s", h.store.BaseURL(), owner, req.Name),
 		CreatedAt:     now,
@@ -215,7 +261,7 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		_, _ = h.store.CommitChange(owner, req.Name, "main", "README.md", []byte(readme), "Initial commit", sig)
 	}
 
-	ghJSON(w, 201, rp)
+	ghJSON(w, 201, h.rd(r).repoFull(rp, owner))
 }
 
 // UpdateRepo handles PATCH /repos/{owner}/{repo}
@@ -230,21 +276,54 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req map[string]any
-	json.NewDecoder(r.Body).Decode(&req)
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
 	if desc, ok := req["description"].(string); ok {
 		rp.Description = desc
 	}
+	if hp, ok := req["homepage"].(string); ok {
+		rp.Homepage = hp
+	}
 	if priv, ok := req["private"].(bool); ok {
 		rp.Private = priv
+	}
+	if vis, ok := req["visibility"].(string); ok {
+		rp.Private = vis == "private"
 	}
 	if archived, ok := req["archived"].(bool); ok {
 		rp.Archived = archived
 	}
+	for key, dst := range map[string]*bool{"has_issues": &rp.HasIssues, "has_projects": &rp.HasProjects, "has_wiki": &rp.HasWiki, "is_template": &rp.IsTemplate, "delete_branch_on_merge": &rp.DeleteBranchOnMerge} {
+		if v, ok := req[key].(bool); ok {
+			*dst = v
+		}
+	}
+	for key, dst := range map[string]**bool{"allow_squash_merge": &rp.AllowSquashMerge, "allow_merge_commit": &rp.AllowMergeCommit, "allow_rebase_merge": &rp.AllowRebaseMerge} {
+		if v, ok := req[key].(bool); ok {
+			*dst = &v
+		}
+	}
+	if db, ok := req["default_branch"].(string); ok && db != "" {
+		if _, found := h.store.GetBranch(owner, repo, db); !found && h.store.HasCommits(owner, repo) {
+			ghValidationError(w, "Repository", "default_branch", "invalid")
+			return
+		}
+		rp.DefaultBranch = db
+	}
 	rp.UpdatedAt = h.store.Now()
 
-	h.store.Repos.Set(store.RepoKey(owner, repo), *rp)
-	ghJSON(w, 200, rp)
+	key := store.RepoKey(owner, repo)
+	if name, ok := req["name"].(string); ok && name != "" && name != repo {
+		if _, taken := h.store.GetRepo(owner, name); taken {
+			repoExists(w, "https://docs.github.com/rest/repos/repos#update-a-repository")
+			return
+		}
+		h.store.Repos.Delete(key)
+		rp.Name, rp.FullName = name, owner+"/"+name
+		key = store.RepoKey(owner, name)
+	}
+	h.store.Repos.Set(key, *rp)
+	ghJSON(w, 200, h.rd(r).repoFull(*rp, viewer(r)))
 }
 
 // DeleteRepo handles DELETE /repos/{owner}/{repo}
