@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
@@ -52,9 +53,13 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		Created:       now,
 	}
 
-	// Parse line items: line_items[0][price], line_items[0][quantity], etc.
+	// Parse line items: line_items[N][price] or inline line_items[N][price_data], and quantity.
 	for i := 0; i < 20; i++ {
-		priceID := r.FormValue("line_items[" + strconv.Itoa(i) + "][price]")
+		prefix := "line_items[" + strconv.Itoa(i) + "]"
+		priceID := r.FormValue(prefix + "[price]")
+		if priceID == "" {
+			priceID = h.inlinePrice(r, prefix+"[price_data]")
+		}
 		if priceID == "" {
 			break
 		}
@@ -65,6 +70,7 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 		cs.LineItems = append(cs.LineItems, store.CheckoutLineItem{
+			ID:       "li_" + strings.TrimPrefix(id, "cs_") + "_" + strconv.Itoa(i),
 			Price:    priceID,
 			Quantity: qty,
 		})
@@ -73,13 +79,16 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		if amountTotal == 0 {
 			if p, ok := h.store.Prices.Get(priceID); ok {
 				cs.AmountTotal += p.UnitAmount * qty
+				if cs.Currency == "" {
+					cs.Currency = p.Currency
+				}
 			}
 		}
 	}
 
 	h.store.CheckoutSessions.Set(id, cs)
-	h.emitEvent("checkout.session.created", mapFromJSON(cs))
-	twincore.JSON(w, http.StatusOK, cs)
+	h.emitEvent("checkout.session.created", h.renderCheckoutSession(cs, false))
+	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 
 func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
@@ -89,17 +98,22 @@ func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
-	twincore.JSON(w, http.StatusOK, cs)
+	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 
 func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, 10)
 	page := paginate(r, h.store.CheckoutSessions, limit, nil)
+	withItems := expandRequested(r, "data.line_items")
+	data := make([]map[string]any, 0, len(page.Data))
+	for _, cs := range page.Data {
+		data = append(data, h.renderCheckoutSession(cs, withItems))
+	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
 		"url":      "/v1/checkout/sessions",
 		"has_more": page.HasMore,
-		"data":     page.Data,
+		"data":     data,
 	})
 }
 
@@ -120,7 +134,7 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
 	h.emitEvent("checkout.session.expired", mapFromJSON(cs))
-	twincore.JSON(w, http.StatusOK, cs)
+	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 
 // AdminCompleteCheckoutSession handles POST /admin/checkout/sessions/{id}/complete.
@@ -229,8 +243,8 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 	cs.Status = "complete"
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
-	h.emitEvent("checkout.session.completed", mapFromJSON(cs))
-	twincore.JSON(w, http.StatusOK, cs)
+	h.emitEvent("checkout.session.completed", h.renderCheckoutSession(cs, false))
+	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 
 // ── Payment Links ──────────────────────────────────────────────────
@@ -303,4 +317,90 @@ func (h *Handler) ListPaymentLinks(w http.ResponseWriter, r *http.Request) {
 		"has_more": page.HasMore,
 		"data":     page.Data,
 	})
+}
+
+// renderCheckoutSession renders a session as Stripe does: line_items is an
+// includable field, absent unless expanded, and then a list of item objects.
+func (h *Handler) renderCheckoutSession(cs store.CheckoutSession, withLineItems bool) map[string]any {
+	m := mapFromJSON(cs)
+	delete(m, "line_items")
+	if withLineItems {
+		m["line_items"] = h.checkoutLineItemList(cs)
+	}
+	return m
+}
+
+// checkoutLineItemList renders a session's line items as a Stripe list of
+// item objects.
+func (h *Handler) checkoutLineItemList(cs store.CheckoutSession) map[string]any {
+	data := make([]map[string]any, 0, len(cs.LineItems))
+	for _, li := range cs.LineItems {
+		item := map[string]any{
+			"id":              li.ID,
+			"object":          "item",
+			"amount_discount": 0,
+			"amount_tax":      0,
+			"quantity":        li.Quantity,
+		}
+		if p, ok := h.store.Prices.Get(li.Price); ok {
+			item["price"] = p
+			item["currency"] = p.Currency
+			item["amount_subtotal"] = p.UnitAmount * li.Quantity
+			item["amount_total"] = p.UnitAmount * li.Quantity
+			if prod, ok := h.store.Products.Get(p.Product); ok {
+				item["description"] = prod.Name
+			}
+		} else {
+			item["price"] = li.Price
+		}
+		data = append(data, item)
+	}
+	return map[string]any{
+		"object":   "list",
+		"url":      "/v1/checkout/sessions/" + cs.ID + "/line_items",
+		"has_more": false,
+		"data":     data,
+	}
+}
+
+// ListCheckoutSessionLineItems handles GET /v1/checkout/sessions/{id}/line_items.
+func (h *Handler) ListCheckoutSessionLineItems(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	cs, ok := h.store.CheckoutSessions.Get(id)
+	if !ok {
+		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
+		return
+	}
+	twincore.JSON(w, http.StatusOK, h.checkoutLineItemList(cs))
+}
+
+// inlinePrice creates the price a price_data parameter describes, with its
+// product when product_data is given, and returns its ID ("" if absent).
+func (h *Handler) inlinePrice(r *http.Request, prefix string) string {
+	currency := r.FormValue(prefix + "[currency]")
+	if currency == "" {
+		return ""
+	}
+	now := h.store.Now()
+	productID := r.FormValue(prefix + "[product]")
+	if name := r.FormValue(prefix + "[product_data][name]"); name != "" {
+		productID = h.store.Products.NextID()
+		h.store.Products.Set(productID, store.Product{
+			ID: productID, Object: "product", Name: name, Active: false,
+			Description: r.FormValue(prefix + "[product_data][description]"), Created: now, Updated: now,
+		})
+	}
+	unit, _ := strconv.ParseInt(r.FormValue(prefix+"[unit_amount]"), 10, 64)
+	priceID := h.store.Prices.NextID()
+	price := store.Price{
+		ID: priceID, Object: "price", Active: false, Currency: currency, Product: productID,
+		UnitAmount: unit, UnitAmountDecimal: strconv.FormatInt(unit, 10),
+		Type: "one_time", BillingScheme: "per_unit", Created: now,
+	}
+	if interval := r.FormValue(prefix + "[recurring][interval]"); interval != "" {
+		price.Type = "recurring"
+		price.Recurring = &store.PriceRecurring{Interval: interval, IntervalCount: 1, UsageType: "licensed"}
+	}
+	h.store.Prices.Set(priceID, price)
+	return priceID
 }

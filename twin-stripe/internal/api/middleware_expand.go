@@ -82,6 +82,18 @@ func (h *Handler) expandMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// expandRequested reports whether path was requested in expand[] (either
+// array form; see arrayParamsMiddleware).
+func expandRequested(r *http.Request, path string) bool {
+	_ = r.ParseForm()
+	for _, p := range r.Form["expand[]"] {
+		if p == path {
+			return true
+		}
+	}
+	return false
+}
+
 func flushBuffer(w http.ResponseWriter, buf *expandBuffer) {
 	copyHeader(w.Header(), buf.header)
 	w.WriteHeader(buf.statusCode)

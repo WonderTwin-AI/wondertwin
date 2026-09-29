@@ -566,6 +566,7 @@ type CheckoutSession struct {
 
 // CheckoutLineItem represents a line item in a checkout session.
 type CheckoutLineItem struct {
+	ID       string `json:"id,omitempty"`
 	Price    string `json:"price"`
 	Quantity int64  `json:"quantity"`
 }

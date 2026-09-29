@@ -181,6 +181,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/checkout/sessions/{id}", h.GetCheckoutSession)
 		r.Get("/checkout/sessions", h.ListCheckoutSessions)
 		r.Post("/checkout/sessions/{id}/expire", h.ExpireCheckoutSession)
+		r.Get("/checkout/sessions/{id}/line_items", h.ListCheckoutSessionLineItems)
 
 		// Payment Links
 		r.Post("/payment_links", h.CreatePaymentLink)
