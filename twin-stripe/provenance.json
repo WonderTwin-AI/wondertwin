@@ -3,25 +3,43 @@
   "sdk_target": {
     "package": "github.com/stripe/stripe-go",
     "language": "go",
-    "version": "v81"
+    "version": "v86"
   },
-  "build": 7,
-  "generated_at": "2026-09-17T16:01:30Z",
+  "build": 8,
+  "generated_at": "2026-09-28T21:00:00Z",
   "sources": {
     "openapi": {
       "origin": "vendor_published",
-      "url": "https://raw.githubusercontent.com/stripe/openapi/3b6451bba542f42b8df3c2cfca2f98e053411cc3/openapi/spec3.json",
-      "retrieved_at": "2026-05-08T20:31:00Z",
-      "sha256": "6f7c5c122b98ccca6218b3980cbbf48773ffd40dc2fc9a09c4783143b9261915",
-      "api_version": "2026-04-22.dahlia"
+      "url": "https://raw.githubusercontent.com/stripe/openapi/v2524/latest/openapi.spec3.json",
+      "retrieved_at": "2026-09-28T00:00:00Z",
+      "sha256": "2c31317cdff103e4495b5b3501004d9ddc0af61f43b0ab819e2db392eef008f6",
+      "api_version": "2026-08-26.dahlia"
     },
     "sdk_analysis": {
       "method": "manual",
       "repo": "https://github.com/stripe/stripe-go",
-      "repo_ref": "v81"
+      "repo_ref": "v86.4.2"
     }
   },
   "research_archive": "wondertwin-docs/research/twins/stripe",
-  "research_completed": "2026-05-08T20:32:00Z",
-  "api_version": "2024-12-18"
+  "research_completed": "2026-09-28T00:00:00Z",
+  "api_version": "2026-08-26.dahlia",
+  "scope": {
+    "implemented": [
+      "use case stripe-card-payment: create a customer, create and confirm a PaymentIntent with a test method, read it back expanded",
+      "use case stripe-card-decline: handle a declined card with the documented decline test methods",
+      "use case stripe-subscription-billing: start a monthly subscription for a customer with a saved card and read its first invoice",
+      "use case stripe-checkout-session: create a hosted Checkout Session and read its line items",
+      "use case stripe-webhook-endpoint-events: register a webhook endpoint pinned to a dahlia version, receive signed events, read them back",
+      "use case stripe-refund: refund part of a successful payment",
+      "use case stripe-expand-and-paginate: list objects newest first with deep and list expansion, and page through them",
+      "use case stripe-idempotent-retry: retry a create safely with an idempotency key",
+      "use case stripe-connect-transfer: create a connected account and transfer funds to it"
+    ],
+    "not_implemented": [
+      "use case stripe-test-clock-subscription: advance a test clock through a subscription renewal (deferred)",
+      "use case stripe-event-destinations-thin-events: receive thin events through a v2 event destination (deferred)",
+      "Stripe API releases other than dahlia, .preview versions, and the /v2 namespace"
+    ]
+  }
 }

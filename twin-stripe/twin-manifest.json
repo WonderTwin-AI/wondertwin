@@ -3,23 +3,43 @@
   "vendor_domain": "stripe.com",
   "tier": "community",
   "category": "payments",
-  "description": "Simulates the Stripe API \u2014 Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs with webhook delivery. Responses support the `expand[]` request parameter (including nested paths like `latest_invoice.payment_intent` and list responses via `data.<field>`), resolving any known object ID regardless of endpoint-specific allowlists.",
+  "description": "Simulates the Stripe API /v1 on the dahlia release, served in the shape of 2026-08-26.dahlia: Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs, with signed webhook delivery. Accepts any dahlia Stripe-Version and refuses other releases with a 400. Array parameters are read in both the name[] and the indexed name[N] form the official SDKs send. Responses support expand (up to Stripe's documented four levels, including list expansion through data.), resolving any known object ID without checking Stripe's per-endpoint expandable-fields allowlist.",
+  "vendor_api_version": "2026-08-26.dahlia",
   "sdk_target": {
     "primary": {
       "package": "github.com/stripe/stripe-go",
       "language": "go",
-      "version": "v81",
-      "api_version": "2024-12-18",
+      "version": "v86",
+      "api_version": "2026-08-26.dahlia",
       "repo_url": "https://github.com/stripe/stripe-go",
       "docs_url": "https://docs.stripe.com/api"
     },
-    "additional": []
+    "additional": [
+      {
+        "package": "stripe",
+        "language": "javascript",
+        "version": "22.6.2",
+        "repo_url": "https://github.com/stripe/stripe-node",
+        "compatibility": "tested",
+        "last_validated": "2026-09-28",
+        "validation_method": "scenario_suite"
+      },
+      {
+        "package": "stripe",
+        "language": "python",
+        "version": "15.6.1",
+        "repo_url": "https://github.com/stripe/stripe-python",
+        "compatibility": "tested",
+        "last_validated": "2026-09-28",
+        "validation_method": "scenario_suite"
+      }
+    ]
   },
   "service_surface": {
     "openapi_spec": {
       "available": true,
       "origin": "vendor_published",
-      "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json"
+      "url": "https://raw.githubusercontent.com/stripe/openapi/v2524/latest/openapi.spec3.json"
     },
     "auth_pattern": "api_key",
     "has_webhooks": true,
@@ -107,8 +127,7 @@
       "reporting_report_runs",
       "reporting_report_types",
       "forwarding_requests"
-    ],
-    "estimated_coverage_pct": 80
+    ]
   },
   "generation": {
     "method": "manual",
@@ -127,6 +146,6 @@
   "lifecycle": {
     "release_type": "stable",
     "maintenance_status": "active",
-    "changelog": "## Build 7\n\nAdds response expansion: responses now support the `expand[]` request parameter, including nested paths (e.g. `latest_invoice.payment_intent`) and list responses (`data.<field>`). Resolves any known object ID named in expand[]; does not enforce Stripe's per-endpoint expandable-fields allowlist (see the commercial twin for that).\n\n### Added\n- `twinkit/expand` package: recursive path-substitution over a JSON response body given a Resolver\n- `expand[]`-aware response middleware on all `/v1` routes\n\n## Build 6\n\nArchitecture release: the twin now builds on the tagged twinkit v0.1.0 library and carries auditable provenance. No API surface changes.\n\n### Changed\n- Publisher is now `localstack`: this twin is published by LocalStack (CTO-50)\n- Removed internal lifecycle wiring that duplicated the handlers and store: invoice, subscription and payment_intent lifecycles were already owned by the handlers and store; behavior is unchanged and covered by the existing tests and conformance checks\n- Provenance now points at the pinned research archive: OpenAPI spec pinned to commit 3b6451b (2026-04-22.dahlia) with sha256, recorded as the conformance reference; the twin's generation target remains stripe-go v81 / API 2024-12-18\n- Built against twinkit v0.1.0 (first tagged release) instead of an untagged checkout\n"
+    "changelog": "## Build 8\n\nTargets the Stripe API on the dahlia release, served in the shape of `2026-08-26.dahlia`, and makes the official SDKs (stripe-go v86, stripe-node v22, stripe-python v15) work against it.\n\n### Changed\n- `Stripe-Version`: any dahlia version is accepted; other releases, `.preview` and `/v2` are refused. The account default is `STRIPE_API_VERSION`, default `2026-08-26.dahlia`\n- Events are labelled with a dahlia version instead of `2024-04-10`; each webhook endpoint receives events labelled with its own `api_version`\n- Webhooks are delivered as signed Stripe event objects to every registered endpoint, without needing `--webhook-url`\n- Lists are newest first, with `ending_before`; filters apply before paging\n- Subscriptions and invoices carry dahlia `discounts` (IDs, expandable) instead of the removed `discount`\n- Object IDs are opaque and Stripe-shaped instead of sequential\n- Errors carry `param` and `doc_url`; an unknown key is refused with 401; an unknown path is a JSON 404\n\n### Fixed\n- Indexed array parameters (`expand[0]`, `enabled_events[0]`) sent by every official SDK were ignored\n- Documented decline test payment methods (`pm_card_visa_chargeDeclined` and family) now decline as documented\n- Reusing an idempotency key with different parameters returns `idempotency_error`\n- Checkout Sessions accept `price_data`, and `line_items` is an includable list with its own list route\n- Expansions deeper than four levels are refused\n\n### Removed\n- The self-declared `estimated_coverage_pct`\n\n## Build 7\n\nAdds response expansion: responses now support the `expand[]` request parameter, including nested paths (e.g. `latest_invoice.payment_intent`) and list responses (`data.<field>`). Resolves any known object ID named in expand[]; does not enforce Stripe's per-endpoint expandable-fields allowlist (see the commercial twin for that).\n\n### Added\n- `twinkit/expand` package: recursive path-substitution over a JSON response body given a Resolver\n- `expand[]`-aware response middleware on all `/v1` routes\n\n## Build 6\n\nArchitecture release: the twin now builds on the tagged twinkit v0.1.0 library and carries auditable provenance. No API surface changes.\n\n### Changed\n- Publisher is now `localstack`: this twin is published by LocalStack (CTO-50)\n- Removed internal lifecycle wiring that duplicated the handlers and store: invoice, subscription and payment_intent lifecycles were already owned by the handlers and store; behavior is unchanged and covered by the existing tests and conformance checks\n- Provenance now points at the pinned research archive: OpenAPI spec pinned to commit 3b6451b (2026-04-22.dahlia) with sha256, recorded as the conformance reference; the twin's generation target remains stripe-go v81 / API 2024-12-18\n- Built against twinkit v0.1.0 (first tagged release) instead of an untagged checkout\n"
   }
 }
