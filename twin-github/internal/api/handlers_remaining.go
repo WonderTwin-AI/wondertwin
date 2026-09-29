@@ -171,32 +171,6 @@ func (h *Handler) RenameBranch(w http.ResponseWriter, r *http.Request) {
 
 // --- Check Runs/Suites extra ---
 
-// ListCheckRunsInSuite handles GET /repos/{owner}/{repo}/check-suites/{check_suite_id}/check-runs
-func (h *Handler) ListCheckRunsInSuite(w http.ResponseWriter, r *http.Request) {
-	// Simplified: return all check runs for the repo
-	owner := chi.URLParam(r, "owner")
-	repo := chi.URLParam(r, "repo")
-	runs := h.store.CheckRuns.Filter(func(_ string, cr store.CheckRun) bool {
-		return cr.RepoOwner == owner && cr.RepoName == repo
-	})
-	ghJSON(w, 200, map[string]any{"total_count": len(runs), "check_runs": paginate(w, r, runs)})
-}
-
-// ListCheckRunAnnotations handles GET /repos/{owner}/{repo}/check-runs/{check_run_id}/annotations
-func (h *Handler) ListCheckRunAnnotations(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []any{})
-}
-
-// RerequestCheckRun handles POST /repos/{owner}/{repo}/check-runs/{check_run_id}/rerequest
-func (h *Handler) RerequestCheckRun(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(201)
-}
-
-// RerequestCheckSuite handles POST /repos/{owner}/{repo}/check-suites/{check_suite_id}/rerequest
-func (h *Handler) RerequestCheckSuite(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(201)
-}
-
 // UpdateCheckSuitePreferences handles PATCH /repos/{owner}/{repo}/check-suites/preferences
 func (h *Handler) UpdateCheckSuitePreferences(w http.ResponseWriter, r *http.Request) {
 	ghJSON(w, 200, map[string]any{"preferences": map[string]any{"auto_trigger_checks": []any{}}})

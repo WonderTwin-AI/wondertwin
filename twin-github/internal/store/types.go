@@ -196,9 +196,9 @@ type CommitStatus struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-	SHA       string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+	SHA       string `json:"sha"`
 }
 
 // Release represents a GitHub release.
@@ -299,9 +299,12 @@ type CheckRun struct {
 	DetailsURL  string          `json:"details_url,omitempty"`
 	ExternalID  string          `json:"external_id,omitempty"`
 	Output      *CheckRunOutput `json:"output,omitempty"`
+	AppID       int64           `json:"app_id,omitempty"`
+	SuiteID     int64           `json:"check_suite_id,omitempty"`
+	Annotations int             `json:"annotations_count,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // CheckRunOutput holds check run output details.
@@ -320,9 +323,10 @@ type CheckSuite struct {
 	Conclusion string `json:"conclusion,omitempty"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
+	AppID      int64  `json:"app_id,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // Organization represents a GitHub organization.

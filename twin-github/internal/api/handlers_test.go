@@ -696,26 +696,28 @@ func TestMergeConflictIsRefused(t *testing.T) {
 func TestCommitStatuses(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "status-repo")
-	sha := "abc123"
+	sha := mainSHA(tc, "status-repo")
+	path := "/repos/twin-bot/status-repo/statuses/"
 
-	ghPost(tc, fmt.Sprintf("/repos/twin-bot/status-repo/statuses/%s", sha), map[string]any{
-		"state":   "success",
-		"context": "ci/tests",
-	}).AssertStatus(201)
+	ghPost(tc, path+"abc123", map[string]any{"state": "success"}).AssertStatus(422)
+	ghPost(tc, path+sha, map[string]any{"state": "green"}).AssertStatus(422)
 
-	ghPost(tc, fmt.Sprintf("/repos/twin-bot/status-repo/statuses/%s", sha), map[string]any{
-		"state":   "success",
-		"context": "ci/lint",
-	}).AssertStatus(201)
+	st := ghPost(tc, path+sha, map[string]any{"state": "pending", "context": "ci/tests"}).AssertStatus(201).JSONMap()
+	assertRequired(t, "status", st)
+	ghPost(tc, path+sha, map[string]any{"state": "success", "context": "ci/tests"}).AssertStatus(201)
+	ghPost(tc, path+sha, map[string]any{"state": "success", "context": "ci/lint"}).AssertStatus(201)
 
-	resp := ghGet(tc, fmt.Sprintf("/repos/twin-bot/status-repo/commits/%s/status", sha))
-	resp.AssertStatus(200)
-	m := resp.JSONMap()
-	if m["state"] != "success" {
-		t.Errorf("expected combined state=success, got %v", m["state"])
+	// The branch name resolves to the same commit.
+	m := ghGet(tc, "/repos/twin-bot/status-repo/commits/main/status").AssertStatus(200).JSONMap()
+	assertRequired(t, "combined-commit-status", m)
+	assertRequired(t, "simple-commit-status", m["statuses"].([]any)[0].(map[string]any))
+	assertRequired(t, "minimal-repository", m["repository"].(map[string]any))
+	if m["state"] != "success" || m["total_count"].(float64) != 2 || m["sha"] != sha {
+		t.Errorf("only the newest status per context counts; got %v with %v statuses", m["state"], m["total_count"])
 	}
-	if m["total_count"].(float64) != 2 {
-		t.Error("expected 2 statuses")
+	ghPost(tc, path+sha, map[string]any{"state": "failure", "context": "ci/lint"}).AssertStatus(201)
+	if s := ghGet(tc, "/repos/twin-bot/status-repo/commits/"+sha+"/status").JSONMap()["state"]; s != "failure" {
+		t.Errorf("a failing context fails the commit, got %v", s)
 	}
 }
 
@@ -845,30 +847,53 @@ func TestPRReviewComments(t *testing.T) {
 
 // --- Check Run Tests ---
 
+// installationToken mints a token for the seeded App's installation.
+func installationToken(t *testing.T, tc *testutil.TwinClient) string {
+	t.Helper()
+	jwt := appJWT("1000001", time.Now().Add(9*time.Minute))
+	var installs []map[string]any
+	tc.DoWithHeaders("GET", "/app/installations", nil, bearer(jwt)).AssertStatus(200).JSON(&installs)
+	path := fmt.Sprintf("/app/installations/%d/access_tokens", int64(installs[0]["id"].(float64)))
+	return tc.DoWithHeaders("POST", path, nil, bearer(jwt)).AssertStatus(201).JSONMap()["token"].(string)
+}
+
 func TestCheckRuns(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "check-repo")
-	sha := "abc123"
+	sha := mainSHA(tc, "check-repo")
+	app := bearer(installationToken(t, tc))
+	path := "/repos/twin-bot/check-repo/check-runs"
 
-	resp := ghPost(tc, "/repos/twin-bot/check-repo/check-runs", map[string]any{
-		"name":       "ci/test",
-		"head_sha":   sha,
-		"status":     "completed",
-		"conclusion": "success",
-	})
+	// Check-run writes are GitHub App only.
+	ghPost(tc, path, map[string]any{"name": "ci/test", "head_sha": sha}).AssertStatus(403)
+	tc.DoWithHeaders("POST", path, map[string]any{"name": "ci/test", "head_sha": "abc123"}, app).AssertStatus(422)
+	tc.DoWithHeaders("POST", path, map[string]any{"name": "ci/test", "head_sha": sha, "status": "completed"}, app).AssertStatus(422)
+
+	resp := tc.DoWithHeaders("POST", path, map[string]any{"name": "ci/test", "head_sha": sha, "status": "in_progress"}, app)
 	resp.AssertStatus(201)
-	crID := int(resp.JSONMap()["id"].(float64))
+	cr := resp.JSONMap()
+	assertRequired(t, "check-run", cr)
+	if cr["app"].(map[string]any)["slug"] != "wondertwin-app" || cr["completed_at"] != nil {
+		t.Errorf("unexpected check run %v %v", cr["app"], cr["completed_at"])
+	}
+	crID := int64(cr["id"].(float64))
 
-	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/check-repo/check-runs/%d", crID))
-	resp.AssertStatus(200)
-	if resp.JSONMap()["conclusion"] != "success" {
+	done := tc.DoWithHeaders("PATCH", fmt.Sprintf("%s/%d", path, crID), map[string]any{"conclusion": "success"}, app).AssertStatus(200).JSONMap()
+	if done["status"] != "completed" || done["completed_at"] == nil {
+		t.Errorf("a conclusion completes the run, got %v %v", done["status"], done["completed_at"])
+	}
+	if ghGet(tc, fmt.Sprintf("%s/%d", path, crID)).AssertStatus(200).JSONMap()["conclusion"] != "success" {
 		t.Error("expected conclusion=success")
 	}
 
-	resp = ghGet(tc, fmt.Sprintf("/repos/twin-bot/check-repo/commits/%s/check-runs", sha))
-	m := resp.JSONMap()
-	if m["total_count"].(float64) != 1 {
-		t.Error("expected 1 check run")
+	m := ghGet(tc, "/repos/twin-bot/check-repo/commits/main/check-runs").AssertStatus(200).JSONMap()
+	runs := m["check_runs"].([]any)
+	if m["total_count"].(float64) != 1 || runs[0].(map[string]any)["conclusion"] != "success" {
+		t.Errorf("expected the completed run, got %v", m)
+	}
+	suite := ghGet(tc, fmt.Sprintf("/repos/twin-bot/check-repo/check-suites/%d", int64(cr["check_suite"].(map[string]any)["id"].(float64)))).AssertStatus(200).JSONMap()
+	if suite["status"] != "completed" || suite["conclusion"] != "success" {
+		t.Errorf("the suite follows its runs, got %v %v", suite["status"], suite["conclusion"])
 	}
 }
 
