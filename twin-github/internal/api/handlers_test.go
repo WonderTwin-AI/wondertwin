@@ -136,7 +136,9 @@ func TestSeededTokenAuthenticatesAsItsUser(t *testing.T) {
 	if u["login"] != "reviewer" {
 		t.Errorf("expected reviewer, got %v", u["login"])
 	}
-	if ghGet(tc, "/user").AssertStatus(200).JSONMap()["login"] != "twin-bot" {
+	me := ghGet(tc, "/user").AssertStatus(200).JSONMap()
+	assertRequired(t, "private-user", me)
+	if me["login"] != "twin-bot" {
 		t.Error("an unregistered well-formed token is the default user")
 	}
 }
@@ -1153,6 +1155,7 @@ func TestGitRefs(t *testing.T) {
 	ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{"ref": "refs/heads/feature", "sha": base}).AssertStatus(422)
 
 	got := ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature").AssertStatus(200).JSONMap()
+	assertRequired(t, "git-ref", got)
 	if got["object"].(map[string]any)["sha"] != base {
 		t.Errorf("new branch should point at main, got %v", got["object"])
 	}
@@ -1184,6 +1187,7 @@ func TestContentsBootstrapAnEmptyRepo(t *testing.T) {
 	put := ghPut(tc, "/repos/twin-bot/boot/contents/README.md", map[string]any{
 		"message": "init", "content": "IyBoZWxsbwo=",
 	}).AssertStatus(201).JSONMap()
+	assertRequired(t, "file-commit", put)
 	commit := put["commit"].(map[string]any)
 	blob := put["content"].(map[string]any)["sha"].(string)
 	// `printf '# hello\n' | git hash-object --stdin`
@@ -1201,7 +1205,9 @@ func TestContentsBootstrapAnEmptyRepo(t *testing.T) {
 		t.Fatalf("the first commit creates main at that commit, got %v", branches)
 	}
 
+	assertRequired(t, "short-branch", branches[0])
 	file := ghGet(tc, "/repos/twin-bot/boot/contents/README.md").AssertStatus(200).JSONMap()
+	assertRequired(t, "content-file", file)
 	if file["type"] != "file" || file["sha"] != blob || file["content"] != "IyBoZWxsbwo=\n" {
 		t.Errorf("unexpected file %v", file)
 	}
