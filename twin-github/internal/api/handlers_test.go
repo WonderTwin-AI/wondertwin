@@ -239,6 +239,21 @@ func TestCreateAndGetRepo(t *testing.T) {
 	}
 }
 
+func TestDuplicateRepoIs422(t *testing.T) {
+	_, tc := setupGitHub(t)
+	first := ghPost(tc, "/user/repos", map[string]any{"name": "dup"}).AssertStatus(201).JSONMap()
+	resp := ghPost(tc, "/user/repos", map[string]any{"name": "dup"})
+	resp.AssertStatus(422)
+	m := resp.JSONMap()
+	errs := m["errors"].([]any)
+	if m["message"] != "Repository creation failed." || errs[0].(map[string]any)["message"] != "name already exists on this account" {
+		t.Errorf("unexpected 422 body %v", m)
+	}
+	if got := ghGet(tc, "/repos/twin-bot/dup").JSONMap()["id"]; got != first["id"] {
+		t.Errorf("the first repository must survive, got id %v want %v", got, first["id"])
+	}
+}
+
 func TestRepoNotFound(t *testing.T) {
 	_, tc := setupGitHub(t)
 	resp := ghGet(tc, "/repos/nobody/nothing")

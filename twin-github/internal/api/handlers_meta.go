@@ -180,7 +180,11 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner := "twin-bot"
+	owner := actor(r)
+	if _, exists := h.store.GetRepo(owner, req.Name); exists {
+		repoExists(w, "https://docs.github.com/rest/repos/repos#create-a-repository-for-the-authenticated-user")
+		return
+	}
 	now := h.store.Now()
 	rp := store.Repository{
 		ID:            h.store.NewID(store.KindRepo),
@@ -192,7 +196,7 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		HasIssues:     true,
 		HasProjects:   true,
 		HasWiki:       true,
-		Owner:         store.User{ID: 1, Login: owner, Type: "User"},
+		Owner:         h.userRef(owner),
 		HTMLURL:       fmt.Sprintf("%s/%s/%s", h.store.BaseURL(), owner, req.Name),
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -256,4 +260,15 @@ func (h *Handler) DeleteRepo(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Repos.Delete(key)
 	w.WriteHeader(204)
+}
+
+// userRef returns the stored user for login, creating it on first sight so
+// that every login the emulator mentions has one stable ID.
+func (h *Handler) userRef(login string) store.User {
+	if u, ok := h.store.Users.Get(login); ok {
+		return u
+	}
+	u := store.User{ID: h.store.NewID(store.KindUser), Login: login, Type: "User"}
+	h.store.Users.Set(login, u)
+	return u
 }

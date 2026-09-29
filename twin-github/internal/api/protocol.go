@@ -115,3 +115,19 @@ func ghValidationErrors(w http.ResponseWriter, message string, errs ...map[strin
 func notFound(w http.ResponseWriter, _ *http.Request) {
 	ghError(w, http.StatusNotFound, "Not Found")
 }
+
+// repoExists writes GitHub's 422 for a repository name already taken on the
+// account.
+func repoExists(w http.ResponseWriter, doc string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"message": "Repository creation failed.",
+		"errors": []map[string]any{{
+			"resource": "Repository", "code": "custom", "field": "name",
+			"message": "name already exists on this account",
+		}},
+		"documentation_url": doc,
+		"status":            "422",
+	})
+}

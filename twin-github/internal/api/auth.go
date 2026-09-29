@@ -35,6 +35,14 @@ func principalFrom(r *http.Request) principal {
 	return principal{Kind: principalAnonymous}
 }
 
+// actor returns the login a write is attributed to.
+func actor(r *http.Request) string {
+	if p := principalFrom(r); p.Login != "" {
+		return p.Login
+	}
+	return store.DefaultLogin
+}
+
 // bearerToken extracts the credential from "Bearer <t>" or the legacy
 // "token <t>" scheme. ok is false when an Authorization header is present
 // but unusable.

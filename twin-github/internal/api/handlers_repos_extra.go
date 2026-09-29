@@ -39,6 +39,15 @@ func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Name == "" {
+		ghValidationError(w, "Repository", "name", "missing_field")
+		return
+	}
+	if _, exists := h.store.GetRepo(org, req.Name); exists {
+		repoExists(w, "https://docs.github.com/rest/repos/repos#create-an-organization-repository")
+		return
+	}
+
 	now := h.store.Now()
 	rp := store.Repository{
 		ID:            h.store.NewID(store.KindRepo),
