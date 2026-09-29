@@ -2,7 +2,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -24,8 +23,24 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 
 // Routes mounts the GitHub REST API-compatible routes.
 func (h *Handler) Routes(r chi.Router) {
+	r.NotFound(notFound)
+	r.MethodNotAllowed(notFound)
+
+	// Meta routes GitHub serves without a token.
 	r.Group(func(r chi.Router) {
+		r.Use(commonHeaders)
+		r.Use(versionMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.GetRoot)
+		r.Get("/versions", h.ListVersions)
+		r.Get("/zen", h.GetZen)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(commonHeaders)
 		r.Use(h.bearerAuthMiddleware)
+		r.Use(versionMiddleware)
 		r.Use(h.mw.FaultInjection)
 
 		// Meta
@@ -355,38 +370,5 @@ func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
-	})
-}
-
-// ghJSON writes a successful JSON response with GitHub-standard headers.
-func ghJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("X-RateLimit-Limit", "5000")
-	w.Header().Set("X-RateLimit-Remaining", "4999")
-	w.Header().Set("X-RateLimit-Used", "1")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-// ghError writes a GitHub-style error response.
-func ghError(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]any{
-		"message":           message,
-		"documentation_url": "https://docs.github.com/rest",
-	})
-}
-
-// ghValidationError writes a 422 validation error.
-func ghValidationError(w http.ResponseWriter, resource, field, code string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusUnprocessableEntity)
-	json.NewEncoder(w).Encode(map[string]any{
-		"message":           "Validation Failed",
-		"documentation_url": "https://docs.github.com/rest",
-		"errors": []map[string]any{
-			{"resource": resource, "field": field, "code": code},
-		},
 	})
 }

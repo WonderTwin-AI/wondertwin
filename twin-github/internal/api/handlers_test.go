@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/api"
@@ -79,8 +80,89 @@ func TestRateLimit(t *testing.T) {
 	resp := ghGet(tc, "/rate_limit")
 	resp.AssertStatus(200)
 	m := resp.JSONMap()
-	if m["rate"] == nil {
-		t.Error("expected rate in response")
+	if _, ok := m["rate"]; ok {
+		t.Error("2026-03-10 removes the top-level rate object")
+	}
+	core := m["resources"].(map[string]any)["core"].(map[string]any)
+	if core["limit"] == nil {
+		t.Error("expected resources.core.limit")
+	}
+}
+
+// --- API Version Tests ---
+
+func withHeaders(extra map[string]string) map[string]string {
+	h := map[string]string{}
+	for k, v := range ghHeaders {
+		h[k] = v
+	}
+	for k, v := range extra {
+		h[k] = v
+	}
+	return h
+}
+
+func TestVersionsListsOnlyServedVersion(t *testing.T) {
+	_, tc := setupGitHub(t)
+	resp := tc.Get("/versions")
+	resp.AssertStatus(200)
+	var versions []string
+	resp.JSON(&versions)
+	if len(versions) != 1 || versions[0] != "2026-03-10" {
+		t.Errorf("expected [2026-03-10], got %v", versions)
+	}
+}
+
+func TestVersionDefaultAndExplicitAreEchoed(t *testing.T) {
+	_, tc := setupGitHub(t)
+	for _, hdr := range []map[string]string{ghHeaders, withHeaders(map[string]string{"X-GitHub-Api-Version": "2026-03-10"})} {
+		resp := tc.DoWithHeaders("GET", "/rate_limit", nil, hdr)
+		resp.AssertStatus(200)
+		if got := resp.Headers.Get("X-GitHub-Api-Version-Selected"); got != "2026-03-10" {
+			t.Errorf("expected selected version 2026-03-10, got %q", got)
+		}
+	}
+}
+
+func TestUnsupportedVersionsAreRefused(t *testing.T) {
+	_, tc := setupGitHub(t)
+	for _, v := range []string{"2022-11-28", "2024-01-01", "latest"} {
+		resp := tc.DoWithHeaders("GET", "/rate_limit", nil, withHeaders(map[string]string{"X-GitHub-Api-Version": v}))
+		resp.AssertStatus(400)
+		if resp.Headers.Get("X-GitHub-Api-Version-Selected") != "" {
+			t.Errorf("%s: the 400 must not echo a selected version", v)
+		}
+		m := resp.JSONMap()
+		errs, _ := m["errors"].(string)
+		if m["message"] != "Bad Request" || m["status"] != "400" {
+			t.Errorf("%s: unexpected body %v", v, m)
+		}
+		if !strings.Contains(errs, `"`+v+`"`) || !strings.Contains(errs, `"2026-03-10" (most recent)`) {
+			t.Errorf("%s: errors should name the value and the supported version, got %q", v, errs)
+		}
+	}
+}
+
+func TestUnknownRouteIsGitHubNotFound(t *testing.T) {
+	_, tc := setupGitHub(t)
+	resp := ghGet(tc, "/orgs/acme/teams/core/discussions")
+	resp.AssertStatus(404)
+	if m := resp.JSONMap(); m["message"] != "Not Found" || m["status"] != "404" {
+		t.Errorf("unexpected 404 body %v", m)
+	}
+}
+
+func TestRootAndZen(t *testing.T) {
+	_, tc := setupGitHub(t)
+	root := tc.Get("/").AssertStatus(200).JSONMap()
+	if _, ok := root["authorizations_url"]; ok {
+		t.Error("2026-03-10 root drops authorizations_url")
+	}
+	if !strings.HasSuffix(root["rate_limit_url"].(string), "/rate_limit") {
+		t.Errorf("unexpected rate_limit_url %v", root["rate_limit_url"])
+	}
+	if z := tc.Get("/zen").AssertStatus(200); len(z.Body) == 0 {
+		t.Error("expected a zen line")
 	}
 }
 

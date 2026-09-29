@@ -4,20 +4,105 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-github/internal/store"
 )
 
-// RateLimit handles GET /rate_limit
+// RateLimit handles GET /rate_limit. The 2026-03-10 shape has no top-level
+// "rate" object (changeset remove_rate_limit_rate); resources.core replaces it.
 func (h *Handler) RateLimit(w http.ResponseWriter, r *http.Request) {
+	reset := h.store.Clock.Now().Add(time.Hour).Unix()
+	bucket := func(limit, used int) map[string]any {
+		return map[string]any{"limit": limit, "remaining": limit - used, "reset": reset, "used": used}
+	}
 	ghJSON(w, 200, map[string]any{
 		"resources": map[string]any{
-			"core":    map[string]any{"limit": 5000, "remaining": 4999, "reset": 0, "used": 1},
-			"search":  map[string]any{"limit": 30, "remaining": 30, "reset": 0, "used": 0},
-			"graphql": map[string]any{"limit": 5000, "remaining": 5000, "reset": 0, "used": 0},
+			"core":                        bucket(5000, 1),
+			"search":                      bucket(30, 0),
+			"graphql":                     bucket(5000, 0),
+			"code_search":                 bucket(10, 0),
+			"integration_manifest":        bucket(5000, 0),
+			"source_import":               bucket(100, 0),
+			"actions_runner_registration": bucket(10000, 0),
+			"scim":                        bucket(15000, 0),
+			"dependency_snapshots":        bucket(100, 0),
+			"dependency_sbom":             bucket(100, 0),
+			"code_scanning_autofix":       bucket(10, 0),
+			"code_scanning_upload":        bucket(1000, 0),
+			"audit_log":                   bucket(1750, 0),
+			"audit_log_streaming":         bucket(15, 0),
 		},
-		"rate": map[string]any{"limit": 5000, "remaining": 4999, "reset": 0, "used": 1},
+	})
+}
+
+// ListVersions handles GET /versions: the calendar versions served, newest
+// first. Community serves one.
+func (h *Handler) ListVersions(w http.ResponseWriter, r *http.Request) {
+	ghJSON(w, 200, []string{APIVersion})
+}
+
+var zen = []string{
+	"Keep it logically awesome.",
+	"Design for failure.",
+	"Speak like a human.",
+	"Approachable is better than simple.",
+	"Mind your words, they are important.",
+	"Non-blocking is better than blocking.",
+	"Favor focus over features.",
+	"Avoid administrative distraction.",
+	"Anything added dilutes everything else.",
+	"Half measures are as bad as nothing at all.",
+	"Responsive is better than fast.",
+	"It's not fully shipped until it's fast.",
+	"Practicality beats purity.",
+	"Encourage flow.",
+}
+
+// GetZen handles GET /zen, which answers in plain text.
+func (h *Handler) GetZen(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain;charset=utf-8")
+	w.WriteHeader(200)
+	_, _ = w.Write([]byte(zen[h.store.Clock.Now().Unix()%int64(len(zen))]))
+}
+
+// GetRoot handles GET /, the hypermedia index. The 2026-03-10 shape drops
+// authorizations_url and hub_url.
+func (h *Handler) GetRoot(w http.ResponseWriter, r *http.Request) {
+	o := origin(r)
+	ghJSON(w, 200, map[string]any{
+		"current_user_url":                     o + "/user",
+		"current_user_authorizations_html_url": "https://github.com/settings/connections/applications{/client_id}",
+		"code_search_url":                      o + "/search/code?q={query}{&page,per_page,sort,order}",
+		"commit_search_url":                    o + "/search/commits?q={query}{&page,per_page,sort,order}",
+		"emails_url":                           o + "/user/emails",
+		"emojis_url":                           o + "/emojis",
+		"events_url":                           o + "/events",
+		"feeds_url":                            o + "/feeds",
+		"followers_url":                        o + "/user/followers",
+		"following_url":                        o + "/user/following{/target}",
+		"gists_url":                            o + "/gists{/gist_id}",
+		"issue_search_url":                     o + "/search/issues?q={query}{&page,per_page,sort,order}",
+		"issues_url":                           o + "/issues",
+		"keys_url":                             o + "/user/keys",
+		"label_search_url":                     o + "/search/labels?q={query}&repository_id={repository_id}{&page,per_page}",
+		"notifications_url":                    o + "/notifications",
+		"organization_url":                     o + "/orgs/{org}",
+		"organization_repositories_url":        o + "/orgs/{org}/repos{?type,page,per_page,sort}",
+		"organization_teams_url":               o + "/orgs/{org}/teams",
+		"public_gists_url":                     o + "/gists/public",
+		"rate_limit_url":                       o + "/rate_limit",
+		"repository_url":                       o + "/repos/{owner}/{repo}",
+		"repository_search_url":                o + "/search/repositories?q={query}{&page,per_page,sort,order}",
+		"current_user_repositories_url":        o + "/user/repos{?type,page,per_page,sort}",
+		"starred_url":                          o + "/user/starred{/owner}{/repo}",
+		"starred_gists_url":                    o + "/gists/starred",
+		"topic_search_url":                     o + "/search/topics?q={query}{&page,per_page}",
+		"user_url":                             o + "/users/{user}",
+		"user_organizations_url":               o + "/user/orgs",
+		"user_repositories_url":                o + "/users/{user}/repos{?type,page,per_page,sort}",
+		"user_search_url":                      o + "/search/users?q={query}{&page,per_page}",
 	})
 }
 
