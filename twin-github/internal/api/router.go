@@ -181,6 +181,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Patch("/repos/{owner}/{repo}/check-suites/preferences", h.UpdateCheckSuitePreferences)
 
 		// Contents
+		r.Get("/repos/{owner}/{repo}/contents", h.GetContents)
 		r.Get("/repos/{owner}/{repo}/contents/*", h.GetContents)
 		r.Put("/repos/{owner}/{repo}/contents/*", h.CreateOrUpdateContents)
 		r.Delete("/repos/{owner}/{repo}/contents/*", h.DeleteContents)

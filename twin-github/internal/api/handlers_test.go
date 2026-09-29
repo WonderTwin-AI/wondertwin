@@ -838,26 +838,92 @@ func TestActionsSecrets(t *testing.T) {
 
 // --- Git Data Tests ---
 
+func mainSHA(tc *testutil.TwinClient, repo string) string {
+	return ghGet(tc, "/repos/twin-bot/"+repo+"/git/ref/heads/main").AssertStatus(200).JSONMap()["object"].(map[string]any)["sha"].(string)
+}
+
 func TestGitRefs(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "git-repo")
+	base := mainSHA(tc, "git-repo")
 
-	// Create ref
-	resp := ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{
-		"ref": "refs/heads/feature",
-		"sha": "abc123",
-	})
+	ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{"ref": "refs/heads/feature", "sha": "0123456789abcdef0123456789abcdef01234567"}).AssertStatus(422)
+
+	resp := ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{"ref": "refs/heads/feature", "sha": base})
 	resp.AssertStatus(201)
 	if resp.JSONMap()["ref"] != "refs/heads/feature" {
 		t.Error("expected ref=refs/heads/feature")
 	}
+	ghPost(tc, "/repos/twin-bot/git-repo/git/refs", map[string]any{"ref": "refs/heads/feature", "sha": base}).AssertStatus(422)
 
-	// Get ref
-	resp = ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature")
-	resp.AssertStatus(200)
+	got := ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature").AssertStatus(200).JSONMap()
+	if got["object"].(map[string]any)["sha"] != base {
+		t.Errorf("new branch should point at main, got %v", got["object"])
+	}
+	var branches []map[string]any
+	ghGet(tc, "/repos/twin-bot/git-repo/branches").AssertStatus(200).JSON(&branches)
+	if len(branches) != 2 {
+		t.Errorf("a ref under refs/heads is a branch; expected 2 branches, got %d", len(branches))
+	}
 
-	// Delete ref
 	ghDelete(tc, "/repos/twin-bot/git-repo/git/refs/heads/feature").AssertStatus(204)
+	ghGet(tc, "/repos/twin-bot/git-repo/git/ref/heads/feature").AssertStatus(404)
+}
+
+func TestEmptyRepoRefIs409(t *testing.T) {
+	_, tc := setupGitHub(t)
+	ghPost(tc, "/user/repos", map[string]any{"name": "blank"}).AssertStatus(201)
+	ghGet(tc, "/repos/twin-bot/blank/git/ref/heads/main").AssertStatus(409)
+	var branches []map[string]any
+	ghGet(tc, "/repos/twin-bot/blank/branches").AssertStatus(200).JSON(&branches)
+	if len(branches) != 0 {
+		t.Errorf("an empty repository has no branches, got %d", len(branches))
+	}
+}
+
+func TestContentsBootstrapAnEmptyRepo(t *testing.T) {
+	_, tc := setupGitHub(t)
+	ghPost(tc, "/user/repos", map[string]any{"name": "boot"}).AssertStatus(201)
+
+	put := ghPut(tc, "/repos/twin-bot/boot/contents/README.md", map[string]any{
+		"message": "init", "content": "IyBoZWxsbwo=",
+	}).AssertStatus(201).JSONMap()
+	commit := put["commit"].(map[string]any)
+	blob := put["content"].(map[string]any)["sha"].(string)
+	// `printf '# hello\n' | git hash-object --stdin`
+	if blob != "8954bb97349bfe2a7799e6a7a64c6f747c635d6c" {
+		t.Errorf("unexpected blob sha %s", blob)
+	}
+	// `git write-tree` over the same single file
+	if tree := commit["tree"].(map[string]any)["sha"]; tree != "5e7818ac0625a0a2c14f7fb43e344a856cbbc8cb" {
+		t.Errorf("unexpected tree sha %v", tree)
+	}
+
+	var branches []map[string]any
+	ghGet(tc, "/repos/twin-bot/boot/branches").AssertStatus(200).JSON(&branches)
+	if len(branches) != 1 || branches[0]["name"] != "main" || branches[0]["commit"].(map[string]any)["sha"] != commit["sha"] {
+		t.Fatalf("the first commit creates main at that commit, got %v", branches)
+	}
+
+	file := ghGet(tc, "/repos/twin-bot/boot/contents/README.md").AssertStatus(200).JSONMap()
+	if file["type"] != "file" || file["sha"] != blob || file["content"] != "IyBoZWxsbwo=\n" {
+		t.Errorf("unexpected file %v", file)
+	}
+
+	// Updating needs the current blob sha.
+	ghPut(tc, "/repos/twin-bot/boot/contents/README.md", map[string]any{"message": "again", "content": "eAo="}).AssertStatus(422)
+	upd := ghPut(tc, "/repos/twin-bot/boot/contents/README.md", map[string]any{"message": "again", "content": "eAo=", "sha": blob}).AssertStatus(200).JSONMap()
+	parents := upd["commit"].(map[string]any)["parents"].([]any)
+	if len(parents) != 1 || parents[0].(map[string]any)["sha"] != commit["sha"] {
+		t.Errorf("the update's parent is the first commit, got %v", parents)
+	}
+}
+
+func TestGitBlobSHAMatchesGit(t *testing.T) {
+	// `printf 'Hello' | git hash-object --stdin`
+	if got := store.BlobSHA([]byte("Hello")); got != "5ab2f8a4323abafb10abb68657d9d39f1a775057" {
+		t.Errorf("blob sha = %s", got)
+	}
 }
 
 func TestGitCommitsAndTrees(t *testing.T) {
@@ -885,10 +951,19 @@ func TestGitCommitsAndTrees(t *testing.T) {
 	resp = ghPost(tc, "/repos/twin-bot/gitdata-repo/git/commits", map[string]any{
 		"message": "initial commit",
 		"tree":    treeSHA,
+		"parents": []string{mainSHA(tc, "gitdata-repo")},
 	})
 	resp.AssertStatus(201)
-	if resp.JSONMap()["message"] != "initial commit" {
+	c := resp.JSONMap()
+	if c["message"] != "initial commit" {
 		t.Error("expected message=initial commit")
+	}
+	ghGet(tc, "/repos/twin-bot/gitdata-repo/git/commits/"+c["sha"].(string)).AssertStatus(200)
+
+	// Moving main to it is a fast-forward.
+	ghPatch(tc, "/repos/twin-bot/gitdata-repo/git/refs/heads/main", map[string]any{"sha": c["sha"]}).AssertStatus(200)
+	if mainSHA(tc, "gitdata-repo") != c["sha"] {
+		t.Error("main should have moved")
 	}
 }
 

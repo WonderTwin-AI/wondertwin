@@ -94,23 +94,43 @@ func (h *Handler) ListTags(w http.ResponseWriter, r *http.Request) {
 	ghJSON(w, 200, []any{})
 }
 
-// ListCommits handles GET /repos/{owner}/{repo}/commits
+// ListCommits handles GET /repos/{owner}/{repo}/commits: the history of sha
+// (a branch, tag or SHA; the default branch when absent), newest first.
 func (h *Handler) ListCommits(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []any{})
+	owner := chi.URLParam(r, "owner")
+	repo := chi.URLParam(r, "repo")
+	if _, ok := h.store.GetRepo(owner, repo); !ok {
+		ghError(w, 404, "Not Found")
+		return
+	}
+	if !h.store.HasCommits(owner, repo) {
+		ghError(w, 409, "Git Repository is empty.")
+		return
+	}
+	head, ok := h.store.ResolveRef(owner, repo, r.URL.Query().Get("sha"))
+	if !ok {
+		ghError(w, 404, "Not Found")
+		return
+	}
+	x := h.rd(r)
+	out := []map[string]any{}
+	for _, c := range paginate(w, r, h.store.History(owner, repo, head.SHA, "")) {
+		out = append(out, x.commit(c))
+	}
+	ghJSON(w, 200, out)
 }
 
 // GetCommit handles GET /repos/{owner}/{repo}/commits/{ref} (high-level)
 func (h *Handler) GetCommit(w http.ResponseWriter, r *http.Request) {
+	owner := chi.URLParam(r, "owner")
+	repo := chi.URLParam(r, "repo")
 	ref := chi.URLParam(r, "ref")
-	ghJSON(w, 200, map[string]any{
-		"sha": ref,
-		"commit": map[string]any{
-			"message": "simulated commit",
-			"author":  store.GitSignature{Name: "twin-bot", Email: "bot@wondertwin.dev", Date: h.store.Now()},
-		},
-		"author":    store.User{ID: 1, Login: "twin-bot", Type: "User"},
-		"committer": store.User{ID: 1, Login: "twin-bot", Type: "User"},
-	})
+	c, ok := h.store.ResolveRef(owner, repo, ref)
+	if !ok {
+		ghValidationErrors(w, "No commit found for SHA: "+ref)
+		return
+	}
+	ghJSON(w, 200, h.rd(r).commit(c))
 }
 
 // CompareCommits handles GET /repos/{owner}/{repo}/compare/{basehead}

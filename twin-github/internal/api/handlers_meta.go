@@ -205,15 +205,14 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Repos.Set(store.RepoKey(owner, req.Name), rp)
 
-	// Create default branch if auto_init
+	// auto_init makes an initial commit holding a README, as GitHub does.
 	if req.AutoInit {
-		bID := h.store.Branches.NextID()
-		h.store.Branches.Set(bID, store.Branch{
-			Name:      "main",
-			Commit:    store.BranchCommit{SHA: store.DefaultSHA()},
-			RepoOwner: owner,
-			RepoName:  req.Name,
-		})
+		readme := "# " + req.Name + "\n"
+		if req.Description != "" {
+			readme += req.Description + "\n"
+		}
+		sig := h.signature(r, contentsRequest{})
+		_, _ = h.store.CommitChange(owner, req.Name, "main", "README.md", []byte(readme), "Initial commit", sig)
 	}
 
 	ghJSON(w, 201, rp)

@@ -210,8 +210,8 @@ type Branch struct {
 	Protected bool         `json:"protected"`
 	Commit    BranchCommit `json:"commit"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // BranchCommit is the head commit of a branch.
@@ -305,22 +305,6 @@ type CheckSuite struct {
 	Conclusion string `json:"conclusion,omitempty"`
 	CreatedAt  string `json:"created_at"`
 	UpdatedAt  string `json:"updated_at"`
-
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
-}
-
-// Content represents a file or directory in a repository.
-type Content struct {
-	Type        string `json:"type"` // "file", "dir", "symlink", "submodule"
-	Name        string `json:"name"`
-	Path        string `json:"path"`
-	SHA         string `json:"sha"`
-	Size        int    `json:"size"`
-	HTMLURL     string `json:"html_url"`
-	DownloadURL string `json:"download_url,omitempty"`
-	Content     string `json:"content,omitempty"`  // base64-encoded for files
-	Encoding    string `json:"encoding,omitempty"` // "base64"
 
 	RepoOwner string `json:"-"`
 	RepoName  string `json:"-"`
@@ -517,8 +501,8 @@ type GitRef struct {
 	URL    string    `json:"url"`
 	Object GitObject `json:"object"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
 }
 
 // GitObject represents the object a ref points to.

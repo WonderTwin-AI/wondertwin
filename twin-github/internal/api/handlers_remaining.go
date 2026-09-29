@@ -151,17 +151,23 @@ func (h *Handler) RenameBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
-	ids, branches := h.store.Branches.FilterWithIDs(func(_ string, b store.Branch) bool {
-		return b.RepoOwner == owner && b.RepoName == repo && b.Name == oldName
-	})
-	if len(ids) > 0 {
-		b := branches[0]
-		b.Name = req.NewName
-		h.store.Branches.Set(ids[0], b)
-		ghJSON(w, 201, b)
+	b, ok := h.store.GetBranch(owner, repo, oldName)
+	if !ok {
+		ghError(w, 404, "Branch not found")
 		return
 	}
-	ghJSON(w, 201, store.Branch{Name: req.NewName, Commit: store.BranchCommit{SHA: store.DefaultSHA()}})
+	if _, taken := h.store.GetBranch(owner, repo, req.NewName); taken || req.NewName == "" {
+		ghValidationErrors(w, "Validation Failed")
+		return
+	}
+	h.store.DeleteBranch(owner, repo, oldName)
+	h.store.SetBranch(owner, repo, req.NewName, b.Commit.SHA)
+	if rp, found := h.store.GetRepo(owner, repo); found && rp.DefaultBranch == oldName {
+		rp.DefaultBranch = req.NewName
+		h.store.Repos.Set(store.RepoKey(owner, repo), *rp)
+	}
+	nb, _ := h.store.GetBranch(owner, repo, req.NewName)
+	ghJSON(w, 201, h.rd(r).branch(nb))
 }
 
 // --- Check Runs/Suites extra ---
@@ -201,7 +207,7 @@ func (h *Handler) UpdateCheckSuitePreferences(w http.ResponseWriter, r *http.Req
 
 // GetReadmeForDir handles GET /repos/{owner}/{repo}/readme/{dir}
 func (h *Handler) GetReadmeForDir(w http.ResponseWriter, r *http.Request) {
-	h.GetReadme(w, r) // Simplified: same as readme
+	h.readme(w, r, chi.URLParam(r, "dir"))
 }
 
 // DownloadTarball handles GET /repos/{owner}/{repo}/tarball/{ref}

@@ -1,8 +1,9 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sync/atomic"
 
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -26,7 +27,6 @@ type MemoryStore struct {
 	PRReviewComments *pkgstate.Store[PRReviewComment]
 	CheckRuns        *pkgstate.Store[CheckRun]
 	CheckSuites      *pkgstate.Store[CheckSuite]
-	Contents         *pkgstate.Store[Content]
 	Orgs             *pkgstate.Store[Organization]
 	Teams            *pkgstate.Store[Team]
 	DeployKeys       *pkgstate.Store[DeployKey]
@@ -44,6 +44,8 @@ type MemoryStore struct {
 	GitBlobs         *pkgstate.Store[GitBlob]
 	GitTags          *pkgstate.Store[GitTag]
 	Tokens           *pkgstate.Store[Token]
+	Commits          *pkgstate.Store[Commit]
+	Blobs            *pkgstate.Store[Blob]
 	Clock            *pkgstate.Clock
 
 	ids        *idAllocator
@@ -69,7 +71,6 @@ func New() *MemoryStore {
 		PRReviewComments: pkgstate.New[PRReviewComment]("rc"),
 		CheckRuns:        pkgstate.New[CheckRun]("cr"),
 		CheckSuites:      pkgstate.New[CheckSuite]("cs"),
-		Contents:         pkgstate.New[Content]("content"),
 		Orgs:             pkgstate.New[Organization]("org"),
 		Teams:            pkgstate.New[Team]("team"),
 		DeployKeys:       pkgstate.New[DeployKey]("dk"),
@@ -87,6 +88,8 @@ func New() *MemoryStore {
 		GitBlobs:         pkgstate.New[GitBlob]("gb"),
 		GitTags:          pkgstate.New[GitTag]("gtag"),
 		Tokens:           pkgstate.New[Token]("token"),
+		Commits:          pkgstate.New[Commit]("commit"),
+		Blobs:            pkgstate.New[Blob]("blob"),
 		Clock:            pkgstate.NewClock(),
 		ids:              newIDAllocator(),
 	}
@@ -229,9 +232,10 @@ func DefaultSHA() string {
 	return "abc1234567890def1234567890abcdef12345678"
 }
 
-// MakeSHA generates a deterministic SHA from a string.
+// MakeSHA derives a deterministic 40-character hex identifier from a string.
 func MakeSHA(input string) string {
-	return fmt.Sprintf("%040x", []byte(input))[:40]
+	sum := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(sum[:])[:40]
 }
 
 type stateSnapshot struct {
@@ -247,6 +251,9 @@ type stateSnapshot struct {
 	Releases     map[string]Release      `json:"releases,omitempty"`
 	Branches     map[string]Branch       `json:"branches,omitempty"`
 	Tokens       map[string]Token        `json:"tokens,omitempty"`
+	Commits      map[string]Commit       `json:"commits,omitempty"`
+	Blobs        map[string]Blob         `json:"blobs,omitempty"`
+	GitRefs      map[string]GitRef       `json:"git_refs,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -263,6 +270,9 @@ func (s *MemoryStore) Snapshot() any {
 		Releases:     s.Releases.Snapshot(),
 		Branches:     s.Branches.Snapshot(),
 		Tokens:       s.Tokens.Snapshot(),
+		Commits:      s.Commits.Snapshot(),
+		Blobs:        s.Blobs.Snapshot(),
+		GitRefs:      s.GitRefs.Snapshot(),
 	}
 }
 
@@ -306,6 +316,15 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	}
 	if snap.Tokens != nil {
 		s.Tokens.LoadSnapshot(snap.Tokens)
+	}
+	if snap.Commits != nil {
+		s.Commits.LoadSnapshot(snap.Commits)
+	}
+	if snap.Blobs != nil {
+		s.Blobs.LoadSnapshot(snap.Blobs)
+	}
+	if snap.GitRefs != nil {
+		s.GitRefs.LoadSnapshot(snap.GitRefs)
 	}
 	s.observeLoaded()
 	s.seedDefaults()
@@ -359,13 +378,6 @@ func (s *MemoryStore) ListPRReviews(owner, repo string, prNumber int) []PRReview
 func (s *MemoryStore) ListCheckRunsForRef(owner, repo, sha string) []CheckRun {
 	return s.CheckRuns.Filter(func(_ string, cr CheckRun) bool {
 		return cr.RepoOwner == owner && cr.RepoName == repo && cr.HeadSHA == sha
-	})
-}
-
-// ListRepoContents returns contents at a path.
-func (s *MemoryStore) ListRepoContents(owner, repo, path string) []Content {
-	return s.Contents.Filter(func(_ string, c Content) bool {
-		return c.RepoOwner == owner && c.RepoName == repo && c.Path == path
 	})
 }
 
@@ -435,7 +447,6 @@ func (s *MemoryStore) Reset() {
 	s.PRReviewComments.Reset()
 	s.CheckRuns.Reset()
 	s.CheckSuites.Reset()
-	s.Contents.Reset()
 	s.Orgs.Reset()
 	s.Teams.Reset()
 	s.DeployKeys.Reset()
@@ -453,6 +464,8 @@ func (s *MemoryStore) Reset() {
 	s.GitBlobs.Reset()
 	s.GitTags.Reset()
 	s.Tokens.Reset()
+	s.Commits.Reset()
+	s.Blobs.Reset()
 	s.Clock.Reset()
 	s.ids.reset()
 	s.runCounter.Store(0)
