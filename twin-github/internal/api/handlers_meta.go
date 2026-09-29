@@ -133,7 +133,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Return a generated user
 		u = store.User{
-			ID:      h.store.NextID(),
+			ID:      h.store.NewID(store.KindUser),
 			Login:   username,
 			Type:    "User",
 			HTMLURL: h.store.BaseURL() + "/" + username,
@@ -175,7 +175,7 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	owner := "twin-bot"
 	now := h.store.Now()
 	rp := store.Repository{
-		ID:            h.store.NextID(),
+		ID:            h.store.NewID(store.KindRepo),
 		Name:          req.Name,
 		FullName:      owner + "/" + req.Name,
 		Description:   req.Description,

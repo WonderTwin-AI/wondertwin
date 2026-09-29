@@ -35,7 +35,7 @@ func (h *Handler) CreateCheckRun(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	cr := store.CheckRun{
-		ID:         h.store.NextID(),
+		ID:         h.store.NewID(store.KindCheckRun),
 		Name:       req.Name,
 		HeadSHA:    req.HeadSHA,
 		Status:     req.Status,
@@ -44,11 +44,12 @@ func (h *Handler) CreateCheckRun(w http.ResponseWriter, r *http.Request) {
 		DetailsURL: req.DetailsURL,
 		ExternalID: req.ExternalID,
 		Output:     req.Output,
-		HTMLURL:    fmt.Sprintf("%s/%s/%s/runs/%d", h.store.BaseURL(), owner, repo, h.store.NextID()),
-		RepoOwner:  owner,
-		RepoName:   repo,
+
+		RepoOwner: owner,
+		RepoName:  repo,
 	}
 
+	cr.HTMLURL = fmt.Sprintf("%s/%s/%s/runs/%d", h.store.BaseURL(), owner, repo, cr.ID)
 	if req.Status == "completed" {
 		cr.CompletedAt = now
 	}
@@ -131,7 +132,7 @@ func (h *Handler) CreateCheckSuite(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	cs := store.CheckSuite{
-		ID:         h.store.NextID(),
+		ID:         h.store.NewID(store.KindCheckSuite),
 		HeadSHA:    req.HeadSHA,
 		HeadBranch: req.HeadBranch,
 		Status:     "queued",

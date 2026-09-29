@@ -45,10 +45,8 @@ type MemoryStore struct {
 	GitTags          *pkgstate.Store[GitTag]
 	Clock            *pkgstate.Clock
 
-	// Monotonic counters
-	issueCounter atomic.Int64
-	idCounter    atomic.Int64
-	runCounter   atomic.Int64
+	ids        *idAllocator
+	runCounter atomic.Int64
 }
 
 // New creates a new MemoryStore with empty state.
@@ -88,17 +86,8 @@ func New() *MemoryStore {
 		GitBlobs:         pkgstate.New[GitBlob]("gb"),
 		GitTags:          pkgstate.New[GitTag]("gtag"),
 		Clock:            pkgstate.NewClock(),
+		ids:              newIDAllocator(),
 	}
-}
-
-// NextID returns a monotonically increasing numeric ID.
-func (s *MemoryStore) NextID() int64 {
-	return s.idCounter.Add(1)
-}
-
-// NextIssueNumber returns the next issue/PR number for a repo.
-func (s *MemoryStore) NextIssueNumber() int {
-	return int(s.issueCounter.Add(1))
 }
 
 // RepoKey builds a lookup key for owner/repo.
@@ -309,7 +298,44 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Branches != nil {
 		s.Branches.LoadSnapshot(snap.Branches)
 	}
+	s.observeLoaded()
 	return nil
+}
+
+// observeLoaded moves the ID and number sequences past everything loaded.
+func (s *MemoryStore) observeLoaded() {
+	for _, r := range s.Repos.List() {
+		s.ids.observe(KindRepo, r.ID)
+	}
+	for _, u := range s.Users.List() {
+		s.ids.observe(KindUser, u.ID)
+	}
+	for _, i := range s.Issues.List() {
+		s.ids.observe(KindIssue, i.ID)
+		s.ids.observeNumber(RepoKey(i.RepoOwner, i.RepoName), i.Number)
+	}
+	for _, p := range s.PullRequests.List() {
+		s.ids.observe(KindPull, p.ID)
+		s.ids.observeNumber(RepoKey(p.RepoOwner, p.RepoName), p.Number)
+	}
+	for _, c := range s.Comments.List() {
+		s.ids.observe(KindComment, c.ID)
+	}
+	for _, l := range s.Labels.List() {
+		s.ids.observe(KindLabel, l.ID)
+	}
+	for _, m := range s.Milestones.List() {
+		s.ids.observe(KindMilestone, m.ID)
+	}
+	for _, w := range s.Webhooks.List() {
+		s.ids.observe(KindHook, w.ID)
+	}
+	for _, st := range s.Statuses.List() {
+		s.ids.observe(KindStatus, st.ID)
+	}
+	for _, r := range s.Releases.List() {
+		s.ids.observe(KindRelease, r.ID)
+	}
 }
 
 // ListPRReviews returns reviews for a pull request.
@@ -417,8 +443,7 @@ func (s *MemoryStore) Reset() {
 	s.GitBlobs.Reset()
 	s.GitTags.Reset()
 	s.Clock.Reset()
-	s.issueCounter.Store(0)
-	s.idCounter.Store(0)
+	s.ids.reset()
 	s.runCounter.Store(0)
 }
 

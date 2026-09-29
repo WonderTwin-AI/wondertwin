@@ -54,10 +54,10 @@ func (h *Handler) CreatePullRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Now()
-	num := h.store.NextIssueNumber()
+	num := h.store.NextIssueNumber(owner, repo)
 	mergeable := true
 	pr := store.PullRequest{
-		ID:     h.store.NextID(),
+		ID:     h.store.NewID(store.KindPull),
 		Number: num,
 		Title:  req.Title,
 		Body:   req.Body,

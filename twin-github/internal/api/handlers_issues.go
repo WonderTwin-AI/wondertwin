@@ -49,9 +49,9 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Now()
-	num := h.store.NextIssueNumber()
+	num := h.store.NextIssueNumber(owner, repo)
 	issue := store.Issue{
-		ID:        h.store.NextID(),
+		ID:        h.store.NewID(store.KindIssue),
 		Number:    num,
 		Title:     req.Title,
 		Body:      req.Body,
@@ -152,7 +152,7 @@ func (h *Handler) CreateIssueComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Now()
-	cid := h.store.NextID()
+	cid := h.store.NewID(store.KindComment)
 	comment := store.Comment{
 		ID:          cid,
 		Body:        req.Body,
@@ -263,7 +263,7 @@ func (h *Handler) CreateLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	label := store.Label{
-		ID:          h.store.NextID(),
+		ID:          h.store.NewID(store.KindLabel),
 		Name:        req.Name,
 		Color:       req.Color,
 		Description: req.Description,

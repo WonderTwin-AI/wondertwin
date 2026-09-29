@@ -177,7 +177,7 @@ func (h *Handler) ReplyToPRReviewComment(w http.ResponseWriter, r *http.Request)
 
 	now := h.store.Now()
 	rc := store.PRReviewComment{
-		ID:          h.store.NextID(),
+		ID:          h.store.NewID(store.KindReviewCmt),
 		Body:        req.Body,
 		User:        store.User{ID: 1, Login: "twin-bot", Type: "User"},
 		CreatedAt:   now,

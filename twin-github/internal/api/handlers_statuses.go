@@ -28,7 +28,7 @@ func (h *Handler) CreateCommitStatus(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	cs := store.CommitStatus{
-		ID:          h.store.NextID(),
+		ID:          h.store.NewID(store.KindStatus),
 		State:       req.State,
 		TargetURL:   req.TargetURL,
 		Description: req.Description,
@@ -147,7 +147,7 @@ func (h *Handler) CreateRelease(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	rel := store.Release{
-		ID:              h.store.NextID(),
+		ID:              h.store.NewID(store.KindRelease),
 		TagName:         req.TagName,
 		Name:            req.Name,
 		Body:            req.Body,

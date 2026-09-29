@@ -221,7 +221,7 @@ func (h *Handler) CreateFork(w http.ResponseWriter, r *http.Request) {
 	forkOwner := "twin-bot"
 	now := h.store.Now()
 	fork := *rp
-	fork.ID = h.store.NextID()
+	fork.ID = h.store.NewID(store.KindRepo)
 	fork.FullName = forkOwner + "/" + repo
 	fork.Fork = true
 	fork.Owner = store.User{ID: 1, Login: forkOwner, Type: "User"}
@@ -252,7 +252,7 @@ func (h *Handler) UploadReleaseAsset(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	asset := store.ReleaseAsset{
-		ID:                 h.store.NextID(),
+		ID:                 h.store.NewID(store.KindAsset),
 		Name:               name,
 		ContentType:        r.Header.Get("Content-Type"),
 		Size:               int(r.ContentLength),

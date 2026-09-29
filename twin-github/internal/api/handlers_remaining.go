@@ -242,7 +242,7 @@ func (h *Handler) UpdateOrg(w http.ResponseWriter, r *http.Request) {
 	orgLogin := chi.URLParam(r, "org")
 	org, ok := h.store.Orgs.Get(orgLogin)
 	if !ok {
-		org = store.Organization{ID: h.store.NextID(), Login: orgLogin, Type: "Organization"}
+		org = store.Organization{ID: h.store.NewID(store.KindOrg), Login: orgLogin, Type: "Organization"}
 	}
 
 	var req map[string]any

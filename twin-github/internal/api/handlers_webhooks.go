@@ -43,7 +43,7 @@ func (h *Handler) CreateWebhook(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	hook := store.Webhook{
-		ID:        h.store.NextID(),
+		ID:        h.store.NewID(store.KindHook),
 		Name:      req.Name,
 		Active:    active,
 		Events:    req.Events,

@@ -41,9 +41,9 @@ func (h *Handler) CreateMilestone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := h.store.Now()
-	num := int(h.store.NextID())
+	num := len(h.store.ListRepoMilestones(owner, repo)) + 1
 	ms := store.Milestone{
-		ID:          h.store.NextID(),
+		ID:          h.store.NewID(store.KindMilestone),
 		Number:      num,
 		Title:       req.Title,
 		Description: req.Description,

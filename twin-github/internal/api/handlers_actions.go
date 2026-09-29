@@ -48,7 +48,7 @@ func (h *Handler) TriggerWorkflow(w http.ResponseWriter, r *http.Request) {
 	// Create a run for the workflow
 	now := h.store.Now()
 	run := store.WorkflowRun{
-		ID:         h.store.NextID(),
+		ID:         h.store.NewID(store.KindRun),
 		WorkflowID: wfID,
 		Name:       "workflow_dispatch",
 		HeadBranch: req.Ref,

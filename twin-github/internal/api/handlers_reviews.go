@@ -54,7 +54,7 @@ func (h *Handler) CreatePRReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	review := store.PRReview{
-		ID:          h.store.NextID(),
+		ID:          h.store.NewID(store.KindReview),
 		User:        store.User{ID: 1, Login: "twin-bot", Type: "User"},
 		Body:        req.Body,
 		State:       state,
@@ -147,7 +147,7 @@ func (h *Handler) CreatePRReviewComment(w http.ResponseWriter, r *http.Request) 
 
 	now := h.store.Now()
 	rc := store.PRReviewComment{
-		ID:               h.store.NextID(),
+		ID:               h.store.NewID(store.KindReviewCmt),
 		Body:             req.Body,
 		Path:             req.Path,
 		Position:         req.Position,

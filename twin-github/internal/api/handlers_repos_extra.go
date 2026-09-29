@@ -41,7 +41,7 @@ func (h *Handler) CreateOrgRepo(w http.ResponseWriter, r *http.Request) {
 
 	now := h.store.Now()
 	rp := store.Repository{
-		ID:            h.store.NextID(),
+		ID:            h.store.NewID(store.KindRepo),
 		Name:          req.Name,
 		FullName:      org + "/" + req.Name,
 		Description:   req.Description,

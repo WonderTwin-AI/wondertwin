@@ -17,7 +17,7 @@ func (h *Handler) GetOrg(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Generate a default org
 		org = store.Organization{
-			ID:      h.store.NextID(),
+			ID:      h.store.NewID(store.KindOrg),
 			Login:   orgLogin,
 			Type:    "Organization",
 			HTMLURL: h.store.BaseURL() + "/" + orgLogin,
