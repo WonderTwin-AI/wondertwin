@@ -1,0 +1,134 @@
+{
+  "twin_id": "twin-github",
+  "tier": "community",
+  "vendor_api_version": "2026-03-10",
+  "reviewed_at": "2026-09-28",
+  "divergences": [
+    {
+      "route": "*",
+      "reason": "A request with no X-GitHub-Api-Version header is served as 2026-03-10. GitHub serves it as 2022-11-28.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "*",
+      "reason": "X-GitHub-Api-Version: 2022-11-28 is refused with GitHub's unsupported-version 400. GitHub serves 2022-11-28; it is a later commercial target. Default go-github clients send it and get 400 until they send 2026-03-10.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "*",
+      "reason": "The version header is applied to unauthenticated requests too. GitHub ignores it when there is no token and serves 2022-11-28.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "GET /versions",
+      "reason": "Returns [\"2026-03-10\"]; GitHub returns both supported versions.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "*",
+      "reason": "The unsupported-version 400 names one supported version: '\"2026-03-10\" (most recent).' GitHub's lists both.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Follows from serving one version."
+    },
+    {
+      "route": "*",
+      "reason": "Tokens in GitHub's documented formats (ghp_, github_pat_, gho_, ghu_, ghr_) are accepted without having been issued, as the default user unless seeded to another; anything else is 401 Bad credentials. There is no per-repository access control for authenticated callers.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Community tier: no identity provider."
+    },
+    {
+      "route": "GET /app, GET /app/installations, POST /app/installations/{installation_id}/access_tokens",
+      "reason": "JWT claims (iss, exp) are checked; the RS256 signature is not, because the emulator holds no App public key.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Community tier."
+    },
+    {
+      "route": "POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
+      "reason": "The run is created already completed with conclusion success; nothing executes and runs never progress over time. Workflows are the files under .github/workflows on the default branch, and the workflow_dispatch trigger is detected textually.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "POST /repos/{owner}/{repo}/hooks",
+      "reason": "Deliveries are sent for issues, pull_request, push, check_run and ping only. There is no redelivery route. The User-Agent is GitHub-Hookshot/emulator.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "*",
+      "reason": "API URLs in responses and Link headers use the origin the client called (the emulator); html_url and other browser links keep https://github.com.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Keeps every link an SDK follows on the emulator."
+    },
+    {
+      "route": "*",
+      "reason": "Rate-limit headers and GET /rate_limit report GitHub's limits (60 unauthenticated, 5,000 with a token) but nothing is counted or enforced.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Community tier."
+    },
+    {
+      "route": "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge",
+      "reason": "Conflicts are detected per file (a file changed differently on both sides conflicts); additions and deletions count whole files, not diff hunks.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "No line-level diff engine."
+    },
+    {
+      "route": "GET /search/*",
+      "reason": "The existing search handlers are thin and out of the MVP; search is deferred.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Operator decision, 2026-09-28 (recorded in the private research repository)."
+    },
+    {
+      "route": "/admin/*",
+      "reason": "Emulator-only operator routes (reset, state, time, faults, webhooks/flush, health and repository inspection). GitHub has no equivalent.",
+      "references": {
+        "openapi": "github/rest-api-description@2f44eacae7f376f1ed158829fbe008cc4eae5815 descriptions/api.github.com/api.github.com.2026-03-10.json",
+        "api_version": "2026-03-10"
+      },
+      "operator_note": "Test affordance."
+    }
+  ]
+}
