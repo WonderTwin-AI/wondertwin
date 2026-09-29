@@ -20,7 +20,7 @@ func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListUserReposByUsername(w http.ResponseWriter, r *http.Request) {
 	username := param(r, "username")
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Owner.Login == username && (!rp.Private || viewer(r) == username)
+		return rp.Owner.Login == username && (!rp.Private || viewer(r) == username) && !hiddenFrom(r, rp)
 	})
 	h.writeRepos(w, r, repos)
 }
@@ -221,4 +221,9 @@ func (h *Handler) writeRepos(w http.ResponseWriter, r *http.Request, repos []sto
 		out = append(out, x.repo(rp, viewer(r)))
 	}
 	ghJSON(w, 200, out)
+}
+
+// hiddenFrom reports whether rp is private and the caller is anonymous.
+func hiddenFrom(r *http.Request, rp store.Repository) bool {
+	return rp.Private && principalFrom(r).Kind == principalAnonymous
 }

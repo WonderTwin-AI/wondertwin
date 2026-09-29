@@ -35,7 +35,7 @@ func (h *Handler) ListOrgMembers(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListOrgRepos(w http.ResponseWriter, r *http.Request) {
 	orgLogin := param(r, "org")
 	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Owner.Login == orgLogin
+		return rp.Owner.Login == orgLogin && !hiddenFrom(r, rp)
 	})
 	h.writeRepos(w, r, repos)
 }

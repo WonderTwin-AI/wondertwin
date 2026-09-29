@@ -1200,6 +1200,32 @@ func TestSearchIssues(t *testing.T) {
 	}
 }
 
+func TestAnonymousListingsHidePrivateRepos(t *testing.T) {
+	_, tc := setupGitHub(t)
+	ghPost(tc, "/user/repos", map[string]any{"name": "secret-repo", "private": true}).AssertStatus(201)
+	ghPost(tc, "/user/repos", map[string]any{"name": "open-repo"}).AssertStatus(201)
+	ghPost(tc, "/orgs/acme/repos", map[string]any{"name": "secret-repo", "private": true}).AssertStatus(201)
+	ghPost(tc, "/repos/twin-bot/secret-repo/issues", map[string]any{"title": "hidden issue"}).AssertStatus(201)
+
+	anon := map[string]string{"Accept": "application/vnd.github+json"}
+	for _, path := range []string{"/users/twin-bot/repos", "/orgs/acme/repos", "/search/repositories", "/search/issues"} {
+		resp := tc.DoWithHeaders("GET", path, nil, anon)
+		resp.AssertStatus(200)
+		body := string(resp.Body)
+		if strings.Contains(body, "secret-repo") {
+			t.Errorf("%s leaked private repo to anonymous caller", path)
+		}
+	}
+	anonRepos := tc.DoWithHeaders("GET", "/search/repositories", nil, anon)
+	if !strings.Contains(string(anonRepos.Body), "open-repo") {
+		t.Error("public repo missing from anonymous search")
+	}
+	authed := ghGet(tc, "/search/repositories")
+	if !strings.Contains(string(authed.Body), "secret-repo") {
+		t.Error("authenticated search should include private repo")
+	}
+}
+
 // --- Fork Tests ---
 
 func TestCreateFork(t *testing.T) {

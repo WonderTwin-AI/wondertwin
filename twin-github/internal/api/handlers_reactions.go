@@ -117,7 +117,10 @@ func (h *Handler) SearchIssues(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	_ = q // Search is simplified — return all issues
 
-	issues := h.store.Issues.List()
+	issues := h.store.Issues.Filter(func(_ string, is store.Issue) bool {
+		rp, ok := h.store.GetRepo(is.RepoOwner, is.RepoName)
+		return !ok || !hiddenFrom(r, *rp)
+	})
 	ghJSON(w, 200, map[string]any{
 		"total_count":        len(issues),
 		"incomplete_results": false,
@@ -127,7 +130,9 @@ func (h *Handler) SearchIssues(w http.ResponseWriter, r *http.Request) {
 
 // SearchRepos handles GET /search/repositories
 func (h *Handler) SearchRepos(w http.ResponseWriter, r *http.Request) {
-	repos := h.store.Repos.List()
+	repos := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
+		return !hiddenFrom(r, rp)
+	})
 	ghJSON(w, 200, map[string]any{
 		"total_count":        len(repos),
 		"incomplete_results": false,
