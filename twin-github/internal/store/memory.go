@@ -260,6 +260,13 @@ type stateSnapshot struct {
 	GitRefs       map[string]GitRef       `json:"git_refs,omitempty"`
 	Apps          map[string]App          `json:"apps,omitempty"`
 	Installations map[string]Installation `json:"installations,omitempty"`
+	Workflows     map[string]Workflow     `json:"workflows,omitempty"`
+	WorkflowRuns  map[string]WorkflowRun  `json:"workflow_runs,omitempty"`
+	CheckRuns     map[string]CheckRun     `json:"check_runs,omitempty"`
+	CheckSuites   map[string]CheckSuite   `json:"check_suites,omitempty"`
+	PRReviews     map[string]PRReview     `json:"pr_reviews,omitempty"`
+	ReleaseAssets map[string]ReleaseAsset `json:"release_assets,omitempty"`
+	Orgs          map[string]Organization `json:"orgs,omitempty"`
 }
 
 func (s *MemoryStore) Snapshot() any {
@@ -281,6 +288,13 @@ func (s *MemoryStore) Snapshot() any {
 		GitRefs:       s.GitRefs.Snapshot(),
 		Apps:          s.Apps.Snapshot(),
 		Installations: s.Installations.Snapshot(),
+		Workflows:     s.Workflows.Snapshot(),
+		WorkflowRuns:  s.WorkflowRuns.Snapshot(),
+		CheckRuns:     s.CheckRuns.Snapshot(),
+		CheckSuites:   s.CheckSuites.Snapshot(),
+		PRReviews:     s.PRReviews.Snapshot(),
+		ReleaseAssets: s.ReleaseAssets.Snapshot(),
+		Orgs:          s.Orgs.Snapshot(),
 	}
 }
 
@@ -340,6 +354,27 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Installations != nil {
 		s.Installations.LoadSnapshot(snap.Installations)
 	}
+	if snap.Workflows != nil {
+		s.Workflows.LoadSnapshot(snap.Workflows)
+	}
+	if snap.WorkflowRuns != nil {
+		s.WorkflowRuns.LoadSnapshot(snap.WorkflowRuns)
+	}
+	if snap.CheckRuns != nil {
+		s.CheckRuns.LoadSnapshot(snap.CheckRuns)
+	}
+	if snap.CheckSuites != nil {
+		s.CheckSuites.LoadSnapshot(snap.CheckSuites)
+	}
+	if snap.PRReviews != nil {
+		s.PRReviews.LoadSnapshot(snap.PRReviews)
+	}
+	if snap.ReleaseAssets != nil {
+		s.ReleaseAssets.LoadSnapshot(snap.ReleaseAssets)
+	}
+	if snap.Orgs != nil {
+		s.Orgs.LoadSnapshot(snap.Orgs)
+	}
 	s.observeLoaded()
 	s.seedDefaults()
 	return nil
@@ -384,6 +419,27 @@ func (s *MemoryStore) observeLoaded() {
 	}
 	for _, i := range s.Installations.List() {
 		s.ids.observe(KindInstallation, i.ID)
+	}
+	for _, wf := range s.Workflows.List() {
+		s.ids.observe(KindWorkflow, wf.ID)
+	}
+	for _, run := range s.WorkflowRuns.List() {
+		s.ids.observe(KindRun, run.ID)
+	}
+	for _, cr := range s.CheckRuns.List() {
+		s.ids.observe(KindCheckRun, cr.ID)
+	}
+	for _, cs := range s.CheckSuites.List() {
+		s.ids.observe(KindCheckSuite, cs.ID)
+	}
+	for _, rv := range s.PRReviews.List() {
+		s.ids.observe(KindReview, rv.ID)
+	}
+	for _, a := range s.ReleaseAssets.List() {
+		s.ids.observe(KindAsset, a.ID)
+	}
+	for _, o := range s.Orgs.List() {
+		s.ids.observe(KindOrg, o.ID)
 	}
 }
 
