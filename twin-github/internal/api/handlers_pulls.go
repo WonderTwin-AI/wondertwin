@@ -702,6 +702,3 @@ func (h *Handler) DismissPRReview(w http.ResponseWriter, r *http.Request) {
 	h.store.PRReviews.Set(id, rv)
 	ghJSON(w, 200, h.rd(r).review(rv))
 }
-
-// onPull is where webhook delivery attaches to pull request changes.
-func (h *Handler) onPull(_ *http.Request, _ string, _ store.PullRequest) {}

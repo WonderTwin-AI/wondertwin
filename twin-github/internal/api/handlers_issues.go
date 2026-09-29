@@ -726,6 +726,3 @@ func (h *Handler) RemoveIssueLabel(w http.ResponseWriter, r *http.Request) {
 	set(kept)
 	ghJSON(w, 200, h.rd(r).labels(owner, repo, kept))
 }
-
-// onIssue is where webhook delivery attaches to issue changes.
-func (h *Handler) onIssue(_ *http.Request, _ string, _ store.Issue) {}

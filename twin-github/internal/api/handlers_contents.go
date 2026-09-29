@@ -200,6 +200,10 @@ func (h *Handler) CreateOrUpdateContents(w http.ResponseWriter, r *http.Request)
 	}
 
 	status := 201
+	before := zeroSHA
+	if b, found := h.store.GetBranch(owner, repo, branch); found {
+		before = b.Commit.SHA
+	}
 	if head, found := h.store.ResolveRef(owner, repo, branch); found {
 		if cur, exists := head.Files[path]; exists {
 			if req.SHA == "" {
@@ -224,6 +228,7 @@ func (h *Handler) CreateOrUpdateContents(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.touchRepo(owner, repo)
+	h.onRefUpdated(r, owner, repo, "refs/heads/"+branch, before, c.SHA, false)
 
 	x := h.rd(r)
 	content := x.contentEntry(owner, repo, branch, path, "file", c.Files[path], len(decoded))
@@ -267,6 +272,7 @@ func (h *Handler) DeleteContents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.touchRepo(owner, repo)
+	h.onRefUpdated(r, owner, repo, "refs/heads/"+branch, head.SHA, c.SHA, false)
 	ghJSON(w, 200, map[string]any{"content": nil, "commit": h.rd(r).gitCommit(c)})
 }
 

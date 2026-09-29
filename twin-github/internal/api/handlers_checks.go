@@ -597,6 +597,3 @@ func (h *Handler) ListCheckSuitesForRef(w http.ResponseWriter, r *http.Request) 
 	}
 	ghJSON(w, 200, map[string]any{"total_count": len(suites), "check_suites": out})
 }
-
-// onCheckRun is where webhook delivery attaches to check-run changes.
-func (h *Handler) onCheckRun(_ *http.Request, _ string, _ store.CheckRun) {}

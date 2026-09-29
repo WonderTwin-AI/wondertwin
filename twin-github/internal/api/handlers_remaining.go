@@ -98,21 +98,6 @@ func (h *Handler) DownloadZipball(w http.ResponseWriter, r *http.Request) {
 
 // --- Webhooks extra ---
 
-// PingWebhook handles POST /repos/{owner}/{repo}/hooks/{hook_id}/pings
-func (h *Handler) PingWebhook(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(204)
-}
-
-// TestWebhook handles POST /repos/{owner}/{repo}/hooks/{hook_id}/tests
-func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(204)
-}
-
-// ListWebhookDeliveries handles GET /repos/{owner}/{repo}/hooks/{hook_id}/deliveries
-func (h *Handler) ListWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
-	ghJSON(w, 200, []any{})
-}
-
 // --- Orgs extra ---
 
 // UpdateOrg handles PATCH /orgs/{org}

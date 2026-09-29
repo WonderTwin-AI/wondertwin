@@ -48,6 +48,7 @@ type MemoryStore struct {
 	Blobs            *pkgstate.Store[Blob]
 	Apps             *pkgstate.Store[App]
 	Installations    *pkgstate.Store[Installation]
+	HookDeliveries   *pkgstate.Store[HookDelivery]
 	Clock            *pkgstate.Clock
 
 	ids        *idAllocator
@@ -94,6 +95,7 @@ func New() *MemoryStore {
 		Blobs:            pkgstate.New[Blob]("blob"),
 		Apps:             pkgstate.New[App]("app"),
 		Installations:    pkgstate.New[Installation]("installation"),
+		HookDeliveries:   pkgstate.New[HookDelivery]("delivery"),
 		Clock:            pkgstate.NewClock(),
 		ids:              newIDAllocator(),
 	}
@@ -544,6 +546,7 @@ func (s *MemoryStore) Reset() {
 	s.Blobs.Reset()
 	s.Apps.Reset()
 	s.Installations.Reset()
+	s.HookDeliveries.Reset()
 	s.Clock.Reset()
 	s.ids.reset()
 	s.runCounter.Store(0)

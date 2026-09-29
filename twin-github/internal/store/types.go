@@ -172,9 +172,35 @@ type Webhook struct {
 	Config    WebhookConfig `json:"config"`
 	CreatedAt string        `json:"created_at"`
 	UpdatedAt string        `json:"updated_at"`
+	// LastResponse is the outcome of the most recent delivery.
+	LastResponse *HookResponse `json:"last_response,omitempty"`
 
-	RepoOwner string `json:"-"`
-	RepoName  string `json:"-"`
+	RepoOwner string `json:"repo_owner"`
+	RepoName  string `json:"repo_name"`
+}
+
+// HookResponse summarises a delivery attempt.
+type HookResponse struct {
+	Code    int    `json:"code"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+// HookDelivery records one webhook delivery.
+type HookDelivery struct {
+	ID             int64             `json:"id"`
+	GUID           string            `json:"guid"`
+	HookID         int64             `json:"hook_id"`
+	DeliveredAt    string            `json:"delivered_at"`
+	Duration       float64           `json:"duration"`
+	Status         string            `json:"status"`
+	StatusCode     int               `json:"status_code"`
+	Event          string            `json:"event"`
+	Action         string            `json:"action,omitempty"`
+	InstallationID int64             `json:"installation_id,omitempty"`
+	RepositoryID   int64             `json:"repository_id,omitempty"`
+	RequestHeaders map[string]string `json:"request_headers,omitempty"`
+	RequestBody    string            `json:"request_body,omitempty"`
 }
 
 // WebhookConfig holds webhook delivery configuration.

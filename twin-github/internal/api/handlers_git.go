@@ -410,11 +410,3 @@ func (h *Handler) CreateGitTag(w http.ResponseWriter, r *http.Request) {
 	h.store.GitTags.Set(id, gt)
 	ghJSON(w, 201, gt)
 }
-
-// onRefCreated and onRefUpdated are the hooks later layers (webhook
-// delivery) attach to; a new or moved branch is a push.
-func (h *Handler) onRefCreated(r *http.Request, owner, repo, ref, sha string) {
-	h.onRefUpdated(r, owner, repo, ref, "0000000000000000000000000000000000000000", sha, false)
-}
-
-func (h *Handler) onRefUpdated(_ *http.Request, _, _, _, _, _ string, _ bool) {}

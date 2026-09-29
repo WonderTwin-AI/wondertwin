@@ -11,11 +11,14 @@ import (
 type Handler struct {
 	store *store.MemoryStore
 	mw    *twincore.Middleware
+	hooks *hookBus
 }
 
 // NewHandler creates a new GitHub API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw}
+	h.hooks = newHookBus(h)
+	return h
 }
 
 // Routes mounts the GitHub REST API-compatible routes.

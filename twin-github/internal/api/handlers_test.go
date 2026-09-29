@@ -1,11 +1,17 @@
 package api_test
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +30,7 @@ func setupGitHub(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	handler := api.NewHandler(memStore, twin.Middleware())
 	handler.Routes(twin.Router)
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler.SetFlusher(handler)
 	adminHandler.Routes(twin.Router)
 	srv := httptest.NewServer(twin.Router)
 	t.Cleanup(srv.Close)
@@ -786,28 +793,155 @@ func TestReleasePublishAndLatest(t *testing.T) {
 
 // --- Webhook Tests ---
 
+// hookReceiver records the webhook deliveries it is sent.
+type hookReceiver struct {
+	mu   sync.Mutex
+	got  []*http.Request
+	body [][]byte
+	srv  *httptest.Server
+}
+
+func newHookReceiver(t *testing.T, status int) *hookReceiver {
+	hr := &hookReceiver{}
+	hr.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		hr.mu.Lock()
+		hr.got = append(hr.got, r)
+		hr.body = append(hr.body, b)
+		hr.mu.Unlock()
+		w.WriteHeader(status)
+	}))
+	t.Cleanup(hr.srv.Close)
+	return hr
+}
+
+func (hr *hookReceiver) events() []string {
+	hr.mu.Lock()
+	defer hr.mu.Unlock()
+	var out []string
+	for i, r := range hr.got {
+		var p map[string]any
+		_ = json.Unmarshal(hr.body[i], &p)
+		e := r.Header.Get("X-GitHub-Event")
+		if a, ok := p["action"].(string); ok {
+			e += "." + a
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
 func TestWebhooks(t *testing.T) {
 	_, tc := setupGitHub(t)
 	createRepo(tc, "hook-repo")
+	recv := newHookReceiver(t, 200)
 
+	ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{"config": map[string]any{}}).AssertStatus(422)
 	resp := ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{
-		"events": []string{"push", "pull_request"},
-		"config": map[string]any{
-			"url":          "https://example.com/webhook",
-			"content_type": "json",
-		},
+		"events": []string{"issues", "push"},
+		"config": map[string]any{"url": recv.srv.URL, "content_type": "json", "secret": "It's a Secret to Everybody"},
 	})
 	resp.AssertStatus(201)
-	hookID := int(resp.JSONMap()["id"].(float64))
+	hook := resp.JSONMap()
+	assertRequired(t, "hook", hook)
+	if hook["config"].(map[string]any)["secret"] != "********" {
+		t.Error("the secret is never echoed back")
+	}
+	hookID := int64(hook["id"].(float64))
 
-	resp = ghGet(tc, "/repos/twin-bot/hook-repo/hooks")
-	var hooks []map[string]any
-	json.Unmarshal(resp.Body, &hooks)
-	if len(hooks) != 1 {
-		t.Errorf("expected 1 webhook, got %d", len(hooks))
+	ghPost(tc, "/repos/twin-bot/hook-repo/issues", map[string]any{"title": "hooked"}).AssertStatus(201)
+	ghPut(tc, "/repos/twin-bot/hook-repo/contents/a.txt", map[string]any{"message": "a", "content": "YQo="}).AssertStatus(201)
+	testutil.NewAdminClient(tc).FlushWebhooks().AssertStatus(200)
+
+	if got := strings.Join(recv.events(), ","); got != "ping,issues.opened,push" {
+		t.Fatalf("expected ping, issues.opened and push in order, got %s", got)
+	}
+	recv.mu.Lock()
+	req, body := recv.got[1], recv.body[1]
+	pushBody := recv.body[2]
+	recv.mu.Unlock()
+
+	// X-Hub-Signature-256 is GitHub's HMAC-SHA256 of the exact body.
+	mac := hmac.New(sha256.New, []byte("It's a Secret to Everybody"))
+	mac.Write(body)
+	if want := "sha256=" + hex.EncodeToString(mac.Sum(nil)); req.Header.Get("X-Hub-Signature-256") != want {
+		t.Errorf("signature %q, want %q", req.Header.Get("X-Hub-Signature-256"), want)
+	}
+	for _, hdr := range []string{"X-GitHub-Delivery", "X-GitHub-Hook-ID", "X-GitHub-Hook-Installation-Target-ID", "X-Hub-Signature"} {
+		if req.Header.Get(hdr) == "" {
+			t.Errorf("missing %s", hdr)
+		}
+	}
+	if !strings.HasPrefix(req.Header.Get("User-Agent"), "GitHub-Hookshot/") || req.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("unexpected agent or content type: %q %q", req.Header.Get("User-Agent"), req.Header.Get("Content-Type"))
+	}
+	var issuePayload map[string]any
+	_ = json.Unmarshal(body, &issuePayload)
+	for _, k := range []string{"action", "issue", "repository", "sender"} {
+		if issuePayload[k] == nil {
+			t.Errorf("issues payload lacks %s", k)
+		}
+	}
+	var push map[string]any
+	_ = json.Unmarshal(pushBody, &push)
+	if push["ref"] != "refs/heads/main" || len(push["commits"].([]any)) != 1 || push["head_commit"] == nil {
+		t.Errorf("unexpected push payload %v", push)
 	}
 
+	var deliveries []map[string]any
+	ghGet(tc, fmt.Sprintf("/repos/twin-bot/hook-repo/hooks/%d/deliveries", hookID)).AssertStatus(200).JSON(&deliveries)
+	if len(deliveries) != 3 || deliveries[0]["event"] != "push" || deliveries[0]["status_code"].(float64) != 200 {
+		t.Errorf("deliveries are listed newest first, got %v", deliveries)
+	}
+	assertRequired(t, "hook-delivery-item", deliveries[0])
+
 	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/hook-repo/hooks/%d", hookID)).AssertStatus(204)
+}
+
+func TestWebhookFailureIsNotRetried(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "hook-fail")
+	recv := newHookReceiver(t, 500)
+	hook := ghPost(tc, "/repos/twin-bot/hook-fail/hooks", map[string]any{
+		"events": []string{"issues"}, "config": map[string]any{"url": recv.srv.URL, "content_type": "form"},
+	}).AssertStatus(201).JSONMap()
+	testutil.NewAdminClient(tc).FlushWebhooks().AssertStatus(200)
+
+	if n := len(recv.events()); n != 1 {
+		t.Errorf("GitHub does not retry a failed delivery; expected 1 attempt, got %d", n)
+	}
+	recv.mu.Lock()
+	form := string(recv.body[0])
+	ctype := recv.got[0].Header.Get("Content-Type")
+	recv.mu.Unlock()
+	if !strings.HasPrefix(form, "payload=") || ctype != "application/x-www-form-urlencoded" {
+		t.Errorf("content_type form sends payload=<json>, got %q as %q", form[:min(20, len(form))], ctype)
+	}
+	got := ghGet(tc, fmt.Sprintf("/repos/twin-bot/hook-fail/hooks/%d", int64(hook["id"].(float64)))).JSONMap()
+	if lr := got["last_response"].(map[string]any); lr["code"].(float64) != 500 || lr["status"] != "failed" {
+		t.Errorf("last_response should record the failure, got %v", lr)
+	}
+}
+
+func TestPullRequestAndCheckRunEvents(t *testing.T) {
+	_, tc := setupGitHub(t)
+	createRepo(tc, "hook-events")
+	recv := newHookReceiver(t, 200)
+	ghPost(tc, "/repos/twin-bot/hook-events/hooks", map[string]any{
+		"events": []string{"pull_request", "check_run"}, "config": map[string]any{"url": recv.srv.URL, "content_type": "json"},
+	}).AssertStatus(201)
+
+	num := openPR(t, tc, "hook-events", "Evented")
+	app := bearer(installationToken(t, tc))
+	sha := ghGet(tc, fmt.Sprintf("/repos/twin-bot/hook-events/pulls/%d", num)).JSONMap()["head"].(map[string]any)["sha"]
+	tc.DoWithHeaders("POST", "/repos/twin-bot/hook-events/check-runs", map[string]any{"name": "ci", "head_sha": sha, "conclusion": "success"}, app).AssertStatus(201)
+	ghPut(tc, fmt.Sprintf("/repos/twin-bot/hook-events/pulls/%d/merge", num), nil).AssertStatus(200)
+	testutil.NewAdminClient(tc).FlushWebhooks().AssertStatus(200)
+
+	want := "ping,pull_request.opened,check_run.created,check_run.completed,pull_request.closed"
+	if got := strings.Join(recv.events(), ","); got != want {
+		t.Errorf("events = %s, want %s", got, want)
+	}
 }
 
 // --- Milestone Tests ---
