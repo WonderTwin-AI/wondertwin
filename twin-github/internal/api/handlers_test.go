@@ -1239,6 +1239,23 @@ func TestCreateFork(t *testing.T) {
 	}
 }
 
+func TestAnonymousForkListHidesPrivateForks(t *testing.T) {
+	_, tc := setupGitHub(t)
+	ghPost(tc, "/orgs/acme/repos", map[string]any{"name": "shared"}).AssertStatus(201)
+	ghPost(tc, "/repos/acme/shared/forks", nil).AssertStatus(202)
+	ghPatch(tc, "/repos/twin-bot/shared", map[string]any{"private": true}).AssertStatus(200)
+
+	anon := map[string]string{"Accept": "application/vnd.github+json"}
+	resp := tc.DoWithHeaders("GET", "/repos/acme/shared/forks", nil, anon)
+	resp.AssertStatus(200)
+	if strings.Contains(string(resp.Body), "twin-bot") {
+		t.Error("anonymous fork list leaked a private fork")
+	}
+	if !strings.Contains(string(ghGet(tc, "/repos/acme/shared/forks").Body), "twin-bot") {
+		t.Error("authenticated fork list should include the private fork")
+	}
+}
+
 // --- Actions Workflow Tests ---
 
 func commitWorkflow(tc *testutil.TwinClient, repo, file, yaml string) {

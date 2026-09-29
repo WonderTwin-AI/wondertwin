@@ -76,7 +76,7 @@ func (h *Handler) ListForks(w http.ResponseWriter, r *http.Request) {
 	owner := param(r, "owner")
 	repo := param(r, "repo")
 	forks := h.store.Repos.Filter(func(_ string, rp store.Repository) bool {
-		return rp.Fork && rp.Name == repo && rp.Owner.Login != owner
+		return rp.Fork && rp.Name == repo && rp.Owner.Login != owner && !hiddenFrom(r, rp)
 	})
 	ghJSON(w, 200, paginate(w, r, forks))
 }
