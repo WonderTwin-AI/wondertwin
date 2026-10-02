@@ -484,12 +484,17 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 		Members:    members,
 		NumMembers: len(members),
 	}
-	if len(members) == 2 {
+	if len(members) <= 2 {
 		// A direct message has a D id and names the other user, as Slack's
-		// IM objects do.
+		// IM objects do; a message to oneself names the caller.
 		ch.ID = "D" + strings.TrimPrefix(id, "C")
 		ch.IsIM = true
-		ch.User = users[0]
+		ch.User = caller
+		for _, m := range members {
+			if m != caller {
+				ch.User = m
+			}
+		}
 	} else {
 		ch.ID = id
 		ch.IsMPIM = true

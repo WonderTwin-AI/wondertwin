@@ -63,6 +63,23 @@ func TestConversationsOpenResumesTheSameDM(t *testing.T) {
 	}
 }
 
+func TestConversationsOpenDMUserIsTheOtherMember(t *testing.T) {
+	srv, _ := setupSlack(t)
+	seedUsers(t, srv, twoUsers)
+
+	self := open(t, srv, url.Values{"users": {"U_BOT"}, "return_im": {"true"}})
+	ch, _ := self["channel"].(map[string]any)
+	if ch["is_im"] != true || ch["is_mpim"] == true || ch["user"] != "U_BOT" || !strings.HasPrefix(ch["id"].(string), "D") {
+		t.Errorf("naming only the caller opens an IM with the caller: %v", self)
+	}
+
+	named := open(t, srv, url.Values{"users": {"U_BOT,U1"}, "return_im": {"true"}})
+	ch, _ = named["channel"].(map[string]any)
+	if ch["is_im"] != true || ch["user"] != "U1" {
+		t.Errorf("the IM names the member who is not the caller: %v", named)
+	}
+}
+
 func TestConversationsOpenMultiPerson(t *testing.T) {
 	srv, _ := setupSlack(t)
 	seedUsers(t, srv, twoUsers)
