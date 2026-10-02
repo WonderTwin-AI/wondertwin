@@ -3,16 +3,29 @@ package api
 import (
 	"net/http"
 	"strings"
+
+	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
 
 // UsersList handles POST /api/users.list
 func (h *Handler) UsersList(w http.ResponseWriter, r *http.Request) {
-	users := h.store.Users.List()
+	var req struct {
+		Cursor string `json:"cursor"`
+		Limit  int    `json:"limit"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	users, next, err := pageOf(h.store.Users.List(), func(u store.User) string { return u.ID },
+		pageUsersList, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
 	slackOK(w, map[string]any{
-		"members": users,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"members":           users,
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 
@@ -55,31 +68,39 @@ func (h *Handler) UsersLookupByEmail(w http.ResponseWriter, r *http.Request) {
 // UsersConversations handles POST /api/users.conversations
 func (h *Handler) UsersConversations(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		User string `json:"user"`
+		User   string `json:"user"`
+		Cursor string `json:"cursor"`
+		Limit  int    `json:"limit"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	userID := req.User
 	if userID == "" {
 		userID = "U_BOT"
 	}
 
-	channels := h.store.Channels.List()
-	var result []any
-	for _, ch := range channels {
+	var member []store.Channel
+	for _, ch := range h.store.Channels.List() {
 		for _, m := range ch.Members {
 			if m == userID {
-				result = append(result, ch)
+				member = append(member, ch)
 				break
 			}
 		}
 	}
 
+	channels, next, err := pageOf(member, func(c store.Channel) string { return c.ID },
+		pageUsersConversations, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
 	slackOK(w, map[string]any{
-		"channels": result,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"channels":          channels,
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 

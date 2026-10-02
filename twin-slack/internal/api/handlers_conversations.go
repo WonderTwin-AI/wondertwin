@@ -8,12 +8,23 @@ import (
 
 // ConversationsList handles POST /api/conversations.list
 func (h *Handler) ConversationsList(w http.ResponseWriter, r *http.Request) {
-	channels := h.store.Channels.List()
+	var req struct {
+		Cursor string `json:"cursor"`
+		Limit  int    `json:"limit"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	channels, next, err := pageOf(h.store.Channels.List(), func(c store.Channel) string { return c.ID },
+		pageConversationsList, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
 	slackOK(w, map[string]any{
-		"channels": channels,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"channels":          channels,
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 
@@ -40,7 +51,8 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
-		Limit   int    `json:"limit,omitempty"`
+		Cursor  string `json:"cursor"`
+		Limit   int    `json:"limit"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -51,18 +63,16 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 100
+	messages, next, err := pageOf(h.store.GetChannelMessages(req.Channel, 0), func(m store.Message) string { return m.TS },
+		pageConversationsHistory, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
 	}
-
-	messages := h.store.GetChannelMessages(req.Channel, limit)
 	slackOK(w, map[string]any{
-		"messages": messages,
-		"has_more": false,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"messages":          messages,
+		"has_more":          next != "",
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 
@@ -71,22 +81,24 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
 		TS      string `json:"ts"`
-		Limit   int    `json:"limit,omitempty"`
+		Cursor  string `json:"cursor"`
+		Limit   int    `json:"limit"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
 
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 100
+	replies, next, err := pageOf(h.store.GetThreadReplies(req.Channel, req.TS, 0), func(m store.Message) string { return m.TS },
+		pageConversationsReplies, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
 	}
-
-	replies := h.store.GetThreadReplies(req.Channel, req.TS, limit)
 	slackOK(w, map[string]any{
-		"messages": replies,
-		"has_more": false,
+		"messages":          replies,
+		"has_more":          next != "",
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 
@@ -94,6 +106,8 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ConversationsMembers(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
+		Cursor  string `json:"cursor"`
+		Limit   int    `json:"limit"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -106,11 +120,15 @@ func (h *Handler) ConversationsMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	members, next, err := pageOf(ch.Members, func(id string) string { return id },
+		pageConversationsMembers, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
 	slackOK(w, map[string]any{
-		"members": ch.Members,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"members":           members,
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 
