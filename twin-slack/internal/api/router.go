@@ -32,12 +32,15 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
 		r.NotFound(unknownMethod)
-		// api.test answers without a token, so it sits outside the group that
-		// authenticates.
+		// api.test and oauth.v2.access answer without a token, so they sit
+		// outside the group that authenticates.
 		r.Group(func(r chi.Router) {
 			r.Use(argsMiddleware)
 			r.Use(argsErrorMiddleware)
 			route(r, "api.test", h.APITest)
+			// oauth.v2.access is how an app gets its first token, so it is
+			// called without one; the client credentials authenticate it.
+			route(r, "oauth.v2.access", h.OAuthV2Access)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(argsMiddleware)
@@ -172,9 +175,6 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "stars.add", h.StarsAdd)
 			route(r, "stars.remove", h.StarsRemove)
 			route(r, "stars.list", h.StarsList)
-
-			// oauth.*
-			route(r, "oauth.v2.access", h.OAuthV2Access)
 
 			// dialog.*
 			route(r, "dialog.open", h.DialogOpen)
