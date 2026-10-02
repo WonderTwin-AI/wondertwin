@@ -97,7 +97,7 @@
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Not in the approved MVP (research/twins/slack/mvp.md). No operator decision is recorded yet.",
+      "operator_note": "Operator decision, 2026-10-02: rate limits are not simulated in the community app emulator; simulating them likely belongs to the commercial emulator. This is a decision for Slack, not a standing rule for other app emulators.",
       "quirk_ids": [
         "ratelimit-001",
         "error-001"
