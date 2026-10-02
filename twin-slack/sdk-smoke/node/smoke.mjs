@@ -63,6 +63,17 @@ const cases = {
 
   async 'slack-read-history-paginated'() {
     const channel = await newChannel();
+    // Find the channel the way an app does: page through conversations.list,
+    // which lists public channels and no direct messages by default. A DM
+    // exists, so the default list has one to leave out.
+    const {user_id} = await web.auth.test();
+    await web.conversations.open({users: user_id});
+    const listed = [];
+    for await (const page of web.paginate('conversations.list', {limit: 200})) {
+      listed.push(...page.channels);
+    }
+    assert.ok(listed.some((c) => c.id === channel), 'conversations.list finds the channel');
+    assert.ok(listed.every((c) => !c.is_im && !c.is_mpim), 'no direct messages in the default list');
     for (let i = 1; i <= 5; i++) {
       await web.chat.postMessage({channel, text: `m${i}`});
     }
