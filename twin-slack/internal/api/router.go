@@ -181,6 +181,10 @@ func (h *Handler) Routes(r chi.Router) {
 		})
 	})
 
+	// The upload step of the external file upload. It lives outside /api,
+	// as it does on Slack's upload host, and the URL itself is the credential.
+	r.Post(uploadPath+"{fileID}", h.UploadFileBytes)
+
 	// Admin extras (no auth required)
 	r.Get("/admin/messages", h.AdminListMessages)
 	r.Get("/admin/channels", h.AdminListChannels)

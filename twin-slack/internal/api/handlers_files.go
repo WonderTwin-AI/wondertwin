@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -29,8 +31,10 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 	}
 	h.store.Files.Set(id, file)
 
+	// Slack hands out a URL on its upload host. The emulator serves that step
+	// itself, so the URL points back at whichever host the client called.
 	slackOK(w, map[string]any{
-		"upload_url": fmt.Sprintf("https://files.slack.com/upload/v1/%s", id),
+		"upload_url": origin(r) + uploadPath + id,
 		"file_id":    id,
 	})
 }
@@ -43,13 +47,33 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 			Title string `json:"title,omitempty"`
 		} `json:"files"`
 		ChannelID string `json:"channel_id,omitempty"`
+		Channels  string `json:"channels,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
 
-	var files []store.File
+	var share []string
+	if req.ChannelID != "" {
+		if _, ok := h.store.Channels.Get(req.ChannelID); !ok {
+			slackError(w, "channel_not_found")
+			return
+		}
+		share = append(share, req.ChannelID)
+	}
+	for _, c := range strings.Split(req.Channels, ",") {
+		if c = strings.TrimSpace(c); c == "" {
+			continue
+		}
+		if _, ok := h.store.Channels.Get(c); !ok {
+			slackError(w, "invalid_channel")
+			return
+		}
+		share = append(share, c)
+	}
+
+	completed := []map[string]any{}
 	for _, f := range req.Files {
 		file, ok := h.store.Files.Get(f.ID)
 		if !ok {
@@ -59,16 +83,18 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		if f.Title != "" {
 			file.Title = f.Title
 		}
-		if req.ChannelID != "" {
-			file.Channels = []string{req.ChannelID}
+		for _, c := range share {
+			if !slices.Contains(file.Channels, c) {
+				file.Channels = append(file.Channels, c)
+			}
 		}
-		file.IsPublic = true
+		file.IsPublic = len(file.Channels) > 0
 		file.Permalink = fmt.Sprintf("https://files.slack.com/%s/%s", h.store.Team.ID, f.ID)
 		h.store.Files.Set(f.ID, file)
-		files = append(files, file)
+		completed = append(completed, map[string]any{"id": file.ID, "title": file.Title})
 	}
 
-	slackOK(w, map[string]any{"files": files})
+	slackOK(w, map[string]any{"files": completed})
 }
 
 // FilesList handles POST /api/files.list
