@@ -142,61 +142,6 @@ func (h *Handler) RemindersList(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"reminders": rms})
 }
 
-// --- views.* (stateful — stores trigger_id → view mapping) ---
-
-func (h *Handler) ViewsOpen(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		TriggerID string `json:"trigger_id"`
-		View      any    `json:"view"`
-	}
-	parseJSON(r, &req)
-	slackOK(w, map[string]any{"view": map[string]any{
-		"id":   "V_" + h.store.Channels.NextID(),
-		"type": "modal",
-	}})
-}
-
-func (h *Handler) ViewsPush(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		TriggerID string `json:"trigger_id"`
-		View      any    `json:"view"`
-	}
-	parseJSON(r, &req)
-	slackOK(w, map[string]any{"view": map[string]any{
-		"id":   "V_" + h.store.Channels.NextID(),
-		"type": "modal",
-	}})
-}
-
-func (h *Handler) ViewsUpdate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ViewID     string `json:"view_id"`
-		ExternalID string `json:"external_id"`
-		View       any    `json:"view"`
-	}
-	parseJSON(r, &req)
-	viewID := req.ViewID
-	if viewID == "" {
-		viewID = req.ExternalID
-	}
-	slackOK(w, map[string]any{"view": map[string]any{
-		"id":   viewID,
-		"type": "modal",
-	}})
-}
-
-func (h *Handler) ViewsPublish(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		UserID string `json:"user_id"`
-		View   any    `json:"view"`
-	}
-	parseJSON(r, &req)
-	slackOK(w, map[string]any{"view": map[string]any{
-		"id":   "V_HOME_" + req.UserID,
-		"type": "home",
-	}})
-}
-
 // --- emoji.* ---
 
 func (h *Handler) EmojiList(w http.ResponseWriter, r *http.Request) {

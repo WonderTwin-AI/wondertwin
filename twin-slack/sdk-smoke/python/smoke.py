@@ -72,6 +72,24 @@ def case_upload_file_external():
     assert info["file"]["size"] == len(content), info["file"].get("size")
 
 
+def case_app_home_publish():
+    # The app publishes a Home tab for the user who opened it. The SDK sends a
+    # JSON body with the view as an object.
+    user_id = WebClient(token="xoxp-sdk-smoke-python-home", base_url=f"{BASE}/api/").auth_test()["user_id"]
+    external_id = f"home-{int(time.time() * 1000):x}"
+    view = {"type": "home", "external_id": external_id, "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": "Welcome"}}]}
+    first = client.views_publish(user_id=user_id, view=view)
+    assert first["ok"] is True
+    assert first["view"]["id"], "the published view has an id"
+    assert first["view"]["type"] == "home"
+    again = client.views_publish(user_id=user_id, view=view, hash=first["view"]["hash"])
+    assert again["view"]["id"] == first["view"]["id"], "a user has one Home view"
+    updated = client.views_update(external_id=external_id, view={**view, "callback_id": "home_v2"})
+    assert updated["view"]["id"] == first["view"]["id"]
+    assert updated["view"]["callback_id"] == "home_v2"
+    assert platform_error(lambda: client.views_publish(user_id=user_id, view=view, hash=first["view"]["hash"])) == "hash_conflict"
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -143,6 +161,7 @@ CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-read-history-paginated": case_read_history_paginated,
     "slack-upload-file-external": case_upload_file_external,
+    "slack-app-home-publish": case_app_home_publish,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,

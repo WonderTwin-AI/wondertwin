@@ -91,6 +91,24 @@ const cases = {
     assert.equal(info.file.size, Buffer.byteLength(content));
   },
 
+  async 'slack-app-home-publish'() {
+    // The app publishes a Home tab for the user who opened it. The SDK sends
+    // the view as JSON text in a form field.
+    const {user_id} = await client('xoxp-sdk-smoke-node-home').auth.test();
+    const external_id = `home-${unique()}`;
+    const view = {type: 'home', external_id, blocks: [{type: 'section', text: {type: 'mrkdwn', text: 'Welcome'}}]};
+    const first = await web.views.publish({user_id, view});
+    assert.equal(first.ok, true);
+    assert.ok(first.view.id, 'the published view has an id');
+    assert.equal(first.view.type, 'home');
+    const again = await web.views.publish({user_id, view, hash: first.view.hash});
+    assert.equal(again.view.id, first.view.id, 'a user has one Home view');
+    const updated = await web.views.update({external_id, view: {...view, callback_id: 'home_v2'}});
+    assert.equal(updated.view.id, first.view.id);
+    assert.equal(updated.view.callback_id, 'home_v2');
+    assert.equal(await platformError(() => web.views.publish({user_id, view, hash: first.view.hash})), 'hash_conflict');
+  },
+
   async 'slack-message-lifecycle'() {
     const channel = await newChannel();
     const posted = await web.chat.postMessage({channel, text: 'draft'});

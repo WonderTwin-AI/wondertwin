@@ -21,6 +21,7 @@ type MemoryStore struct {
 	Usergroups        *pkgstate.Store[Usergroup]
 	Stars             *pkgstate.Store[Star]
 	Tokens            *pkgstate.Store[Token]
+	Views             *pkgstate.Store[ViewRecord]
 	Clock             *pkgstate.Clock
 
 	// Team info (singleton)
@@ -46,6 +47,7 @@ func New() *MemoryStore {
 		Usergroups:        pkgstate.New[Usergroup]("UG"),
 		Stars:             pkgstate.New[Star]("ST"),
 		Tokens:            pkgstate.New[Token]("tok"),
+		Views:             pkgstate.New[ViewRecord]("V"),
 		DndStatuses:       make(map[string]DndStatus),
 		Clock:             pkgstate.NewClock(),
 		Team: Team{
@@ -129,6 +131,21 @@ func (s *MemoryStore) GetUserByEmail(email string) (*User, bool) {
 	return nil, false
 }
 
+// KnownUser reports whether id is a user of the workspace: a stored user, or
+// a user that a token, seeded or default, speaks for.
+func (s *MemoryStore) KnownUser(id string) bool {
+	if id == "" {
+		return false
+	}
+	if _, ok := s.Users.Get(id); ok {
+		return true
+	}
+	if id == DefaultBotUserID || id == DefaultUserID {
+		return true
+	}
+	return len(s.Tokens.Filter(func(_ string, t Token) bool { return t.UserID == id })) > 0
+}
+
 type stateSnapshot struct {
 	Channels          map[string]Channel          `json:"channels,omitempty"`
 	Messages          map[string]Message          `json:"messages,omitempty"`
@@ -141,6 +158,7 @@ type stateSnapshot struct {
 	Reminders         map[string]Reminder         `json:"reminders,omitempty"`
 	Usergroups        map[string]Usergroup        `json:"usergroups,omitempty"`
 	Stars             map[string]Star             `json:"stars,omitempty"`
+	Views             map[string]ViewRecord       `json:"views,omitempty"`
 	DndStatuses       map[string]DndStatus        `json:"dnd_statuses,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
 }
@@ -158,6 +176,7 @@ func (s *MemoryStore) Snapshot() any {
 		Reminders:         s.Reminders.Snapshot(),
 		Usergroups:        s.Usergroups.Snapshot(),
 		Stars:             s.Stars.Snapshot(),
+		Views:             s.Views.Snapshot(),
 		DndStatuses:       s.dndSnapshot(),
 		Team:              &s.Team,
 	}
@@ -201,6 +220,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Stars != nil {
 		s.Stars.LoadSnapshot(snap.Stars)
 	}
+	if snap.Views != nil {
+		s.Views.LoadSnapshot(snap.Views)
+	}
 	if snap.DndStatuses != nil {
 		s.DndStatuses = snap.DndStatuses
 	}
@@ -222,6 +244,7 @@ func (s *MemoryStore) Reset() {
 	s.Usergroups.Reset()
 	s.Stars.Reset()
 	s.Tokens.Reset()
+	s.Views.Reset()
 	s.DndStatuses = make(map[string]DndStatus)
 	s.Clock.Reset()
 	s.tsCounter.Store(0)

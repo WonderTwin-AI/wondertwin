@@ -1,6 +1,8 @@
 // Package store defines the Slack twin's state types and in-memory store.
 package store
 
+import "encoding/json"
+
 // Channel represents a Slack channel (public, private, DM, or group DM).
 type Channel struct {
 	ID         string   `json:"id"`
@@ -188,6 +190,42 @@ type DndStatus struct {
 	NextEnd       int64 `json:"next_dnd_end_ts"`
 	SnoozeEnabled bool  `json:"snooze_enabled"`
 	SnoozeEndtime int64 `json:"snooze_endtime,omitempty"`
+}
+
+// View is a surface an app draws with Block Kit: a user's Home tab, or a
+// modal. It is rendered as Slack's view payload.
+type View struct {
+	ID              string          `json:"id"`
+	TeamID          string          `json:"team_id"`
+	Type            string          `json:"type"`
+	Title           json.RawMessage `json:"title,omitempty"`
+	Close           json.RawMessage `json:"close"`
+	Submit          json.RawMessage `json:"submit"`
+	Blocks          json.RawMessage `json:"blocks"`
+	PrivateMetadata string          `json:"private_metadata"`
+	CallbackID      string          `json:"callback_id"`
+	State           ViewState       `json:"state"`
+	Hash            string          `json:"hash"`
+	ClearOnClose    bool            `json:"clear_on_close"`
+	NotifyOnClose   bool            `json:"notify_on_close"`
+	SubmitDisabled  bool            `json:"submit_disabled,omitempty"`
+	RootViewID      string          `json:"root_view_id"`
+	PreviousViewID  *string         `json:"previous_view_id"`
+	AppID           string          `json:"app_id"`
+	ExternalID      string          `json:"external_id"`
+	BotID           string          `json:"bot_id"`
+}
+
+// ViewState holds the values a user has entered in a view's input blocks.
+type ViewState struct {
+	Values map[string]any `json:"values"`
+}
+
+// ViewRecord is a stored view and the user it was published to. UserID is
+// set for a Home tab view, which views.publish keeps one of per user.
+type ViewRecord struct {
+	UserID string `json:"user_id,omitempty"`
+	View   View   `json:"view"`
 }
 
 // Token types, from the prefix Slack gives each credential.
