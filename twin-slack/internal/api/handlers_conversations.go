@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -413,43 +415,135 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 // ConversationsOpen handles POST /api/conversations.open
 func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel,omitempty"`
-		Users   string `json:"users,omitempty"`
+		Channel         string `json:"channel,omitempty"`
+		Users           string `json:"users,omitempty"`
+		ReturnIM        bool   `json:"return_im,omitempty"`
+		PreventCreation bool   `json:"prevent_creation,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
 
-	// If channel provided, return it
+	// Resuming by channel works only for a direct or multi-person message.
 	if req.Channel != "" {
 		ch, ok := h.store.Channels.Get(req.Channel)
 		if !ok {
 			slackError(w, "channel_not_found")
 			return
 		}
-		slackOK(w, map[string]any{"channel": ch})
+		if !ch.IsIM && !ch.IsMPIM {
+			slackError(w, "method_not_supported_for_channel_type")
+			return
+		}
+		h.openAnswer(w, ch, true, req.ReturnIM)
 		return
 	}
 
-	// Create a DM channel for the users
+	users := splitCSV(req.Users)
+	if len(users) == 0 {
+		slackError(w, "users_list_not_supplied")
+		return
+	}
+	if len(users) > 8 {
+		slackError(w, "too_many_users")
+		return
+	}
+	for _, u := range users {
+		if !h.store.KnownUser(u) {
+			slackError(w, "user_not_found")
+			return
+		}
+		if user, ok := h.store.Users.Get(u); ok && user.Deleted {
+			slackError(w, "user_disabled")
+			return
+		}
+	}
+
+	// The caller is a member without being named, so the same set of users
+	// always resumes the same conversation.
+	caller := principal(r).UserID
+	if caller == "" {
+		caller = store.DefaultBotUserID
+	}
+	members := memberSet(append(users, caller))
+	if ch, ok := h.conversationWith(members); ok {
+		h.openAnswer(w, ch, true, req.ReturnIM)
+		return
+	}
+	if req.PreventCreation {
+		slackOK(w, map[string]any{"no_op": true, "already_open": false})
+		return
+	}
+
 	id := h.store.Channels.NextID()
 	ch := store.Channel{
-		ID:         id,
-		Name:       "dm-" + id,
-		IsIM:       true,
 		IsMember:   true,
-		Creator:    "U_BOT",
+		Creator:    caller,
 		Created:    h.store.Clock.Now().Unix(),
-		Members:    append(splitCSV(req.Users), "U_BOT"),
-		NumMembers: len(splitCSV(req.Users)) + 1,
+		Members:    members,
+		NumMembers: len(members),
 	}
-	h.store.Channels.Set(id, ch)
-	slackOK(w, map[string]any{
-		"channel":      ch,
-		"no_op":        false,
-		"already_open": false,
+	if len(members) == 2 {
+		// A direct message has a D id and names the other user, as Slack's
+		// IM objects do.
+		ch.ID = "D" + strings.TrimPrefix(id, "C")
+		ch.IsIM = true
+		ch.User = users[0]
+	} else {
+		ch.ID = id
+		ch.IsMPIM = true
+		ch.IsPrivate = true
+		ch.Name = h.mpimName(members)
+	}
+	h.store.Channels.Set(ch.ID, ch)
+	h.openAnswer(w, ch, false, req.ReturnIM)
+}
+
+// openAnswer writes the answer to conversations.open. Without return_im, the
+// channel is answered with its id only, as the docs describe.
+func (h *Handler) openAnswer(w http.ResponseWriter, ch store.Channel, existing, returnIM bool) {
+	fields := map[string]any{"channel": map[string]any{"id": ch.ID}}
+	if returnIM {
+		fields["channel"] = ch
+	}
+	if existing {
+		fields["no_op"] = true
+		fields["already_open"] = true
+	}
+	slackOK(w, fields)
+}
+
+// conversationWith finds the direct or multi-person message whose members are
+// exactly members, which memberSet has sorted.
+func (h *Handler) conversationWith(members []string) (store.Channel, bool) {
+	found := h.store.Channels.Filter(func(_ string, ch store.Channel) bool {
+		return (ch.IsIM || ch.IsMPIM) && slices.Equal(memberSet(ch.Members), members)
 	})
+	if len(found) == 0 {
+		return store.Channel{}, false
+	}
+	return found[0], true
+}
+
+// memberSet sorts and de-duplicates user ids.
+func memberSet(ids []string) []string {
+	out := slices.Clone(ids)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// mpimName follows Slack's naming for a multi-person message:
+// mpdm-{name}--{name}...-1.
+func (h *Handler) mpimName(members []string) string {
+	names := make([]string, len(members))
+	for i, id := range members {
+		names[i] = id
+		if u, ok := h.store.Users.Get(id); ok && u.Name != "" {
+			names[i] = u.Name
+		}
+	}
+	return "mpdm-" + strings.Join(names, "--") + "-1"
 }
 
 // ConversationsClose handles POST /api/conversations.close

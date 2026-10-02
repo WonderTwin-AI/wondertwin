@@ -20,6 +20,8 @@ type Channel struct {
 	Purpose    Topic    `json:"purpose"`
 	Members    []string `json:"members,omitempty"`
 	NumMembers int      `json:"num_members"`
+	// User is the other member of a direct message.
+	User string `json:"user,omitempty"`
 }
 
 // Topic holds a channel topic or purpose.
