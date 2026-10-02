@@ -122,6 +122,28 @@ const cases = {
     assert.equal(await platformError(() => web.views.publish({user_id, view, hash: first.view.hash})), 'hash_conflict');
   },
 
+  async 'slack-dm-user'() {
+    // Fixture: a workspace user to find. Seeding is the emulator's admin API,
+    // not the SDK's; everything after it goes through the SDK.
+    const email = `dm-${unique()}@example.com`;
+    const seeded = await fetch(`${base}/admin/state`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({users: {U_SMOKE_NODE: {id: 'U_SMOKE_NODE', name: 'smoke-node', profile: {email}}}}),
+    });
+    assert.equal(seeded.status, 200);
+    const found = await web.users.lookupByEmail({email});
+    const opened = await web.conversations.open({users: found.user.id});
+    assert.equal(opened.ok, true);
+    const channel = opened.channel.id;
+    const again = await web.conversations.open({users: found.user.id});
+    assert.equal(again.channel.id, channel, 'opening again resumes the same DM');
+    assert.equal(again.already_open, true);
+    const posted = await web.chat.postMessage({channel, text: 'hello there'});
+    const history = await web.conversations.history({channel});
+    assert.ok(history.messages.some((m) => m.ts === posted.ts && m.text === 'hello there'));
+  },
+
   async 'slack-message-lifecycle'() {
     const channel = await newChannel();
     const posted = await web.chat.postMessage({channel, text: 'draft'});
