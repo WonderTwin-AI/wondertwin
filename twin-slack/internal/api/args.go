@@ -258,6 +258,15 @@ func decodeJSONArgs(body []byte, v any) error {
 	}
 	var typeErr *json.UnmarshalTypeError
 	if errors.As(err, &typeErr) {
+		if typeErr.Field == "limit" {
+			var obj map[string]json.RawMessage
+			if json.Unmarshal(body, &obj) == nil {
+				delete(obj, "limit")
+				if rest, merr := json.Marshal(obj); merr == nil {
+					return decodeJSONArgs(rest, v)
+				}
+			}
+		}
 		if typeErr.Value == "array" && typeErr.Type.Kind() == reflect.String {
 			return &argError{"invalid_array_arg"}
 		}
@@ -291,6 +300,11 @@ func decodeFormArgs(values url.Values, v any) error {
 			continue
 		}
 		if err := setFromString(rv.Field(i), vals[0]); err != nil {
+			// Slack adjusts an unusable limit to something sensible and never
+			// rejects it (apis/web-api/pagination).
+			if name == "limit" {
+				continue
+			}
 			return &argError{"invalid_arguments"}
 		}
 	}

@@ -61,6 +61,22 @@ const cases = {
     assert.equal(inThread.thread_ts, parent.ts);
   },
 
+  async 'slack-read-history-paginated'() {
+    const channel = await newChannel();
+    for (let i = 1; i <= 5; i++) {
+      await web.chat.postMessage({channel, text: `m${i}`});
+    }
+    // The SDK's own paginator follows response_metadata.next_cursor to the end.
+    const found = [];
+    let pages = 0;
+    for await (const page of web.paginate('conversations.history', {channel, limit: 2})) {
+      pages++;
+      for (const m of page.messages) found.push(m.text);
+    }
+    assert.deepEqual(found, ['m5', 'm4', 'm3', 'm2', 'm1']);
+    assert.equal(pages, 3);
+  },
+
   async 'slack-message-lifecycle'() {
     const channel = await newChannel();
     const posted = await web.chat.postMessage({channel, text: 'draft'});
