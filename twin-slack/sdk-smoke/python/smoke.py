@@ -45,6 +45,19 @@ def case_post_and_thread():
     assert in_thread[0]["thread_ts"] == parent["ts"]
 
 
+def case_read_history_paginated():
+    channel = new_channel()
+    for i in range(1, 6):
+        client.chat_postMessage(channel=channel, text=f"m{i}")
+    # Iterating the response follows response_metadata.next_cursor to the end.
+    found, pages = [], 0
+    for page in client.conversations_history(channel=channel, limit=2):
+        pages += 1
+        found += [m["text"] for m in page["messages"]]
+    assert found == ["m5", "m4", "m3", "m2", "m1"], found
+    assert pages == 3, pages
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -114,6 +127,7 @@ def case_error_invalid_auth():
 
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
+    "slack-read-history-paginated": case_read_history_paginated,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
