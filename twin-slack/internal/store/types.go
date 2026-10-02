@@ -117,6 +117,9 @@ type File struct {
 	URLPrivateDownload string   `json:"url_private_download,omitempty"`
 	Permalink          string   `json:"permalink,omitempty"`
 	IsPublic           bool     `json:"is_public"`
+	// Content holds the uploaded bytes. It is never rendered in an answer, and
+	// is not kept in a state snapshot.
+	Content []byte `json:"-"`
 }
 
 // ScheduledMessage holds a message scheduled for future delivery.

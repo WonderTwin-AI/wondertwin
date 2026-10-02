@@ -77,6 +77,20 @@ const cases = {
     assert.equal(pages, 3);
   },
 
+  async 'slack-upload-file-external'() {
+    // files.uploadV2 drives the three-step external upload: get an upload URL,
+    // POST the bytes to it, then complete the upload into a channel.
+    const channel = await newChannel();
+    const content = 'release notes for the smoke test\n';
+    const res = await web.files.uploadV2({channel_id: channel, file: Buffer.from(content), filename: 'notes.txt', title: 'Notes'});
+    assert.equal(res.ok, true);
+    const id = res.files[0].files[0].id;
+    const info = await web.files.info({file: id});
+    assert.equal(info.file.id, id);
+    assert.ok(info.file.channels.includes(channel), 'the file is shared to the channel');
+    assert.equal(info.file.size, Buffer.byteLength(content));
+  },
+
   async 'slack-message-lifecycle'() {
     const channel = await newChannel();
     const posted = await web.chat.postMessage({channel, text: 'draft'});
