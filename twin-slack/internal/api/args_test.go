@@ -283,3 +283,17 @@ func TestArgsUnusableLimitIsNotAnError(t *testing.T) {
 		mustOK(t, status, m)
 	}
 }
+
+func TestArgsUnusableJSONLimitIsNotAnError(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "general")
+	for _, limit := range []string{`"abc"`, `"50"`, `1.5`, `null`, `true`, `[1]`} {
+		body := `{"channel":"` + ch + `","limit":` + limit + `}`
+		status, m := call(t, srv, "POST", "/api/conversations.history", "application/json", body, true)
+		mustOK(t, status, m)
+	}
+	_, m := call(t, srv, "POST", "/api/conversations.history", "application/json", `{"channel":{"a":1}}`, true)
+	if m["ok"] != false || m["error"] != "invalid_arguments" {
+		t.Fatalf("type error on another field = %v", m)
+	}
+}
