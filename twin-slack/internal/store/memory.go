@@ -202,10 +202,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 		s.Stars.LoadSnapshot(snap.Stars)
 	}
 	if snap.DndStatuses != nil {
-		s.DndStatuses = make(map[string]DndStatus, len(snap.DndStatuses))
-		for k, v := range snap.DndStatuses {
-			s.DndStatuses[k] = v
-		}
+		s.DndStatuses = snap.DndStatuses
 	}
 	if snap.Team != nil {
 		s.Team = *snap.Team
