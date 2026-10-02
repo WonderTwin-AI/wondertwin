@@ -76,7 +76,7 @@ func (s *MemoryStore) GetMessageByTS(channel, ts string) (*Message, string, bool
 // GetChannelMessages returns messages in a channel, newest first.
 func (s *MemoryStore) GetChannelMessages(channel string, limit int) []Message {
 	all := s.Messages.List()
-	var result []Message
+	result := []Message{}
 	// Iterate in reverse (newest first)
 	for i := len(all) - 1; i >= 0; i-- {
 		msg := all[i]
@@ -93,7 +93,7 @@ func (s *MemoryStore) GetChannelMessages(channel string, limit int) []Message {
 // GetThreadReplies returns messages in a thread.
 func (s *MemoryStore) GetThreadReplies(channel, threadTS string, limit int) []Message {
 	all := s.Messages.List()
-	var result []Message
+	result := []Message{}
 	for _, msg := range all {
 		if msg.Channel == channel && !msg.IsDeleted &&
 			(msg.TS == threadTS || msg.ThreadTS == threadTS) {
