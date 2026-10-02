@@ -1,0 +1,131 @@
+{
+  "twin_id": "twin-slack",
+  "tier": "community",
+  "vendor_api_version": "Slack Web API as documented on 2026-09-26",
+  "reviewed_at": "2026-10-02",
+  "divergences": [
+    {
+      "route": "POST /api/files.getUploadURLExternal",
+      "reason": "upload_url points at the host the client called (/upload/v1/{file_id} on the app emulator, following X-Forwarded-Host behind the LocalStack gateway). Slack points it at files.slack.com.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator-approved plan for WonderTwin-AI/wondertwin #325, 2026-10-01: the upload stays on the app emulator.",
+      "quirk_ids": [
+        "crud-006"
+      ]
+    },
+    {
+      "route": "POST /upload/v1/{file_id}",
+      "reason": "An upload body over 10 MiB answers HTTP 413, the twincore request body cap. Slack's limit is not stated in the 2026-09-26 docs capture.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-01: log the gap (WonderTwin-AI/wondertwin #325). Raising the kit cap is a separate fleet decision.",
+      "quirk_ids": [
+        "crud-006"
+      ]
+    },
+    {
+      "route": "POST /api/oauth.v2.access",
+      "reason": "Any non-empty authorization code is accepted, once. The app emulator serves no slack.com/oauth/v2/authorize page, so no code is issued for the user's approval and none expires after ten minutes.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-02 (WonderTwin-AI/wondertwin #327): accept any non-empty code; the research Arazzo workflow takes the code as an input.",
+      "quirk_ids": [
+        "auth-008",
+        "auth-010"
+      ]
+    },
+    {
+      "route": "POST /api/oauth.v2.access",
+      "reason": "The granted bot scopes are a fixed set (chat:write, channels:read, users:read), and token rotation is not served: tokens do not expire and grant_type=refresh_token answers invalid_refresh_token.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator-approved plan for WonderTwin-AI/wondertwin #327, 2026-10-02.",
+      "quirk_ids": [
+        "auth-010"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "Any well-formed xoxb-, xoxp- or xapp- token is accepted as the default principal of its type. Slack answers invalid_auth for a token it did not issue.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator-approved plan for WonderTwin-AI/wondertwin #321, 2026-10-01: tokens need not be seeded first.",
+      "quirk_ids": [
+        "auth-012"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "Scopes are not enforced: missing_scope is never returned and the x-accepted-oauth-scopes header is not sent.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Deferred by the operator, 2026-10-01: scopes are PR 3b, after a refresh run captures the scope headers.",
+      "quirk_ids": [
+        "auth-003",
+        "auth-004"
+      ]
+    },
+    {
+      "route": "POST /api/views.open, POST /api/views.push",
+      "reason": "trigger_id is not checked (never expired_trigger_id, exchanged_trigger_id or invalid_trigger_id) and the two-push limit is not enforced. The app emulator issues no triggers until interactivity is served.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-02 (WonderTwin-AI/wondertwin #326): open and push wait for Events and interactivity.",
+      "quirk_ids": [
+        "crud-012"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "Rate limits are not enforced: no method answers HTTP 429 with Retry-After.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Not in the approved MVP (research/twins/slack/mvp.md). No operator decision is recorded yet.",
+      "quirk_ids": [
+        "ratelimit-001",
+        "error-001"
+      ]
+    },
+    {
+      "route": "Events API and interactivity",
+      "reason": "No events or interactivity payloads are delivered, so there is no request signing and no retry.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Deferred in the operator-approved MVP (research/twins/slack/mvp.md section 4: slack-events-http-receive, slack-socket-mode, slack-modal-open).",
+      "quirk_ids": [
+        "events-001",
+        "auth-006"
+      ]
+    },
+    {
+      "route": "/admin/*",
+      "reason": "Operator endpoints for seeding, inspecting and resetting state, and for fault injection. Slack has no equivalent.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Every app emulator serves the admin namespace.",
+      "quirk_ids": [],
+      "no_quirk_reason": "An app-emulator-only operator namespace; no vendor behaviour is involved."
+    }
+  ]
+}
