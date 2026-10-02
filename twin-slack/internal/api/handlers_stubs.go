@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -20,8 +21,24 @@ func (h *Handler) BookmarksAdd(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if req.Type == "" {
-		req.Type = "link"
+	switch {
+	case req.Title == "":
+		invalidArgument(w, "title")
+		return
+	case req.Type == "":
+		invalidArgument(w, "type")
+		return
+	case req.Type != "link":
+		// link is the only type the docs say bookmarks.add accepts.
+		slackError(w, "invalid_bookmark_type")
+		return
+	case !strings.HasPrefix(req.Link, "http://") && !strings.HasPrefix(req.Link, "https://"):
+		slackError(w, "invalid_link")
+		return
+	}
+	if _, ok := h.store.Channels.Get(req.ChannelID); !ok {
+		slackError(w, "channel_not_found")
+		return
 	}
 
 	now := h.store.Clock.Now().Unix()
@@ -64,11 +81,23 @@ func (h *Handler) BookmarksList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ChannelID string `json:"channel_id"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	if req.ChannelID != "" {
+		if _, ok := h.store.Channels.Get(req.ChannelID); !ok {
+			slackError(w, "channel_not_found")
+			return
+		}
+	}
 
 	bms := h.store.Bookmarks.Filter(func(_ string, bm store.Bookmark) bool {
 		return req.ChannelID == "" || bm.ChannelID == req.ChannelID
 	})
+	if bms == nil {
+		bms = []store.Bookmark{}
+	}
 	slackOK(w, map[string]any{"bookmarks": bms})
 }
 
