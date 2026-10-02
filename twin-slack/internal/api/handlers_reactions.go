@@ -143,7 +143,7 @@ func (h *Handler) ReactionsList(w http.ResponseWriter, r *http.Request) {
 		userID = "U_BOT"
 	}
 
-	var items []any
+	items := []any{}
 	for _, msg := range h.store.Messages.List() {
 		for _, rx := range msg.Reactions {
 			for _, u := range rx.Users {

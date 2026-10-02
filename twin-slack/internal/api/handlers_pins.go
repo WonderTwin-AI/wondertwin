@@ -64,7 +64,7 @@ func (h *Handler) PinsList(w http.ResponseWriter, r *http.Request) {
 	}
 	parseJSON(r, &req)
 
-	var items []store.Pin
+	items := []store.Pin{}
 	for _, pin := range h.store.Pins.List() {
 		if req.Channel == "" || pin.Channel == req.Channel {
 			items = append(items, pin)
