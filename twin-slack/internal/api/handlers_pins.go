@@ -17,9 +17,18 @@ func (h *Handler) PinsAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, _, ok := h.store.GetMessageByTS(req.Channel, req.Timestamp)
+	if req.Timestamp == "" {
+		slackError(w, "no_item_specified")
+		return
+	}
+	msg, _, ok := h.messageIn(w, req.Channel, req.Timestamp)
 	if !ok {
-		slackError(w, "message_not_found")
+		return
+	}
+	if len(h.store.Pins.Filter(func(_ string, pin store.Pin) bool {
+		return pin.Channel == req.Channel && pin.Message.TS == req.Timestamp
+	})) > 0 {
+		slackError(w, "already_pinned")
 		return
 	}
 
@@ -29,7 +38,7 @@ func (h *Handler) PinsAdd(w http.ResponseWriter, r *http.Request) {
 		Channel: req.Channel,
 		Message: *msg,
 		Created: h.store.Clock.Now().Unix(),
-		Creator: "U_BOT",
+		Creator: callerUserID(r),
 	})
 	slackOK(w, nil)
 }

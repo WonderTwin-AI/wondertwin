@@ -130,6 +130,22 @@ def case_dm_user():
     assert any(m["ts"] == posted["ts"] and m["text"] == "hello there" for m in history["messages"])
 
 
+def case_react_pin_bookmark():
+    channel = new_channel()
+    ts = client.chat_postMessage(channel=channel, text="ship it")["ts"]
+    client.reactions_add(channel=channel, timestamp=ts, name="rocket")
+    got = client.reactions_get(channel=channel, timestamp=ts)
+    assert any(r["name"] == "rocket" and r["count"] == 1 for r in got["message"]["reactions"])
+    client.pins_add(channel=channel, timestamp=ts)
+    assert platform_error(lambda: client.pins_add(channel=channel, timestamp=ts)) == "already_pinned"
+    pins = client.pins_list(channel=channel)
+    assert len([i for i in pins["items"] if i["message"]["ts"] == ts]) == 1, "the message is pinned once"
+    assert client.bookmarks_list(channel_id=channel)["bookmarks"] == []
+    client.bookmarks_add(channel_id=channel, title="Runbook", type="link", link="https://example.com/runbook")
+    bookmarks = client.bookmarks_list(channel_id=channel)
+    assert any(b["link"] == "https://example.com/runbook" for b in bookmarks["bookmarks"])
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -204,6 +220,7 @@ CASES = {
     "slack-upload-file-external": case_upload_file_external,
     "slack-app-home-publish": case_app_home_publish,
     "slack-dm-user": case_dm_user,
+    "slack-react-pin-bookmark": case_react_pin_bookmark,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
