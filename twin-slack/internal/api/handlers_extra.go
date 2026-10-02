@@ -111,21 +111,6 @@ func (h *Handler) UsersDeletePhoto(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, nil)
 }
 
-// --- oauth ---
-
-// OAuthV2Access handles POST /api/oauth.v2.access
-func (h *Handler) OAuthV2Access(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{
-		"access_token": "xoxb-sim-token",
-		"token_type":   "bot",
-		"scope":        "chat:write,channels:read,users:read",
-		"bot_user_id":  "U_BOT",
-		"app_id":       "A_SIM",
-		"team":         map[string]any{"name": h.store.Team.Name, "id": h.store.Team.ID},
-		"authed_user":  map[string]any{"id": "U_BOT"},
-	})
-}
-
 // --- dialog ---
 
 // DialogOpen handles POST /api/dialog.open (legacy, prefer views.*)

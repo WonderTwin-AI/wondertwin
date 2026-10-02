@@ -58,6 +58,21 @@ def case_read_history_paginated():
     assert pages == 3, pages
 
 
+def case_oauth_v2_install():
+    # The install's last step: the app, which has no token yet, exchanges the
+    # code from the authorize redirect, then uses the bot token it got. The
+    # SDK sends the client credentials by HTTP Basic.
+    code = f"code-{int(time.time() * 1000):x}"
+    install = anonymous_client().oauth_v2_access(client_id="123.456", client_secret="smoke-secret", code=code)
+    assert install["ok"] is True
+    assert install["token_type"] == "bot"
+    assert install["access_token"].startswith("xoxb-"), install["access_token"]
+    assert install["scope"], "the granted scopes are returned"
+    who = WebClient(token=install["access_token"], base_url=f"{BASE}/api/").auth_test()
+    assert who["ok"] is True
+    assert who["team_id"] == install["team"]["id"]
+
+
 def case_upload_file_external():
     # files_upload_v2 drives the three-step external upload: get an upload URL,
     # POST the bytes to it, then complete the upload into a channel.
@@ -160,6 +175,7 @@ def case_error_invalid_auth():
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-read-history-paginated": case_read_history_paginated,
+    "slack-oauth-v2-install": case_oauth_v2_install,
     "slack-upload-file-external": case_upload_file_external,
     "slack-app-home-publish": case_app_home_publish,
     "slack-message-lifecycle": case_message_lifecycle,

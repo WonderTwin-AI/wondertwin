@@ -10,8 +10,8 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
 
-// viewAppID is the app the emulator's bot belongs to, as bots.info reports it.
-const viewAppID = "A_SIM"
+// appID is the app the emulator's bot belongs to, as bots.info reports it.
+const appID = "A_SIM"
 
 // viewInput is the view payload a caller sends. Slack documents it as a
 // JSON-encoded string; the node SDK sends it that way in a form field, and the
@@ -85,7 +85,7 @@ func (h *Handler) buildView(r *http.Request, id, typ string, in viewInput) store
 		NotifyOnClose:   in.NotifyOnClose,
 		SubmitDisabled:  in.SubmitDisabled,
 		RootViewID:      id,
-		AppID:           viewAppID,
+		AppID:           appID,
 		ExternalID:      in.ExternalID,
 		BotID:           botID,
 	}

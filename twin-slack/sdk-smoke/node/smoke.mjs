@@ -77,6 +77,19 @@ const cases = {
     assert.equal(pages, 3);
   },
 
+  async 'slack-oauth-v2-install'() {
+    // The install's last step: the app, which has no token yet, exchanges the
+    // code from the authorize redirect, then uses the bot token it got.
+    const install = await client(undefined).oauth.v2.access({client_id: '123.456', client_secret: 'smoke-secret', code: `code-${unique()}`});
+    assert.equal(install.ok, true);
+    assert.equal(install.token_type, 'bot');
+    assert.ok(install.access_token.startsWith('xoxb-'), install.access_token);
+    assert.ok(install.scope, 'the granted scopes are returned');
+    const who = await client(install.access_token).auth.test();
+    assert.equal(who.ok, true);
+    assert.equal(who.team_id, install.team.id);
+  },
+
   async 'slack-upload-file-external'() {
     // files.uploadV2 drives the three-step external upload: get an upload URL,
     // POST the bytes to it, then complete the upload into a channel.

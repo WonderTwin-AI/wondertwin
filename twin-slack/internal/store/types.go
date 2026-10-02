@@ -246,4 +246,7 @@ type Token struct {
 	TeamID  string   `json:"team_id,omitempty"`
 	Scopes  []string `json:"scopes,omitempty"`
 	Revoked bool     `json:"revoked,omitempty"`
+	// OAuthCode is the authorization code the token was issued for, by
+	// oauth.v2.access. A code is exchanged once.
+	OAuthCode string `json:"oauth_code,omitempty"`
 }
