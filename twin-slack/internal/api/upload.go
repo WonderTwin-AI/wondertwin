@@ -16,8 +16,10 @@ import (
 // upload URL has this shape on its upload host.
 const uploadPath = "/upload/v1/"
 
-// maxUploadBytes bounds an uploaded file.
-var maxUploadBytes int64 = 64 << 20
+// maxUploadBytes bounds an uploaded file. It matches the request body cap
+// twincore's server puts on every request, which would refuse a larger body
+// first.
+var maxUploadBytes int64 = 10 << 20
 
 var (
 	errUploadTooLarge = errors.New("upload too large")
@@ -53,8 +55,9 @@ func (h *Handler) UploadFileBytes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := readUpload(r)
+	var maxBytesErr *http.MaxBytesError
 	switch {
-	case errors.Is(err, errUploadTooLarge):
+	case errors.Is(err, errUploadTooLarge), errors.As(err, &maxBytesErr):
 		http.Error(w, "upload too large", http.StatusRequestEntityTooLarge)
 		return
 	case errors.Is(err, errNoFilePart):

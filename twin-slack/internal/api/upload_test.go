@@ -134,6 +134,22 @@ func TestUploadOverTheLimitFails(t *testing.T) {
 	}
 }
 
+// The running server caps every request body before the handler sees it; a
+// body cut off there is still too large, not unreadable.
+func TestUploadOverTheServerBodyCapFails(t *testing.T) {
+	srv, _ := setupSlack(t)
+	capped := httptest.NewServer(http.MaxBytesHandler(srv.Config.Handler, 4))
+	t.Cleanup(capped.Close)
+	u, id := uploadTicket(t, srv, "big.txt", 1)
+	u = capped.URL + strings.TrimPrefix(u, srv.URL)
+	if code := postBytes(t, u, "application/octet-stream", []byte("0123456789")); code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("upload status = %d, want 413", code)
+	}
+	if size := fileInfo(t, srv, id)["size"]; size != float64(1) {
+		t.Errorf("size = %v, want the announced 1 (nothing stored)", size)
+	}
+}
+
 func TestUploadToAnUnknownTicketFails(t *testing.T) {
 	srv, _ := setupSlack(t)
 	if code := postBytes(t, srv.URL+"/upload/v1/F_NOPE", "", []byte("x")); code == 200 {
