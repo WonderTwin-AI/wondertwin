@@ -222,7 +222,7 @@ func TestArgsErrors(t *testing.T) {
 		{"charset outside utf-8 and iso-8859-1", "/api/chat.postMessage", formType + "; charset=utf-16", "channel=" + ch, "invalid_charset"},
 		{"malformed form data", "/api/chat.postMessage", formType, "channel=%zz", "invalid_form_data"},
 		{"multipart without a boundary", "/api/chat.postMessage", "multipart/form-data", "x", "invalid_form_data"},
-		{"non-integer limit", "/api/conversations.history", formType, "channel=" + ch + "&limit=abc", "invalid_arguments"},
+		{"non-boolean argument", "/api/auth.revoke", formType, "test=maybe", "invalid_arguments"},
 		{"array where a string is expected", "/api/chat.postMessage", jsonType, `{"channel":["` + ch + `"],"text":"x"}`, "invalid_array_arg"},
 		{"object where a string is expected", "/api/chat.postMessage", jsonType, `{"channel":{"a":1},"text":"x"}`, "invalid_arguments"},
 	}
@@ -270,5 +270,16 @@ func TestEveryMethodAnswersGetAndPost(t *testing.T) {
 		if !got["GET"] || !got["POST"] {
 			t.Errorf("%s must answer both GET and POST, has %v", route, got)
 		}
+	}
+}
+
+// Slack adjusts a limit it cannot use and never rejects it, so a limit that is
+// not an integer is not an invalid argument (apis/web-api/pagination).
+func TestArgsUnusableLimitIsNotAnError(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "general")
+	for _, limit := range []string{"abc", "1.5", "", "-1"} {
+		status, m := call(t, srv, "GET", "/api/conversations.history?channel="+ch+"&limit="+limit, "", "", true)
+		mustOK(t, status, m)
 	}
 }

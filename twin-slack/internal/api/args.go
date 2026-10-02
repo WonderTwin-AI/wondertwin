@@ -291,6 +291,11 @@ func decodeFormArgs(values url.Values, v any) error {
 			continue
 		}
 		if err := setFromString(rv.Field(i), vals[0]); err != nil {
+			// Slack adjusts an unusable limit to something sensible and never
+			// rejects it (apis/web-api/pagination).
+			if name == "limit" {
+				continue
+			}
 			return &argError{"invalid_arguments"}
 		}
 	}
