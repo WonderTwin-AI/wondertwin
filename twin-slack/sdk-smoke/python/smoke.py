@@ -11,7 +11,8 @@ import json
 import os
 import sys
 import time
-import urllib.request
+from http.client import HTTPConnection
+from urllib.parse import urlsplit
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -111,10 +112,12 @@ def case_dm_user():
     # not the SDK's; everything after it goes through the SDK.
     email = f"dm-{int(time.time() * 1000):x}@example.com"
     users = {"U_SMOKE_PY": {"id": "U_SMOKE_PY", "name": "smoke-py", "profile": {"email": email}}}
-    req = urllib.request.Request(f"{BASE}/admin/state", data=json.dumps({"users": users}).encode(),
-                                 headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req) as resp:
-        assert resp.status == 200
+    conn = HTTPConnection(urlsplit(BASE).netloc)
+    conn.request("POST", "/admin/state", json.dumps({"users": users}), {"Content-Type": "application/json"})
+    resp = conn.getresponse()
+    resp.read()
+    conn.close()
+    assert resp.status == 200
     found = client.users_lookupByEmail(email=email)
     opened = client.conversations_open(users=found["user"]["id"])
     assert opened["ok"] is True
