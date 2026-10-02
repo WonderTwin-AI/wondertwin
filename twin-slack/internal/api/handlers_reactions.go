@@ -149,7 +149,7 @@ func (h *Handler) ReactionsList(w http.ResponseWriter, r *http.Request) {
 
 	userID := req.User
 	if userID == "" {
-		userID = "U_BOT"
+		userID = callerUserID(r)
 	}
 
 	items := []any{}

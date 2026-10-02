@@ -184,9 +184,9 @@ func (h *Handler) ConversationsCreate(w http.ResponseWriter, r *http.Request) {
 		IsGroup:    req.IsPrivate,
 		IsPrivate:  req.IsPrivate,
 		IsMember:   true,
-		Creator:    "U_BOT",
+		Creator:    callerUserID(r),
 		Created:    h.store.Clock.Now().Unix(),
-		Members:    []string{"U_BOT"},
+		Members:    []string{callerUserID(r)},
 		NumMembers: 1,
 	}
 	h.store.Channels.Set(id, ch)
@@ -288,7 +288,7 @@ func (h *Handler) ConversationsSetPurpose(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ch.Purpose = store.Topic{Value: req.Purpose, Creator: "U_BOT", LastSet: h.store.Clock.Now().Unix()}
+	ch.Purpose = store.Topic{Value: req.Purpose, Creator: callerUserID(r), LastSet: h.store.Clock.Now().Unix()}
 	h.store.Channels.Set(req.Channel, ch)
 	slackOK(w, map[string]any{"purpose": req.Purpose})
 }
@@ -310,7 +310,7 @@ func (h *Handler) ConversationsSetTopic(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ch.Topic = store.Topic{Value: req.Topic, Creator: "U_BOT", LastSet: h.store.Clock.Now().Unix()}
+	ch.Topic = store.Topic{Value: req.Topic, Creator: callerUserID(r), LastSet: h.store.Clock.Now().Unix()}
 	h.store.Channels.Set(req.Channel, ch)
 	slackOK(w, map[string]any{"topic": req.Topic})
 }
@@ -394,8 +394,8 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !ch.IsMember {
-		ch.Members = append(ch.Members, "U_BOT")
+	if caller := callerUserID(r); !slices.Contains(ch.Members, caller) {
+		ch.Members = append(ch.Members, caller)
 		ch.NumMembers++
 		ch.IsMember = true
 		h.store.Channels.Set(req.Channel, ch)
@@ -422,7 +422,7 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 
 	members := make([]string, 0, len(ch.Members))
 	for _, m := range ch.Members {
-		if m != "U_BOT" {
+		if m != callerUserID(r) {
 			members = append(members, m)
 		}
 	}
