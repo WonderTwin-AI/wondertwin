@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import time
+import urllib.request
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -105,6 +106,27 @@ def case_app_home_publish():
     assert platform_error(lambda: client.views_publish(user_id=user_id, view=view, hash=first["view"]["hash"])) == "hash_conflict"
 
 
+def case_dm_user():
+    # Fixture: a workspace user to find. Seeding is the emulator's admin API,
+    # not the SDK's; everything after it goes through the SDK.
+    email = f"dm-{int(time.time() * 1000):x}@example.com"
+    users = {"U_SMOKE_PY": {"id": "U_SMOKE_PY", "name": "smoke-py", "profile": {"email": email}}}
+    req = urllib.request.Request(f"{BASE}/admin/state", data=json.dumps({"users": users}).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req) as resp:
+        assert resp.status == 200
+    found = client.users_lookupByEmail(email=email)
+    opened = client.conversations_open(users=found["user"]["id"])
+    assert opened["ok"] is True
+    channel = opened["channel"]["id"]
+    again = client.conversations_open(users=found["user"]["id"])
+    assert again["channel"]["id"] == channel, "opening again resumes the same DM"
+    assert again["already_open"] is True
+    posted = client.chat_postMessage(channel=channel, text="hello there")
+    history = client.conversations_history(channel=channel)
+    assert any(m["ts"] == posted["ts"] and m["text"] == "hello there" for m in history["messages"])
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -178,6 +200,7 @@ CASES = {
     "slack-oauth-v2-install": case_oauth_v2_install,
     "slack-upload-file-external": case_upload_file_external,
     "slack-app-home-publish": case_app_home_publish,
+    "slack-dm-user": case_dm_user,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
