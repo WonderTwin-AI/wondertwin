@@ -29,3 +29,29 @@ func TestEmptyMessageListsAreArrays(t *testing.T) {
 		t.Fatalf("replies to a thread with no messages should be [], got %#v", m["messages"])
 	}
 }
+
+// pins.list, reactions.list and the admin message listing return [] when there
+// is nothing to list, never null.
+func TestEmptyCollectionListsAreArrays(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "general")
+
+	for _, c := range []struct{ name, path, field string }{
+		{"pins.list", "/api/pins.list?channel=" + ch, "items"},
+		{"reactions.list", "/api/reactions.list", "items"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			status, m := call(t, srv, "GET", c.path, "", "", true)
+			mustOK(t, status, m)
+			if v, ok := m[c.field].([]any); !ok || len(v) != 0 {
+				t.Errorf("%s %s = %#v, want []", c.name, c.field, m[c.field])
+			}
+		})
+	}
+
+	resp := tc.Get("/admin/messages")
+	resp.AssertStatus(200)
+	if v, ok := resp.JSONMap()["messages"].([]any); !ok || len(v) != 0 {
+		t.Errorf("/admin/messages messages = %#v, want []", resp.JSONMap()["messages"])
+	}
+}

@@ -10,7 +10,7 @@ import (
 func (h *Handler) AdminListMessages(w http.ResponseWriter, r *http.Request) {
 	messages := h.store.Messages.List()
 	// Filter out deleted
-	var active []any
+	active := []any{}
 	for _, m := range messages {
 		if !m.IsDeleted {
 			active = append(active, m)
