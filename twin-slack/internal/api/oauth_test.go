@@ -7,6 +7,10 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/api"
+	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // exchange calls oauth.v2.access with no token, the way an app does before it
@@ -120,5 +124,24 @@ func TestOAuthNewTokenAfterAStateLoadIsFresh(t *testing.T) {
 	}
 	if m := exchange(t, srv, creds("a"), false); m["error"] != "invalid_code" {
 		t.Errorf("the first install's code became usable again: %v", m)
+	}
+}
+
+func TestOAuthV2AccessAppliesInjectedFault(t *testing.T) {
+	twin := twincore.New(&twincore.Config{Name: "twin-slack-test"})
+	api.NewHandler(store.New(), twin.Middleware()).Routes(twin.Router)
+	srv := httptest.NewServer(twin.Router)
+	t.Cleanup(srv.Close)
+	twin.Middleware().Faults.Set("/api/oauth.v2.access", twincore.FaultConfig{StatusCode: http.StatusInternalServerError, Body: `{"ok":false,"error":"fatal_error"}`})
+
+	form := url.Values{"client_id": {"123.456"}, "client_secret": {"s3cret"}, "code": {"c"}}
+	m := exchange(t, srv, form, false)
+	if m["ok"] != false || m["error"] != "fatal_error" {
+		t.Fatalf("injected fault not applied: %v", m)
+	}
+
+	twin.Middleware().Faults.Remove("/api/oauth.v2.access")
+	if m := exchange(t, srv, form, false); m["ok"] != true {
+		t.Fatalf("after removing the fault: %v", m)
 	}
 }

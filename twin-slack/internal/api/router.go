@@ -40,7 +40,7 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "api.test", h.APITest)
 			// oauth.v2.access is how an app gets its first token, so it is
 			// called without one; the client credentials authenticate it.
-			route(r, "oauth.v2.access", h.OAuthV2Access)
+			route(r.With(h.mw.FaultInjection), "oauth.v2.access", h.OAuthV2Access)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(argsMiddleware)
