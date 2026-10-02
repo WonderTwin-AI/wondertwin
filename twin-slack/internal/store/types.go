@@ -186,3 +186,23 @@ type DndStatus struct {
 	SnoozeEnabled bool  `json:"snooze_enabled"`
 	SnoozeEndtime int64 `json:"snooze_endtime,omitempty"`
 }
+
+// Token types, from the prefix Slack gives each credential.
+const (
+	TokenBot  = "bot"  // xoxb-
+	TokenUser = "user" // xoxp-
+	TokenApp  = "app"  // xapp-, app-level
+)
+
+// Token is a credential the app emulator recognises, and who it speaks for.
+// A token the emulator has not been told about is still accepted when it is
+// well formed (see ResolveToken), as a default principal of its type.
+type Token struct {
+	Token   string   `json:"token"`
+	Type    string   `json:"type"`
+	UserID  string   `json:"user_id,omitempty"`
+	BotID   string   `json:"bot_id,omitempty"`
+	TeamID  string   `json:"team_id,omitempty"`
+	Scopes  []string `json:"scopes,omitempty"`
+	Revoked bool     `json:"revoked,omitempty"`
+}

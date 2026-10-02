@@ -32,9 +32,16 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
 		r.NotFound(unknownMethod)
+		// api.test answers without a token, so it sits outside the group that
+		// authenticates.
 		r.Group(func(r chi.Router) {
 			r.Use(argsMiddleware)
-			r.Use(h.bearerAuthMiddleware)
+			r.Use(argsErrorMiddleware)
+			route(r, "api.test", h.APITest)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(argsMiddleware)
+			r.Use(h.authMiddleware)
 			r.Use(argsErrorMiddleware)
 			r.Use(h.mw.FaultInjection)
 
@@ -178,27 +185,6 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/messages", h.AdminListMessages)
 	r.Get("/admin/channels", h.AdminListChannels)
 	r.Get("/admin/users", h.AdminListUsers)
-}
-
-// bearerAuthMiddleware validates Slack-style Bearer token auth.
-// Accepts any token starting with "xoxb-" or "xoxp-" in sim mode.
-func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			slackError(w, "not_authed")
-			return
-		}
-
-		token := strings.TrimPrefix(auth, "Bearer ")
-		if token == auth || token == "" {
-			slackError(w, "invalid_auth")
-			return
-		}
-
-		// In sim mode, accept any non-empty token
-		next.ServeHTTP(w, r)
-	})
 }
 
 // jsonContentType is the content type of every Web API answer.

@@ -77,11 +77,51 @@ def case_error_channel_not_found():
     assert platform_error(lambda: client.chat_postMessage(channel="C0NOSUCH", text="x")) == "channel_not_found"
 
 
+def anonymous_client():
+    return WebClient(token=None, base_url=f"{BASE}/api/")
+
+
+def case_auth_test_reflects_token():
+    bot = client.auth_test()
+    assert bot.get("bot_id"), "a bot token carries a bot_id"
+    user = WebClient(token="xoxp-sdk-smoke-python-user", base_url=f"{BASE}/api/").auth_test()
+    assert not user.get("bot_id"), "a user token has no bot_id"
+    assert user["user_id"] != bot["user_id"]
+    assert user["team_id"] == bot["team_id"]
+
+
+def case_api_test():
+    res = anonymous_client().api_test(foo="bar")
+    assert res["ok"] is True and res["args"]["foo"] == "bar"
+    assert platform_error(lambda: client.api_test(error="my_error")) == "my_error"
+
+
+def case_auth_revoke():
+    doomed = WebClient(token=f"xoxb-sdk-smoke-python-revoke-{int(time.time() * 1000):x}", base_url=f"{BASE}/api/")
+    assert doomed.auth_revoke()["revoked"] is True
+    assert platform_error(lambda: doomed.auth_test()) == "token_revoked"
+    assert client.auth_test()["ok"] is True
+
+
+def case_error_not_authed():
+    assert platform_error(lambda: anonymous_client().auth_test()) == "not_authed"
+
+
+def case_error_invalid_auth():
+    bad = WebClient(token="not-a-slack-token", base_url=f"{BASE}/api/")
+    assert platform_error(lambda: bad.auth_test()) == "invalid_auth"
+
+
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
+    "slack-auth-test-reflects-token": case_auth_test_reflects_token,
+    "slack-api-test": case_api_test,
+    "slack-auth-revoke": case_auth_revoke,
+    "error-not-authed": case_error_not_authed,
+    "error-invalid-auth": case_error_invalid_auth,
 }
 
 
