@@ -13,7 +13,7 @@ func (h *Handler) PinsAdd(w http.ResponseWriter, r *http.Request) {
 		Timestamp string `json:"timestamp"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *Handler) PinsRemove(w http.ResponseWriter, r *http.Request) {
 		Timestamp string `json:"timestamp"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 

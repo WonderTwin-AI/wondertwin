@@ -15,7 +15,7 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		Blocks   any    `json:"blocks,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Channel == "" {
@@ -63,7 +63,7 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 		Text    string `json:"text"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Channel == "" {
@@ -90,7 +90,7 @@ func (h *Handler) ChatUpdate(w http.ResponseWriter, r *http.Request) {
 		Blocks  any    `json:"blocks,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 		TS      string `json:"ts"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -149,7 +149,7 @@ func (h *Handler) ChatGetPermalink(w http.ResponseWriter, r *http.Request) {
 		MessageTS string `json:"message_ts"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *Handler) ChatScheduleMessage(w http.ResponseWriter, r *http.Request) {
 		PostAt  int64  `json:"post_at"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Channel == "" {
@@ -206,7 +206,7 @@ func (h *Handler) ChatDeleteScheduledMessage(w http.ResponseWriter, r *http.Requ
 		ScheduledMessageID string `json:"scheduled_message_id"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 		Text    string `json:"text"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 

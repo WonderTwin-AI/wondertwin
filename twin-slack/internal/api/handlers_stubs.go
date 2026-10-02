@@ -17,7 +17,7 @@ func (h *Handler) BookmarksAdd(w http.ResponseWriter, r *http.Request) {
 		Type      string `json:"type"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Type == "" {

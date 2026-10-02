@@ -23,7 +23,7 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		Limit   int    `json:"limit,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Channel == "" {
@@ -74,7 +74,7 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 		Limit   int    `json:"limit,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *Handler) ConversationsMembers(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *Handler) ConversationsCreate(w http.ResponseWriter, r *http.Request) {
 		IsPrivate bool   `json:"is_private,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	if req.Name == "" {
@@ -159,7 +159,7 @@ func (h *Handler) ConversationsArchive(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *Handler) ConversationsUnarchive(w http.ResponseWriter, r *http.Request)
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -210,7 +210,7 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 		Name    string `json:"name"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -237,7 +237,7 @@ func (h *Handler) ConversationsSetPurpose(w http.ResponseWriter, r *http.Request
 		Purpose string `json:"purpose"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -259,7 +259,7 @@ func (h *Handler) ConversationsSetTopic(w http.ResponseWriter, r *http.Request) 
 		Topic   string `json:"topic"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -281,7 +281,7 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		Users   string `json:"users"` // comma-separated
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -307,7 +307,7 @@ func (h *Handler) ConversationsKick(w http.ResponseWriter, r *http.Request) {
 		User    string `json:"user"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -343,7 +343,7 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -369,7 +369,7 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -399,7 +399,7 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 		Users   string `json:"users,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -440,7 +440,7 @@ func (h *Handler) ConversationsClose(w http.ResponseWriter, r *http.Request) {
 		Channel string `json:"channel"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	slackOK(w, nil)
@@ -453,7 +453,7 @@ func (h *Handler) ConversationsMark(w http.ResponseWriter, r *http.Request) {
 		TS      string `json:"ts"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 	slackOK(w, nil)

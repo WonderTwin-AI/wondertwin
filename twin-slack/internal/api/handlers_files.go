@@ -14,7 +14,7 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 		Length   int    `json:"length"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		ChannelID string `json:"channel_id,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h *Handler) FilesInfo(w http.ResponseWriter, r *http.Request) {
 		File string `json:"file"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *Handler) FilesDelete(w http.ResponseWriter, r *http.Request) {
 		File string `json:"file"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
