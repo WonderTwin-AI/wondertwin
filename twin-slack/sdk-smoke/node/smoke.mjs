@@ -142,6 +142,22 @@ const cases = {
     const posted = await web.chat.postMessage({channel, text: 'hello there'});
     const history = await web.conversations.history({channel});
     assert.ok(history.messages.some((m) => m.ts === posted.ts && m.text === 'hello there'));
+    },
+
+  async 'slack-react-pin-bookmark'() {
+    const channel = await newChannel();
+    const {ts} = await web.chat.postMessage({channel, text: 'ship it'});
+    await web.reactions.add({channel, timestamp: ts, name: 'rocket'});
+    const got = await web.reactions.get({channel, timestamp: ts});
+    assert.ok(got.message.reactions.some((r) => r.name === 'rocket' && r.count === 1));
+    await web.pins.add({channel, timestamp: ts});
+    assert.equal(await platformError(() => web.pins.add({channel, timestamp: ts})), 'already_pinned');
+    const pins = await web.pins.list({channel});
+    assert.equal(pins.items.filter((i) => i.message.ts === ts).length, 1, 'the message is pinned once');
+    assert.deepEqual((await web.bookmarks.list({channel_id: channel})).bookmarks, []);
+    await web.bookmarks.add({channel_id: channel, title: 'Runbook', type: 'link', link: 'https://example.com/runbook'});
+    const bookmarks = await web.bookmarks.list({channel_id: channel});
+    assert.ok(bookmarks.bookmarks.some((b) => b.link === 'https://example.com/runbook'));
   },
 
   async 'slack-message-lifecycle'() {
