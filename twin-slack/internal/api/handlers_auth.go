@@ -98,3 +98,19 @@ func (h *Handler) AuthRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 	slackOK(w, map[string]any{"revoked": h.store.RevokeToken(principal(r).Token)})
 }
+
+// APITest handles /api/api.test, which Slack answers without a token. It echoes
+// the arguments it was given, and returns the error named by the error
+// argument when there is one.
+func (h *Handler) APITest(w http.ResponseWriter, r *http.Request) {
+	a, _ := r.Context().Value(argsKey{}).(*slackArgs)
+	echo := map[string]any{}
+	if a != nil {
+		echo = a.echo()
+	}
+	if code, ok := echo["error"].(string); ok && code != "" {
+		slackErrorWith(w, code, map[string]any{"args": echo})
+		return
+	}
+	slackOK(w, map[string]any{"args": echo})
+}

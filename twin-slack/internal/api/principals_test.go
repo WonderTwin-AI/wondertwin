@@ -208,3 +208,63 @@ func TestRevokeInTestMode(t *testing.T) {
 		})
 	}
 }
+
+func TestAPITestAnswersWithoutAToken(t *testing.T) {
+	srv, _ := setupSlack(t)
+
+	// Slack's live answer to a bare call, observed without credentials.
+	status, _, m := callAs(t, srv, "POST", "/api/api.test", "", "", "")
+	mustOK(t, status, m)
+	if args, ok := m["args"].(map[string]any); !ok || len(args) != 0 {
+		t.Errorf("args = %#v, want {}", m["args"])
+	}
+
+	status, _, m = callAs(t, srv, "GET", "/api/api.test?foo=bar", "", "", "")
+	mustOK(t, status, m)
+	if m["args"].(map[string]any)["foo"] != "bar" {
+		t.Errorf("args = %v", m["args"])
+	}
+
+	status, _, m = callAs(t, srv, "POST", "/api/api.test", formType, "foo=baz", "")
+	mustOK(t, status, m)
+	if m["args"].(map[string]any)["foo"] != "baz" {
+		t.Errorf("args = %v", m["args"])
+	}
+
+	status, _, m = callAs(t, srv, "POST", "/api/api.test", jsonType, `{"foo":"qux"}`, "")
+	mustOK(t, status, m)
+	if m["args"].(map[string]any)["foo"] != "qux" {
+		t.Errorf("args = %v", m["args"])
+	}
+}
+
+func TestAPITestReturnsTheRequestedError(t *testing.T) {
+	srv, _ := setupSlack(t)
+	status, h, m := callAs(t, srv, "POST", "/api/api.test", formType, "error=my_error", "")
+	wantError(t, status, m, "my_error")
+	if m["args"].(map[string]any)["error"] != "my_error" {
+		t.Errorf("args = %v", m["args"])
+	}
+	if h.Get("X-Slack-Failure") != "my_error" {
+		t.Errorf("x-slack-failure = %q", h.Get("X-Slack-Failure"))
+	}
+}
+
+func TestAPITestNeverEchoesTheToken(t *testing.T) {
+	srv, _ := setupSlack(t)
+	status, _, m := callAs(t, srv, "POST", "/api/api.test", formType, "token=xoxb-secret&foo=bar", "")
+	mustOK(t, status, m)
+	args := m["args"].(map[string]any)
+	if _, has := args["token"]; has {
+		t.Errorf("api.test must not reflect a credential: %v", args)
+	}
+	if args["foo"] != "bar" {
+		t.Errorf("args = %v", args)
+	}
+}
+
+func TestAPITestReportsUndecodableRequests(t *testing.T) {
+	srv, _ := setupSlack(t)
+	status, _, m := callAs(t, srv, "POST", "/api/api.test", jsonType, `{"foo":`, "")
+	wantError(t, status, m, "invalid_json")
+}

@@ -153,6 +153,28 @@ func decodeArgs(r *http.Request) *slackArgs {
 	return a
 }
 
+// echo returns the call's arguments as a flat object, for api.test. The token
+// is left out so a credential is never reflected back.
+func (a *slackArgs) echo() map[string]any {
+	out := map[string]any{}
+	if a.json != nil {
+		var m map[string]any
+		if json.Unmarshal(a.json, &m) == nil {
+			for k, v := range m {
+				out[k] = v
+			}
+		}
+	} else {
+		for k, v := range a.values {
+			if len(v) > 0 {
+				out[k] = v[0]
+			}
+		}
+	}
+	delete(out, "token")
+	return out
+}
+
 func mergeValues(dst, src url.Values) {
 	for k, v := range src {
 		dst[k] = append(dst[k], v...)

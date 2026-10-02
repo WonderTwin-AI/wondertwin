@@ -32,6 +32,13 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
 		r.NotFound(unknownMethod)
+		// api.test answers without a token, so it sits outside the group that
+		// authenticates.
+		r.Group(func(r chi.Router) {
+			r.Use(argsMiddleware)
+			r.Use(argsErrorMiddleware)
+			route(r, "api.test", h.APITest)
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(argsMiddleware)
 			r.Use(h.authMiddleware)
