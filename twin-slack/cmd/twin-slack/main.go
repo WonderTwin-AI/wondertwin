@@ -4,6 +4,10 @@
 //
 // SDK compatibility target: github.com/slack-go/slack, @slack/web-api
 // Integration method: Override base URL
+//
+// Events API delivery: --webhook-url is the app's Event Subscriptions Request
+// URL, and SLACK_SIGNING_SECRET its signing secret. Both can also be set at
+// runtime through POST /admin/events/config.
 package main
 
 import (
@@ -27,11 +31,16 @@ func main() {
 
 	// API handlers
 	apiHandler := api.NewHandler(memStore, twin.Middleware())
+	apiHandler.ConfigureEvents(api.EventsConfig{
+		RequestURL:    cfg.WebhookURL,
+		SigningSecret: os.Getenv("SLACK_SIGNING_SECRET"),
+	})
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetFlusher(apiHandler.EventsFlusher())
 	adminHandler.Routes(twin.Router)
 
 	// Load seed data if provided
