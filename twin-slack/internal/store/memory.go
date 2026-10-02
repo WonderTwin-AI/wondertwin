@@ -20,6 +20,7 @@ type MemoryStore struct {
 	Reminders         *pkgstate.Store[Reminder]
 	Usergroups        *pkgstate.Store[Usergroup]
 	Stars             *pkgstate.Store[Star]
+	Tokens            *pkgstate.Store[Token]
 	Clock             *pkgstate.Clock
 
 	// Team info (singleton)
@@ -44,6 +45,7 @@ func New() *MemoryStore {
 		Reminders:         pkgstate.New[Reminder]("RM"),
 		Usergroups:        pkgstate.New[Usergroup]("UG"),
 		Stars:             pkgstate.New[Star]("ST"),
+		Tokens:            pkgstate.New[Token]("tok"),
 		DndStatuses:       make(map[string]DndStatus),
 		Clock:             pkgstate.NewClock(),
 		Team: Team{
@@ -133,6 +135,7 @@ type stateSnapshot struct {
 	Users             map[string]User             `json:"users,omitempty"`
 	Files             map[string]File             `json:"files,omitempty"`
 	ScheduledMessages map[string]ScheduledMessage `json:"scheduled_messages,omitempty"`
+	Tokens            map[string]Token            `json:"tokens,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
 }
 
@@ -143,6 +146,7 @@ func (s *MemoryStore) Snapshot() any {
 		Users:             s.Users.Snapshot(),
 		Files:             s.Files.Snapshot(),
 		ScheduledMessages: s.ScheduledMessages.Snapshot(),
+		Tokens:            s.Tokens.Snapshot(),
 		Team:              &s.Team,
 	}
 }
@@ -167,6 +171,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.ScheduledMessages != nil {
 		s.ScheduledMessages.LoadSnapshot(snap.ScheduledMessages)
 	}
+	if snap.Tokens != nil {
+		s.Tokens.LoadSnapshot(snap.Tokens)
+	}
 	if snap.Team != nil {
 		s.Team = *snap.Team
 	}
@@ -184,6 +191,7 @@ func (s *MemoryStore) Reset() {
 	s.Reminders.Reset()
 	s.Usergroups.Reset()
 	s.Stars.Reset()
+	s.Tokens.Reset()
 	s.DndStatuses = make(map[string]DndStatus)
 	s.Clock.Reset()
 	s.tsCounter.Store(0)

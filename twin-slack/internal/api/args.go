@@ -35,6 +35,10 @@ type slackArgs struct {
 	// values holds query, form, multipart and text/plain arguments. Body values
 	// come first, so Get returns the body's value when a key is in both.
 	values url.Values
+	// body holds only the arguments that arrived in a form, multipart or
+	// text/plain POST body. A token may be sent there, but not in the query
+	// string and not in a JSON body.
+	body url.Values
 	// json holds the body of an application/json request, nil otherwise. When
 	// it is set the query string is not used for arguments: Slack's docs say to
 	// choose one approach per request.
@@ -80,7 +84,7 @@ func route(r chi.Router, method string, h http.HandlerFunc) {
 // decodeArgs reads a call's arguments. Failures are recorded on the result and
 // not returned, so the caller decides when to report them.
 func decodeArgs(r *http.Request) *slackArgs {
-	a := &slackArgs{values: url.Values{}}
+	a := &slackArgs{values: url.Values{}, body: url.Values{}}
 	query := r.URL.Query()
 	if r.Method != http.MethodPost || r.Body == nil {
 		mergeValues(a.values, query)
@@ -131,6 +135,7 @@ func decodeArgs(r *http.Request) *slackArgs {
 			a.err = &argError{"invalid_form_data"}
 			return a
 		}
+		mergeValues(a.body, form)
 		mergeValues(a.values, form)
 		mergeValues(a.values, query)
 	case "multipart/form-data":
@@ -139,6 +144,7 @@ func decodeArgs(r *http.Request) *slackArgs {
 			a.err = &argError{"invalid_form_data"}
 			return a
 		}
+		mergeValues(a.body, form)
 		mergeValues(a.values, form)
 		mergeValues(a.values, query)
 	default:
