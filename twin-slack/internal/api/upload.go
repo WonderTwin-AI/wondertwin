@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -15,7 +17,12 @@ import (
 const uploadPath = "/upload/v1/"
 
 // maxUploadBytes bounds an uploaded file.
-const maxUploadBytes = 64 << 20
+var maxUploadBytes int64 = 64 << 20
+
+var (
+	errUploadTooLarge = errors.New("upload too large")
+	errNoFilePart     = errors.New("no file part")
+)
 
 // origin is the scheme and host the client called, so a URL handed back to it
 // reaches this emulator however it is fronted.
@@ -46,7 +53,15 @@ func (h *Handler) UploadFileBytes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := readUpload(r)
-	if err != nil {
+	switch {
+	case errors.Is(err, errUploadTooLarge):
+		http.Error(w, "upload too large", http.StatusRequestEntityTooLarge)
+		return
+	case errors.Is(err, errNoFilePart):
+		// Our status code; how Slack's upload host answers this is unverified.
+		http.Error(w, "no file part in form", http.StatusBadRequest)
+		return
+	case err != nil:
 		http.Error(w, "unreadable upload", http.StatusBadRequest)
 		return
 	}
@@ -60,30 +75,28 @@ func (h *Handler) UploadFileBytes(w http.ResponseWriter, r *http.Request) {
 // readUpload returns the file's bytes: the first file part of a multipart form,
 // or the whole body otherwise.
 func readUpload(r *http.Request) ([]byte, error) {
-	body := io.LimitReader(r.Body, maxUploadBytes)
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxUploadBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxUploadBytes {
+		return nil, errUploadTooLarge
+	}
 	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "multipart/form-data" {
-		return io.ReadAll(body)
+		return body, nil
 	}
-	mr := multipart.NewReader(body, params["boundary"])
-	var fallback []byte
+	mr := multipart.NewReader(bytes.NewReader(body), params["boundary"])
 	for {
 		part, err := mr.NextPart()
 		if err == io.EOF {
-			return fallback, nil
+			return nil, errNoFilePart
 		}
-		if err != nil {
-			return nil, err
-		}
-		data, err := io.ReadAll(part)
 		if err != nil {
 			return nil, err
 		}
 		if part.FileName() != "" {
-			return data, nil
-		}
-		if fallback == nil {
-			fallback = data
+			return io.ReadAll(part)
 		}
 	}
 }

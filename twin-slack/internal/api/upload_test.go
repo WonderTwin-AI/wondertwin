@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/api"
 )
 
 // uploadTicket asks for an upload URL and returns it with the file id.
@@ -103,6 +105,35 @@ func TestUploadStoresAMultipartFile(t *testing.T) {
 	}
 }
 
+func TestUploadWithoutAFilePartFails(t *testing.T) {
+	srv, _ := setupSlack(t)
+	u, id := uploadTicket(t, srv, "n.txt", 1)
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	_ = mw.WriteField("filename", "not the file")
+	_ = mw.Close()
+
+	if code := postBytes(t, u, mw.FormDataContentType(), body.Bytes()); code != http.StatusBadRequest {
+		t.Fatalf("upload status = %d, want 400", code)
+	}
+	if size := fileInfo(t, srv, id)["size"]; size != float64(1) {
+		t.Errorf("size = %v, want the announced 1 (nothing stored)", size)
+	}
+}
+
+func TestUploadOverTheLimitFails(t *testing.T) {
+	api.SetMaxUploadBytes(t, 4)
+	srv, _ := setupSlack(t)
+	u, id := uploadTicket(t, srv, "big.txt", 1)
+	if code := postBytes(t, u, "application/octet-stream", []byte("0123456789")); code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("upload status = %d, want 413", code)
+	}
+	if size := fileInfo(t, srv, id)["size"]; size != float64(1) {
+		t.Errorf("size = %v, want the announced 1 (nothing stored)", size)
+	}
+}
+
 func TestUploadToAnUnknownTicketFails(t *testing.T) {
 	srv, _ := setupSlack(t)
 	if code := postBytes(t, srv.URL+"/upload/v1/F_NOPE", "", []byte("x")); code == 200 {
@@ -165,6 +196,23 @@ func TestCompleteUploadErrors(t *testing.T) {
 			status, m := call(t, srv, "POST", "/api/files.completeUploadExternal", formType, c.form.Encode(), true)
 			wantError(t, status, m, c.want)
 		})
+	}
+}
+
+func TestCompleteUploadWithAnUnknownFileSharesNothing(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "general")
+	_, id := uploadTicket(t, srv, "v.txt", 1)
+	form := url.Values{"files": {`[{"id":"` + id + `","title":"Changed"},{"id":"F_NOPE"}]`}, "channel_id": {ch}}
+	status, m := call(t, srv, "POST", "/api/files.completeUploadExternal", formType, form.Encode(), true)
+	wantError(t, status, m, "file_not_found")
+
+	info := fileInfo(t, srv, id)
+	if chans, _ := info["channels"].([]any); len(chans) != 0 {
+		t.Errorf("a failed complete shared the valid file: channels = %v", chans)
+	}
+	if info["title"] != "v.txt" {
+		t.Errorf("a failed complete changed the title: %v", info["title"])
 	}
 }
 

@@ -73,13 +73,19 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		share = append(share, c)
 	}
 
-	completed := []map[string]any{}
-	for _, f := range req.Files {
+	files := make([]store.File, len(req.Files))
+	for i, f := range req.Files {
 		file, ok := h.store.Files.Get(f.ID)
 		if !ok {
 			slackError(w, "file_not_found")
 			return
 		}
+		files[i] = file
+	}
+
+	completed := []map[string]any{}
+	for i, f := range req.Files {
+		file := files[i]
 		if f.Title != "" {
 			file.Title = f.Title
 		}
