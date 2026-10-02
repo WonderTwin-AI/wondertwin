@@ -10,12 +10,15 @@ non-zero if any case fails. run.sh drives both SDK suites.
 import json
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from http.client import HTTPConnection
 from urllib.parse import urlsplit
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.signature import SignatureVerifier
 from slack_sdk.version import __version__
 
 BASE = os.environ.get("SLACK_EMULATOR_URL", "http://localhost:4197").rstrip("/")
@@ -153,6 +156,61 @@ def case_react_pin_bookmark():
     assert any(b["link"] == "https://example.com/runbook" for b in bookmarks["bookmarks"])
 
 
+def case_events_http_receive():
+    # A local receiver stands in for the app's Request URL. It fails the first
+    # delivery, so the event arrives a second time as retry 1. The official
+    # SignatureVerifier checks every delivery.
+    got = []
+
+    class Receiver(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            got.append((dict(self.headers), body))
+            self.send_response(500 if len(got) == 1 else 200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    receiver = HTTPServer(("127.0.0.1", 0), Receiver)
+    threading.Thread(target=receiver.serve_forever, daemon=True).start()
+    secret = f"smoke-python-{int(time.time() * 1000):x}"
+
+    def configure(cfg):
+        conn = HTTPConnection(urlsplit(BASE).netloc)
+        conn.request("POST", "/admin/events/config", json.dumps(cfg), {"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        resp.read()
+        conn.close()
+        assert resp.status == 200
+
+    try:
+        configure({"request_url": f"http://127.0.0.1:{receiver.server_port}/slack/events",
+                   "signing_secret": secret, "retry_delays_ms": [0, 0, 0]})
+        channel = new_channel()
+        posted = client.chat_postMessage(channel=channel, text="deploy started")
+        for _ in range(200):
+            if len(got) >= 2:
+                break
+            time.sleep(0.025)
+        assert len(got) == 2, f"the failed delivery is retried once and then succeeds, got {len(got)}"
+        verifier = SignatureVerifier(signing_secret=secret)
+        for headers, body in got:
+            assert verifier.is_valid_request(body, headers), "SignatureVerifier rejected the delivery"
+        lower = [{k.lower(): v for k, v in h.items()} for h, _ in got]
+        assert "x-slack-retry-num" not in lower[0]
+        assert lower[1]["x-slack-retry-num"] == "1"
+        assert lower[1]["x-slack-retry-reason"] == "http_error"
+        env = json.loads(got[1][1])
+        assert env["type"] == "event_callback"
+        assert env["event"]["type"] == "message"
+        assert env["event"]["channel"] == channel
+        assert env["event"]["ts"] == posted["ts"]
+    finally:
+        configure({"request_url": ""})
+        receiver.shutdown()
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -228,6 +286,7 @@ CASES = {
     "slack-app-home-publish": case_app_home_publish,
     "slack-dm-user": case_dm_user,
     "slack-react-pin-bookmark": case_react_pin_bookmark,
+    "slack-events-http-receive": case_events_http_receive,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,

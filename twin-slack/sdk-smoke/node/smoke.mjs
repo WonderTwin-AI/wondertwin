@@ -8,6 +8,8 @@
 
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createServer} from 'node:http';
+import {createHmac} from 'node:crypto';
 import {WebClient, LogLevel, ErrorCode} from '@slack/web-api';
 
 const base = (process.env.SLACK_EMULATOR_URL || 'http://localhost:4197').replace(/\/$/, '');
@@ -169,6 +171,51 @@ const cases = {
     await web.bookmarks.add({channel_id: channel, title: 'Runbook', type: 'link', link: 'https://example.com/runbook'});
     const bookmarks = await web.bookmarks.list({channel_id: channel});
     assert.ok(bookmarks.bookmarks.some((b) => b.link === 'https://example.com/runbook'));
+  },
+
+  async 'slack-events-http-receive'() {
+    // A local receiver stands in for the app's Request URL. It fails the first
+    // delivery, so the event arrives a second time as retry 1.
+    const got = [];
+    const receiver = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', () => {
+        got.push({headers: req.headers, body});
+        res.writeHead(got.length === 1 ? 500 : 200).end();
+      });
+    });
+    await new Promise((resolve) => receiver.listen(0, '127.0.0.1', resolve));
+    const secret = `smoke-node-${unique()}`;
+    const configure = (cfg) => fetch(`${base}/admin/events/config`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg),
+    });
+    try {
+      await configure({request_url: `http://127.0.0.1:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
+      const channel = await newChannel();
+      const posted = await web.chat.postMessage({channel, text: 'deploy started'});
+      for (let i = 0; i < 200 && got.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
+      assert.equal(got.length, 2, 'the failed delivery is retried once and then succeeds');
+      for (const {headers, body} of got) {
+        // The documented scheme: v0= hex HMAC-SHA256 of v0:{timestamp}:{body}.
+        const ts = headers['x-slack-request-timestamp'];
+        assert.ok(Math.abs(Date.now() / 1000 - Number(ts)) < 300, 'the timestamp is current');
+        const want = 'v0=' + createHmac('sha256', secret).update(`v0:${ts}:${body}`).digest('hex');
+        assert.equal(headers['x-slack-signature'], want);
+      }
+      assert.equal(got[0].headers['x-slack-retry-num'], undefined);
+      assert.equal(got[1].headers['x-slack-retry-num'], '1');
+      assert.equal(got[1].headers['x-slack-retry-reason'], 'http_error');
+      const env = JSON.parse(got[1].body);
+      assert.equal(env.type, 'event_callback');
+      assert.equal(env.event.type, 'message');
+      assert.equal(env.event.channel, channel);
+      assert.equal(env.event.ts, posted.ts);
+      assert.equal(env.event.text, 'deploy started');
+    } finally {
+      await configure({request_url: ''});
+      receiver.close();
+    }
   },
 
   async 'slack-message-lifecycle'() {
