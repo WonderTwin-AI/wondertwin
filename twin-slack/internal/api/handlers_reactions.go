@@ -14,7 +14,7 @@ func (h *Handler) ReactionsAdd(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *Handler) ReactionsRemove(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *Handler) ReactionsGet(w http.ResponseWriter, r *http.Request) {
 		Timestamp string `json:"timestamp"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 

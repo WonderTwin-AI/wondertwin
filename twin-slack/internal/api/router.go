@@ -23,145 +23,150 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 }
 
 // Routes mounts the Slack Web API-compatible routes.
-// Slack uses POST to method-name paths: /api/chat.postMessage, /api/conversations.list, etc.
+// Methods live at /api/{method}, for example /api/chat.postMessage, and answer
+// both GET and POST. Arguments are decoded once, by argsMiddleware, whichever
+// way the client sent them; a request that cannot be decoded is reported after
+// authentication.
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/api", func(r chi.Router) {
+		r.Use(argsMiddleware)
 		r.Use(h.bearerAuthMiddleware)
+		r.Use(argsErrorMiddleware)
 		r.Use(h.mw.FaultInjection)
 
 		// auth.*
-		r.Post("/auth.test", h.AuthTest)
-		r.Post("/auth.revoke", h.AuthRevoke)
+		route(r, "auth.test", h.AuthTest)
+		route(r, "auth.revoke", h.AuthRevoke)
 
 		// chat.*
-		r.Post("/chat.postMessage", h.ChatPostMessage)
-		r.Post("/chat.postEphemeral", h.ChatPostEphemeral)
-		r.Post("/chat.update", h.ChatUpdate)
-		r.Post("/chat.delete", h.ChatDelete)
-		r.Post("/chat.getPermalink", h.ChatGetPermalink)
-		r.Post("/chat.scheduleMessage", h.ChatScheduleMessage)
-		r.Post("/chat.deleteScheduledMessage", h.ChatDeleteScheduledMessage)
-		r.Post("/chat.scheduledMessages.list", h.ChatScheduledMessagesList)
-		r.Post("/chat.meMessage", h.ChatMeMessage)
-		r.Post("/chat.unfurl", h.ChatUnfurl)
+		route(r, "chat.postMessage", h.ChatPostMessage)
+		route(r, "chat.postEphemeral", h.ChatPostEphemeral)
+		route(r, "chat.update", h.ChatUpdate)
+		route(r, "chat.delete", h.ChatDelete)
+		route(r, "chat.getPermalink", h.ChatGetPermalink)
+		route(r, "chat.scheduleMessage", h.ChatScheduleMessage)
+		route(r, "chat.deleteScheduledMessage", h.ChatDeleteScheduledMessage)
+		route(r, "chat.scheduledMessages.list", h.ChatScheduledMessagesList)
+		route(r, "chat.meMessage", h.ChatMeMessage)
+		route(r, "chat.unfurl", h.ChatUnfurl)
 
 		// conversations.*
-		r.Post("/conversations.list", h.ConversationsList)
-		r.Post("/conversations.info", h.ConversationsInfo)
-		r.Post("/conversations.history", h.ConversationsHistory)
-		r.Post("/conversations.replies", h.ConversationsReplies)
-		r.Post("/conversations.members", h.ConversationsMembers)
-		r.Post("/conversations.create", h.ConversationsCreate)
-		r.Post("/conversations.archive", h.ConversationsArchive)
-		r.Post("/conversations.unarchive", h.ConversationsUnarchive)
-		r.Post("/conversations.rename", h.ConversationsRename)
-		r.Post("/conversations.setPurpose", h.ConversationsSetPurpose)
-		r.Post("/conversations.setTopic", h.ConversationsSetTopic)
-		r.Post("/conversations.invite", h.ConversationsInvite)
-		r.Post("/conversations.kick", h.ConversationsKick)
-		r.Post("/conversations.join", h.ConversationsJoin)
-		r.Post("/conversations.leave", h.ConversationsLeave)
-		r.Post("/conversations.open", h.ConversationsOpen)
-		r.Post("/conversations.close", h.ConversationsClose)
-		r.Post("/conversations.mark", h.ConversationsMark)
+		route(r, "conversations.list", h.ConversationsList)
+		route(r, "conversations.info", h.ConversationsInfo)
+		route(r, "conversations.history", h.ConversationsHistory)
+		route(r, "conversations.replies", h.ConversationsReplies)
+		route(r, "conversations.members", h.ConversationsMembers)
+		route(r, "conversations.create", h.ConversationsCreate)
+		route(r, "conversations.archive", h.ConversationsArchive)
+		route(r, "conversations.unarchive", h.ConversationsUnarchive)
+		route(r, "conversations.rename", h.ConversationsRename)
+		route(r, "conversations.setPurpose", h.ConversationsSetPurpose)
+		route(r, "conversations.setTopic", h.ConversationsSetTopic)
+		route(r, "conversations.invite", h.ConversationsInvite)
+		route(r, "conversations.kick", h.ConversationsKick)
+		route(r, "conversations.join", h.ConversationsJoin)
+		route(r, "conversations.leave", h.ConversationsLeave)
+		route(r, "conversations.open", h.ConversationsOpen)
+		route(r, "conversations.close", h.ConversationsClose)
+		route(r, "conversations.mark", h.ConversationsMark)
 
 		// users.*
-		r.Post("/users.list", h.UsersList)
-		r.Post("/users.info", h.UsersInfo)
-		r.Post("/users.lookupByEmail", h.UsersLookupByEmail)
-		r.Post("/users.conversations", h.UsersConversations)
-		r.Post("/users.profile.get", h.UsersProfileGet)
-		r.Post("/users.profile.set", h.UsersProfileSet)
-		r.Post("/users.getPresence", h.UsersGetPresence)
-		r.Post("/users.setPresence", h.UsersSetPresence)
-		r.Post("/users.identity", h.UsersIdentity)
-		r.Post("/users.setPhoto", h.UsersSetPhoto)
-		r.Post("/users.deletePhoto", h.UsersDeletePhoto)
+		route(r, "users.list", h.UsersList)
+		route(r, "users.info", h.UsersInfo)
+		route(r, "users.lookupByEmail", h.UsersLookupByEmail)
+		route(r, "users.conversations", h.UsersConversations)
+		route(r, "users.profile.get", h.UsersProfileGet)
+		route(r, "users.profile.set", h.UsersProfileSet)
+		route(r, "users.getPresence", h.UsersGetPresence)
+		route(r, "users.setPresence", h.UsersSetPresence)
+		route(r, "users.identity", h.UsersIdentity)
+		route(r, "users.setPhoto", h.UsersSetPhoto)
+		route(r, "users.deletePhoto", h.UsersDeletePhoto)
 
 		// reactions.*
-		r.Post("/reactions.add", h.ReactionsAdd)
-		r.Post("/reactions.remove", h.ReactionsRemove)
-		r.Post("/reactions.get", h.ReactionsGet)
-		r.Post("/reactions.list", h.ReactionsList)
+		route(r, "reactions.add", h.ReactionsAdd)
+		route(r, "reactions.remove", h.ReactionsRemove)
+		route(r, "reactions.get", h.ReactionsGet)
+		route(r, "reactions.list", h.ReactionsList)
 
 		// pins.*
-		r.Post("/pins.add", h.PinsAdd)
-		r.Post("/pins.remove", h.PinsRemove)
-		r.Post("/pins.list", h.PinsList)
+		route(r, "pins.add", h.PinsAdd)
+		route(r, "pins.remove", h.PinsRemove)
+		route(r, "pins.list", h.PinsList)
 
 		// files.*
-		r.Post("/files.getUploadURLExternal", h.FilesGetUploadURLExternal)
-		r.Post("/files.completeUploadExternal", h.FilesCompleteUploadExternal)
-		r.Post("/files.list", h.FilesList)
-		r.Post("/files.info", h.FilesInfo)
-		r.Post("/files.delete", h.FilesDelete)
-		r.Post("/files.sharedPublicURL", h.FilesSharedPublicURL)
-		r.Post("/files.revokePublicURL", h.FilesRevokePublicURL)
-		r.Post("/files.upload", h.FilesUploadLegacy)
+		route(r, "files.getUploadURLExternal", h.FilesGetUploadURLExternal)
+		route(r, "files.completeUploadExternal", h.FilesCompleteUploadExternal)
+		route(r, "files.list", h.FilesList)
+		route(r, "files.info", h.FilesInfo)
+		route(r, "files.delete", h.FilesDelete)
+		route(r, "files.sharedPublicURL", h.FilesSharedPublicURL)
+		route(r, "files.revokePublicURL", h.FilesRevokePublicURL)
+		route(r, "files.upload", h.FilesUploadLegacy)
 
 		// bookmarks.*
-		r.Post("/bookmarks.add", h.BookmarksAdd)
-		r.Post("/bookmarks.edit", h.BookmarksEdit)
-		r.Post("/bookmarks.list", h.BookmarksList)
-		r.Post("/bookmarks.remove", h.BookmarksRemove)
+		route(r, "bookmarks.add", h.BookmarksAdd)
+		route(r, "bookmarks.edit", h.BookmarksEdit)
+		route(r, "bookmarks.list", h.BookmarksList)
+		route(r, "bookmarks.remove", h.BookmarksRemove)
 
 		// reminders.*
-		r.Post("/reminders.add", h.RemindersAdd)
-		r.Post("/reminders.complete", h.RemindersComplete)
-		r.Post("/reminders.delete", h.RemindersDelete)
-		r.Post("/reminders.info", h.RemindersInfo)
-		r.Post("/reminders.list", h.RemindersList)
+		route(r, "reminders.add", h.RemindersAdd)
+		route(r, "reminders.complete", h.RemindersComplete)
+		route(r, "reminders.delete", h.RemindersDelete)
+		route(r, "reminders.info", h.RemindersInfo)
+		route(r, "reminders.list", h.RemindersList)
 
 		// views.*
-		r.Post("/views.open", h.ViewsOpen)
-		r.Post("/views.push", h.ViewsPush)
-		r.Post("/views.update", h.ViewsUpdate)
-		r.Post("/views.publish", h.ViewsPublish)
+		route(r, "views.open", h.ViewsOpen)
+		route(r, "views.push", h.ViewsPush)
+		route(r, "views.update", h.ViewsUpdate)
+		route(r, "views.publish", h.ViewsPublish)
 
 		// emoji.*
-		r.Post("/emoji.list", h.EmojiList)
+		route(r, "emoji.list", h.EmojiList)
 
 		// team.*
-		r.Post("/team.info", h.TeamInfo)
-		r.Post("/team.accessLogs", h.TeamAccessLogs)
-		r.Post("/team.billableInfo", h.TeamBillableInfo)
-		r.Post("/team.integrationLogs", h.TeamIntegrationLogs)
-		r.Post("/team.profile.get", h.TeamProfileGet)
+		route(r, "team.info", h.TeamInfo)
+		route(r, "team.accessLogs", h.TeamAccessLogs)
+		route(r, "team.billableInfo", h.TeamBillableInfo)
+		route(r, "team.integrationLogs", h.TeamIntegrationLogs)
+		route(r, "team.profile.get", h.TeamProfileGet)
 
 		// bots.*
-		r.Post("/bots.info", h.BotsInfo)
+		route(r, "bots.info", h.BotsInfo)
 
 		// usergroups.*
-		r.Post("/usergroups.list", h.UsergroupsList)
-		r.Post("/usergroups.create", h.UsergroupsCreate)
-		r.Post("/usergroups.update", h.UsergroupsUpdate)
-		r.Post("/usergroups.disable", h.UsergroupsDisable)
-		r.Post("/usergroups.enable", h.UsergroupsEnable)
-		r.Post("/usergroups.users.list", h.UsergroupsUsersList)
-		r.Post("/usergroups.users.update", h.UsergroupsUsersUpdate)
+		route(r, "usergroups.list", h.UsergroupsList)
+		route(r, "usergroups.create", h.UsergroupsCreate)
+		route(r, "usergroups.update", h.UsergroupsUpdate)
+		route(r, "usergroups.disable", h.UsergroupsDisable)
+		route(r, "usergroups.enable", h.UsergroupsEnable)
+		route(r, "usergroups.users.list", h.UsergroupsUsersList)
+		route(r, "usergroups.users.update", h.UsergroupsUsersUpdate)
 
 		// dnd.*
-		r.Post("/dnd.info", h.DndInfo)
-		r.Post("/dnd.setSnooze", h.DndSetSnooze)
-		r.Post("/dnd.endSnooze", h.DndEndSnooze)
-		r.Post("/dnd.endDnd", h.DndEndDnd)
-		r.Post("/dnd.teamInfo", h.DndTeamInfo)
+		route(r, "dnd.info", h.DndInfo)
+		route(r, "dnd.setSnooze", h.DndSetSnooze)
+		route(r, "dnd.endSnooze", h.DndEndSnooze)
+		route(r, "dnd.endDnd", h.DndEndDnd)
+		route(r, "dnd.teamInfo", h.DndTeamInfo)
 
 		// search.*
-		r.Post("/search.messages", h.SearchMessages)
-		r.Post("/search.files", h.SearchFiles)
-		r.Post("/search.all", h.SearchAll)
+		route(r, "search.messages", h.SearchMessages)
+		route(r, "search.files", h.SearchFiles)
+		route(r, "search.all", h.SearchAll)
 
 		// stars.*
-		r.Post("/stars.add", h.StarsAdd)
-		r.Post("/stars.remove", h.StarsRemove)
-		r.Post("/stars.list", h.StarsList)
+		route(r, "stars.add", h.StarsAdd)
+		route(r, "stars.remove", h.StarsRemove)
+		route(r, "stars.list", h.StarsList)
 
 		// oauth.*
-		r.Post("/oauth.v2.access", h.OAuthV2Access)
+		route(r, "oauth.v2.access", h.OAuthV2Access)
 
 		// dialog.*
-		r.Post("/dialog.open", h.DialogOpen)
+		route(r, "dialog.open", h.DialogOpen)
 	})
 
 	// Admin extras (no auth required)
@@ -208,15 +213,4 @@ func slackError(w http.ResponseWriter, code string) {
 		"ok":    false,
 		"error": code,
 	})
-}
-
-// parseJSON reads JSON body from the request. Slack accepts both JSON and form-encoded.
-func parseJSON(r *http.Request, v any) error {
-	ct := r.Header.Get("Content-Type")
-	if strings.Contains(ct, "application/json") {
-		return json.NewDecoder(r.Body).Decode(v)
-	}
-	// For form-encoded, Slack SDKs still send JSON body with JSON content type.
-	// Fall back to trying JSON anyway.
-	return json.NewDecoder(r.Body).Decode(v)
 }

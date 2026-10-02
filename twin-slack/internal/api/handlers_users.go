@@ -22,7 +22,7 @@ func (h *Handler) UsersInfo(w http.ResponseWriter, r *http.Request) {
 		User string `json:"user"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (h *Handler) UsersLookupByEmail(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 		} `json:"profile"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -170,7 +170,7 @@ func (h *Handler) UsersSetPresence(w http.ResponseWriter, r *http.Request) {
 		Presence string `json:"presence"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 

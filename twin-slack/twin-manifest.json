@@ -3,7 +3,7 @@
   "vendor_domain": "slack.com",
   "tier": "community",
   "category": "workspace",
-  "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more.",
+  "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more. Every method answers GET and POST, and arguments are accepted as a query string, a form body, multipart, text/plain or JSON, as Slack accepts them.",
   "sdk_target": {
     "primary": {
       "package": "github.com/slack-go/slack",

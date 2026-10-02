@@ -23,7 +23,7 @@ func (h *Handler) FilesSharedPublicURL(w http.ResponseWriter, r *http.Request) {
 		File string `json:"file"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
@@ -44,7 +44,7 @@ func (h *Handler) FilesRevokePublicURL(w http.ResponseWriter, r *http.Request) {
 		File string `json:"file"`
 	}
 	if err := parseJSON(r, &req); err != nil {
-		slackError(w, "invalid_json")
+		slackArgsError(w, err)
 		return
 	}
 
