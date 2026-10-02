@@ -646,7 +646,9 @@ func conversationTypes(arg string) (map[string]bool, bool) {
 }
 
 // visibleTo reports whether a caller can list a conversation: any public
-// channel, and other conversations only when the caller is a member.
+// channel, and other conversations only when the caller is a member. The
+// users.conversations docs state this rule; applying it to conversations.list
+// is an unverified guess to confirm at the next sandbox refresh.
 func visibleTo(ch store.Channel, user string) bool {
 	return conversationType(ch) == "public_channel" || slices.Contains(ch.Members, user)
 }
