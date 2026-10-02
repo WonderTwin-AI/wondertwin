@@ -13,12 +13,22 @@ func (h *Handler) ConversationsList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Cursor string `json:"cursor"`
 		Limit  int    `json:"limit"`
+		Types  string `json:"types"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
-	channels, next, err := pageOf(h.store.Channels.List(), func(c store.Channel) string { return c.ID },
+	types, ok := conversationTypes(req.Types)
+	if !ok {
+		slackError(w, "invalid_types")
+		return
+	}
+	caller := callerUserID(r)
+	listed := h.store.Channels.Filter(func(_ string, ch store.Channel) bool {
+		return types[conversationType(ch)] && visibleTo(ch, caller)
+	})
+	channels, next, err := pageOf(listed, func(c store.Channel) string { return c.ID },
 		pageConversationsList, req.Cursor, req.Limit)
 	if err != nil {
 		slackError(w, "invalid_cursor")
@@ -601,4 +611,42 @@ func splitParts(s string) []string {
 	}
 	parts = append(parts, s[start:])
 	return parts
+}
+
+// conversationType names a conversation the way the types argument does.
+func conversationType(ch store.Channel) string {
+	switch {
+	case ch.IsIM:
+		return "im"
+	case ch.IsMPIM:
+		return "mpim"
+	case ch.IsPrivate:
+		return "private_channel"
+	}
+	return "public_channel"
+}
+
+// conversationTypes reads a types argument. Slack's default is public
+// channels only; a name that is not a conversation type is invalid_types.
+func conversationTypes(arg string) (map[string]bool, bool) {
+	if strings.TrimSpace(arg) == "" {
+		return map[string]bool{"public_channel": true}, true
+	}
+	out := map[string]bool{}
+	for _, t := range strings.Split(arg, ",") {
+		t = strings.TrimSpace(t)
+		switch t {
+		case "public_channel", "private_channel", "mpim", "im":
+			out[t] = true
+		default:
+			return nil, false
+		}
+	}
+	return out, true
+}
+
+// visibleTo reports whether a caller can list a conversation: any public
+// channel, and other conversations only when the caller is a member.
+func visibleTo(ch store.Channel, user string) bool {
+	return conversationType(ch) == "public_channel" || slices.Contains(ch.Members, user)
 }

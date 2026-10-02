@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -71,24 +72,30 @@ func (h *Handler) UsersConversations(w http.ResponseWriter, r *http.Request) {
 		User   string `json:"user"`
 		Cursor string `json:"cursor"`
 		Limit  int    `json:"limit"`
+		Types  string `json:"types"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
+	types, ok := conversationTypes(req.Types)
+	if !ok {
+		slackError(w, "invalid_types")
+		return
+	}
+	caller := callerUserID(r)
 
 	userID := req.User
 	if userID == "" {
 		userID = "U_BOT"
 	}
 
+	// Another user's non-public conversations are listed only where the
+	// caller is a member too.
 	var member []store.Channel
 	for _, ch := range h.store.Channels.List() {
-		for _, m := range ch.Members {
-			if m == userID {
-				member = append(member, ch)
-				break
-			}
+		if types[conversationType(ch)] && slices.Contains(ch.Members, userID) && visibleTo(ch, caller) {
+			member = append(member, ch)
 		}
 	}
 
