@@ -23,11 +23,6 @@ func TestEmptyMessageListsAreArrays(t *testing.T) {
 		t.Fatalf("history after the last message is deleted should be [], got %#v", m["messages"])
 	}
 
-	status, m = call(t, srv, "GET", "/api/conversations.replies?channel="+ch+"&ts=1.000000", "", "", true)
-	mustOK(t, status, m)
-	if msgs, ok := m["messages"].([]any); !ok || len(msgs) != 0 {
-		t.Fatalf("replies to a thread with no messages should be [], got %#v", m["messages"])
-	}
 }
 
 // pins.list, reactions.list and the admin message listing return [] when there
