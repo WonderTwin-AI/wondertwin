@@ -136,6 +136,12 @@ type stateSnapshot struct {
 	Files             map[string]File             `json:"files,omitempty"`
 	ScheduledMessages map[string]ScheduledMessage `json:"scheduled_messages,omitempty"`
 	Tokens            map[string]Token            `json:"tokens,omitempty"`
+	Pins              map[string]Pin              `json:"pins,omitempty"`
+	Bookmarks         map[string]Bookmark         `json:"bookmarks,omitempty"`
+	Reminders         map[string]Reminder         `json:"reminders,omitempty"`
+	Usergroups        map[string]Usergroup        `json:"usergroups,omitempty"`
+	Stars             map[string]Star             `json:"stars,omitempty"`
+	DndStatuses       map[string]DndStatus        `json:"dnd_statuses,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
 }
 
@@ -147,6 +153,12 @@ func (s *MemoryStore) Snapshot() any {
 		Files:             s.Files.Snapshot(),
 		ScheduledMessages: s.ScheduledMessages.Snapshot(),
 		Tokens:            s.Tokens.Snapshot(),
+		Pins:              s.Pins.Snapshot(),
+		Bookmarks:         s.Bookmarks.Snapshot(),
+		Reminders:         s.Reminders.Snapshot(),
+		Usergroups:        s.Usergroups.Snapshot(),
+		Stars:             s.Stars.Snapshot(),
+		DndStatuses:       s.dndSnapshot(),
 		Team:              &s.Team,
 	}
 }
@@ -174,6 +186,24 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Tokens != nil {
 		s.Tokens.LoadSnapshot(snap.Tokens)
 	}
+	if snap.Pins != nil {
+		s.Pins.LoadSnapshot(snap.Pins)
+	}
+	if snap.Bookmarks != nil {
+		s.Bookmarks.LoadSnapshot(snap.Bookmarks)
+	}
+	if snap.Reminders != nil {
+		s.Reminders.LoadSnapshot(snap.Reminders)
+	}
+	if snap.Usergroups != nil {
+		s.Usergroups.LoadSnapshot(snap.Usergroups)
+	}
+	if snap.Stars != nil {
+		s.Stars.LoadSnapshot(snap.Stars)
+	}
+	if snap.DndStatuses != nil {
+		s.DndStatuses = snap.DndStatuses
+	}
 	if snap.Team != nil {
 		s.Team = *snap.Team
 	}
@@ -196,4 +226,14 @@ func (s *MemoryStore) Reset() {
 	s.Clock.Reset()
 	s.tsCounter.Store(0)
 	s.Team = Team{ID: "T0001", Name: "WonderTwin", Domain: "wondertwin"}
+}
+
+// dndSnapshot copies the Do Not Disturb state, so a snapshot does not share the
+// live map.
+func (s *MemoryStore) dndSnapshot() map[string]DndStatus {
+	out := make(map[string]DndStatus, len(s.DndStatuses))
+	for k, v := range s.DndStatuses {
+		out[k] = v
+	}
+	return out
 }
