@@ -58,6 +58,20 @@ def case_read_history_paginated():
     assert pages == 3, pages
 
 
+def case_upload_file_external():
+    # files_upload_v2 drives the three-step external upload: get an upload URL,
+    # POST the bytes to it, then complete the upload into a channel.
+    channel = new_channel()
+    content = b"release notes for the smoke test\n"
+    res = client.files_upload_v2(channel=channel, content=content, filename="notes.txt", title="Notes")
+    assert res["ok"] is True
+    file_id = res["files"][0]["id"]
+    info = client.files_info(file=file_id)
+    assert info["file"]["id"] == file_id
+    assert channel in info["file"]["channels"], info["file"].get("channels")
+    assert info["file"]["size"] == len(content), info["file"].get("size")
+
+
 def case_message_lifecycle():
     channel = new_channel()
     posted = client.chat_postMessage(channel=channel, text="draft")
@@ -128,6 +142,7 @@ def case_error_invalid_auth():
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-read-history-paginated": case_read_history_paginated,
+    "slack-upload-file-external": case_upload_file_external,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
