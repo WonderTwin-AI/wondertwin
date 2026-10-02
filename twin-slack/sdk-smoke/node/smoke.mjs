@@ -21,6 +21,10 @@ const web = new WebClient(TOKEN, {
   logLevel: LogLevel.ERROR,
 });
 
+function client(token) {
+  return new WebClient(token, {slackApiUrl: `${base}/api/`, retryConfig: {retries: 0}, logLevel: LogLevel.ERROR});
+}
+
 let counter = 0;
 const unique = () => `${Date.now().toString(36)}${counter++}`;
 
@@ -79,6 +83,39 @@ const cases = {
 
   async 'error-channel-not-found'() {
     assert.equal(await platformError(() => web.chat.postMessage({channel: 'C0NOSUCH', text: 'x'})), 'channel_not_found');
+  },
+
+  async 'slack-auth-test-reflects-token'() {
+    const bot = await web.auth.test();
+    assert.ok(bot.bot_id, 'a bot token carries a bot_id');
+    const userClient = client('xoxp-sdk-smoke-node-user');
+    const user = await userClient.auth.test();
+    assert.ok(!user.bot_id, 'a user token has no bot_id');
+    assert.notEqual(user.user_id, bot.user_id);
+    assert.equal(user.team_id, bot.team_id);
+  },
+
+  async 'slack-api-test'() {
+    const res = await new WebClient(undefined, {slackApiUrl: `${base}/api/`, retryConfig: {retries: 0}, logLevel: LogLevel.ERROR}).api.test({foo: 'bar'});
+    assert.equal(res.ok, true);
+    assert.equal(res.args.foo, 'bar');
+    assert.equal(await platformError(() => web.api.test({error: 'my_error'})), 'my_error');
+  },
+
+  async 'slack-auth-revoke'() {
+    const doomed = client(`xoxb-sdk-smoke-node-revoke-${unique()}`);
+    assert.equal((await doomed.auth.revoke()).revoked, true);
+    assert.equal(await platformError(() => doomed.auth.test()), 'token_revoked');
+    assert.equal((await web.auth.test()).ok, true);
+  },
+
+  async 'error-not-authed'() {
+    const anonymous = client(undefined);
+    assert.equal(await platformError(() => anonymous.auth.test()), 'not_authed');
+  },
+
+  async 'error-invalid-auth'() {
+    assert.equal(await platformError(() => client('not-a-slack-token').auth.test()), 'invalid_auth');
   },
 };
 
