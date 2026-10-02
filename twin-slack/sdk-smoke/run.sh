@@ -3,7 +3,7 @@
 #
 # Builds twin-slack, starts it the way lstk launches an app emulator
 # (--port=N, ready when GET /admin/health returns {"status":"ok"}), and runs
-# every covered MVP use case through the official SDKs pinned in
+# every covered MVP use case and error case through the official SDKs pinned in
 # node/package-lock.json (@slack/web-api) and python/uv.lock (slack-sdk).
 # Test-only: nothing here is part of the Go build.
 #
