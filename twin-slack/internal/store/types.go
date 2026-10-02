@@ -166,15 +166,18 @@ type Reminder struct {
 
 // Usergroup represents a Slack user group (handle).
 type Usergroup struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Handle      string   `json:"handle"`
-	Description string   `json:"description"`
-	IsEnabled   bool     `json:"is_usergroup"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Handle      string `json:"handle"`
+	Description string `json:"description"`
+	// IsUsergroup is always true: Slack uses it to mark the object as a user
+	// group. A disabled group is the one with a DateDelete.
+	IsUsergroup bool     `json:"is_usergroup"`
 	Users       []string `json:"users,omitempty"`
 	CreatedBy   string   `json:"created_by"`
 	DateCreate  int64    `json:"date_create"`
 	DateUpdate  int64    `json:"date_update"`
+	DateDelete  int64    `json:"date_delete"`
 }
 
 // Star represents a starred item.
