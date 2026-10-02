@@ -13,6 +13,7 @@ import sys
 import time
 
 from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 from slack_sdk.version import __version__
 
 BASE = os.environ.get("SLACK_EMULATOR_URL", "http://localhost:4197").rstrip("/")
@@ -57,9 +58,30 @@ def case_message_lifecycle():
     assert not [m for m in history["messages"] if m["ts"] == posted["ts"]]
 
 
+def platform_error(fn):
+    try:
+        fn()
+    except SlackApiError as err:
+        return err.response["error"]
+    raise AssertionError("expected the call to fail")
+
+
+def case_error_unknown_method():
+    # channels.list was retired by Slack in 2021. Slack answers it, and a name
+    # that never existed, with unknown_method.
+    assert platform_error(lambda: client.api_call("channels.list")) == "unknown_method"
+    assert platform_error(lambda: client.api_call("definitely.notAMethod")) == "unknown_method"
+
+
+def case_error_channel_not_found():
+    assert platform_error(lambda: client.chat_postMessage(channel="C0NOSUCH", text="x")) == "channel_not_found"
+
+
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-message-lifecycle": case_message_lifecycle,
+    "error-unknown-method": case_error_unknown_method,
+    "error-channel-not-found": case_error_channel_not_found,
 }
 
 

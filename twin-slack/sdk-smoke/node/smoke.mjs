@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {WebClient, LogLevel} from '@slack/web-api';
+import {WebClient, LogLevel, ErrorCode} from '@slack/web-api';
 
 const base = (process.env.SLACK_EMULATOR_URL || 'http://localhost:4197').replace(/\/$/, '');
 const TOKEN = 'xoxb-sdk-smoke-node';
@@ -28,6 +28,17 @@ async function newChannel() {
   const res = await web.conversations.create({name: `smoke-${unique()}`});
   assert.equal(res.ok, true);
   return res.channel.id;
+}
+
+
+async function platformError(fn) {
+  try {
+    await fn();
+  } catch (err) {
+    assert.equal(err.code, ErrorCode.PlatformError, `expected a platform error, got ${err.code}: ${err.message}`);
+    return err.data.error;
+  }
+  assert.fail('expected the call to fail');
 }
 
 const cases = {
@@ -57,6 +68,17 @@ const cases = {
     await web.chat.delete({channel, ts: posted.ts});
     history = await web.conversations.history({channel});
     assert.equal(history.messages.find((m) => m.ts === posted.ts), undefined);
+  },
+
+  async 'error-unknown-method'() {
+    // channels.list was retired by Slack in 2021. Slack answers it, and a name
+    // that never existed, with unknown_method.
+    assert.equal(await platformError(() => web.apiCall('channels.list')), 'unknown_method');
+    assert.equal(await platformError(() => web.apiCall('definitely.notAMethod')), 'unknown_method');
+  },
+
+  async 'error-channel-not-found'() {
+    assert.equal(await platformError(() => web.chat.postMessage({channel: 'C0NOSUCH', text: 'x'})), 'channel_not_found');
   },
 };
 
