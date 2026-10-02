@@ -49,6 +49,13 @@ def case_post_and_thread():
 
 def case_read_history_paginated():
     channel = new_channel()
+    # Find the channel the way an app does: page through conversations.list,
+    # which lists public channels and no direct messages by default. A DM
+    # exists, so the default list has one to leave out.
+    client.conversations_open(users=client.auth_test()["user_id"])
+    listed = [c for page in client.conversations_list(limit=200) for c in page["channels"]]
+    assert any(c["id"] == channel for c in listed), "conversations.list finds the channel"
+    assert all(not c.get("is_im") and not c.get("is_mpim") for c in listed), "no direct messages in the default list"
     for i in range(1, 6):
         client.chat_postMessage(channel=channel, text=f"m{i}")
     # Iterating the response follows response_metadata.next_cursor to the end.
