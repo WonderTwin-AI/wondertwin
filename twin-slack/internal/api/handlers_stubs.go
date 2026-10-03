@@ -220,8 +220,22 @@ func (h *Handler) BotsInfo(w http.ResponseWriter, r *http.Request) {
 
 // --- usergroups.* (stateful) ---
 
+// UsergroupsList lists enabled user groups, and disabled ones too with
+// include_disabled.
 func (h *Handler) UsergroupsList(w http.ResponseWriter, r *http.Request) {
-	ugs := h.store.Usergroups.List()
+	var req struct {
+		IncludeDisabled bool `json:"include_disabled"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	ugs := h.store.Usergroups.Filter(func(_ string, ug store.Usergroup) bool {
+		return req.IncludeDisabled || ug.DateDelete == 0
+	})
+	if ugs == nil {
+		ugs = []store.Usergroup{}
+	}
 	slackOK(w, map[string]any{"usergroups": ugs})
 }
 
@@ -237,7 +251,7 @@ func (h *Handler) UsergroupsCreate(w http.ResponseWriter, r *http.Request) {
 	id := h.store.Usergroups.NextID()
 	ug := store.Usergroup{
 		ID: id, Name: req.Name, Handle: req.Handle, Description: req.Description,
-		IsEnabled: true, CreatedBy: "U_BOT", DateCreate: now, DateUpdate: now,
+		IsUsergroup: true, CreatedBy: callerUserID(r), DateCreate: now, DateUpdate: now,
 	}
 	h.store.Usergroups.Set(id, ug)
 	slackOK(w, map[string]any{"usergroup": ug})
@@ -281,7 +295,7 @@ func (h *Handler) UsergroupsDisable(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "not_found")
 		return
 	}
-	ug.IsEnabled = false
+	ug.DateDelete = h.store.Clock.Now().Unix()
 	h.store.Usergroups.Set(req.Usergroup, ug)
 	slackOK(w, map[string]any{"usergroup": ug})
 }
@@ -296,7 +310,7 @@ func (h *Handler) UsergroupsEnable(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "not_found")
 		return
 	}
-	ug.IsEnabled = true
+	ug.DateDelete = 0
 	h.store.Usergroups.Set(req.Usergroup, ug)
 	slackOK(w, map[string]any{"usergroup": ug})
 }
