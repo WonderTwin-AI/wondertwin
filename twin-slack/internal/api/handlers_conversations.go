@@ -70,7 +70,7 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if req.Channel == "" {
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
 		slackError(w, "channel_not_found")
 		return
 	}
@@ -98,6 +98,17 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
+		return
+	}
+
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
+	// The docs answer thread_not_found for a ts that is "missing or invalid":
+	// no message in the channel has it.
+	if _, _, ok := h.store.GetMessageByTS(req.Channel, req.TS); !ok {
+		slackError(w, "thread_not_found")
 		return
 	}
 
