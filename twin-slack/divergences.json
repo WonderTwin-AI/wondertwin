@@ -104,13 +104,13 @@
       ]
     },
     {
-      "route": "Events API and interactivity",
-      "reason": "No events or interactivity payloads are delivered, so there is no request signing and no retry.",
+      "route": "Events API HTTP delivery and interactivity",
+      "reason": "Events API HTTP delivery is served for three events: message from chat.postMessage, message_deleted from chat.delete and reaction_added from reactions.add, each signed and retried with x-slack-retry-num and x-slack-retry-reason. Not served: the other events Slack sends for these writes (message_changed, pin_added, channel and member events, file events, app_mention and the rest), the url_verification handshake, Socket Mode and interactivity payloads. x-slack-no-retry is not honoured, too_many_redirects is never the retry reason, Delayed Events and the failure-rate disabling of subscriptions are not modelled, and every event goes to the configured Request URL whatever the app's subscriptions or channel membership. The retry schedule defaults to Slack's (nearly immediately, 1 minute, 5 minutes) and can be shortened through POST /admin/events/config.",
       "references": {
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Deferred in the operator-approved MVP (research/twins/slack/mvp.md section 4: slack-events-http-receive, slack-socket-mode, slack-modal-open).",
+      "operator_note": "Operator decision, 2026-09-28 (research/twins/slack/mvp.md section 9): Events API HTTP delivery is in the MVP; Socket Mode, modals and agents stay deferred. The events beyond the three served, and url_verification, are follow-ups.",
       "quirk_ids": [
         "events-001",
         "auth-006"

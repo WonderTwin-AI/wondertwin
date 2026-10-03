@@ -63,6 +63,7 @@ func (h *Handler) ReactionsAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Messages.Set(id, *msg)
+	h.emitReactionAdded(reactor, req.Name, *msg)
 	slackOK(w, nil)
 }
 

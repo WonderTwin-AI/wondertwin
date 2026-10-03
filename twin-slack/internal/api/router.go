@@ -13,13 +13,14 @@ import (
 
 // Handler holds Slack API state.
 type Handler struct {
-	store *store.MemoryStore
-	mw    *twincore.Middleware
+	store  *store.MemoryStore
+	mw     *twincore.Middleware
+	events *eventBus
 }
 
 // NewHandler creates a new Slack API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	return &Handler{store: s, mw: mw, events: newEventBus()}
 }
 
 // Routes mounts the Slack Web API-compatible routes.
@@ -189,6 +190,12 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/messages", h.AdminListMessages)
 	r.Get("/admin/channels", h.AdminListChannels)
 	r.Get("/admin/users", h.AdminListUsers)
+
+	// Event Subscriptions settings and the delivery log. Slack keeps these in
+	// the app's settings, not the Web API.
+	r.Get("/admin/events/config", h.AdminEventsConfig)
+	r.Post("/admin/events/config", h.AdminEventsConfig)
+	r.Get("/admin/events/deliveries", h.AdminEventDeliveries)
 }
 
 // jsonContentType is the content type of every Web API answer.

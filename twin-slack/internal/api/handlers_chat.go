@@ -47,6 +47,7 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 
 	id := h.store.Messages.NextID()
 	h.store.Messages.Set(id, msg)
+	h.emitMessage(msg)
 
 	slackOK(w, map[string]any{
 		"channel": req.Channel,
@@ -135,6 +136,7 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 
 	msg.IsDeleted = true
 	h.store.Messages.Set(id, *msg)
+	h.emitMessageDeleted(req.Channel, req.TS)
 
 	slackOK(w, map[string]any{
 		"channel": req.Channel,
