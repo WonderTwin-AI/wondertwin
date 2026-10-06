@@ -27,7 +27,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 15
+    "resource_count": 14
   },
   "coverage": {
     "resources_implemented": [
