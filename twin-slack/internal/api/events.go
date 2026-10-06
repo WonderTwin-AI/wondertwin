@@ -458,8 +458,10 @@ func (h *Handler) emitReactionAdded(user, reaction string, msg store.Message) {
 	})
 }
 
-// memberChannelType names a conversation the way member_joined_channel and
-// member_left_channel do: C for a public channel, G for a private one.
+// memberChannelType names a conversation for member_joined_channel and
+// member_left_channel: C for a public channel, G for a private one. This is
+// unverified, since Slack's reference page for those events is not in the
+// captured docs (see the Events entry in divergences.json).
 func memberChannelType(ch store.Channel) string {
 	if ch.IsPrivate || ch.IsMPIM {
 		return "G"
