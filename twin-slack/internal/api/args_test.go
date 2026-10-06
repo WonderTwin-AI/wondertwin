@@ -263,7 +263,7 @@ func TestEveryMethodAnswersGetAndPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(verbs) < 85 {
+	if len(verbs) < 70 {
 		t.Fatalf("expected the whole Web API surface under /api, found %d methods", len(verbs))
 	}
 	for route, got := range verbs {

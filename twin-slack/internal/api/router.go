@@ -95,8 +95,6 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "users.getPresence", h.UsersGetPresence)
 			route(r, "users.setPresence", h.UsersSetPresence)
 			route(r, "users.identity", h.UsersIdentity)
-			route(r, "users.setPhoto", h.UsersSetPhoto)
-			route(r, "users.deletePhoto", h.UsersDeletePhoto)
 
 			// reactions.*
 			route(r, "reactions.add", h.ReactionsAdd)
@@ -135,10 +133,6 @@ func (h *Handler) Routes(r chi.Router) {
 
 			// team.*
 			route(r, "team.info", h.TeamInfo)
-			route(r, "team.accessLogs", h.TeamAccessLogs)
-			route(r, "team.billableInfo", h.TeamBillableInfo)
-			route(r, "team.integrationLogs", h.TeamIntegrationLogs)
-			route(r, "team.profile.get", h.TeamProfileGet)
 
 			// bots.*
 			route(r, "bots.info", h.BotsInfo)
@@ -152,20 +146,6 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "usergroups.users.list", h.UsergroupsUsersList)
 			route(r, "usergroups.users.update", h.UsergroupsUsersUpdate)
 
-			// dnd.*
-			route(r, "dnd.info", h.DndInfo)
-			route(r, "dnd.setSnooze", h.DndSetSnooze)
-			route(r, "dnd.endSnooze", h.DndEndSnooze)
-			route(r, "dnd.endDnd", h.DndEndDnd)
-			route(r, "dnd.teamInfo", h.DndTeamInfo)
-
-			// search.*
-			route(r, "search.messages", h.SearchMessages)
-			route(r, "search.files", h.SearchFiles)
-			route(r, "search.all", h.SearchAll)
-
-			// dialog.*
-			route(r, "dialog.open", h.DialogOpen)
 		})
 	})
 

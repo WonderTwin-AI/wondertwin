@@ -25,9 +25,6 @@ type MemoryStore struct {
 	// Team info (singleton)
 	Team Team
 
-	// DND state per user
-	DndStatuses map[string]DndStatus
-
 	tsCounter atomic.Int64
 }
 
@@ -44,7 +41,6 @@ func New() *MemoryStore {
 		Usergroups:        pkgstate.New[Usergroup]("UG"),
 		Tokens:            pkgstate.New[Token]("tok"),
 		Views:             pkgstate.New[ViewRecord]("V"),
-		DndStatuses:       make(map[string]DndStatus),
 		Clock:             pkgstate.NewClock(),
 		Team: Team{
 			ID:     "T0001",
@@ -153,7 +149,6 @@ type stateSnapshot struct {
 	Bookmarks         map[string]Bookmark         `json:"bookmarks,omitempty"`
 	Usergroups        map[string]Usergroup        `json:"usergroups,omitempty"`
 	Views             map[string]ViewRecord       `json:"views,omitempty"`
-	DndStatuses       map[string]DndStatus        `json:"dnd_statuses,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
 }
 
@@ -169,7 +164,6 @@ func (s *MemoryStore) Snapshot() any {
 		Bookmarks:         s.Bookmarks.Snapshot(),
 		Usergroups:        s.Usergroups.Snapshot(),
 		Views:             s.Views.Snapshot(),
-		DndStatuses:       s.dndSnapshot(),
 		Team:              &s.Team,
 	}
 }
@@ -209,9 +203,6 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Views != nil {
 		s.Views.LoadSnapshot(snap.Views)
 	}
-	if snap.DndStatuses != nil {
-		s.DndStatuses = snap.DndStatuses
-	}
 	if snap.Team != nil {
 		s.Team = *snap.Team
 	}
@@ -229,18 +220,7 @@ func (s *MemoryStore) Reset() {
 	s.Usergroups.Reset()
 	s.Tokens.Reset()
 	s.Views.Reset()
-	s.DndStatuses = make(map[string]DndStatus)
 	s.Clock.Reset()
 	s.tsCounter.Store(0)
 	s.Team = Team{ID: "T0001", Name: "WonderTwin", Domain: "wondertwin"}
-}
-
-// dndSnapshot copies the Do Not Disturb state, so a snapshot does not share the
-// live map.
-func (s *MemoryStore) dndSnapshot() map[string]DndStatus {
-	out := make(map[string]DndStatus, len(s.DndStatuses))
-	for k, v := range s.DndStatuses {
-		out[k] = v
-	}
-	return out
 }

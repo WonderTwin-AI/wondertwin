@@ -174,15 +174,6 @@ type Usergroup struct {
 	DateDelete  int64    `json:"date_delete"`
 }
 
-// DndStatus holds a user's Do Not Disturb state.
-type DndStatus struct {
-	DndEnabled    bool  `json:"dnd_enabled"`
-	NextStart     int64 `json:"next_dnd_start_ts"`
-	NextEnd       int64 `json:"next_dnd_end_ts"`
-	SnoozeEnabled bool  `json:"snooze_enabled"`
-	SnoozeEndtime int64 `json:"snooze_endtime,omitempty"`
-}
-
 // View is a surface an app draws with Block Kit: a user's Home tab, or a
 // modal. It is rendered as Slack's view payload.
 type View struct {

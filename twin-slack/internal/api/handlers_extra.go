@@ -72,29 +72,3 @@ func (h *Handler) UsersIdentity(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-
-// UsersSetPhoto handles POST /api/users.setPhoto
-func (h *Handler) UsersSetPhoto(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{
-		"profile": map[string]any{
-			"image_24":  "https://placekitten.com/24/24",
-			"image_32":  "https://placekitten.com/32/32",
-			"image_48":  "https://placekitten.com/48/48",
-			"image_72":  "https://placekitten.com/72/72",
-			"image_192": "https://placekitten.com/192/192",
-			"image_512": "https://placekitten.com/512/512",
-		},
-	})
-}
-
-// UsersDeletePhoto handles POST /api/users.deletePhoto
-func (h *Handler) UsersDeletePhoto(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, nil)
-}
-
-// --- dialog ---
-
-// DialogOpen handles POST /api/dialog.open (legacy, prefer views.*)
-func (h *Handler) DialogOpen(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, nil)
-}
