@@ -5,14 +5,18 @@ import "encoding/json"
 
 // Channel represents a Slack channel (public, private, DM, or group DM).
 type Channel struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	IsChannel  bool     `json:"is_channel"`
-	IsGroup    bool     `json:"is_group"`
-	IsIM       bool     `json:"is_im"`
-	IsMPIM     bool     `json:"is_mpim"`
-	IsPrivate  bool     `json:"is_private"`
-	IsArchived bool     `json:"is_archived"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	IsChannel  bool   `json:"is_channel"`
+	IsGroup    bool   `json:"is_group"`
+	IsIM       bool   `json:"is_im"`
+	IsMPIM     bool   `json:"is_mpim"`
+	IsPrivate  bool   `json:"is_private"`
+	IsArchived bool   `json:"is_archived"`
+	// IsMember is not stored state: handlers set it per request from Members
+	// and the caller (see membershipView in the api package), as Slack computes
+	// it per caller. Nothing writes it to the store, so a stored Channel reads
+	// false here, and the admin state dump reports it that way.
 	IsMember   bool     `json:"is_member"`
 	Creator    string   `json:"creator"`
 	Created    int64    `json:"created"`
