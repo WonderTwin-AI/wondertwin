@@ -116,7 +116,10 @@ func (h *Handler) UsersProfileGet(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User string `json:"user"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	userID := req.User
 	if userID == "" {
@@ -177,7 +180,10 @@ func (h *Handler) UsersGetPresence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User string `json:"user"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	u, ok := h.store.Users.Get(req.User)
 	if !ok {

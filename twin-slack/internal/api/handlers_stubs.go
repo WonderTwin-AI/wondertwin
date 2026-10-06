@@ -59,7 +59,10 @@ func (h *Handler) BookmarksEdit(w http.ResponseWriter, r *http.Request) {
 		Title      string `json:"title,omitempty"`
 		Link       string `json:"link,omitempty"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	bm, ok := h.store.Bookmarks.Get(req.BookmarkID)
 	if !ok {
@@ -106,7 +109,10 @@ func (h *Handler) BookmarksRemove(w http.ResponseWriter, r *http.Request) {
 		BookmarkID string `json:"bookmark_id"`
 		ChannelID  string `json:"channel_id"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	h.store.Bookmarks.Delete(req.BookmarkID)
 	slackOK(w, nil)
 }
@@ -169,7 +175,10 @@ func (h *Handler) UsergroupsCreate(w http.ResponseWriter, r *http.Request) {
 		Handle      string `json:"handle"`
 		Description string `json:"description"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	now := h.store.Clock.Now().Unix()
 	id := h.store.Usergroups.NextID()
@@ -188,7 +197,10 @@ func (h *Handler) UsergroupsUpdate(w http.ResponseWriter, r *http.Request) {
 		Handle      string `json:"handle,omitempty"`
 		Description string `json:"description,omitempty"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
@@ -213,7 +225,10 @@ func (h *Handler) UsergroupsDisable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
@@ -228,7 +243,10 @@ func (h *Handler) UsergroupsEnable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
@@ -243,7 +261,10 @@ func (h *Handler) UsergroupsUsersList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
@@ -257,7 +278,10 @@ func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) 
 		Usergroup string `json:"usergroup"`
 		Users     string `json:"users"` // comma-separated
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")

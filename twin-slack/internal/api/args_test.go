@@ -297,3 +297,30 @@ func TestArgsUnusableJSONLimitIsNotAnError(t *testing.T) {
 		t.Fatalf("type error on another field = %v", m)
 	}
 }
+
+// A wrongly typed argument is refused by every method, including the ones
+// whose arguments are all optional.
+func TestEveryMethodRefusesAWronglyTypedArgument(t *testing.T) {
+	srv, _ := setupSlack(t)
+	for method, field := range map[string]string{
+		"reactions.list":          "user",
+		"pins.list":               "channel",
+		"users.profile.get":       "user",
+		"users.getPresence":       "user",
+		"bookmarks.edit":          "bookmark_id",
+		"bookmarks.remove":        "bookmark_id",
+		"usergroups.create":       "name",
+		"usergroups.update":       "usergroup",
+		"usergroups.disable":      "usergroup",
+		"usergroups.enable":       "usergroup",
+		"usergroups.users.list":   "usergroup",
+		"usergroups.users.update": "usergroup",
+	} {
+		t.Run(method, func(t *testing.T) {
+			_, m := call(t, srv, "POST", "/api/"+method, jsonType, `{"`+field+`":{"a":1}}`, true)
+			if m["ok"] != false || m["error"] != "invalid_arguments" {
+				t.Errorf("%s with an object for %s: %v", method, field, m)
+			}
+		})
+	}
+}
