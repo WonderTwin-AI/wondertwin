@@ -26,7 +26,7 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 		Name:    req.Filename,
 		Title:   req.Filename,
 		Size:    req.Length,
-		User:    "U_BOT",
+		User:    callerUserID(r),
 		Created: h.store.Clock.Now().Unix(),
 	}
 	h.store.Files.Set(id, file)
