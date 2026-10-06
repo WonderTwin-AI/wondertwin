@@ -223,6 +223,18 @@ const cases = {
       assert.equal(env.event.ts, posted.ts);
       assert.equal(env.event.text, 'deploy started');
 
+      // Inviting a user is delivered as member_joined_channel, naming the
+      // inviter.
+      await web.conversations.invite({channel, users: 'U_SMOKE_NODE_GUEST'});
+      for (let i = 0; i < 200 && got.length < 3; i++) await new Promise((r) => setTimeout(r, 25));
+      assert.equal(got.length, 3, 'member_joined_channel is delivered');
+      const joined = JSON.parse(got[2].body).event;
+      assert.equal(joined.type, 'member_joined_channel');
+      assert.equal(joined.user, 'U_SMOKE_NODE_GUEST');
+      assert.equal(joined.channel, channel);
+      assert.equal(joined.inviter, (await web.auth.test()).user_id);
+      const ts = got[2].headers['x-slack-request-timestamp'];
+      assert.equal(got[2].headers['x-slack-signature'], 'v0=' + createHmac('sha256', secret).update(`v0:${ts}:${got[2].body}`).digest('hex'));
     } finally {
       await configure({request_url: ''});
       receiver.close();

@@ -220,6 +220,20 @@ def case_events_http_receive():
         assert env["event"]["channel"] == channel
         assert env["event"]["ts"] == posted["ts"]
 
+        # Inviting a user is delivered as member_joined_channel, naming the
+        # inviter.
+        client.conversations_invite(channel=channel, users="U_SMOKE_PY_GUEST")
+        for _ in range(200):
+            if len(got) >= 3:
+                break
+            time.sleep(0.025)
+        assert len(got) == 3, f"member_joined_channel was not delivered, got {len(got)}"
+        assert verifier.is_valid_request(got[2][1], got[2][0])
+        joined = json.loads(got[2][1])["event"]
+        assert joined["type"] == "member_joined_channel"
+        assert joined["user"] == "U_SMOKE_PY_GUEST"
+        assert joined["channel"] == channel
+        assert joined["inviter"] == client.auth_test()["user_id"]
     finally:
         configure({"request_url": ""})
         receiver.shutdown()
