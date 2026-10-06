@@ -172,6 +172,34 @@ func TestFlushSuccess(t *testing.T) {
 	}
 }
 
+// A delivery keeps the receiver's response headers, and they stay out of the
+// serialized delivery log.
+func TestDeliveryKeepsResponseHeaders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Receiver", "kept")
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(Config{URL: srv.URL, MaxRetries: 1})
+	d.Enqueue("order.created", nil)
+	d.Flush()
+
+	deliveries := d.Deliveries()
+	if len(deliveries) != 1 || deliveries[0].Header.Get("X-Receiver") != "kept" {
+		t.Fatalf("response header not kept: %+v", deliveries)
+	}
+	raw, _ := json.Marshal(deliveries[0])
+	var m map[string]any
+	json.Unmarshal(raw, &m)
+	if _, ok := m["Header"]; ok {
+		t.Errorf("headers leaked into the delivery log: %s", raw)
+	}
+	if len(m) != 5 {
+		t.Errorf("delivery log fields changed: %s", raw)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Flush – retry on failure
 // ---------------------------------------------------------------------------

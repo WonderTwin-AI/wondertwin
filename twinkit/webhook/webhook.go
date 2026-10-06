@@ -49,6 +49,10 @@ type Delivery struct {
 	Error      string    `json:"error,omitempty"`
 	Attempt    int       `json:"attempt"`
 	Timestamp  time.Time `json:"timestamp"`
+	// Header holds the receiver's response headers, for emulators whose
+	// vendor lets the receiver steer redelivery from them. It is not
+	// serialized, so delivery logs keep their shape.
+	Header http.Header `json:"-"`
 }
 
 // Dispatcher manages outbound webhook delivery.
@@ -297,6 +301,7 @@ func (d *Dispatcher) deliverToURL(evt Event, url, secret string, signer Signer) 
 			io.ReadAll(resp.Body)
 			resp.Body.Close()
 			delivery.StatusCode = resp.StatusCode
+			delivery.Header = resp.Header
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				d.mu.Lock()
 				d.deliveries = append(d.deliveries, delivery)
