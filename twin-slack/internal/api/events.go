@@ -343,6 +343,11 @@ func (b *eventBus) log() []EventDelivery {
 
 // ConfigureEvents sets the app's Event Subscriptions settings.
 func (h *Handler) ConfigureEvents(cfg EventsConfig) {
+	h.events.configure(withEventDefaults(cfg))
+}
+
+// withEventDefaults fills the settings a caller left empty.
+func withEventDefaults(cfg EventsConfig) EventsConfig {
 	if cfg.SigningSecret == "" {
 		cfg.SigningSecret = DefaultSigningSecret
 	}
@@ -352,7 +357,7 @@ func (h *Handler) ConfigureEvents(cfg EventsConfig) {
 	if cfg.RetryDelays == nil {
 		cfg.RetryDelays = defaultRetryDelays
 	}
-	h.events.configure(cfg)
+	return cfg
 }
 
 // adminState is the app emulator's state as POST /admin/reset, GET and
@@ -584,6 +589,8 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			cfg.RetryDelays = delays
 		}
+		// The handshake is signed with the settings later deliveries use.
+		cfg = withEventDefaults(cfg)
 		if req.RequestURL != nil && cfg.RequestURL != "" {
 			if err := verifyRequestURL(cfg); err != nil {
 				twincore.Error(w, http.StatusBadRequest, "url_verification failed: "+err.Error())

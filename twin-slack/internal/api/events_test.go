@@ -390,6 +390,36 @@ func TestRequestURLIsVerified(t *testing.T) {
 	}
 }
 
+// An empty signing secret means the default, for the handshake as for every
+// later delivery: the app verifies both with the same secret.
+func TestHandshakeAndDeliveriesShareTheDefaultSecret(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "", "verification_token": ""})
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	secret, _ := cfg["signing_secret"].(string)
+	if secret == "" {
+		t.Fatalf("no default signing secret: %v", cfg)
+	}
+
+	rc.mu.Lock()
+	vs := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(vs) != 1 {
+		t.Fatalf("url_verification requests: %d, want 1", len(vs))
+	}
+	verify(t, vs[0], secret)
+	var body map[string]any
+	json.Unmarshal(vs[0].body, &body)
+	if body["token"] != cfg["verification_token"] || body["token"] == "" {
+		t.Errorf("handshake token %v, settings %v", body["token"], cfg["verification_token"])
+	}
+
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"defaults"}})["channel"].(map[string]any)["id"].(string)
+	form(t, srv, "chat.postMessage", url.Values{"channel": {ch}, "text": {"hi"}})
+	verify(t, rc.wait(t, 1)[0], secret)
+}
+
 // A URL that does not echo the challenge is refused and nothing changes; a
 // URL echoing it in any documented form is accepted.
 func TestRequestURLThatFailsVerificationIsRefused(t *testing.T) {
