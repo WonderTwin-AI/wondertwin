@@ -174,13 +174,21 @@ const cases = {
   },
 
   async 'slack-events-http-receive'() {
-    // A local receiver stands in for the app's Request URL. It fails the first
+    // A local receiver stands in for the app's Request URL. It answers the
+    // url_verification handshake by echoing the challenge, and fails the first
     // delivery, so the event arrives a second time as retry 1.
     const got = [];
+    const verifications = [];
     const receiver = createServer((req, res) => {
       let body = '';
       req.on('data', (c) => { body += c; });
       req.on('end', () => {
+        const payload = JSON.parse(body);
+        if (payload.type === 'url_verification') {
+          verifications.push({headers: req.headers, body});
+          res.writeHead(200, {'Content-Type': 'application/json'}).end(JSON.stringify({challenge: payload.challenge}));
+          return;
+        }
         got.push({headers: req.headers, body});
         res.writeHead(got.length === 1 ? 500 : 200).end();
       });
@@ -191,12 +199,14 @@ const cases = {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg),
     });
     try {
-      await configure({request_url: `http://127.0.0.1:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
+      const configured = await configure({request_url: `http://127.0.0.1:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
+      assert.equal(configured.status, 200, 'the Request URL passes url_verification');
+      assert.equal(verifications.length, 1, 'setting the Request URL makes one url_verification handshake');
       const channel = await newChannel();
       const posted = await web.chat.postMessage({channel, text: 'deploy started'});
       for (let i = 0; i < 200 && got.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
       assert.equal(got.length, 2, 'the failed delivery is retried once and then succeeds');
-      for (const {headers, body} of got) {
+      for (const {headers, body} of [...verifications, ...got]) {
         // The documented scheme: v0= hex HMAC-SHA256 of v0:{timestamp}:{body}.
         const ts = headers['x-slack-request-timestamp'];
         assert.ok(Math.abs(Date.now() / 1000 - Number(ts)) < 300, 'the timestamp is current');
@@ -212,6 +222,19 @@ const cases = {
       assert.equal(env.event.channel, channel);
       assert.equal(env.event.ts, posted.ts);
       assert.equal(env.event.text, 'deploy started');
+
+      // Inviting a user is delivered as member_joined_channel, naming the
+      // inviter.
+      await web.conversations.invite({channel, users: 'U_SMOKE_NODE_GUEST'});
+      for (let i = 0; i < 200 && got.length < 3; i++) await new Promise((r) => setTimeout(r, 25));
+      assert.equal(got.length, 3, 'member_joined_channel is delivered');
+      const joined = JSON.parse(got[2].body).event;
+      assert.equal(joined.type, 'member_joined_channel');
+      assert.equal(joined.user, 'U_SMOKE_NODE_GUEST');
+      assert.equal(joined.channel, channel);
+      assert.equal(joined.inviter, (await web.auth.test()).user_id);
+      const ts = got[2].headers['x-slack-request-timestamp'];
+      assert.equal(got[2].headers['x-slack-signature'], 'v0=' + createHmac('sha256', secret).update(`v0:${ts}:${got[2].body}`).digest('hex'));
     } finally {
       await configure({request_url: ''});
       receiver.close();

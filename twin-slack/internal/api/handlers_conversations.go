@@ -331,12 +331,25 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add users (simplified — no dedup check)
-	for _, u := range splitCSV(req.Users) {
+	users := splitCSV(req.Users)
+	var added []string
+	for _, u := range users {
+		if slices.Contains(ch.Members, u) {
+			continue
+		}
 		ch.Members = append(ch.Members, u)
 		ch.NumMembers++
+		added = append(added, u)
+	}
+	// Slack refuses an invite that adds nobody: every user named is already in.
+	if len(users) > 0 && len(added) == 0 {
+		slackError(w, "already_in_channel")
+		return
 	}
 	h.store.Channels.Set(req.Channel, ch)
+	for _, u := range added {
+		h.emitMemberJoined(ch, u, callerUserID(r))
+	}
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
@@ -374,6 +387,7 @@ func (h *Handler) ConversationsKick(w http.ResponseWriter, r *http.Request) {
 	ch.Members = members
 	ch.NumMembers = len(members)
 	h.store.Channels.Set(req.Channel, ch)
+	h.emitMemberLeft(ch, req.User)
 	slackOK(w, nil)
 }
 
@@ -397,6 +411,7 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		ch.Members = append(ch.Members, caller)
 		ch.NumMembers++
 		h.store.Channels.Set(req.Channel, ch)
+		h.emitMemberJoined(ch, caller, "")
 	}
 
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
@@ -418,15 +433,20 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	caller := callerUserID(r)
 	members := make([]string, 0, len(ch.Members))
 	for _, m := range ch.Members {
-		if m != callerUserID(r) {
+		if m != caller {
 			members = append(members, m)
 		}
 	}
+	left := len(members) < len(ch.Members)
 	ch.Members = members
 	ch.NumMembers = len(members)
 	h.store.Channels.Set(req.Channel, ch)
+	if left {
+		h.emitMemberLeft(ch, caller)
+	}
 	slackOK(w, nil)
 }
 

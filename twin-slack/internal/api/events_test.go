@@ -30,6 +30,12 @@ type receiver struct {
 	got        []received
 	status     []int
 	firstDelay time.Duration
+	// header is set on every answer.
+	header http.Header
+	// verifications are the url_verification requests, which the receiver
+	// answers by echoing the challenge, as an app does, unless refuse is set.
+	verifications []received
+	refuse        bool
 }
 
 func newReceiver(t *testing.T, status ...int) *receiver {
@@ -37,6 +43,18 @@ func newReceiver(t *testing.T, status ...int) *receiver {
 	rc := &receiver{status: status}
 	rc.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
+		var probe struct{ Type, Challenge string }
+		if json.Unmarshal(body, &probe) == nil && probe.Type == "url_verification" {
+			rc.mu.Lock()
+			rc.verifications = append(rc.verifications, received{header: r.Header.Clone(), body: body})
+			refuse := rc.refuse
+			rc.mu.Unlock()
+			if !refuse {
+				w.Header().Set("Content-Type", "text/plain")
+				io.WriteString(w, probe.Challenge)
+			}
+			return
+		}
 		rc.mu.Lock()
 		rc.got = append(rc.got, received{header: r.Header.Clone(), body: body})
 		code := http.StatusOK
@@ -47,6 +65,9 @@ func newReceiver(t *testing.T, status ...int) *receiver {
 		rc.mu.Unlock()
 		if first {
 			time.Sleep(rc.firstDelay)
+		}
+		for k, v := range rc.header {
+			w.Header()[k] = v
 		}
 		w.WriteHeader(code)
 	}))
@@ -92,19 +113,25 @@ func envelope(t *testing.T, r received) map[string]any {
 	return m
 }
 
-// verify checks a delivery's signature the way Slack's SDK verifiers do.
-func verify(t *testing.T, r received, secret string) {
-	t.Helper()
+// signatureValid checks a delivery's signature the way Slack's SDK verifiers
+// do: a recent timestamp and v0= HMAC-SHA256 of v0:{timestamp}:{body}.
+func signatureValid(r received, secret string) bool {
 	ts := r.header.Get("X-Slack-Request-Timestamp")
 	n, err := strconv.ParseInt(ts, 10, 64)
 	if err != nil || time.Since(time.Unix(n, 0)) > 5*time.Minute {
-		t.Fatalf("X-Slack-Request-Timestamp %q is not a recent epoch", ts)
+		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte("v0:" + ts + ":"))
 	mac.Write(r.body)
-	if want := "v0=" + hex.EncodeToString(mac.Sum(nil)); r.header.Get("X-Slack-Signature") != want {
-		t.Fatalf("X-Slack-Signature %q, want %q", r.header.Get("X-Slack-Signature"), want)
+	return hmac.Equal([]byte(r.header.Get("X-Slack-Signature")), []byte("v0="+hex.EncodeToString(mac.Sum(nil))))
+}
+
+func verify(t *testing.T, r received, secret string) {
+	t.Helper()
+	if !signatureValid(r, secret) {
+		t.Fatalf("signature %q (timestamp %q) does not verify with the signing secret",
+			r.header.Get("X-Slack-Signature"), r.header.Get("X-Slack-Request-Timestamp"))
 	}
 }
 
@@ -256,12 +283,251 @@ func TestEventsConfigEndpoint(t *testing.T) {
 	if len(delays) != 3 || delays[0] != float64(0) || delays[1] != float64(60000) || delays[2] != float64(300000) {
 		t.Errorf("the default retry schedule is Slack's: %v", delays)
 	}
-	m = configureEvents(t, srv, map[string]any{"request_url": "http://example.invalid/events"})
-	if m["request_url"] != "http://example.invalid/events" || m["signing_secret"] == "" {
+	rc := newReceiver(t)
+	m = configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	if m["request_url"] != rc.srv.URL || m["signing_secret"] == "" {
 		t.Errorf("a partial update keeps the other settings: %v", m)
 	}
 	status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"retry_delays_ms":[-1]}`, false)
 	if status != 400 {
 		t.Errorf("a negative delay: %d", status)
+	}
+}
+
+// A receiver that fails with x-slack-no-retry: 1 gets no retry of that event,
+// and later events are still delivered.
+func TestNoRetryHeaderStopsRedelivery(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	rc.header = http.Header{"X-Slack-No-Retry": {"1"}}
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
+	ch := seedChannel(tc, "no-retry")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"once"}}.Encode(), true)
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"next"}}.Encode(), true)
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	got = rc.wait(t, 2)
+	if len(got) != 2 {
+		t.Fatalf("deliveries: %d, want the failed one once and the next one", len(got))
+	}
+	for i, want := range []string{"once", "next"} {
+		if ev := envelope(t, got[i])["event"].(map[string]any); ev["text"] != want || got[i].header.Get("X-Slack-Retry-Num") != "" {
+			t.Errorf("delivery %d: %v retry %q, want %q first try", i, ev["text"], got[i].header.Get("X-Slack-Retry-Num"), want)
+		}
+	}
+}
+
+// POST /admin/reset empties the delivery log, restarts event ids, and drops
+// an event waiting out Slack's retry schedule, so the next event is delivered
+// at once. The Request URL stays configured.
+func TestResetClearsTheEventBus(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{60000}})
+	ch := seedChannel(tc, "before")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"stuck"}}.Encode(), true)
+	rc.wait(t, 1)
+
+	if status, _ := call(t, srv, "POST", "/admin/reset", "", "", false); status != 200 {
+		t.Fatalf("reset: %d", status)
+	}
+	_, m := call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+	if d := m["deliveries"].([]any); len(d) != 0 {
+		t.Errorf("deliveries after reset: %v", d)
+	}
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	if cfg["request_url"] != rc.srv.URL {
+		t.Errorf("reset dropped the Request URL: %v", cfg)
+	}
+
+	ch = seedChannel(tc, "after")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"fresh"}}.Encode(), true)
+	got := rc.wait(t, 2)
+	env := envelope(t, got[1])
+	if ev := env["event"].(map[string]any); ev["text"] != "fresh" || got[1].header.Get("X-Slack-Retry-Num") != "" {
+		t.Errorf("first delivery after reset: %v", ev)
+	}
+	if env["event_id"] != "Ev00000001" {
+		t.Errorf("event ids restart after reset: %v", env["event_id"])
+	}
+	_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+	if d := m["deliveries"].([]any); len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
+		t.Errorf("delivery log after reset: %v", d)
+	}
+}
+
+// Setting a Request URL makes Slack's url_verification handshake: a signed
+// POST with a challenge the app must echo.
+func TestRequestURLIsVerified(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "v3r1fy", "verification_token": "tok"})
+
+	rc.mu.Lock()
+	vs := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(vs) != 1 {
+		t.Fatalf("url_verification requests: %d, want 1", len(vs))
+	}
+	verify(t, vs[0], "v3r1fy")
+	var body map[string]any
+	json.Unmarshal(vs[0].body, &body)
+	if body["type"] != "url_verification" || body["token"] != "tok" || len(body) != 3 {
+		t.Errorf("url_verification body: %v", body)
+	}
+	if c, _ := body["challenge"].(string); len(c) < 16 {
+		t.Errorf("challenge %q", body["challenge"])
+	}
+
+	// Each setting of a URL gets a fresh challenge.
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	rc.mu.Lock()
+	again := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(again) != 2 || string(again[1].body) == string(again[0].body) {
+		t.Errorf("a second setting reuses the challenge: %d requests", len(again))
+	}
+}
+
+// An empty signing secret means the default, for the handshake as for every
+// later delivery: the app verifies both with the same secret.
+func TestHandshakeAndDeliveriesShareTheDefaultSecret(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "", "verification_token": ""})
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	secret, _ := cfg["signing_secret"].(string)
+	if secret == "" {
+		t.Fatalf("no default signing secret: %v", cfg)
+	}
+
+	rc.mu.Lock()
+	vs := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(vs) != 1 {
+		t.Fatalf("url_verification requests: %d, want 1", len(vs))
+	}
+	verify(t, vs[0], secret)
+	var body map[string]any
+	json.Unmarshal(vs[0].body, &body)
+	if body["token"] != cfg["verification_token"] || body["token"] == "" {
+		t.Errorf("handshake token %v, settings %v", body["token"], cfg["verification_token"])
+	}
+
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"defaults"}})["channel"].(map[string]any)["id"].(string)
+	form(t, srv, "chat.postMessage", url.Values{"channel": {ch}, "text": {"hi"}})
+	verify(t, rc.wait(t, 1)[0], secret)
+}
+
+// A URL that does not echo the challenge is refused and nothing changes; a
+// URL echoing it in any documented form is accepted.
+func TestRequestURLThatFailsVerificationIsRefused(t *testing.T) {
+	srv, _ := setupSlack(t)
+	good := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": good.srv.URL, "signing_secret": "first"})
+
+	bad := newReceiver(t)
+	bad.refuse = true
+	status, m := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+bad.srv.URL+`","signing_secret":"second"}`, false)
+	if status != 400 {
+		t.Errorf("a URL that does not echo the challenge: %d %v", status, m)
+	}
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	if cfg["request_url"] != good.srv.URL || cfg["signing_secret"] != "first" {
+		t.Errorf("a refused URL changed the settings: %v", cfg)
+	}
+
+	for name, answer := range map[string]func(string) (string, string){
+		"json": func(c string) (string, string) { return "application/json", `{"challenge":"` + c + `"}` },
+		"form": func(c string) (string, string) { return "application/x-www-form-urlencoded", "challenge=" + c },
+		"text": func(c string) (string, string) { return "text/plain", c },
+	} {
+		t.Run(name, func(t *testing.T) {
+			rcv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var probe struct{ Challenge string }
+				json.NewDecoder(r.Body).Decode(&probe)
+				ct, body := answer(probe.Challenge)
+				w.Header().Set("Content-Type", ct)
+				io.WriteString(w, body)
+			}))
+			defer rcv.Close()
+			configureEvents(t, srv, map[string]any{"request_url": rcv.URL})
+		})
+	}
+
+	wrong := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "not-the-challenge")
+	}))
+	defer wrong.Close()
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+wrong.URL+`"}`, false); status != 400 {
+		t.Errorf("a wrong echo: %d", status)
+	}
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var probe struct{ Challenge string }
+		json.NewDecoder(r.Body).Decode(&probe)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, probe.Challenge)
+	}))
+	defer failing.Close()
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+failing.URL+`"}`, false); status != 400 {
+		t.Errorf("an echo with HTTP 500: %d", status)
+	}
+
+	// Clearing the URL needs no handshake.
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":""}`, false); status != 200 {
+		t.Errorf("clearing the Request URL: %d", status)
+	}
+}
+
+// Every delivery is signed with the configured secret, and with nothing else.
+func TestEveryDeliveryIsSignedWithTheSigningSecret(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "right", "retry_delays_ms": []int{0}})
+	ch := seedChannel(tc, "signed")
+	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"a"}}.Encode(), true)
+	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {posted["ts"].(string)}, "name": {"eyes"}}.Encode(), true)
+	call(t, srv, "POST", "/api/chat.delete", formType, url.Values{"channel": {ch}, "ts": {posted["ts"].(string)}}.Encode(), true)
+
+	got := rc.wait(t, 4) // the message twice (one retry), the reaction, the deletion
+	for i, r := range got {
+		if !signatureValid(r, "right") {
+			t.Errorf("delivery %d does not verify with the signing secret", i)
+		}
+		if signatureValid(r, "wrong") {
+			t.Errorf("delivery %d verifies with the wrong secret", i)
+		}
+	}
+	tampered := got[0]
+	tampered.body = append(append([]byte{}, tampered.body...), ' ')
+	if signatureValid(tampered, "right") {
+		t.Error("a changed body still verifies")
+	}
+}
+
+// An event names the user who acted; authorizations names the installation
+// the event is delivered to, which is the app's bot user
+// (apis/events-api.md), whoever acted.
+func TestEventNamesTheActorAndTheInstallation(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"actors"}})["channel"].(map[string]any)["id"].(string)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+
+	posted := formAs(t, srv, "xoxp-actor", "chat.postMessage", url.Values{"channel": {ch}, "text": {"by a user"}})
+	mustOK(t, 200, posted)
+	mustOK(t, 200, formAs(t, srv, "xoxp-actor", "reactions.add", url.Values{"channel": {ch}, "timestamp": {posted["ts"].(string)}, "name": {"wave"}}))
+
+	for i, r := range rc.wait(t, 2) {
+		env := envelope(t, r)
+		ev := env["event"].(map[string]any)
+		if ev["user"] != "U_USER" {
+			t.Errorf("event %d (%v) user %v, want the caller U_USER", i, ev["type"], ev["user"])
+		}
+		auth := env["authorizations"].([]any)[0].(map[string]any)
+		if auth["user_id"] != "U_BOT" || auth["is_bot"] != true || auth["team_id"] != "T0001" {
+			t.Errorf("event %d authorizations %v, want the bot installation", i, auth)
+		}
 	}
 }
