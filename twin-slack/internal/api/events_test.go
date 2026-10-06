@@ -30,6 +30,8 @@ type receiver struct {
 	got        []received
 	status     []int
 	firstDelay time.Duration
+	// header is set on every answer.
+	header http.Header
 }
 
 func newReceiver(t *testing.T, status ...int) *receiver {
@@ -47,6 +49,9 @@ func newReceiver(t *testing.T, status ...int) *receiver {
 		rc.mu.Unlock()
 		if first {
 			time.Sleep(rc.firstDelay)
+		}
+		for k, v := range rc.header {
+			w.Header()[k] = v
 		}
 		w.WriteHeader(code)
 	}))
@@ -263,5 +268,29 @@ func TestEventsConfigEndpoint(t *testing.T) {
 	status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"retry_delays_ms":[-1]}`, false)
 	if status != 400 {
 		t.Errorf("a negative delay: %d", status)
+	}
+}
+
+// A receiver that fails with x-slack-no-retry: 1 gets no retry of that event,
+// and later events are still delivered.
+func TestNoRetryHeaderStopsRedelivery(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	rc.header = http.Header{"X-Slack-No-Retry": {"1"}}
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
+	ch := seedChannel(tc, "no-retry")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"once"}}.Encode(), true)
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"next"}}.Encode(), true)
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	got = rc.wait(t, 2)
+	if len(got) != 2 {
+		t.Fatalf("deliveries: %d, want the failed one once and the next one", len(got))
+	}
+	for i, want := range []string{"once", "next"} {
+		if ev := envelope(t, got[i])["event"].(map[string]any); ev["text"] != want || got[i].header.Get("X-Slack-Retry-Num") != "" {
+			t.Errorf("delivery %d: %v retry %q, want %q first try", i, ev["text"], got[i].header.Get("X-Slack-Retry-Num"), want)
+		}
 	}
 }

@@ -238,10 +238,11 @@ func (b *eventBus) attempt(job eventJob, retry int, reason string) (EventDeliver
 	if retry > 0 {
 		rec.RetryReason = reason
 	}
-	sent := false
+	sent, noRetry := false, false
 	for _, d := range b.d.Deliveries() {
 		if d.EventID == evt.ID {
 			rec.StatusCode, rec.Error, sent = d.StatusCode, d.Error, true
+			noRetry = d.Header.Get("X-Slack-No-Retry") == "1"
 		}
 	}
 	b.mu.Lock()
@@ -251,8 +252,10 @@ func (b *eventBus) attempt(job eventJob, retry int, reason string) (EventDeliver
 	}
 	b.mu.Unlock()
 	// An attempt the dispatcher did not send (no Request URL is configured)
-	// ends the delivery rather than waiting out the retry schedule.
-	return rec, !sent || (err == nil && rec.StatusCode >= 200 && rec.StatusCode < 300)
+	// ends the delivery rather than waiting out the retry schedule, and so
+	// does a failure the receiver answered with x-slack-no-retry: 1, which
+	// asks Slack not to redeliver this event.
+	return rec, !sent || noRetry || (err == nil && rec.StatusCode >= 200 && rec.StatusCode < 300)
 }
 
 // retryReason names a failed attempt with the x-slack-retry-reason value the
