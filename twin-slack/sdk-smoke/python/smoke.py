@@ -157,14 +157,26 @@ def case_react_pin_bookmark():
 
 
 def case_events_http_receive():
-    # A local receiver stands in for the app's Request URL. It fails the first
+    # A local receiver stands in for the app's Request URL. It answers the
+    # url_verification handshake by echoing the challenge, and fails the first
     # delivery, so the event arrives a second time as retry 1. The official
-    # SignatureVerifier checks every delivery.
+    # SignatureVerifier checks every request.
     got = []
+    verifications = []
 
     class Receiver(BaseHTTPRequestHandler):
         def do_POST(self):
             body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            payload = json.loads(body)
+            if payload.get("type") == "url_verification":
+                verifications.append((dict(self.headers), body))
+                answer = payload["challenge"].encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(answer)))
+                self.end_headers()
+                self.wfile.write(answer)
+                return
             got.append((dict(self.headers), body))
             self.send_response(500 if len(got) == 1 else 200)
             self.end_headers()
@@ -194,9 +206,10 @@ def case_events_http_receive():
                 break
             time.sleep(0.025)
         assert len(got) == 2, f"the failed delivery is retried once and then succeeds, got {len(got)}"
+        assert len(verifications) == 1, "setting the Request URL makes one url_verification handshake"
         verifier = SignatureVerifier(signing_secret=secret)
-        for headers, body in got:
-            assert verifier.is_valid_request(body, headers), "SignatureVerifier rejected the delivery"
+        for headers, body in verifications + got:
+            assert verifier.is_valid_request(body, headers), "SignatureVerifier rejected the request"
         lower = [{k.lower(): v for k, v in h.items()} for h, _ in got]
         assert "x-slack-retry-num" not in lower[0]
         assert lower[1]["x-slack-retry-num"] == "1"
@@ -206,6 +219,7 @@ def case_events_http_receive():
         assert env["event"]["type"] == "message"
         assert env["event"]["channel"] == channel
         assert env["event"]["ts"] == posted["ts"]
+
     finally:
         configure({"request_url": ""})
         receiver.shutdown()

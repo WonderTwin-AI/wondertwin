@@ -32,6 +32,10 @@ type receiver struct {
 	firstDelay time.Duration
 	// header is set on every answer.
 	header http.Header
+	// verifications are the url_verification requests, which the receiver
+	// answers by echoing the challenge, as an app does, unless refuse is set.
+	verifications []received
+	refuse        bool
 }
 
 func newReceiver(t *testing.T, status ...int) *receiver {
@@ -39,6 +43,18 @@ func newReceiver(t *testing.T, status ...int) *receiver {
 	rc := &receiver{status: status}
 	rc.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
+		var probe struct{ Type, Challenge string }
+		if json.Unmarshal(body, &probe) == nil && probe.Type == "url_verification" {
+			rc.mu.Lock()
+			rc.verifications = append(rc.verifications, received{header: r.Header.Clone(), body: body})
+			refuse := rc.refuse
+			rc.mu.Unlock()
+			if !refuse {
+				w.Header().Set("Content-Type", "text/plain")
+				io.WriteString(w, probe.Challenge)
+			}
+			return
+		}
 		rc.mu.Lock()
 		rc.got = append(rc.got, received{header: r.Header.Clone(), body: body})
 		code := http.StatusOK
@@ -261,8 +277,9 @@ func TestEventsConfigEndpoint(t *testing.T) {
 	if len(delays) != 3 || delays[0] != float64(0) || delays[1] != float64(60000) || delays[2] != float64(300000) {
 		t.Errorf("the default retry schedule is Slack's: %v", delays)
 	}
-	m = configureEvents(t, srv, map[string]any{"request_url": "http://example.invalid/events"})
-	if m["request_url"] != "http://example.invalid/events" || m["signing_secret"] == "" {
+	rc := newReceiver(t)
+	m = configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	if m["request_url"] != rc.srv.URL || m["signing_secret"] == "" {
 		t.Errorf("a partial update keeps the other settings: %v", m)
 	}
 	status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"retry_delays_ms":[-1]}`, false)
@@ -331,5 +348,98 @@ func TestResetClearsTheEventBus(t *testing.T) {
 	_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
 	if d := m["deliveries"].([]any); len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
 		t.Errorf("delivery log after reset: %v", d)
+	}
+}
+
+// Setting a Request URL makes Slack's url_verification handshake: a signed
+// POST with a challenge the app must echo.
+func TestRequestURLIsVerified(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "v3r1fy", "verification_token": "tok"})
+
+	rc.mu.Lock()
+	vs := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(vs) != 1 {
+		t.Fatalf("url_verification requests: %d, want 1", len(vs))
+	}
+	verify(t, vs[0], "v3r1fy")
+	var body map[string]any
+	json.Unmarshal(vs[0].body, &body)
+	if body["type"] != "url_verification" || body["token"] != "tok" || len(body) != 3 {
+		t.Errorf("url_verification body: %v", body)
+	}
+	if c, _ := body["challenge"].(string); len(c) < 16 {
+		t.Errorf("challenge %q", body["challenge"])
+	}
+
+	// Each setting of a URL gets a fresh challenge.
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	rc.mu.Lock()
+	again := append([]received{}, rc.verifications...)
+	rc.mu.Unlock()
+	if len(again) != 2 || string(again[1].body) == string(again[0].body) {
+		t.Errorf("a second setting reuses the challenge: %d requests", len(again))
+	}
+}
+
+// A URL that does not echo the challenge is refused and nothing changes; a
+// URL echoing it in any documented form is accepted.
+func TestRequestURLThatFailsVerificationIsRefused(t *testing.T) {
+	srv, _ := setupSlack(t)
+	good := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": good.srv.URL, "signing_secret": "first"})
+
+	bad := newReceiver(t)
+	bad.refuse = true
+	status, m := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+bad.srv.URL+`","signing_secret":"second"}`, false)
+	if status != 400 {
+		t.Errorf("a URL that does not echo the challenge: %d %v", status, m)
+	}
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	if cfg["request_url"] != good.srv.URL || cfg["signing_secret"] != "first" {
+		t.Errorf("a refused URL changed the settings: %v", cfg)
+	}
+
+	for name, answer := range map[string]func(string) (string, string){
+		"json": func(c string) (string, string) { return "application/json", `{"challenge":"` + c + `"}` },
+		"form": func(c string) (string, string) { return "application/x-www-form-urlencoded", "challenge=" + c },
+		"text": func(c string) (string, string) { return "text/plain", c },
+	} {
+		t.Run(name, func(t *testing.T) {
+			rcv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var probe struct{ Challenge string }
+				json.NewDecoder(r.Body).Decode(&probe)
+				ct, body := answer(probe.Challenge)
+				w.Header().Set("Content-Type", ct)
+				io.WriteString(w, body)
+			}))
+			defer rcv.Close()
+			configureEvents(t, srv, map[string]any{"request_url": rcv.URL})
+		})
+	}
+
+	wrong := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "not-the-challenge")
+	}))
+	defer wrong.Close()
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+wrong.URL+`"}`, false); status != 400 {
+		t.Errorf("a wrong echo: %d", status)
+	}
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var probe struct{ Challenge string }
+		json.NewDecoder(r.Body).Decode(&probe)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, probe.Challenge)
+	}))
+	defer failing.Close()
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":"`+failing.URL+`"}`, false); status != 400 {
+		t.Errorf("an echo with HTTP 500: %d", status)
+	}
+
+	// Clearing the URL needs no handshake.
+	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":""}`, false); status != 200 {
+		t.Errorf("clearing the Request URL: %d", status)
 	}
 }

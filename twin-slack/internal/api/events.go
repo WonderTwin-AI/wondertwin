@@ -1,12 +1,16 @@
 package api
 
 import (
+	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -487,9 +491,66 @@ func (h *Handler) emitMemberLeft(ch store.Channel, user string) {
 	})
 }
 
+// verifyRequestURL makes the url_verification handshake Slack makes when a
+// Request URL is entered in the app's settings: a signed POST carrying a
+// challenge, which the app must echo with HTTP 200 as plain text, as a
+// challenge form field, or as JSON (reference/events/url_verification.md).
+// Slack keeps a URL that fails out of the settings.
+func verifyRequestURL(cfg EventsConfig) error {
+	nonce := make([]byte, 24)
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+	challenge := hex.EncodeToString(nonce)
+	body, _ := json.Marshal(map[string]string{
+		"token":     cfg.VerificationToken,
+		"challenge": challenge,
+		"type":      "url_verification",
+	})
+	req, err := http.NewRequest(http.MethodPost, cfg.RequestURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range (slackSigner{}).Sign(body, cfg.SigningSecret) {
+		req.Header.Set(k, v)
+	}
+	resp, err := (&http.Client{Timeout: eventAckTimeout}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("the Request URL answered HTTP %d", resp.StatusCode)
+	}
+	if echoed(answer) != challenge {
+		return fmt.Errorf("the Request URL did not echo the challenge")
+	}
+	return nil
+}
+
+// echoed reads the challenge back from a url_verification answer in any of
+// the three forms the docs accept.
+func echoed(answer []byte) string {
+	var j struct {
+		Challenge string `json:"challenge"`
+	}
+	if json.Unmarshal(answer, &j) == nil && j.Challenge != "" {
+		return j.Challenge
+	}
+	text := strings.TrimSpace(string(answer))
+	if v, err := url.ParseQuery(text); err == nil && v.Get("challenge") != "" {
+		return v.Get("challenge")
+	}
+	return text
+}
+
 // AdminEventsConfig handles GET and POST /admin/events/config. POST takes any
 // of request_url, signing_secret, verification_token and retry_delays_ms, and
-// leaves the others as they are.
+// leaves the others as they are. A non-empty request_url must pass Slack's
+// url_verification handshake, or nothing changes. The --webhook-url flag sets
+// the Request URL at startup without one, since the app may not be up yet.
 func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := h.events.config()
 	if r.Method == http.MethodPost {
@@ -522,6 +583,12 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 				delays[i] = time.Duration(ms) * time.Millisecond
 			}
 			cfg.RetryDelays = delays
+		}
+		if req.RequestURL != nil && cfg.RequestURL != "" {
+			if err := verifyRequestURL(cfg); err != nil {
+				twincore.Error(w, http.StatusBadRequest, "url_verification failed: "+err.Error())
+				return
+			}
 		}
 		h.ConfigureEvents(cfg)
 		cfg = h.events.config()
