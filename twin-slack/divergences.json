@@ -2,7 +2,7 @@
   "twin_id": "twin-slack",
   "tier": "community",
   "vendor_api_version": "Slack Web API as documented on 2026-09-26",
-  "reviewed_at": "2026-10-02",
+  "reviewed_at": "2026-10-06",
   "divergences": [
     {
       "route": "POST /api/files.getUploadURLExternal",
@@ -115,6 +115,38 @@
         "events-001",
         "auth-006"
       ]
+    },
+    {
+      "route": "POST /api/files.upload",
+      "reason": "Answers unknown_method before authentication. Slack sunset files.upload on 2025-11-12 (changelog 2025-03-17), but the 2026-09-26 unauthenticated probe (obs-004) shows Slack still routes the name to its auth check. Use files.getUploadURLExternal and files.completeUploadExternal.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-06: remove methods Slack has retired or degraded rather than serve or declare them.",
+      "quirk_ids": [
+        "auth-005"
+      ]
+    },
+    {
+      "route": "POST /api/reminders.*, POST /api/stars.*",
+      "reason": "Answers unknown_method. Slack still serves these methods, but its July 2023 changelog (\"It's later already for stars and reminders\") calls them degraded or useless since Save it for Later replaced both features.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-06: remove methods Slack has retired or degraded rather than serve or declare them.",
+      "no_quirk_reason": "Removal of degraded methods; no vendor behaviour is reproduced or departed from beyond the method being absent."
+    },
+    {
+      "route": "POST /api/{method} for any method outside the supported use cases",
+      "reason": "Answers unknown_method. Slack serves these methods; the app emulator supports only the methods its use cases need (research/twins/slack/mvp.md). Every Slack method marked recommended_scope deferred in research/twins/slack/method-inventory.json in WonderTwin-AI/wondertwin-docs is in this set, each with its revisit trigger in scope-recommendation.json. The 15 stubs the first build served for deferred methods (dialog.open, dnd.*, search.*, team.accessLogs, team.billableInfo, team.integrationLogs, team.profile.get, users.setPhoto, users.deletePhoto) were removed rather than kept as answers that looked real.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-06: state exactly what is supported; methods outside the supported use cases are not served and are declared once here instead of one entry per method.",
+      "no_quirk_reason": "A scope boundary, not a departure from a documented or observed Slack behaviour."
     },
     {
       "route": "/admin/*",

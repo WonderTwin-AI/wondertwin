@@ -158,16 +158,6 @@ type Bookmark struct {
 	UpdatedAt int64  `json:"date_updated"`
 }
 
-// Reminder represents a Slack reminder.
-type Reminder struct {
-	ID         string `json:"id"`
-	Creator    string `json:"creator"`
-	User       string `json:"user"`
-	Text       string `json:"text"`
-	Time       int64  `json:"time"`
-	CompleteTS int64  `json:"complete_ts"`
-}
-
 // Usergroup represents a Slack user group (handle).
 type Usergroup struct {
 	ID          string `json:"id"`
@@ -182,23 +172,6 @@ type Usergroup struct {
 	DateCreate  int64    `json:"date_create"`
 	DateUpdate  int64    `json:"date_update"`
 	DateDelete  int64    `json:"date_delete"`
-}
-
-// Star represents a starred item.
-type Star struct {
-	Type    string   `json:"type"` // "message", "file", "channel"
-	Channel string   `json:"channel,omitempty"`
-	Message *Message `json:"message,omitempty"`
-	File    *File    `json:"file,omitempty"`
-}
-
-// DndStatus holds a user's Do Not Disturb state.
-type DndStatus struct {
-	DndEnabled    bool  `json:"dnd_enabled"`
-	NextStart     int64 `json:"next_dnd_start_ts"`
-	NextEnd       int64 `json:"next_dnd_end_ts"`
-	SnoozeEnabled bool  `json:"snooze_enabled"`
-	SnoozeEndtime int64 `json:"snooze_endtime,omitempty"`
 }
 
 // View is a surface an app draws with Block Kit: a user's Home tab, or a

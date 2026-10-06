@@ -64,6 +64,28 @@ func TestUnknownMethodAnswersBeforeAuthentication(t *testing.T) {
 	}
 }
 
+// The app emulator does not serve methods Slack sunset (files.upload,
+// 2025-11-12) or degraded (reminders.* and stars.*, July 2023), nor live
+// methods outside the supported use cases, which the research defers.
+func TestUnsupportedMethodsAreNotServed(t *testing.T) {
+	srv, _ := setupSlack(t)
+	for _, name := range []string{
+		"files.upload",
+		"reminders.add", "reminders.complete", "reminders.delete", "reminders.info", "reminders.list",
+		"stars.add", "stars.list", "stars.remove",
+		"dialog.open",
+		"dnd.endDnd", "dnd.endSnooze", "dnd.info", "dnd.setSnooze", "dnd.teamInfo",
+		"search.all", "search.files", "search.messages",
+		"team.accessLogs", "team.billableInfo", "team.integrationLogs", "team.profile.get",
+		"users.deletePhoto", "users.setPhoto",
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, h, m := callHeaders(t, srv, "POST", "/api/"+name, "", "", true)
+			wantUnknownMethod(t, status, h, m, name)
+		})
+	}
+}
+
 func TestUnknownMethodIgnoresTokenAndBody(t *testing.T) {
 	srv, _ := setupSlack(t)
 
@@ -155,7 +177,7 @@ func TestNoLifecycleHeaders(t *testing.T) {
 		{"/api/auth.test", true},
 		{"/api/auth.test", false},
 		{"/api/channels.list", false},
-		{"/api/files.upload", true},
+		{"/api/channels.list", true},
 	} {
 		_, h, _ := callHeaders(t, srv, "POST", c.path, "", "", c.authed)
 		for _, name := range []string{"Deprecation", "Sunset", "Link", "Warning"} {
