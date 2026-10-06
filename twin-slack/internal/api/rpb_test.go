@@ -149,7 +149,7 @@ func TestBookmarksList(t *testing.T) {
 // bookmarks.edit and bookmarks.remove answer the errors Slack's docs list:
 // channel_not_found for an unknown channel, not_found for a bookmark that does
 // not exist or belongs to another channel.
-func TestBookmarksEditAndRemove(t *testing.T) {
+func TestBookmarkEditAndRemoveErrors(t *testing.T) {
 	srv, _ := setupSlack(t)
 	ch, _ := postIn(t, srv, "bm")
 	other, _ := postIn(t, srv, "elsewhere")
