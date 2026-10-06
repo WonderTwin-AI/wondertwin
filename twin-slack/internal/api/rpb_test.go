@@ -145,3 +145,39 @@ func TestBookmarksList(t *testing.T) {
 		t.Errorf("unknown channel: %v", m)
 	}
 }
+
+// bookmarks.edit and bookmarks.remove answer the errors Slack's docs list:
+// channel_not_found for an unknown channel, not_found for a bookmark that does
+// not exist or belongs to another channel.
+func TestBookmarksEditAndRemove(t *testing.T) {
+	srv, _ := setupSlack(t)
+	ch, _ := postIn(t, srv, "bm")
+	other, _ := postIn(t, srv, "elsewhere")
+	add := form(t, srv, "bookmarks.add", url.Values{"channel_id": {ch}, "title": {"Docs"}, "type": {"link"}, "link": {"https://example.com"}})
+	mustOK(t, 200, add)
+	id := add["bookmark"].(map[string]any)["id"].(string)
+
+	for _, method := range []string{"bookmarks.edit", "bookmarks.remove"} {
+		wantErrors(t, srv, method, map[string]errCase{
+			"unknown channel":  {url.Values{"channel_id": {"CNOPE"}, "bookmark_id": {id}}, "channel_not_found"},
+			"unknown bookmark": {url.Values{"channel_id": {ch}, "bookmark_id": {"BkNOPE"}}, "not_found"},
+			"other channel":    {url.Values{"channel_id": {other}, "bookmark_id": {id}}, "not_found"},
+		})
+	}
+	if m := form(t, srv, "bookmarks.edit", url.Values{"channel_id": {ch}, "bookmark_id": {id}, "link": {"example.com"}}); m["error"] != "invalid_link" {
+		t.Errorf("edit to a link that is not a URL: %v", m)
+	}
+
+	edited := form(t, srv, "bookmarks.edit", url.Values{"channel_id": {ch}, "bookmark_id": {id}, "title": {"Guide"}})
+	mustOK(t, 200, edited)
+	if edited["bookmark"].(map[string]any)["title"] != "Guide" {
+		t.Errorf("edit: %v", edited)
+	}
+	mustOK(t, 200, form(t, srv, "bookmarks.remove", url.Values{"channel_id": {ch}, "bookmark_id": {id}}))
+	if m := form(t, srv, "bookmarks.remove", url.Values{"channel_id": {ch}, "bookmark_id": {id}}); m["error"] != "not_found" {
+		t.Errorf("removing a removed bookmark: %v", m)
+	}
+	if bms := form(t, srv, "bookmarks.list", url.Values{"channel_id": {ch}})["bookmarks"].([]any); len(bms) != 0 {
+		t.Errorf("after remove: %v", bms)
+	}
+}

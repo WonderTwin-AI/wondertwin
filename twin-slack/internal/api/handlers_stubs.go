@@ -64,9 +64,12 @@ func (h *Handler) BookmarksEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bm, ok := h.store.Bookmarks.Get(req.BookmarkID)
+	bm, ok := h.channelBookmark(w, req.ChannelID, req.BookmarkID)
 	if !ok {
-		slackError(w, "bookmark_not_found")
+		return
+	}
+	if req.Link != "" && !strings.HasPrefix(req.Link, "http://") && !strings.HasPrefix(req.Link, "https://") {
+		slackError(w, "invalid_link")
 		return
 	}
 	if req.Title != "" {
@@ -113,8 +116,27 @@ func (h *Handler) BookmarksRemove(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
+	if _, ok := h.channelBookmark(w, req.ChannelID, req.BookmarkID); !ok {
+		return
+	}
 	h.store.Bookmarks.Delete(req.BookmarkID)
 	slackOK(w, nil)
+}
+
+// channelBookmark finds a bookmark in a channel, answering the error Slack's
+// docs list when it cannot: channel_not_found for an unknown channel, and
+// not_found for a bookmark that does not exist or is in another channel.
+func (h *Handler) channelBookmark(w http.ResponseWriter, channelID, bookmarkID string) (store.Bookmark, bool) {
+	if _, ok := h.store.Channels.Get(channelID); !ok {
+		slackError(w, "channel_not_found")
+		return store.Bookmark{}, false
+	}
+	bm, ok := h.store.Bookmarks.Get(bookmarkID)
+	if !ok || bm.ChannelID != channelID {
+		slackError(w, "not_found")
+		return store.Bookmark{}, false
+	}
+	return bm, true
 }
 
 // --- emoji.* ---
