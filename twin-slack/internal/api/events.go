@@ -89,6 +89,7 @@ type attempt struct {
 type eventJob struct {
 	id, typ string
 	body    []byte
+	gen     int
 }
 
 // eventBus delivers events in order, one at a time, through a twinkit
@@ -102,8 +103,13 @@ type eventBus struct {
 	inflight   map[string]attempt // dispatcher event id -> attempt
 	deliveries []EventDelivery
 	counter    int
-	jobs       chan eventJob
-	pending    sync.WaitGroup
+	// gen counts resets. A job queued before a reset is dropped rather than
+	// delivered into the next test's log, and resetCh, closed on each reset,
+	// cuts short a retry wait so it does not hold up later events.
+	gen     int
+	resetCh chan struct{}
+	jobs    chan eventJob
+	pending sync.WaitGroup
 }
 
 func newEventBus() *eventBus {
@@ -115,6 +121,7 @@ func newEventBus() *eventBus {
 		},
 		inflight: map[string]attempt{},
 		jobs:     make(chan eventJob, 1024),
+		resetCh:  make(chan struct{}),
 	}
 	b.d = webhook.NewDispatcher(webhook.Config{
 		Signer:      slackSigner{},
@@ -169,7 +176,7 @@ func (b *eventBus) publish(h *Handler, event map[string]any) {
 	cfg := b.config()
 	b.mu.Lock()
 	b.counter++
-	n := b.counter
+	n, gen := b.counter, b.gen
 	b.mu.Unlock()
 
 	team := h.store.Team.ID
@@ -199,7 +206,7 @@ func (b *eventBus) publish(h *Handler, event map[string]any) {
 		return
 	}
 	b.pending.Add(1)
-	b.jobs <- eventJob{id: id, typ: fmt.Sprint(event["type"]), body: body}
+	b.jobs <- eventJob{id: id, typ: fmt.Sprint(event["type"]), body: body, gen: gen}
 }
 
 func (b *eventBus) run() {
@@ -214,8 +221,11 @@ func (b *eventBus) deliver(job eventJob) {
 	delays := b.config().RetryDelays
 	reason := ""
 	for retry := 0; retry <= len(delays); retry++ {
-		if retry > 0 {
-			time.Sleep(delays[retry-1])
+		if retry > 0 && !b.wait(job, delays[retry-1]) {
+			return
+		}
+		if !b.current(job) {
+			return
 		}
 		rec, ok := b.attempt(job, retry, reason)
 		if ok {
@@ -247,7 +257,7 @@ func (b *eventBus) attempt(job eventJob, retry int, reason string) (EventDeliver
 	}
 	b.mu.Lock()
 	delete(b.inflight, evt.ID)
-	if sent {
+	if sent && job.gen == b.gen {
 		b.deliveries = append(b.deliveries, rec)
 	}
 	b.mu.Unlock()
@@ -256,6 +266,48 @@ func (b *eventBus) attempt(job eventJob, retry int, reason string) (EventDeliver
 	// does a failure the receiver answered with x-slack-no-retry: 1, which
 	// asks Slack not to redeliver this event.
 	return rec, !sent || noRetry || (err == nil && rec.StatusCode >= 200 && rec.StatusCode < 300)
+}
+
+// wait sleeps before a retry. It returns false if a reset came first.
+func (b *eventBus) wait(job eventJob, d time.Duration) bool {
+	b.mu.Lock()
+	ch := b.resetCh
+	stale := job.gen != b.gen
+	b.mu.Unlock()
+	if stale {
+		return false
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ch:
+		return false
+	}
+}
+
+// current reports whether a job was queued since the last reset.
+func (b *eventBus) current(job eventJob) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return job.gen == b.gen
+}
+
+// reset forgets every event and delivery, and the event counter, as
+// POST /admin/reset does for the rest of the app emulator. The Event
+// Subscriptions settings stay: they are the app's configuration, set at
+// startup or through /admin/events/config, not workspace state, which is also
+// why neither they nor the delivery log is part of a state snapshot.
+func (b *eventBus) reset() {
+	b.mu.Lock()
+	b.gen++
+	b.counter = 0
+	b.deliveries = nil
+	close(b.resetCh)
+	b.resetCh = make(chan struct{})
+	b.mu.Unlock()
+	b.d.Reset()
 }
 
 // retryReason names a failed attempt with the x-slack-retry-reason value the
@@ -297,6 +349,28 @@ func (h *Handler) ConfigureEvents(cfg EventsConfig) {
 		cfg.RetryDelays = defaultRetryDelays
 	}
 	h.events.configure(cfg)
+}
+
+// adminState is the app emulator's state as POST /admin/reset, GET and
+// POST /admin/state see it: the store, plus the event bus on reset.
+type adminState struct {
+	*store.MemoryStore
+	events *eventBus
+}
+
+func (s adminState) Reset() {
+	s.MemoryStore.Reset()
+	s.events.reset()
+}
+
+// AdminState is the state the admin handler manages. Resetting it also
+// clears the Events API delivery log and drops queued events.
+func (h *Handler) AdminState() interface {
+	Snapshot() any
+	LoadState(data []byte) error
+	Reset()
+} {
+	return adminState{MemoryStore: h.store, events: h.events}
 }
 
 // EventsFlusher is what the admin handler's /admin/webhooks/flush waits on.

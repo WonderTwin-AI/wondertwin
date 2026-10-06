@@ -19,7 +19,7 @@ func setupSlack(t *testing.T) (*httptest.Server, *testutil.TwinClient) {
 	twin := twincore.New(cfg)
 	handler := api.NewHandler(memStore, twin.Middleware())
 	handler.Routes(twin.Router)
-	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler := admin.NewHandler(handler.AdminState(), twin.Middleware(), memStore.Clock)
 	adminHandler.Routes(twin.Router)
 	srv := httptest.NewServer(twin.Router)
 	t.Cleanup(srv.Close)

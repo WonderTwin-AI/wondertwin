@@ -38,7 +38,7 @@ func main() {
 	apiHandler.Routes(twin.Router)
 
 	// Admin control plane
-	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
+	adminHandler := admin.NewHandler(apiHandler.AdminState(), twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(twin)
 	adminHandler.SetFlusher(apiHandler.EventsFlusher())
 	adminHandler.Routes(twin.Router)

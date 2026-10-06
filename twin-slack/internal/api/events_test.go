@@ -294,3 +294,42 @@ func TestNoRetryHeaderStopsRedelivery(t *testing.T) {
 		}
 	}
 }
+
+// POST /admin/reset empties the delivery log, restarts event ids, and drops
+// an event waiting out Slack's retry schedule, so the next event is delivered
+// at once. The Request URL stays configured.
+func TestResetClearsTheEventBus(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{60000}})
+	ch := seedChannel(tc, "before")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"stuck"}}.Encode(), true)
+	rc.wait(t, 1)
+
+	if status, _ := call(t, srv, "POST", "/admin/reset", "", "", false); status != 200 {
+		t.Fatalf("reset: %d", status)
+	}
+	_, m := call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+	if d := m["deliveries"].([]any); len(d) != 0 {
+		t.Errorf("deliveries after reset: %v", d)
+	}
+	_, cfg := call(t, srv, "GET", "/admin/events/config", "", "", false)
+	if cfg["request_url"] != rc.srv.URL {
+		t.Errorf("reset dropped the Request URL: %v", cfg)
+	}
+
+	ch = seedChannel(tc, "after")
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"fresh"}}.Encode(), true)
+	got := rc.wait(t, 2)
+	env := envelope(t, got[1])
+	if ev := env["event"].(map[string]any); ev["text"] != "fresh" || got[1].header.Get("X-Slack-Retry-Num") != "" {
+		t.Errorf("first delivery after reset: %v", ev)
+	}
+	if env["event_id"] != "Ev00000001" {
+		t.Errorf("event ids restart after reset: %v", env["event_id"])
+	}
+	_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+	if d := m["deliveries"].([]any); len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
+		t.Errorf("delivery log after reset: %v", d)
+	}
+}
