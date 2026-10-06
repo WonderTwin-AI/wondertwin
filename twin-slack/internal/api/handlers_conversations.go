@@ -407,12 +407,16 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if caller := callerUserID(r); !slices.Contains(ch.Members, caller) {
-		ch.Members = append(ch.Members, caller)
-		ch.NumMembers++
-		h.store.Channels.Set(req.Channel, ch)
-		h.emitMemberJoined(ch, caller, "")
+	caller := callerUserID(r)
+	if slices.Contains(ch.Members, caller) {
+		// Slack still answers ok, with the already_in_channel warning.
+		slackOK(w, withWarnings(map[string]any{"channel": membershipView(r, ch)}, "already_in_channel"))
+		return
 	}
+	ch.Members = append(ch.Members, caller)
+	ch.NumMembers++
+	h.store.Channels.Set(req.Channel, ch)
+	h.emitMemberJoined(ch, caller, "")
 
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
