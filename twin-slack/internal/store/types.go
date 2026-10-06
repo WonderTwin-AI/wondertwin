@@ -52,6 +52,8 @@ type Message struct {
 	Username    string            `json:"username,omitempty"`
 	Icons       map[string]string `json:"icons,omitempty"`
 	Attachments []map[string]any  `json:"attachments,omitempty"`
+	// Files are the files a file_share message shares.
+	Files []File `json:"files,omitempty"`
 	// Metadata is returned by conversations.history and replies only with
 	// include_all_metadata.
 	Metadata  map[string]any `json:"metadata,omitempty"`

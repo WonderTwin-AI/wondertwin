@@ -2,8 +2,11 @@ package api
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -19,15 +22,27 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 		slackArgsError(w, err)
 		return
 	}
+	// Both are required by the docs.
+	if req.Filename == "" {
+		invalidArgument(w, "filename")
+		return
+	}
+	if req.Length <= 0 {
+		invalidArgument(w, "length")
+		return
+	}
 
 	id := h.store.Files.NextID()
+	mimeType, fileType := fileTypes(req.Filename)
 	file := store.File{
-		ID:      id,
-		Name:    req.Filename,
-		Title:   req.Filename,
-		Size:    req.Length,
-		User:    callerUserID(r),
-		Created: h.store.Clock.Now().Unix(),
+		ID:       id,
+		Name:     req.Filename,
+		Title:    req.Filename,
+		MimeType: mimeType,
+		FileType: fileType,
+		Size:     req.Length,
+		User:     callerUserID(r),
+		Created:  h.store.Clock.Now().Unix(),
 	}
 	h.store.Files.Set(id, file)
 
@@ -46,8 +61,10 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 			ID    string `json:"id"`
 			Title string `json:"title,omitempty"`
 		} `json:"files"`
-		ChannelID string `json:"channel_id,omitempty"`
-		Channels  string `json:"channels,omitempty"`
+		ChannelID      string `json:"channel_id,omitempty"`
+		Channels       string `json:"channels,omitempty"`
+		ThreadTS       string `json:"thread_ts,omitempty"`
+		InitialComment string `json:"initial_comment,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -97,7 +114,26 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		file.IsPublic = len(file.Channels) > 0
 		file.Permalink = fmt.Sprintf("https://files.slack.com/%s/%s", h.store.Team.ID, f.ID)
 		h.store.Files.Set(f.ID, file)
+		files[i] = file
 		completed = append(completed, map[string]any{"id": file.ID, "title": file.Title})
+	}
+
+	// Sharing posts a file_share message to each channel, carrying the files
+	// and the initial comment as its text.
+	for _, c := range share {
+		msg := store.Message{
+			Type:     "message",
+			Subtype:  "file_share",
+			Channel:  c,
+			User:     callerUserID(r),
+			Text:     req.InitialComment,
+			TS:       h.store.NextTS(),
+			ThreadTS: req.ThreadTS,
+			Team:     h.store.Team.ID,
+			Files:    files,
+		}
+		h.store.Messages.Set(h.store.Messages.NextID(), msg)
+		h.emitMessage(msg)
 	}
 
 	slackOK(w, map[string]any{"files": completed})
@@ -105,7 +141,47 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 
 // FilesList handles POST /api/files.list
 func (h *Handler) FilesList(w http.ResponseWriter, r *http.Request) {
-	files := h.store.Files.List()
+	var req struct {
+		Channel string `json:"channel"`
+		User    string `json:"user"`
+		Types   string `json:"types"`
+		TSFrom  string `json:"ts_from"`
+		TSTo    string `json:"ts_to"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	if req.User != "" && !h.store.KnownUser(req.User) {
+		slackError(w, "user_not_found")
+		return
+	}
+	match, ok := fileTypeFilter(req.Types)
+	if !ok {
+		slackError(w, "unknown_type")
+		return
+	}
+	from, fromErr := optionalUnix(req.TSFrom)
+	to, toErr := optionalUnix(req.TSTo)
+	if fromErr != nil || toErr != nil {
+		slackError(w, "invalid_arguments")
+		return
+	}
+
+	files := h.store.Files.Filter(func(_ string, f store.File) bool {
+		switch {
+		case req.Channel != "" && !slices.Contains(f.Channels, req.Channel),
+			req.User != "" && f.User != req.User,
+			!match(f),
+			from > 0 && f.Created < from,
+			to > 0 && f.Created > to:
+			return false
+		}
+		return true
+	})
+	if files == nil {
+		files = []store.File{}
+	}
 	slackOK(w, map[string]any{
 		"files": files,
 		"paging": map[string]any{
@@ -151,4 +227,64 @@ func (h *Handler) FilesDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Files.Delete(req.File)
 	slackOK(w, nil)
+}
+
+// fileTypes derives a file's mimetype and filetype from its name's extension.
+func fileTypes(name string) (string, string) {
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
+	if ext == "" {
+		return "application/octet-stream", "binary"
+	}
+	mimeType := mime.TypeByExtension("." + ext)
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	mimeType, _, _ = strings.Cut(mimeType, ";")
+	if ext == "txt" {
+		ext = "text"
+	}
+	return mimeType, ext
+}
+
+// fileTypeFilter matches files against files.list's types argument: a
+// comma-separated list of the documented types, all by default.
+func fileTypeFilter(types string) (func(store.File) bool, bool) {
+	if types == "" {
+		types = "all"
+	}
+	var wanted []func(store.File) bool
+	for _, t := range strings.Split(types, ",") {
+		switch strings.TrimSpace(t) {
+		case "all":
+			return func(store.File) bool { return true }, true
+		case "images":
+			wanted = append(wanted, func(f store.File) bool { return strings.HasPrefix(f.MimeType, "image/") })
+		case "pdfs":
+			wanted = append(wanted, func(f store.File) bool { return f.FileType == "pdf" })
+		case "zips":
+			wanted = append(wanted, func(f store.File) bool { return f.FileType == "zip" })
+		case "spaces", "snippets", "gdocs":
+			// Posts, snippets and Google docs are not created by the app emulator.
+			wanted = append(wanted, func(store.File) bool { return false })
+		default:
+			return nil, false
+		}
+	}
+	return func(f store.File) bool {
+		for _, w := range wanted {
+			if w(f) {
+				return true
+			}
+		}
+		return false
+	}, true
+}
+
+// optionalUnix parses a unix timestamp argument, 0 when absent.
+func optionalUnix(s string) (int64, error) {
+	if s == "" {
+		return 0, nil
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	return int64(f), err
 }
