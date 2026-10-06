@@ -62,9 +62,10 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 // ConversationsHistory handles POST /api/conversations.history
 func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		Cursor  string `json:"cursor"`
-		Limit   int    `json:"limit"`
+		Channel            string `json:"channel"`
+		Cursor             string `json:"cursor"`
+		Limit              int    `json:"limit"`
+		IncludeAllMetadata bool   `json:"include_all_metadata"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -82,7 +83,7 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"messages":          messages,
+		"messages":          withMetadata(messages, req.IncludeAllMetadata),
 		"has_more":          next != "",
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
@@ -91,10 +92,11 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 // ConversationsReplies handles POST /api/conversations.replies
 func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		TS      string `json:"ts"`
-		Cursor  string `json:"cursor"`
-		Limit   int    `json:"limit"`
+		Channel            string `json:"channel"`
+		TS                 string `json:"ts"`
+		Cursor             string `json:"cursor"`
+		Limit              int    `json:"limit"`
+		IncludeAllMetadata bool   `json:"include_all_metadata"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -119,10 +121,24 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"messages":          replies,
+		"messages":          withMetadata(replies, req.IncludeAllMetadata),
 		"has_more":          next != "",
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
+}
+
+// withMetadata returns messages with their metadata only when the caller asked
+// for it with include_all_metadata.
+func withMetadata(messages []store.Message, include bool) []store.Message {
+	if include {
+		return messages
+	}
+	out := make([]store.Message, len(messages))
+	for i, m := range messages {
+		m.Metadata = nil
+		out[i] = m
+	}
+	return out
 }
 
 // ConversationsMembers handles POST /api/conversations.members

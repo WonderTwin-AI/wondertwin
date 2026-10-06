@@ -13,6 +13,12 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		Text     string `json:"text"`
 		ThreadTS string `json:"thread_ts,omitempty"`
 		Blocks   any    `json:"blocks,omitempty"`
+		// Attachments and Metadata arrive as JSON, or as JSON text in a form.
+		Attachments    any    `json:"attachments,omitempty"`
+		Metadata       any    `json:"metadata,omitempty"`
+		Username       string `json:"username,omitempty"`
+		IconEmoji      string `json:"icon_emoji,omitempty"`
+		ReplyBroadcast bool   `json:"reply_broadcast,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -22,8 +28,22 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
-	if req.Text == "" && req.Blocks == nil {
+	if req.Text == "" && req.Blocks == nil && req.Attachments == nil {
 		slackError(w, "no_text")
+		return
+	}
+	attachments, ok := messageAttachments(req.Attachments)
+	if !ok {
+		slackError(w, "invalid_arguments")
+		return
+	}
+	if len(attachments) > maxAttachments {
+		slackError(w, "too_many_attachments")
+		return
+	}
+	metadata, ok := messageMetadata(req.Metadata)
+	if !ok {
+		slackError(w, "invalid_metadata_format")
 		return
 	}
 
@@ -43,6 +63,17 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		ThreadTS: req.ThreadTS,
 		Team:     h.store.Team.ID,
 		Blocks:   req.Blocks,
+
+		Username:    req.Username,
+		Attachments: attachments,
+		Metadata:    metadata,
+	}
+	if req.IconEmoji != "" {
+		msg.Icons = map[string]string{"emoji": req.IconEmoji}
+	}
+	// A broadcast reply is also shown in the channel.
+	if req.ReplyBroadcast && req.ThreadTS != "" {
+		msg.Subtype = "thread_broadcast"
 	}
 
 	id := h.store.Messages.NextID()
@@ -256,4 +287,51 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 		"channel": req.Channel,
 		"ts":      ts,
 	})
+}
+
+// maxAttachments is the most attachments a message may carry, per the
+// chat.postMessage docs for too_many_attachments.
+const maxAttachments = 100
+
+// messageAttachments reads the attachments argument: a JSON array of objects.
+// Each attachment gets the 1-based id Slack's response example shows.
+func messageAttachments(v any) ([]map[string]any, bool) {
+	if v == nil {
+		return nil, true
+	}
+	items, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	out := make([]map[string]any, 0, len(items))
+	for i, item := range items {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		if _, set := obj["id"]; !set {
+			obj["id"] = i + 1
+		}
+		out = append(out, obj)
+	}
+	return out, true
+}
+
+// messageMetadata reads the metadata argument: an object with a string
+// event_type and an object event_payload.
+func messageMetadata(v any) (map[string]any, bool) {
+	if v == nil {
+		return nil, true
+	}
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	if t, ok := obj["event_type"].(string); !ok || t == "" {
+		return nil, false
+	}
+	if _, ok := obj["event_payload"].(map[string]any); !ok {
+		return nil, false
+	}
+	return obj, true
 }

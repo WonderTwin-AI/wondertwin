@@ -79,7 +79,7 @@ func (s *MemoryStore) GetChannelMessages(channel string, limit int) []Message {
 	// Iterate in reverse (newest first)
 	for i := len(all) - 1; i >= 0; i-- {
 		msg := all[i]
-		if msg.Channel == channel && !msg.IsDeleted && msg.ThreadTS == "" {
+		if msg.Channel == channel && !msg.IsDeleted && (msg.ThreadTS == "" || msg.Subtype == "thread_broadcast") {
 			result = append(result, msg)
 			if limit > 0 && len(result) >= limit {
 				break
