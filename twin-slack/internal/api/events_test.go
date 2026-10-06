@@ -113,19 +113,25 @@ func envelope(t *testing.T, r received) map[string]any {
 	return m
 }
 
-// verify checks a delivery's signature the way Slack's SDK verifiers do.
-func verify(t *testing.T, r received, secret string) {
-	t.Helper()
+// signatureValid checks a delivery's signature the way Slack's SDK verifiers
+// do: a recent timestamp and v0= HMAC-SHA256 of v0:{timestamp}:{body}.
+func signatureValid(r received, secret string) bool {
 	ts := r.header.Get("X-Slack-Request-Timestamp")
 	n, err := strconv.ParseInt(ts, 10, 64)
 	if err != nil || time.Since(time.Unix(n, 0)) > 5*time.Minute {
-		t.Fatalf("X-Slack-Request-Timestamp %q is not a recent epoch", ts)
+		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte("v0:" + ts + ":"))
 	mac.Write(r.body)
-	if want := "v0=" + hex.EncodeToString(mac.Sum(nil)); r.header.Get("X-Slack-Signature") != want {
-		t.Fatalf("X-Slack-Signature %q, want %q", r.header.Get("X-Slack-Signature"), want)
+	return hmac.Equal([]byte(r.header.Get("X-Slack-Signature")), []byte("v0="+hex.EncodeToString(mac.Sum(nil))))
+}
+
+func verify(t *testing.T, r received, secret string) {
+	t.Helper()
+	if !signatureValid(r, secret) {
+		t.Fatalf("signature %q (timestamp %q) does not verify with the signing secret",
+			r.header.Get("X-Slack-Signature"), r.header.Get("X-Slack-Request-Timestamp"))
 	}
 }
 
@@ -441,5 +447,57 @@ func TestRequestURLThatFailsVerificationIsRefused(t *testing.T) {
 	// Clearing the URL needs no handshake.
 	if status, _ := call(t, srv, "POST", "/admin/events/config", jsonType, `{"request_url":""}`, false); status != 200 {
 		t.Errorf("clearing the Request URL: %d", status)
+	}
+}
+
+// Every delivery is signed with the configured secret, and with nothing else.
+func TestEveryDeliveryIsSignedWithTheSigningSecret(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t, 500)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "right", "retry_delays_ms": []int{0}})
+	ch := seedChannel(tc, "signed")
+	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"a"}}.Encode(), true)
+	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {posted["ts"].(string)}, "name": {"eyes"}}.Encode(), true)
+	call(t, srv, "POST", "/api/chat.delete", formType, url.Values{"channel": {ch}, "ts": {posted["ts"].(string)}}.Encode(), true)
+
+	got := rc.wait(t, 4) // the message twice (one retry), the reaction, the deletion
+	for i, r := range got {
+		if !signatureValid(r, "right") {
+			t.Errorf("delivery %d does not verify with the signing secret", i)
+		}
+		if signatureValid(r, "wrong") {
+			t.Errorf("delivery %d verifies with the wrong secret", i)
+		}
+	}
+	tampered := got[0]
+	tampered.body = append(append([]byte{}, tampered.body...), ' ')
+	if signatureValid(tampered, "right") {
+		t.Error("a changed body still verifies")
+	}
+}
+
+// An event names the user who acted; authorizations names the installation
+// the event is delivered to, which is the app's bot user
+// (apis/events-api.md), whoever acted.
+func TestEventNamesTheActorAndTheInstallation(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"actors"}})["channel"].(map[string]any)["id"].(string)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+
+	posted := formAs(t, srv, "xoxp-actor", "chat.postMessage", url.Values{"channel": {ch}, "text": {"by a user"}})
+	mustOK(t, 200, posted)
+	mustOK(t, 200, formAs(t, srv, "xoxp-actor", "reactions.add", url.Values{"channel": {ch}, "timestamp": {posted["ts"].(string)}, "name": {"wave"}}))
+
+	for i, r := range rc.wait(t, 2) {
+		env := envelope(t, r)
+		ev := env["event"].(map[string]any)
+		if ev["user"] != "U_USER" {
+			t.Errorf("event %d (%v) user %v, want the caller U_USER", i, ev["type"], ev["user"])
+		}
+		auth := env["authorizations"].([]any)[0].(map[string]any)
+		if auth["user_id"] != "U_BOT" || auth["is_bot"] != true || auth["team_id"] != "T0001" {
+			t.Errorf("event %d authorizations %v, want the bot installation", i, auth)
+		}
 	}
 }
