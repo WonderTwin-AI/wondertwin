@@ -275,6 +275,10 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if req.Name == "" {
+		slackError(w, "invalid_name_required")
+		return
+	}
 
 	if _, _, taken := h.store.GetChannelByName(req.Name); taken {
 		slackError(w, "name_taken")
@@ -617,6 +621,10 @@ func (h *Handler) ConversationsClose(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
 	slackOK(w, nil)
 }
 
@@ -628,6 +636,10 @@ func (h *Handler) ConversationsMark(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
+		return
+	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
 		return
 	}
 	slackOK(w, nil)

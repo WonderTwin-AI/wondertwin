@@ -292,7 +292,11 @@ func (h *Handler) UsergroupsUsersList(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "not_found")
 		return
 	}
-	slackOK(w, map[string]any{"users": ug.Users})
+	users := ug.Users
+	if users == nil {
+		users = []string{}
+	}
+	slackOK(w, map[string]any{"users": users})
 }
 
 func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) {

@@ -23,6 +23,7 @@ type MemoryStore struct {
 	Usergroups        *pkgstate.Store[Usergroup]
 	Tokens            *pkgstate.Store[Token]
 	Views             *pkgstate.Store[ViewRecord]
+	Presences         *pkgstate.Store[Presence]
 	Clock             *pkgstate.Clock
 
 	// Team info (singleton)
@@ -44,6 +45,7 @@ func New() *MemoryStore {
 		Usergroups:        pkgstate.New[Usergroup]("S"),
 		Tokens:            pkgstate.New[Token]("tok"),
 		Views:             pkgstate.New[ViewRecord]("V"),
+		Presences:         pkgstate.New[Presence]("P"),
 		Clock:             pkgstate.NewClock(),
 		Team: Team{
 			ID:     "T0001",
@@ -152,6 +154,7 @@ type stateSnapshot struct {
 	Bookmarks         map[string]Bookmark         `json:"bookmarks,omitempty"`
 	Usergroups        map[string]Usergroup        `json:"usergroups,omitempty"`
 	Views             map[string]ViewRecord       `json:"views,omitempty"`
+	Presences         map[string]Presence         `json:"presences,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
 	// DeletedMessages names the messages chat.delete removed. A message's
 	// deleted flag is not part of its Slack shape, so it travels here.
@@ -173,6 +176,7 @@ func (s *MemoryStore) Snapshot() any {
 		Bookmarks:         s.Bookmarks.Snapshot(),
 		Usergroups:        s.Usergroups.Snapshot(),
 		Views:             s.Views.Snapshot(),
+		Presences:         s.Presences.Snapshot(),
 		Team:              &s.Team,
 		DeletedMessages:   s.deletedMessages(),
 		TSCounter:         s.tsCounter.Load(),
@@ -235,6 +239,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Views != nil {
 		s.Views.LoadSnapshot(snap.Views)
 	}
+	if snap.Presences != nil {
+		s.Presences.LoadSnapshot(snap.Presences)
+	}
 	if snap.Team != nil {
 		s.Team = *snap.Team
 	}
@@ -264,6 +271,7 @@ func (s *MemoryStore) Reset() {
 	s.Usergroups.Reset()
 	s.Tokens.Reset()
 	s.Views.Reset()
+	s.Presences.Reset()
 	s.Clock.Reset()
 	s.tsCounter.Store(0)
 	s.Team = Team{ID: "T0001", Name: "WonderTwin", Domain: "wondertwin"}

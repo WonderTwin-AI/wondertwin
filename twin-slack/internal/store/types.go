@@ -242,3 +242,10 @@ type Token struct {
 	// oauth.v2.access. A code is exchanged once.
 	OAuthCode string `json:"oauth_code,omitempty"`
 }
+
+// Presence is a user's manual presence, set with users.setPresence. Slack
+// keeps it for any user, including a bot user with no profile record here.
+type Presence struct {
+	User     string `json:"user"`
+	Presence string `json:"presence"`
+}

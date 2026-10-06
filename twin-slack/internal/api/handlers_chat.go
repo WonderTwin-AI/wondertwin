@@ -107,6 +107,10 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "user_not_found")
 		return
 	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
 
 	ts := h.store.NextTS()
 	slackOK(w, map[string]any{
@@ -222,7 +226,7 @@ func (h *Handler) ChatScheduleMessage(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if req.Channel == "" {
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
 		slackError(w, "channel_not_found")
 		return
 	}
@@ -279,6 +283,14 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
+		return
+	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
+	if req.Text == "" {
+		slackError(w, "no_text")
 		return
 	}
 
