@@ -61,10 +61,8 @@ func TestNoMemberEventWithoutAMembershipChange(t *testing.T) {
 	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 
 	mustOK(t, 200, form(t, srv, "conversations.join", url.Values{"channel": {ch}}))
-	invited := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}})
-	mustOK(t, 200, invited)
-	if n := invited["channel"].(map[string]any)["num_members"]; n != float64(1) {
-		t.Errorf("inviting a member counts them twice: num_members %v", n)
+	if invited := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}}); invited["ok"] != false || invited["error"] != "already_in_channel" {
+		t.Errorf("inviting a member: %v, want already_in_channel", invited)
 	}
 	mustOK(t, 200, formAs(t, srv, "xoxp-outsider", "conversations.leave", url.Values{"channel": {ch}}))
 
@@ -85,5 +83,24 @@ func TestPrivateChannelMemberEventsAreTypeG(t *testing.T) {
 	mustOK(t, 200, form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_GUEST"}}))
 	if e := envelope(t, rc.wait(t, 1)[0])["event"].(map[string]any); e["channel_type"] != "G" {
 		t.Errorf("private channel member event: %v", e)
+	}
+}
+
+// Slack refuses an invite naming only members with already_in_channel, and an
+// invite naming members and newcomers adds only the newcomers.
+func TestInviteOfExistingMembers(t *testing.T) {
+	srv, _ := setupSlack(t)
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"guests"}})["channel"].(map[string]any)["id"].(string)
+
+	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}}); m["ok"] != false || m["error"] != "already_in_channel" {
+		t.Errorf("inviting only a member: %v", m)
+	}
+	mixed := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT,U_GUEST"}})
+	mustOK(t, 200, mixed)
+	if n := mixed["channel"].(map[string]any)["num_members"]; n != float64(2) {
+		t.Errorf("num_members after a mixed invite: %v, want 2", n)
+	}
+	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_GUEST,U_BOT"}}); m["error"] != "already_in_channel" {
+		t.Errorf("inviting two members: %v", m)
 	}
 }

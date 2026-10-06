@@ -331,14 +331,20 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	users := splitCSV(req.Users)
 	var added []string
-	for _, u := range splitCSV(req.Users) {
+	for _, u := range users {
 		if slices.Contains(ch.Members, u) {
 			continue
 		}
 		ch.Members = append(ch.Members, u)
 		ch.NumMembers++
 		added = append(added, u)
+	}
+	// Slack refuses an invite that adds nobody: every user named is already in.
+	if len(users) > 0 && len(added) == 0 {
+		slackError(w, "already_in_channel")
+		return
 	}
 	h.store.Channels.Set(req.Channel, ch)
 	for _, u := range added {
