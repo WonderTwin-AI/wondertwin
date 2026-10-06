@@ -35,7 +35,7 @@ func (h *Handler) ConversationsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"channels":          channels,
+		"channels":          membershipViews(r, channels),
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
@@ -56,7 +56,7 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slackOK(w, map[string]any{"channel": ch})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsHistory handles POST /api/conversations.history
@@ -183,7 +183,6 @@ func (h *Handler) ConversationsCreate(w http.ResponseWriter, r *http.Request) {
 		IsChannel:  !req.IsPrivate,
 		IsGroup:    req.IsPrivate,
 		IsPrivate:  req.IsPrivate,
-		IsMember:   true,
 		Creator:    callerUserID(r),
 		Created:    h.store.Clock.Now().Unix(),
 		Members:    []string{callerUserID(r)},
@@ -191,7 +190,7 @@ func (h *Handler) ConversationsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.store.Channels.Set(id, ch)
 
-	slackOK(w, map[string]any{"channel": ch})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsArchive handles POST /api/conversations.archive
@@ -268,7 +267,7 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 
 	ch.Name = req.Name
 	h.store.Channels.Set(req.Channel, ch)
-	slackOK(w, map[string]any{"channel": ch})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsSetPurpose handles POST /api/conversations.setPurpose
@@ -338,7 +337,7 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		ch.NumMembers++
 	}
 	h.store.Channels.Set(req.Channel, ch)
-	slackOK(w, map[string]any{"channel": ch})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsKick handles POST /api/conversations.kick
@@ -397,11 +396,10 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 	if caller := callerUserID(r); !slices.Contains(ch.Members, caller) {
 		ch.Members = append(ch.Members, caller)
 		ch.NumMembers++
-		ch.IsMember = true
 		h.store.Channels.Set(req.Channel, ch)
 	}
 
-	slackOK(w, map[string]any{"channel": ch})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsLeave handles POST /api/conversations.leave
@@ -428,7 +426,6 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 	}
 	ch.Members = members
 	ch.NumMembers = len(members)
-	ch.IsMember = false
 	h.store.Channels.Set(req.Channel, ch)
 	slackOK(w, nil)
 }
@@ -457,7 +454,7 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 			slackError(w, "method_not_supported_for_channel_type")
 			return
 		}
-		h.openAnswer(w, ch, true, req.ReturnIM)
+		h.openAnswer(w, r, ch, true, req.ReturnIM)
 		return
 	}
 
@@ -489,7 +486,7 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	members := memberSet(append(users, caller))
 	if ch, ok := h.conversationWith(members); ok {
-		h.openAnswer(w, ch, true, req.ReturnIM)
+		h.openAnswer(w, r, ch, true, req.ReturnIM)
 		return
 	}
 	if req.PreventCreation {
@@ -499,7 +496,6 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 
 	id := h.store.Channels.NextID()
 	ch := store.Channel{
-		IsMember:   true,
 		Creator:    caller,
 		Created:    h.store.Clock.Now().Unix(),
 		Members:    members,
@@ -523,15 +519,15 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 		ch.Name = h.mpimName(members)
 	}
 	h.store.Channels.Set(ch.ID, ch)
-	h.openAnswer(w, ch, false, req.ReturnIM)
+	h.openAnswer(w, r, ch, false, req.ReturnIM)
 }
 
 // openAnswer writes the answer to conversations.open. Without return_im, the
 // channel is answered with its id only, as the docs describe.
-func (h *Handler) openAnswer(w http.ResponseWriter, ch store.Channel, existing, returnIM bool) {
+func (h *Handler) openAnswer(w http.ResponseWriter, r *http.Request, ch store.Channel, existing, returnIM bool) {
 	fields := map[string]any{"channel": map[string]any{"id": ch.ID}}
 	if returnIM {
-		fields["channel"] = ch
+		fields["channel"] = membershipView(r, ch)
 	}
 	if existing {
 		fields["no_op"] = true
@@ -662,4 +658,19 @@ func conversationTypes(arg string) (map[string]bool, bool) {
 // is an unverified guess to confirm at the next sandbox refresh.
 func visibleTo(ch store.Channel, user string) bool {
 	return conversationType(ch) == "public_channel" || slices.Contains(ch.Members, user)
+}
+
+// membershipView is the channel as the caller sees it: is_member is whether
+// the token's user is in Members, as Slack computes it per caller.
+func membershipView(r *http.Request, ch store.Channel) store.Channel {
+	ch.IsMember = slices.Contains(ch.Members, callerUserID(r))
+	return ch
+}
+
+func membershipViews(r *http.Request, chs []store.Channel) []store.Channel {
+	out := make([]store.Channel, len(chs))
+	for i, ch := range chs {
+		out[i] = membershipView(r, ch)
+	}
+	return out
 }

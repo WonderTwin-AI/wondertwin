@@ -106,7 +106,7 @@ func (h *Handler) UsersConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"channels":          channels,
+		"channels":          membershipViews(r, channels),
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }

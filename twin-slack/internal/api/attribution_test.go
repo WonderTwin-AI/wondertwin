@@ -70,6 +70,75 @@ func TestJoinAndLeaveAreTheCallers(t *testing.T) {
 	}
 }
 
+// is_member is the caller's membership, computed per request from Members.
+func TestIsMemberIsTheCallers(t *testing.T) {
+	srv, _ := setupSlack(t)
+	const user, bot = "xoxp-member", "xoxb-test-token"
+	isMember := func(token, method, channel string) bool {
+		t.Helper()
+		m := formAs(t, srv, token, method, url.Values{"channel": {channel}})
+		mustOK(t, 200, m)
+		return m["channel"].(map[string]any)["is_member"].(bool)
+	}
+
+	bots := form(t, srv, "conversations.create", url.Values{"name": {"bots"}})["channel"].(map[string]any)
+	if bots["is_member"] != true {
+		t.Errorf("conversations.create answers the creator's membership: %v", bots)
+	}
+	botsID := bots["id"].(string)
+	if isMember(user, "conversations.info", botsID) {
+		t.Error("a user is a member of a channel only the bot created")
+	}
+
+	joined := formAs(t, srv, user, "conversations.join", url.Values{"channel": {botsID}})
+	if joined["channel"].(map[string]any)["is_member"] != true {
+		t.Errorf("conversations.join answers the joiner's membership: %v", joined)
+	}
+	if !isMember(user, "conversations.info", botsID) || !isMember(bot, "conversations.info", botsID) {
+		t.Error("after a user joins, both the user and the bot are members")
+	}
+
+	theirs := formAs(t, srv, user, "conversations.create", url.Values{"name": {"theirs"}})["channel"].(map[string]any)["id"].(string)
+	if isMember(bot, "conversations.info", theirs) {
+		t.Error("the bot is a member of a channel a user created without it")
+	}
+	formAs(t, srv, "xoxp-other", "conversations.join", url.Values{"channel": {theirs}})
+	if isMember(bot, "conversations.info", theirs) {
+		t.Error("a user joining made the bot a member")
+	}
+
+	mustOK(t, 200, formAs(t, srv, user, "conversations.leave", url.Values{"channel": {botsID}}))
+	if isMember(user, "conversations.info", botsID) {
+		t.Error("a user who left is still a member")
+	}
+	if !isMember(bot, "conversations.info", botsID) {
+		t.Error("a user leaving removed the bot's membership")
+	}
+
+	for _, method := range []string{"conversations.list", "users.conversations"} {
+		byCaller := map[string]map[string]bool{}
+		for _, token := range []string{bot, user} {
+			byCaller[token] = map[string]bool{}
+			for _, c := range formAs(t, srv, token, method, nil)["channels"].([]any) {
+				ch := c.(map[string]any)
+				byCaller[token][ch["id"].(string)] = ch["is_member"].(bool)
+			}
+		}
+		if got, ok := byCaller[bot][botsID]; !ok || !got {
+			t.Errorf("%s: the bot is a member of its own channel: %v", method, byCaller[bot])
+		}
+		if got, ok := byCaller[bot][theirs]; ok && got {
+			t.Errorf("%s: the bot is a member of the user's channel: %v", method, byCaller[bot])
+		}
+		if got, ok := byCaller[user][theirs]; !ok || !got {
+			t.Errorf("%s: the user is a member of their own channel: %v", method, byCaller[user])
+		}
+		if got, ok := byCaller[user][botsID]; ok && got {
+			t.Errorf("%s: the user is a member of a channel they left: %v", method, byCaller[user])
+		}
+	}
+}
+
 func anyStrings(v any) []string {
 	var out []string
 	for _, x := range v.([]any) {
