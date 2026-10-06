@@ -37,7 +37,7 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 	msg := store.Message{
 		Type:     "message",
 		Channel:  req.Channel,
-		User:     "U_BOT",
+		User:     callerUserID(r),
 		Text:     req.Text,
 		TS:       ts,
 		ThreadTS: req.ThreadTS,
@@ -106,7 +106,7 @@ func (h *Handler) ChatUpdate(w http.ResponseWriter, r *http.Request) {
 		msg.Blocks = req.Blocks
 	}
 	editTS := h.store.NextTS()
-	msg.Edited = &store.MessageEdit{User: "U_BOT", TS: editTS}
+	msg.Edited = &store.MessageEdit{User: callerUserID(r), TS: editTS}
 	h.store.Messages.Set(id, *msg)
 
 	slackOK(w, map[string]any{
@@ -244,7 +244,7 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 		Type:    "message",
 		Subtype: "me_message",
 		Channel: req.Channel,
-		User:    "U_BOT",
+		User:    callerUserID(r),
 		Text:    req.Text,
 		TS:      ts,
 		Team:    h.store.Team.ID,

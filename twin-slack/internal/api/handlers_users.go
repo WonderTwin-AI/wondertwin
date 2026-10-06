@@ -87,7 +87,7 @@ func (h *Handler) UsersConversations(w http.ResponseWriter, r *http.Request) {
 
 	userID := req.User
 	if userID == "" {
-		userID = "U_BOT"
+		userID = callerUserID(r)
 	}
 
 	// Another user's non-public conversations are listed only where the
@@ -106,7 +106,7 @@ func (h *Handler) UsersConversations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"channels":          channels,
+		"channels":          membershipViews(r, channels),
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
@@ -120,7 +120,7 @@ func (h *Handler) UsersProfileGet(w http.ResponseWriter, r *http.Request) {
 
 	userID := req.User
 	if userID == "" {
-		userID = "U_BOT"
+		userID = callerUserID(r)
 	}
 
 	u, ok := h.store.Users.Get(userID)
@@ -146,8 +146,8 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply to bot user
-	u, ok := h.store.Users.Get("U_BOT")
+	// Apply to the caller
+	u, ok := h.store.Users.Get(callerUserID(r))
 	if !ok {
 		slackError(w, "user_not_found")
 		return
@@ -168,7 +168,7 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 		u.Profile.RealNameNorm = strings.ToLower(*req.Profile.RealName)
 	}
 
-	h.store.Users.Set("U_BOT", u)
+	h.store.Users.Set(callerUserID(r), u)
 	slackOK(w, map[string]any{"profile": u.Profile})
 }
 
@@ -202,10 +202,10 @@ func (h *Handler) UsersSetPresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, ok := h.store.Users.Get("U_BOT")
+	u, ok := h.store.Users.Get(callerUserID(r))
 	if ok {
 		u.Presence = req.Presence
-		h.store.Users.Set("U_BOT", u)
+		h.store.Users.Set(callerUserID(r), u)
 	}
 	slackOK(w, nil)
 }
