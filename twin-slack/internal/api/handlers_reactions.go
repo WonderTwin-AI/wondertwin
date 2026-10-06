@@ -191,8 +191,11 @@ func (h *Handler) messageIn(w http.ResponseWriter, channel, ts string) (*store.M
 	return msg, id, true
 }
 
-// callerUserID is the user the call's token speaks for: the one who reacts
-// or pins.
+// callerUserID is the user the call's token speaks for. Writes are attributed
+// to it (messages, edits, channels, topics, files, memberships, profile and
+// presence changes) and it is the default user where a method takes one, as
+// users.conversations, users.profile.get and reactions.list do. A token the
+// emulator was not told about speaks for the default principal of its type.
 func callerUserID(r *http.Request) string {
 	if u := principal(r).UserID; u != "" {
 		return u
