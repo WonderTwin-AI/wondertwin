@@ -3,8 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
 
 // --- chat.unfurl ---
@@ -59,23 +57,6 @@ func (h *Handler) FilesRevokePublicURL(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"file": file})
 }
 
-// FilesUploadLegacy handles POST /api/files.upload (deprecated but still in API)
-func (h *Handler) FilesUploadLegacy(w http.ResponseWriter, r *http.Request) {
-	// Legacy single-call upload — create file directly
-	id := h.store.Files.NextID()
-	now := h.store.Clock.Now().Unix()
-	file := store.File{
-		ID:       id,
-		Name:     "upload",
-		Title:    "upload",
-		User:     "U_BOT",
-		Created:  now,
-		IsPublic: false,
-	}
-	h.store.Files.Set(id, file)
-	slackOK(w, map[string]any{"file": file})
-}
-
 // --- users extra ---
 
 // UsersIdentity handles POST /api/users.identity (Sign in with Slack)
@@ -90,30 +71,4 @@ func (h *Handler) UsersIdentity(w http.ResponseWriter, r *http.Request) {
 			"id": h.store.Team.ID,
 		},
 	})
-}
-
-// UsersSetPhoto handles POST /api/users.setPhoto
-func (h *Handler) UsersSetPhoto(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{
-		"profile": map[string]any{
-			"image_24":  "https://placekitten.com/24/24",
-			"image_32":  "https://placekitten.com/32/32",
-			"image_48":  "https://placekitten.com/48/48",
-			"image_72":  "https://placekitten.com/72/72",
-			"image_192": "https://placekitten.com/192/192",
-			"image_512": "https://placekitten.com/512/512",
-		},
-	})
-}
-
-// UsersDeletePhoto handles POST /api/users.deletePhoto
-func (h *Handler) UsersDeletePhoto(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, nil)
-}
-
-// --- dialog ---
-
-// DialogOpen handles POST /api/dialog.open (legacy, prefer views.*)
-func (h *Handler) DialogOpen(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, nil)
 }

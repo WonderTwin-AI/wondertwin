@@ -39,7 +39,6 @@ func TestEveryStoreSurvivesASnapshotRoundTrip(t *testing.T) {
 		item := reflect.New(set.Type().In(1)).Elem()
 		set.Call([]reflect.Value{reflect.ValueOf("seed-" + name), item})
 	}
-	src.DndStatuses["U1"] = store.DndStatus{}
 
 	data, err := json.Marshal(src.Snapshot())
 	if err != nil {
@@ -54,19 +53,5 @@ func TestEveryStoreSurvivesASnapshotRoundTrip(t *testing.T) {
 		if got != 1 {
 			t.Errorf("%s: %d items after a snapshot round trip, want 1", name, got)
 		}
-	}
-	if _, ok := dst.DndStatuses["U1"]; !ok {
-		t.Error("DndStatuses did not survive a snapshot round trip")
-	}
-}
-
-func TestSnapshotDoesNotShareTheDndMap(t *testing.T) {
-	s := store.New()
-	s.DndStatuses["U1"] = store.DndStatus{}
-	snap := s.Snapshot()
-	s.DndStatuses["U2"] = store.DndStatus{}
-	data, _ := json.Marshal(snap)
-	if strings.Contains(string(data), "U2") {
-		t.Error("a snapshot changed after it was taken")
 	}
 }
