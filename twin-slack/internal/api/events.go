@@ -372,6 +372,44 @@ func (h *Handler) emitReactionAdded(user, reaction string, msg store.Message) {
 	})
 }
 
+// memberChannelType names a conversation the way member_joined_channel and
+// member_left_channel do: C for a public channel, G for a private one.
+func memberChannelType(ch store.Channel) string {
+	if ch.IsPrivate || ch.IsMPIM {
+		return "G"
+	}
+	return "C"
+}
+
+// emitMemberJoined reports a member joining a channel. inviter is the user
+// who invited them, and is left out when they joined on their own.
+func (h *Handler) emitMemberJoined(ch store.Channel, user, inviter string) {
+	event := map[string]any{
+		"type":         "member_joined_channel",
+		"user":         user,
+		"channel":      ch.ID,
+		"channel_type": memberChannelType(ch),
+		"team":         h.store.Team.ID,
+		"event_ts":     h.store.NextTS(),
+	}
+	if inviter != "" {
+		event["inviter"] = inviter
+	}
+	h.events.publish(h, event)
+}
+
+// emitMemberLeft reports a member leaving, or being removed from, a channel.
+func (h *Handler) emitMemberLeft(ch store.Channel, user string) {
+	h.events.publish(h, map[string]any{
+		"type":         "member_left_channel",
+		"user":         user,
+		"channel":      ch.ID,
+		"channel_type": memberChannelType(ch),
+		"team":         h.store.Team.ID,
+		"event_ts":     h.store.NextTS(),
+	})
+}
+
 // AdminEventsConfig handles GET and POST /admin/events/config. POST takes any
 // of request_url, signing_secret, verification_token and retry_delays_ms, and
 // leaves the others as they are.
