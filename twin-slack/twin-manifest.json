@@ -39,7 +39,6 @@
       "pins",
       "files",
       "bookmarks",
-      "reminders",
       "views",
       "emoji",
       "team",
@@ -47,11 +46,13 @@
       "usergroups",
       "dnd",
       "search",
-      "stars",
       "oauth",
       "dialog"
     ],
-    "resources_not_implemented": [],
+    "resources_not_implemented": [
+      "reminders",
+      "stars"
+    ],
     "estimated_coverage_pct": 100
   },
   "generation": {

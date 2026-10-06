@@ -111,66 +111,6 @@ func (h *Handler) BookmarksRemove(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, nil)
 }
 
-// --- reminders.* (stateful) ---
-
-func (h *Handler) RemindersAdd(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Text string `json:"text"`
-		Time int64  `json:"time"`
-		User string `json:"user"`
-	}
-	parseJSON(r, &req)
-
-	id := h.store.Reminders.NextID()
-	rm := store.Reminder{
-		ID: id, Creator: "U_BOT", User: req.User, Text: req.Text, Time: req.Time,
-	}
-	h.store.Reminders.Set(id, rm)
-	slackOK(w, map[string]any{"reminder": rm})
-}
-
-func (h *Handler) RemindersComplete(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Reminder string `json:"reminder"`
-	}
-	parseJSON(r, &req)
-	rm, ok := h.store.Reminders.Get(req.Reminder)
-	if !ok {
-		slackError(w, "not_found")
-		return
-	}
-	rm.CompleteTS = h.store.Clock.Now().Unix()
-	h.store.Reminders.Set(req.Reminder, rm)
-	slackOK(w, nil)
-}
-
-func (h *Handler) RemindersDelete(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Reminder string `json:"reminder"`
-	}
-	parseJSON(r, &req)
-	h.store.Reminders.Delete(req.Reminder)
-	slackOK(w, nil)
-}
-
-func (h *Handler) RemindersInfo(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Reminder string `json:"reminder"`
-	}
-	parseJSON(r, &req)
-	rm, ok := h.store.Reminders.Get(req.Reminder)
-	if !ok {
-		slackError(w, "not_found")
-		return
-	}
-	slackOK(w, map[string]any{"reminder": rm})
-}
-
-func (h *Handler) RemindersList(w http.ResponseWriter, r *http.Request) {
-	rms := h.store.Reminders.List()
-	slackOK(w, map[string]any{"reminders": rms})
-}
-
 // --- emoji.* ---
 
 func (h *Handler) EmojiList(w http.ResponseWriter, r *http.Request) {
@@ -445,57 +385,5 @@ func (h *Handler) SearchAll(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{
 		"messages": map[string]any{"total": len(msgs), "matches": msgs},
 		"files":    map[string]any{"total": len(files), "matches": files},
-	})
-}
-
-// --- stars.* (stateful) ---
-
-func (h *Handler) StarsAdd(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Channel   string `json:"channel"`
-		Timestamp string `json:"timestamp"`
-		File      string `json:"file"`
-	}
-	parseJSON(r, &req)
-
-	id := h.store.Stars.NextID()
-	star := store.Star{Type: "message", Channel: req.Channel}
-	if req.Timestamp != "" {
-		msg, _, ok := h.store.GetMessageByTS(req.Channel, req.Timestamp)
-		if ok {
-			star.Message = msg
-		}
-	}
-	if req.File != "" {
-		f, ok := h.store.Files.Get(req.File)
-		if ok {
-			star.Type = "file"
-			star.File = &f
-		}
-	}
-	h.store.Stars.Set(id, star)
-	slackOK(w, nil)
-}
-
-func (h *Handler) StarsRemove(w http.ResponseWriter, r *http.Request) {
-	// Simplified: remove first matching star
-	var req struct {
-		Channel   string `json:"channel"`
-		Timestamp string `json:"timestamp"`
-		File      string `json:"file"`
-	}
-	parseJSON(r, &req)
-	slackOK(w, nil)
-}
-
-func (h *Handler) StarsList(w http.ResponseWriter, r *http.Request) {
-	stars := h.store.Stars.List()
-	items := make([]any, 0, len(stars))
-	for _, s := range stars {
-		items = append(items, s)
-	}
-	slackOK(w, map[string]any{
-		"items":  items,
-		"paging": map[string]any{"count": len(items), "total": len(items), "page": 1, "pages": 1},
 	})
 }

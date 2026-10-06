@@ -17,9 +17,7 @@ type MemoryStore struct {
 	Files             *pkgstate.Store[File]
 	ScheduledMessages *pkgstate.Store[ScheduledMessage]
 	Bookmarks         *pkgstate.Store[Bookmark]
-	Reminders         *pkgstate.Store[Reminder]
 	Usergroups        *pkgstate.Store[Usergroup]
-	Stars             *pkgstate.Store[Star]
 	Tokens            *pkgstate.Store[Token]
 	Views             *pkgstate.Store[ViewRecord]
 	Clock             *pkgstate.Clock
@@ -43,9 +41,7 @@ func New() *MemoryStore {
 		Files:             pkgstate.New[File]("F"),
 		ScheduledMessages: pkgstate.New[ScheduledMessage]("Q"),
 		Bookmarks:         pkgstate.New[Bookmark]("BM"),
-		Reminders:         pkgstate.New[Reminder]("RM"),
 		Usergroups:        pkgstate.New[Usergroup]("UG"),
-		Stars:             pkgstate.New[Star]("ST"),
 		Tokens:            pkgstate.New[Token]("tok"),
 		Views:             pkgstate.New[ViewRecord]("V"),
 		DndStatuses:       make(map[string]DndStatus),
@@ -155,9 +151,7 @@ type stateSnapshot struct {
 	Tokens            map[string]Token            `json:"tokens,omitempty"`
 	Pins              map[string]Pin              `json:"pins,omitempty"`
 	Bookmarks         map[string]Bookmark         `json:"bookmarks,omitempty"`
-	Reminders         map[string]Reminder         `json:"reminders,omitempty"`
 	Usergroups        map[string]Usergroup        `json:"usergroups,omitempty"`
-	Stars             map[string]Star             `json:"stars,omitempty"`
 	Views             map[string]ViewRecord       `json:"views,omitempty"`
 	DndStatuses       map[string]DndStatus        `json:"dnd_statuses,omitempty"`
 	Team              *Team                       `json:"team,omitempty"`
@@ -173,9 +167,7 @@ func (s *MemoryStore) Snapshot() any {
 		Tokens:            s.Tokens.Snapshot(),
 		Pins:              s.Pins.Snapshot(),
 		Bookmarks:         s.Bookmarks.Snapshot(),
-		Reminders:         s.Reminders.Snapshot(),
 		Usergroups:        s.Usergroups.Snapshot(),
-		Stars:             s.Stars.Snapshot(),
 		Views:             s.Views.Snapshot(),
 		DndStatuses:       s.dndSnapshot(),
 		Team:              &s.Team,
@@ -211,14 +203,8 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Bookmarks != nil {
 		s.Bookmarks.LoadSnapshot(snap.Bookmarks)
 	}
-	if snap.Reminders != nil {
-		s.Reminders.LoadSnapshot(snap.Reminders)
-	}
 	if snap.Usergroups != nil {
 		s.Usergroups.LoadSnapshot(snap.Usergroups)
-	}
-	if snap.Stars != nil {
-		s.Stars.LoadSnapshot(snap.Stars)
 	}
 	if snap.Views != nil {
 		s.Views.LoadSnapshot(snap.Views)
@@ -240,9 +226,7 @@ func (s *MemoryStore) Reset() {
 	s.Files.Reset()
 	s.ScheduledMessages.Reset()
 	s.Bookmarks.Reset()
-	s.Reminders.Reset()
 	s.Usergroups.Reset()
-	s.Stars.Reset()
 	s.Tokens.Reset()
 	s.Views.Reset()
 	s.DndStatuses = make(map[string]DndStatus)

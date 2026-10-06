@@ -3,8 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
 
 // --- chat.unfurl ---
@@ -56,23 +54,6 @@ func (h *Handler) FilesRevokePublicURL(w http.ResponseWriter, r *http.Request) {
 	file.IsPublic = false
 	file.Permalink = ""
 	h.store.Files.Set(req.File, file)
-	slackOK(w, map[string]any{"file": file})
-}
-
-// FilesUploadLegacy handles POST /api/files.upload (deprecated but still in API)
-func (h *Handler) FilesUploadLegacy(w http.ResponseWriter, r *http.Request) {
-	// Legacy single-call upload — create file directly
-	id := h.store.Files.NextID()
-	now := h.store.Clock.Now().Unix()
-	file := store.File{
-		ID:       id,
-		Name:     "upload",
-		Title:    "upload",
-		User:     "U_BOT",
-		Created:  now,
-		IsPublic: false,
-	}
-	h.store.Files.Set(id, file)
 	slackOK(w, map[string]any{"file": file})
 }
 

@@ -117,20 +117,12 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "files.delete", h.FilesDelete)
 			route(r, "files.sharedPublicURL", h.FilesSharedPublicURL)
 			route(r, "files.revokePublicURL", h.FilesRevokePublicURL)
-			route(r, "files.upload", h.FilesUploadLegacy)
 
 			// bookmarks.*
 			route(r, "bookmarks.add", h.BookmarksAdd)
 			route(r, "bookmarks.edit", h.BookmarksEdit)
 			route(r, "bookmarks.list", h.BookmarksList)
 			route(r, "bookmarks.remove", h.BookmarksRemove)
-
-			// reminders.*
-			route(r, "reminders.add", h.RemindersAdd)
-			route(r, "reminders.complete", h.RemindersComplete)
-			route(r, "reminders.delete", h.RemindersDelete)
-			route(r, "reminders.info", h.RemindersInfo)
-			route(r, "reminders.list", h.RemindersList)
 
 			// views.*
 			route(r, "views.open", h.ViewsOpen)
@@ -171,11 +163,6 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "search.messages", h.SearchMessages)
 			route(r, "search.files", h.SearchFiles)
 			route(r, "search.all", h.SearchAll)
-
-			// stars.*
-			route(r, "stars.add", h.StarsAdd)
-			route(r, "stars.remove", h.StarsRemove)
-			route(r, "stars.list", h.StarsList)
 
 			// dialog.*
 			route(r, "dialog.open", h.DialogOpen)
