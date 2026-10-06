@@ -862,6 +862,10 @@ func TestWebhooks(t *testing.T) {
 	ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{"events": []string{"push"}, "config": map[string]any{"url": recv.srv.URL}}).AssertStatus(422)
 	other := ghPost(tc, "/repos/twin-bot/hook-repo/hooks", map[string]any{"events": []string{"release"}, "config": map[string]any{"url": recv.srv.URL}}).AssertStatus(201).JSONMap()
 	ghDelete(tc, fmt.Sprintf("/repos/twin-bot/hook-repo/hooks/%d", int64(other["id"].(float64)))).AssertStatus(204)
+	// Each hook delivers on its own worker, so the second hook's ping has no
+	// order against the first hook's deliveries. Land both pings before the
+	// events the first hook alone will carry, in the order they were queued.
+	testutil.NewAdminClient(tc).FlushWebhooks().AssertStatus(200)
 
 	ghPost(tc, "/repos/twin-bot/hook-repo/issues", map[string]any{"title": "hooked"}).AssertStatus(201)
 	ghPut(tc, "/repos/twin-bot/hook-repo/contents/a.txt", map[string]any{"message": "a", "content": "YQo="}).AssertStatus(201)
