@@ -52,8 +52,7 @@
     "resources_not_implemented": [
       "reminders",
       "stars"
-    ],
-    "estimated_coverage_pct": 100
+    ]
   },
   "generation": {
     "method": "manual",
