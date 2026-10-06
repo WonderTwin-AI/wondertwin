@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -192,7 +193,18 @@ func (h *Handler) ChatGetPermalink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	permalink := "https://" + h.store.Team.Domain + ".slack.com/archives/" + ch.ID + "/p" + req.MessageTS
+	msg, _, ok := h.store.GetMessageByTS(req.Channel, req.MessageTS)
+	if !ok {
+		slackError(w, "message_not_found")
+		return
+	}
+
+	// Slack's permalink is p followed by the ts without its dot; a reply adds
+	// its thread and channel.
+	permalink := "https://" + h.store.Team.Domain + ".slack.com/archives/" + ch.ID + "/p" + strings.ReplaceAll(req.MessageTS, ".", "")
+	if msg.ThreadTS != "" && msg.ThreadTS != msg.TS {
+		permalink += "?thread_ts=" + msg.ThreadTS + "&cid=" + ch.ID
+	}
 	slackOK(w, map[string]any{
 		"channel":   req.Channel,
 		"permalink": permalink,
