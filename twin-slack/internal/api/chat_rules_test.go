@@ -106,6 +106,16 @@ func TestChatDeleteRules(t *testing.T) {
 	})
 }
 
+// A bot token seeded without a user_id posts as the default bot user, and
+// can delete what it posted.
+func TestChatDeleteByBotTokenWithoutUserID(t *testing.T) {
+	srv, _ := setupSlack(t)
+	seedTokens(t, srv, `"xoxb-bare":{"token":"xoxb-bare","type":"bot","bot_id":"B_BOT"}`)
+	ch, _ := postIn(t, srv, "bare token")
+	ts := formAs(t, srv, "xoxb-bare", "chat.postMessage", url.Values{"channel": {ch}, "text": {"mine"}})["ts"].(string)
+	mustOK(t, 200, formAs(t, srv, "xoxb-bare", "chat.delete", url.Values{"channel": {ch}, "ts": {ts}}))
+}
+
 // A post to an archived channel is refused, and stores nothing.
 func TestPostToArchivedChannel(t *testing.T) {
 	srv, _ := setupSlack(t)

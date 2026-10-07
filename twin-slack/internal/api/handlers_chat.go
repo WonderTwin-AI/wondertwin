@@ -244,7 +244,7 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "message_not_found")
 		return
 	}
-	if !h.mayDelete(principal(r), *msg) {
+	if !h.mayDelete(principal(r), callerUserID(r), *msg) {
 		slackError(w, "cant_delete_message")
 		return
 	}
@@ -259,8 +259,8 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) mayDelete(t store.Token, msg store.Message) bool {
-	if msg.User == t.UserID {
+func (h *Handler) mayDelete(t store.Token, caller string, msg store.Message) bool {
+	if msg.User == caller {
 		return true
 	}
 	if t.Type != store.TokenUser {
