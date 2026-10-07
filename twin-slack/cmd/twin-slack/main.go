@@ -2,7 +2,7 @@
 // It handles chat.postMessage, conversations.*, users.*, reactions.*,
 // files.*, pins.*, and other Slack Web API methods.
 //
-// SDK compatibility target: github.com/slack-go/slack, @slack/web-api
+// SDK compatibility target: @slack/web-api, slack_sdk
 // Integration method: Override base URL
 //
 // Events API delivery: --webhook-url is the app's Event Subscriptions Request
