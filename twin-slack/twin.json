@@ -3,8 +3,8 @@
   "description": "Simulates the Slack Web API including chat, conversations, users, reactions, pins, files, and more.",
   "category": "collaboration",
   "sdk": {
-    "package": "github.com/slack-go/slack",
-    "version": "latest"
+    "package": "@slack/web-api",
+    "version": "8.1.1"
   },
   "default_port": 4118
 }
