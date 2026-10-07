@@ -20,6 +20,7 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		Username       string `json:"username,omitempty"`
 		IconEmoji      string `json:"icon_emoji,omitempty"`
 		ReplyBroadcast bool   `json:"reply_broadcast,omitempty"`
+		MarkdownText   string `json:"markdown_text,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -29,8 +30,9 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
-	if req.Text == "" && req.Blocks == nil && req.Attachments == nil {
-		slackError(w, "no_text")
+	text, code := messageText(req.Text, req.Blocks, req.Attachments, req.MarkdownText)
+	if code != "" {
+		slackError(w, code)
 		return
 	}
 	attachments, ok := messageAttachments(req.Attachments)
@@ -48,18 +50,21 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify channel exists
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
 		return
 	}
 
 	ts := h.store.NextTS()
-	msg := store.Message{
+	msg := h.authored(r, store.Message{
 		Type:     "message",
 		Channel:  req.Channel,
-		User:     callerUserID(r),
-		Text:     req.Text,
+		Text:     text,
 		TS:       ts,
 		ThreadTS: req.ThreadTS,
 		Team:     h.store.Team.ID,
@@ -68,7 +73,7 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 		Username:    req.Username,
 		Attachments: attachments,
 		Metadata:    metadata,
-	}
+	})
 	if req.IconEmoji != "" {
 		msg.Icons = map[string]string{"emoji": req.IconEmoji}
 	}
@@ -91,9 +96,12 @@ func (h *Handler) ChatPostMessage(w http.ResponseWriter, r *http.Request) {
 // ChatPostEphemeral handles POST /api/chat.postEphemeral
 func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		User    string `json:"user"`
-		Text    string `json:"text"`
+		Channel      string `json:"channel"`
+		User         string `json:"user"`
+		Text         string `json:"text"`
+		Blocks       any    `json:"blocks,omitempty"`
+		Attachments  any    `json:"attachments,omitempty"`
+		MarkdownText string `json:"markdown_text,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -101,6 +109,10 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Channel == "" {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if _, code := messageText(req.Text, req.Blocks, req.Attachments, req.MarkdownText); code != "" {
+		slackError(w, code)
 		return
 	}
 	if req.User == "" {
@@ -118,28 +130,83 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ChatUpdate handles POST /api/chat.update
+// ChatUpdate handles POST /api/chat.update. Only the author of a message may
+// update it, a bot its own posts included. Given text and no blocks, the
+// message's blocks are dropped; attachments and metadata are kept unless the
+// call replaces them, and an empty array or object removes them.
 func (h *Handler) ChatUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		TS      string `json:"ts"`
-		Text    string `json:"text"`
-		Blocks  any    `json:"blocks,omitempty"`
+		Channel      string `json:"channel"`
+		TS           string `json:"ts"`
+		Text         string `json:"text"`
+		Blocks       any    `json:"blocks,omitempty"`
+		Attachments  any    `json:"attachments,omitempty"`
+		Metadata     any    `json:"metadata,omitempty"`
+		MarkdownText string `json:"markdown_text,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
 
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
 	msg, id, ok := h.store.GetMessageByTS(req.Channel, req.TS)
 	if !ok {
 		slackError(w, "message_not_found")
 		return
 	}
+	if msg.User != callerUserID(r) {
+		slackError(w, "cant_update_message")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_inactive")
+		return
+	}
+	text, code := messageText(req.Text, req.Blocks, req.Attachments, req.MarkdownText)
+	if code != "" {
+		slackError(w, code)
+		return
+	}
+	attachments, ok := messageAttachments(req.Attachments)
+	if !ok {
+		slackError(w, "invalid_attachments")
+		return
+	}
+	if len(attachments) > maxAttachments {
+		slackError(w, "too_many_attachments")
+		return
+	}
 
-	msg.Text = req.Text
-	if req.Blocks != nil {
+	msg.Text = text
+	switch {
+	case req.Blocks != nil:
 		msg.Blocks = req.Blocks
+		if b, isList := req.Blocks.([]any); isList && len(b) == 0 {
+			msg.Blocks = nil
+		}
+	case text != "":
+		msg.Blocks = nil
+	}
+	if req.Attachments != nil {
+		msg.Attachments = attachments
+		if len(attachments) == 0 {
+			msg.Attachments = nil
+		}
+	}
+	if req.Metadata != nil {
+		if obj, isObj := req.Metadata.(map[string]any); isObj && len(obj) == 0 {
+			msg.Metadata = nil
+		} else if metadata, ok := messageMetadata(req.Metadata); ok {
+			msg.Metadata = metadata
+		} else {
+			slackError(w, "invalid_metadata_format")
+			return
+		}
 	}
 	editTS := h.store.NextTS()
 	msg.Edited = &store.MessageEdit{User: callerUserID(r), TS: editTS}
@@ -153,7 +220,9 @@ func (h *Handler) ChatUpdate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ChatDelete handles POST /api/chat.delete
+// ChatDelete handles POST /api/chat.delete. A bot token deletes only the
+// bot's own messages; a user token deletes the user's own, and an admin or
+// owner deletes anyone's.
 func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
@@ -164,9 +233,17 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
 	msg, id, ok := h.store.GetMessageByTS(req.Channel, req.TS)
 	if !ok {
 		slackError(w, "message_not_found")
+		return
+	}
+	if !h.mayDelete(principal(r), *msg) {
+		slackError(w, "cant_delete_message")
 		return
 	}
 
@@ -178,6 +255,17 @@ func (h *Handler) ChatDelete(w http.ResponseWriter, r *http.Request) {
 		"channel": req.Channel,
 		"ts":      req.TS,
 	})
+}
+
+func (h *Handler) mayDelete(t store.Token, msg store.Message) bool {
+	if msg.User == t.UserID {
+		return true
+	}
+	if t.Type != store.TokenUser {
+		return false
+	}
+	u, _ := h.store.Users.Get(t.UserID)
+	return u.IsAdmin || u.IsOwner
 }
 
 // ChatGetPermalink handles POST /api/chat.getPermalink
@@ -358,4 +446,38 @@ func messageMetadata(v any) (map[string]any, bool) {
 		return nil, false
 	}
 	return obj, true
+}
+
+// messageText checks a message's content the way chat.postMessage and its
+// siblings do. markdown_text stands alone: with text or blocks it is
+// markdown_text_conflict. A message needs text, blocks, attachments or
+// markdown_text, or it is no_text. The text kept is the text, or the
+// markdown as given: Slack's rendering of markdown into blocks is not
+// reproduced.
+func messageText(text string, blocks, attachments any, markdown string) (string, string) {
+	if markdown != "" {
+		if text != "" || blocks != nil {
+			return "", "markdown_text_conflict"
+		}
+		return markdown, ""
+	}
+	if text == "" && blocks == nil && attachments == nil {
+		return "", "no_text"
+	}
+	return text, ""
+}
+
+// authored sets who a message is from: the token's user, and for a bot token
+// the bot, its app and its bot_profile, as Slack shows a bot's post.
+func (h *Handler) authored(r *http.Request, msg store.Message) store.Message {
+	t := principal(r)
+	msg.User = callerUserID(r)
+	if t.Type == store.TokenBot && t.BotID != "" {
+		msg.BotID = t.BotID
+		if p := h.store.BotProfileFor(t.BotID); p != nil {
+			msg.AppID = p.AppID
+			msg.BotProfile = p
+		}
+	}
+	return msg
 }
