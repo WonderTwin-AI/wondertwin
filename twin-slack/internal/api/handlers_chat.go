@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -121,8 +122,20 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "user_not_found")
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
+	// "If the target user is not in the given channel, the ephemeral message
+	// will not be delivered" (the chat.postEphemeral docs). A user who does
+	// not exist is in no channel.
+	if !slices.Contains(ch.Members, req.User) {
+		slackError(w, "user_not_in_channel")
 		return
 	}
 

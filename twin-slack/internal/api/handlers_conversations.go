@@ -515,6 +515,10 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
 
 	caller := callerUserID(r)
 	if slices.Contains(ch.Members, caller) {
@@ -543,6 +547,10 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 	ch, ok := h.store.Channels.Get(req.Channel)
 	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
 		return
 	}
 
