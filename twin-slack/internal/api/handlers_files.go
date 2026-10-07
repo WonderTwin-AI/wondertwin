@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -113,6 +114,11 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		}
 		file.IsPublic = len(file.Channels) > 0
 		file.Permalink = fmt.Sprintf("https://files.slack.com/%s/%s", h.store.Team.ID, f.ID)
+		// The private URLs serve the bytes to a caller with a token, on the
+		// host the client called, in the shape Slack's file object shows.
+		base := origin(r) + filesPath + h.store.Team.ID + "-" + file.ID + "/"
+		file.URLPrivate = base + url.PathEscape(file.Name)
+		file.URLPrivateDownload = base + "download/" + url.PathEscape(file.Name)
 		h.store.Files.Set(f.ID, file)
 		files[i] = file
 		completed = append(completed, map[string]any{"id": file.ID, "title": file.Title})

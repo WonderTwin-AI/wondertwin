@@ -7,9 +7,11 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
 
 // uploadPath is where files.getUploadURLExternal points a client. Slack's own
@@ -102,4 +104,42 @@ func readUpload(r *http.Request) ([]byte, error) {
 			return io.ReadAll(part)
 		}
 	}
+}
+
+// filesPath is where a file's private URLs point, as on Slack's files host:
+// /files-pri/{team}-{file}/{name}, and .../download/{name} to download it.
+const filesPath = "/files-pri/"
+
+// ServeFile answers a file's url_private or url_private_download with its
+// bytes. Like Slack's, the URLs need a token in the Authorization header; a
+// call without a usable one is refused with HTTP 403 (how Slack's files host
+// answers it is not in the references). A download is sent as an attachment.
+func (h *Handler) ServeFile(download bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) { h.serveFile(w, r, download) }
+}
+
+func (h *Handler) serveFile(w http.ResponseWriter, r *http.Request, download bool) {
+	token, present, malformed := requestToken(r)
+	if !present || malformed {
+		http.Error(w, "a token is required", http.StatusForbidden)
+		return
+	}
+	if _, status := h.store.ResolveToken(token); status != store.TokenOK {
+		http.Error(w, "the token cannot read this file", http.StatusForbidden)
+		return
+	}
+	id, ok := strings.CutPrefix(chi.URLParam(r, "teamFile"), h.store.Team.ID+"-")
+	file, found := h.store.Files.Get(id)
+	name, err := url.PathUnescape(chi.URLParam(r, "name"))
+	if !ok || !found || err != nil || file.URLPrivate == "" || file.Name != name {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	if file.MimeType != "" {
+		w.Header().Set("Content-Type", file.MimeType)
+	}
+	if download {
+		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": file.Name}))
+	}
+	_, _ = w.Write(file.Content)
 }
