@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -225,25 +226,87 @@ func (h *Handler) UsergroupsList(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"usergroups": ugs})
 }
 
+// UsergroupsCreate handles POST /api/usergroups.create. A name is required
+// and unique among user groups; a handle is unique among channels, users and
+// user groups.
 func (h *Handler) UsergroupsCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name        string `json:"name"`
-		Handle      string `json:"handle"`
-		Description string `json:"description"`
+		Name         string `json:"name"`
+		Handle       string `json:"handle"`
+		Description  string `json:"description"`
+		Channels     any    `json:"channels"`
+		IncludeCount bool   `json:"include_count"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
+	if strings.TrimSpace(req.Name) == "" {
+		slackError(w, "missing_subteam_name")
+		return
+	}
+	for _, ug := range h.store.Usergroups.List() {
+		if strings.EqualFold(ug.Name, req.Name) {
+			slackError(w, "name_already_exists")
+			return
+		}
+	}
+	if req.Handle != "" && h.handleTaken(req.Handle) {
+		slackError(w, "handle_already_exists")
+		return
+	}
+	channels := idList(req.Channels)
+	for _, c := range channels {
+		if _, ok := h.store.Channels.Get(c); !ok {
+			slackError(w, "invalid_channel_provided")
+			return
+		}
+	}
 
 	now := h.store.Clock.Now().Unix()
 	id := h.store.Usergroups.NextID()
 	ug := store.Usergroup{
-		ID: id, Name: req.Name, Handle: req.Handle, Description: req.Description,
-		IsUsergroup: true, CreatedBy: callerUserID(r), DateCreate: now, DateUpdate: now,
+		ID: id, TeamID: h.store.Team.ID, Name: req.Name, Handle: req.Handle, Description: req.Description,
+		IsUsergroup: true, CreatedBy: callerUserID(r), UpdatedBy: callerUserID(r), DateCreate: now, DateUpdate: now,
+		Prefs: store.UsergroupPrefs{Channels: channels},
 	}
 	h.store.Usergroups.Set(id, ug)
-	slackOK(w, map[string]any{"usergroup": ug})
+	out := map[string]any{"usergroup": ug}
+	if req.IncludeCount {
+		out["usergroup"] = withUserCount(ug)
+	}
+	slackOK(w, out)
+}
+
+// handleTaken reports whether a mention handle is already a channel's name,
+// a user's name or a user group's handle.
+func (h *Handler) handleTaken(handle string) bool {
+	for _, ch := range h.store.Channels.List() {
+		if strings.EqualFold(ch.Name, handle) {
+			return true
+		}
+	}
+	for _, u := range h.store.Users.List() {
+		if strings.EqualFold(u.Name, handle) {
+			return true
+		}
+	}
+	for _, ug := range h.store.Usergroups.List() {
+		if strings.EqualFold(ug.Handle, handle) {
+			return true
+		}
+	}
+	return false
+}
+
+// withUserCount renders a user group with the user_count include_count asks
+// for.
+func withUserCount(ug store.Usergroup) map[string]any {
+	raw, _ := json.Marshal(ug)
+	var out map[string]any
+	_ = json.Unmarshal(raw, &out)
+	out["user_count"] = len(ug.Users)
+	return out
 }
 
 func (h *Handler) UsergroupsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -351,4 +414,22 @@ func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) 
 	ug.DateUpdate = h.store.Clock.Now().Unix()
 	h.store.Usergroups.Set(req.Usergroup, ug)
 	slackOK(w, map[string]any{"usergroup": ug})
+}
+
+// idList reads a list of IDs given as a comma-separated string or a JSON
+// array.
+func idList(v any) []string {
+	switch l := v.(type) {
+	case string:
+		return splitCSV(l)
+	case []any:
+		var out []string
+		for _, item := range l {
+			if s, ok := item.(string); ok && s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
