@@ -10,6 +10,7 @@ import (
 // replace and list a group's members.
 func TestUsergroupUpdateAndUsers(t *testing.T) {
 	srv, _ := setupSlack(t)
+	seedUsers(t, srv, twoUsers)
 	created := form(t, srv, "usergroups.create", url.Values{"name": {"Oncall"}, "handle": {"oncall"}})
 	mustOK(t, 200, created)
 	id := created["usergroup"].(map[string]any)["id"].(string)
@@ -39,5 +40,25 @@ func TestUsergroupUpdateAndUsers(t *testing.T) {
 			"unknown group": {url.Values{"usergroup": {"S-nope"}, "users": {"U1"}}, "not_found"},
 			"no group":      {url.Values{"users": {"U1"}}, "not_found"},
 		})
+	}
+}
+
+// usergroups.users.update replaces the group's users with users of the
+// workspace: an empty list is no_users_provided (disable the group instead),
+// and a user outside the workspace is failed_for_some_users. A refused update
+// leaves the group as it was.
+func TestUsergroupUsersUpdateChecksTheUsers(t *testing.T) {
+	srv, _ := setupSlack(t)
+	seedUsers(t, srv, twoUsers)
+	id := form(t, srv, "usergroups.create", url.Values{"name": {"Team"}})["usergroup"].(map[string]any)["id"].(string)
+	mustOK(t, 200, form(t, srv, "usergroups.users.update", url.Values{"usergroup": {id}, "users": {"U1"}}))
+
+	wantErrors(t, srv, "usergroups.users.update", map[string]errCase{
+		"no users":     {url.Values{"usergroup": {id}}, "no_users_provided"},
+		"empty users":  {url.Values{"usergroup": {id}, "users": {""}}, "no_users_provided"},
+		"unknown user": {url.Values{"usergroup": {id}, "users": {"U2,UFAKE"}}, "failed_for_some_users"},
+	})
+	if listed := anyStrings(form(t, srv, "usergroups.users.list", url.Values{"usergroup": {id}})["users"]); !slices.Equal(listed, []string{"U1"}) {
+		t.Errorf("a refused update changed the group: %v", listed)
 	}
 }
