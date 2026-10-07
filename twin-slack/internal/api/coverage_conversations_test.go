@@ -60,10 +60,6 @@ func TestConversationsCloseAndMark(t *testing.T) {
 	mustOK(t, 200, form(t, srv, "conversations.close", url.Values{"channel": {id}}))
 }
 
-func TestConversationsCloseAndMarkUnknownChannel(t *testing.T) {
-	t.Skip("bug: conversations.close and conversations.mark answer ok for a channel that does not exist or is not given; Slack answers channel_not_found")
-}
-
 // Archiving twice is already_archived, unarchiving an open channel is
 // not_archived, and an unknown channel is channel_not_found for both.
 func TestConversationsArchiveAndUnarchive(t *testing.T) {
@@ -105,10 +101,6 @@ func TestConversationsRenameErrors(t *testing.T) {
 		"taken name":      {url.Values{"channel": {ch}, "name": {"taken"}}, "name_taken"},
 		"unknown channel": {url.Values{"channel": {"CNOPE"}, "name": {"x"}}, "channel_not_found"},
 	})
-}
-
-func TestConversationsRenameEmptyName(t *testing.T) {
-	t.Skip("bug: conversations.rename accepts an empty name; Slack answers invalid_name_required")
 }
 
 // Kicking a member removes them; kicking a non-member is not_in_channel.

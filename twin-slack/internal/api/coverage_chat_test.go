@@ -28,10 +28,6 @@ func TestChatPostEphemeral(t *testing.T) {
 	})
 }
 
-func TestChatPostEphemeralUnknownChannel(t *testing.T) {
-	t.Skip("bug: chat.postEphemeral answers ok for a channel that does not exist; Slack answers channel_not_found")
-}
-
 // chat.getPermalink answers a permalink for a message in a known channel.
 func TestChatGetPermalink(t *testing.T) {
 	srv, _ := setupSlack(t)
@@ -48,10 +44,6 @@ func TestChatGetPermalink(t *testing.T) {
 		"no channel":      {url.Values{"message_ts": {ts}}, "channel_not_found"},
 		"unknown channel": {url.Values{"channel": {"CNOPE"}, "message_ts": {ts}}, "channel_not_found"},
 	})
-}
-
-func TestChatGetPermalinkUnknownMessage(t *testing.T) {
-	t.Skip("bug: chat.getPermalink answers a permalink for a message_ts that does not exist; Slack answers message_not_found")
 }
 
 // chat.meMessage posts a me_message into the channel history.
@@ -76,10 +68,6 @@ func TestChatMeMessage(t *testing.T) {
 	if !found {
 		t.Error("the me_message is not in the channel history")
 	}
-}
-
-func TestChatMeMessageUnknownChannel(t *testing.T) {
-	t.Skip("bug: chat.meMessage answers ok and stores a message for a channel that does not exist or is not given; Slack answers channel_not_found")
 }
 
 // chat.unfurl acknowledges an unfurl.
@@ -125,8 +113,4 @@ func TestChatScheduledMessages(t *testing.T) {
 	wantErrors(t, srv, "chat.deleteScheduledMessage", map[string]errCase{
 		"deleted twice": {url.Values{"channel": {ch}, "scheduled_message_id": {id}}, "invalid_scheduled_message_id"},
 	})
-}
-
-func TestChatScheduleMessageUnknownChannel(t *testing.T) {
-	t.Skip("bug: chat.scheduleMessage accepts a channel that does not exist; Slack answers channel_not_found")
 }
