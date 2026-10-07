@@ -29,7 +29,9 @@ type MemoryStore struct {
 	// Emoji are the workspace's custom emoji: a name maps to an image URL, or
 	// to "alias:" and the name of another emoji.
 	Emoji *pkgstate.Store[string]
-	Clock *pkgstate.Clock
+	// ReadStates are each user's read cursor and open state per conversation.
+	ReadStates *pkgstate.Store[ReadState]
+	Clock      *pkgstate.Clock
 
 	// Team info (singleton)
 	Team Team
@@ -53,6 +55,7 @@ func New() *MemoryStore {
 		Presences:         pkgstate.New[Presence]("P"),
 		Bots:              pkgstate.New[Bot]("B"),
 		Emoji:             pkgstate.New[string]("E"),
+		ReadStates:        pkgstate.New[ReadState]("R"),
 		Clock:             pkgstate.NewClock(),
 		Team:              defaultTeam(),
 	}
@@ -203,6 +206,7 @@ type stateSnapshot struct {
 	Presences         map[string]Presence         `json:"presences"`
 	Bots              map[string]Bot              `json:"bots"`
 	Emoji             map[string]string           `json:"emoji"`
+	ReadStates        map[string]ReadState        `json:"read_states"`
 	Team              *Team                       `json:"team,omitempty"`
 	// Clock is the simulated clock's offset and pin, so a restored emulator
 	// keeps the time it was moved to.
@@ -230,6 +234,7 @@ func (s *MemoryStore) Snapshot() any {
 		Presences:         s.Presences.Snapshot(),
 		Bots:              s.Bots.Snapshot(),
 		Emoji:             s.Emoji.Snapshot(),
+		ReadStates:        s.ReadStates.Snapshot(),
 		Team:              &s.Team,
 		Clock:             snapshotClock(s.Clock),
 		DeletedMessages:   s.deletedMessages(),
@@ -278,6 +283,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	load(s.Presences, snap.Presences)
 	load(s.Bots, snap.Bots)
 	load(s.Emoji, snap.Emoji)
+	load(s.ReadStates, snap.ReadStates)
 	if snap.Team != nil {
 		s.Team = *snap.Team
 	}
@@ -374,6 +380,7 @@ func (s *MemoryStore) Reset() {
 	s.Presences.Reset()
 	s.Bots.Reset()
 	s.Emoji.Reset()
+	s.ReadStates.Reset()
 	s.Clock.Reset()
 	s.tsCounter.Store(0)
 	s.Team = defaultTeam()

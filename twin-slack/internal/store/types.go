@@ -26,6 +26,12 @@ type Channel struct {
 	NumMembers int      `json:"num_members"`
 	// User is the other member of a direct message.
 	User string `json:"user,omitempty"`
+	// LastRead and IsOpen are the caller's read cursor and, for a direct or
+	// multi-person message, whether it is open for them. Like IsMember they
+	// are not stored: conversations.info fills them from the caller's
+	// ReadState.
+	LastRead string `json:"last_read,omitempty"`
+	IsOpen   *bool  `json:"is_open,omitempty"`
 }
 
 // Topic holds a channel topic or purpose.
@@ -34,6 +40,19 @@ type Topic struct {
 	Creator string `json:"creator"`
 	LastSet int64  `json:"last_set"`
 }
+
+// ReadState is one user's place in one conversation: the read cursor
+// conversations.mark moves, and whether conversations.close closed a direct
+// or multi-person message for them. It is keyed by ReadStateKey.
+type ReadState struct {
+	Channel  string `json:"channel"`
+	User     string `json:"user"`
+	LastRead string `json:"last_read,omitempty"`
+	Closed   bool   `json:"closed,omitempty"`
+}
+
+// ReadStateKey is the key of a user's ReadState in a conversation.
+func ReadStateKey(channel, user string) string { return channel + "/" + user }
 
 // Message represents a Slack message.
 type Message struct {
