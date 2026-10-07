@@ -67,7 +67,7 @@
     },
     {
       "route": "*",
-      "reason": "Scopes are not enforced: missing_scope is never returned and the x-accepted-oauth-scopes header is not sent. So chat.postMessage and files.completeUploadExternal never answer not_in_channel: Slack refuses a post to a public channel the caller is not in unless the app has chat:write.public (chat.postMessage docs, Channel membership), and the app emulator lets any caller post to any channel.",
+      "reason": "Scopes are not enforced: missing_scope is never returned and neither the x-oauth-scopes nor the x-accepted-oauth-scopes header is sent. users.identity answers only the identity.basic fields (the user's name and ID, and the workspace ID), as no identity.email, identity.avatar or identity.team scope is granted. So chat.postMessage and files.completeUploadExternal never answer not_in_channel: Slack refuses a post to a public channel the caller is not in unless the app has chat:write.public (chat.postMessage docs, Channel membership), and the app emulator lets any caller post to any channel.",
       "references": {
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -223,7 +223,7 @@
     },
     {
       "route": "/admin/*",
-      "reason": "Operator endpoints for seeding, inspecting and resetting state, and for fault injection. Slack has no equivalent.",
+      "reason": "Operator endpoints for seeding, inspecting and resetting state, and for fault injection. Slack has no equivalent. POST /admin/state replaces every store the body names, an empty one included, and keeps the stores it leaves out, so a seed file can name only what it fills; a snapshot taken from GET /admin/state names every store and restores the state exactly.",
       "references": {
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -231,6 +231,126 @@
       "operator_note": "Every app emulator serves the admin namespace.",
       "quirk_ids": [],
       "no_quirk_reason": "An app-emulator-only operator namespace; no vendor behaviour is involved."
+    },
+    {
+      "route": "*",
+      "reason": "IDs, timestamps and cursors are shaped like Slack's but not identical. Generated IDs carry an underscore (C_000001, U_BOT, Bk_000001, S_000001), where Slack's are letters and digits only. A message ts is the second it was posted and a sequence number that counts up across the workspace as its fraction, not microseconds, so ts values are unique and ordered but the fraction does not read as a time. Cursors are opaque base64 that name the kind of list they page (channels, users, messages), so a cursor from one method can page another of the same kind.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "identity-001",
+        "pagination-001"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "The token is read from an Authorization header with the scheme written Bearer; another spelling, such as bearer, answers invalid_auth. A token inside a JSON body is ignored, so a JSON call without the header answers not_authed. Slack's docs say a token in a JSON body is not accepted, but not which error Slack answers for either case.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "auth-001",
+        "auth-002"
+      ]
+    },
+    {
+      "route": "POST /api/conversations.open",
+      "reason": "A multi-person message gets a C conversation ID, as public and newer private channels do. Slack has given multi-person messages G IDs, and its changelog tells apps not to rely on the first letter of a conversation ID.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "identity-002"
+      ]
+    },
+    {
+      "route": "POST /api/views.publish",
+      "reason": "Only Home tab views are published. A profile view answers invalid_arguments; Slack publishes profile views too.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "error-006"
+      ]
+    },
+    {
+      "route": "POST /api/chat.unfurl",
+      "reason": "The call is checked as the docs describe (the message, its channel, the links in its text and the unfurls format) and acknowledged, but the unfurl is not shown on the message. The app emulator sends no link_shared events, so any unfurl_id answers invalid_unfurl_id, and the domains an app may unfurl are not modelled, so cannot_find_service and cannot_unfurl_url are never returned.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "no_quirk_reason": "Unfurl rendering and link_shared delivery are not captured in the references; no quirk records them."
+    },
+    {
+      "route": "POST /api/chat.postMessage, chat.postEphemeral, chat.update, chat.scheduleMessage",
+      "reason": "markdown_text is kept as the message's text as given. Slack renders it into the message's blocks, and the shape of that rendering is not in the references.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "no_quirk_reason": "The rendered shape is undocumented in the captured references; no quirk records it."
+    },
+    {
+      "route": "POST /api/chat.scheduleMessage",
+      "reason": "A scheduled message posts when post_at has passed on the app emulator's clock, at the next Web API or GET /admin/messages call, rather than at post_at itself. The limit of 30 messages scheduled to one channel within five minutes (restricted_too_many) is not enforced.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "no_quirk_reason": "Delivery timing is a property of the emulator's lazy clock, not a documented Slack behaviour."
+    },
+    {
+      "route": "POST /api/conversations.setPurpose",
+      "reason": "The answer carries both the purpose string the method docs show and the channel object the official SDK types declare, because the two references disagree and live Slack has not been observed.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "no_quirk_reason": "A disagreement between the docs and the SDK types, not yet observed live; no quirk records it."
+    },
+    {
+      "route": "POST /api/users.profile.set",
+      "reason": "An admin or owner may set another user's profile and an owner an admin's, without the paid-plan and data-source settings Slack also requires. A changed email takes effect at once; Slack updates it only after the user confirms by email. Only the documented non-custom fields and custom fields are set.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "no_quirk_reason": "Workspace plan and email confirmation are outside the app emulator's single-workspace model."
+    },
+    {
+      "route": "GET /files-pri/{team}-{file}/{name}",
+      "reason": "A file's url_private and url_private_download serve its bytes on the host the client called, to any call with a token the app emulator accepts. A call without one answers HTTP 403; how Slack's files host answers it is not in the references. Uploaded bytes are not kept in a state snapshot.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "no_quirk_reason": "The files host's unauthenticated answer is not captured; no quirk records it."
+    },
+    {
+      "route": "POST /api/emoji.list, team.info, bots.info",
+      "reason": "emoji.list lists only seeded custom emoji, and include_categories adds no Unicode categories. team.info marks the default icon with image_default and serves no icon images, and bots.info serves no bot icons.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "no_quirk_reason": "Unicode emoji categories and image URLs are content, not API behaviour; no quirk records them."
     }
   ]
 }
