@@ -221,7 +221,14 @@ def case_events_http_receive():
         assert env["event"]["ts"] == posted["ts"]
 
         # Inviting a user is delivered as member_joined_channel, naming the
-        # inviter.
+        # inviter. Fixture: the guest is a workspace user, seeded through the
+        # emulator's admin API; Slack refuses to invite an unknown user.
+        guest = {"U_SMOKE_PY_GUEST": {"id": "U_SMOKE_PY_GUEST", "name": "smoke-py-guest"}}
+        conn = HTTPConnection(urlsplit(BASE).netloc)
+        conn.request("POST", "/admin/state", json.dumps({"users": guest}), {"Content-Type": "application/json"})
+        seeded = conn.getresponse()
+        seeded.read()
+        assert seeded.status == 200, f"seeding the guest: {seeded.status}"
         client.conversations_invite(channel=channel, users="U_SMOKE_PY_GUEST")
         for _ in range(200):
             if len(got) >= 3:

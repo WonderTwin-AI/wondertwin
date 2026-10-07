@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -121,8 +122,20 @@ func (h *Handler) ChatPostEphemeral(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "user_not_found")
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
+	// "If the target user is not in the given channel, the ephemeral message
+	// will not be delivered" (the chat.postEphemeral docs). A user who does
+	// not exist is in no channel.
+	if !slices.Contains(ch.Members, req.User) {
+		slackError(w, "user_not_in_channel")
 		return
 	}
 
@@ -390,7 +403,7 @@ func (h *Handler) ChatScheduleMessage(w http.ResponseWriter, r *http.Request) {
 		Text:        text,
 		PostAt:      req.PostAt,
 		DateCreated: now,
-		Token:       principal(r).Token,
+		Scheduler:   schedulerOf(principal(r)),
 		Message:     msg,
 		Hold:        metadata != nil,
 	})
@@ -465,6 +478,13 @@ func (h *Handler) ChatDeleteScheduledMessage(w http.ResponseWriter, r *http.Requ
 // pageScheduledMessages pages the scheduled list by message ID.
 var pageScheduledMessages = pageSpec{kind: "scheduled", def: 100, max: 1000}
 
+// schedulerOf names the principal a token speaks for: its type and user.
+// Unseeded tokens of one type share the default principal of that type
+// (divergences.json), so they share its scheduled messages too.
+func schedulerOf(t store.Token) string {
+	return t.Type + ":" + t.UserID
+}
+
 // ChatScheduledMessagesList handles POST /api/chat.scheduledMessages.list. It
 // lists the pending messages the calling token scheduled, in channel when
 // given, with post_at between oldest and latest.
@@ -492,9 +512,11 @@ func (h *Handler) ChatScheduledMessagesList(w http.ResponseWriter, r *http.Reque
 		slackError(w, "invalid_arguments")
 		return
 	}
-	token := principal(r).Token
+	caller := principal(r)
+	scheduler := schedulerOf(caller)
 	pending := h.store.ScheduledMessages.Filter(func(_ string, sm store.ScheduledMessage) bool {
-		return sm.Token == token &&
+		mine := sm.Scheduler == scheduler || (sm.Scheduler == "" && sm.Token == caller.Token)
+		return mine &&
 			(req.Channel == "" || sm.Channel == req.Channel) &&
 			(oldest == 0 || sm.PostAt >= oldest) &&
 			(latest == 0 || sm.PostAt <= latest)
@@ -542,8 +564,13 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
 		return
 	}
 	if req.Text == "" {
@@ -552,17 +579,17 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts := h.store.NextTS()
-	msg := store.Message{
+	msg := h.authored(r, store.Message{
 		Type:    "message",
 		Subtype: "me_message",
 		Channel: req.Channel,
-		User:    callerUserID(r),
 		Text:    req.Text,
 		TS:      ts,
 		Team:    h.store.Team.ID,
-	}
+	})
 	id := h.store.Messages.NextID()
 	h.store.Messages.Set(id, msg)
+	h.emitMessage(msg)
 
 	slackOK(w, map[string]any{
 		"channel": req.Channel,

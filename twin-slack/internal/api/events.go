@@ -398,34 +398,22 @@ func channelType(ch store.Channel) string {
 	return "channel"
 }
 
-// emitMessage reports a posted message as a message event.
+// emitMessage reports a posted message as a message event. The event carries
+// the message as history holds it, so a file_share, me_message or
+// thread_broadcast keeps its subtype, files and attachments (the message
+// event docs: the event structure is the message's, plus channel_type).
 func (h *Handler) emitMessage(msg store.Message) {
 	ch, _ := h.store.Channels.Get(msg.Channel)
-	event := map[string]any{
-		"type":         "message",
-		"channel":      msg.Channel,
-		"user":         msg.User,
-		"text":         msg.Text,
-		"ts":           msg.TS,
-		"event_ts":     msg.TS,
-		"channel_type": channelType(ch),
-		"team":         msg.Team,
-	}
-	if msg.ThreadTS != "" {
-		event["thread_ts"] = msg.ThreadTS
-	}
-	if msg.BotID != "" {
-		event["bot_id"] = msg.BotID
-	}
-	if msg.AppID != "" {
-		event["app_id"] = msg.AppID
-	}
-	if msg.BotProfile != nil {
-		event["bot_profile"] = msg.BotProfile
-	}
-	if msg.Blocks != nil {
-		event["blocks"] = msg.Blocks
-	}
+	msg.Reactions = nil
+	msg.Edited = nil
+	event := map[string]any{}
+	raw, _ := json.Marshal(msg)
+	json.Unmarshal(raw, &event)
+	event["type"] = "message"
+	event["channel"] = msg.Channel
+	event["user"] = msg.User
+	event["event_ts"] = msg.TS
+	event["channel_type"] = channelType(ch)
 	h.events.publish(h, event)
 }
 

@@ -410,7 +410,21 @@ func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) 
 		slackError(w, "not_found")
 		return
 	}
-	ug.Users = splitCSV(req.Users)
+	// The list replaces the group's users, so it cannot be empty (use
+	// usergroups.disable), and every user must be in the workspace (the
+	// usergroups.users.update docs: no_users_provided, failed_for_some_users).
+	users := splitCSV(req.Users)
+	if len(users) == 0 {
+		slackError(w, "no_users_provided")
+		return
+	}
+	for _, u := range users {
+		if !h.store.KnownUser(u) {
+			slackError(w, "failed_for_some_users")
+			return
+		}
+	}
+	ug.Users = users
 	ug.DateUpdate = h.store.Clock.Now().Unix()
 	h.store.Usergroups.Set(req.Usergroup, ug)
 	slackOK(w, map[string]any{"usergroup": ug})

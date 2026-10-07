@@ -41,6 +41,17 @@ func postBytes(t *testing.T, uploadURL, contentType string, body []byte) int {
 	return resp.StatusCode
 }
 
+// withBytes announces a file and sends its bytes, as a client does before
+// files.completeUploadExternal.
+func withBytes(t *testing.T, srv *httptest.Server, filename string, length int) string {
+	t.Helper()
+	u, id := uploadTicket(t, srv, filename, length)
+	if status := postBytes(t, u, "", bytes.Repeat([]byte("x"), length)); status != 200 {
+		t.Fatalf("upload %s: HTTP %d", filename, status)
+	}
+	return id
+}
+
 func fileInfo(t *testing.T, srv *httptest.Server, id string) map[string]any {
 	t.Helper()
 	status, m := call(t, srv, "GET", "/api/files.info?file="+id, "", "", true)
@@ -196,7 +207,7 @@ func TestCompleteUploadSharesToTheChannel(t *testing.T) {
 func TestCompleteUploadErrors(t *testing.T) {
 	srv, tc := setupSlack(t)
 	ch := seedChannel(tc, "general")
-	_, id := uploadTicket(t, srv, "e.txt", 1)
+	id := withBytes(t, srv, "e.txt", 1)
 	files := `[{"id":"` + id + `"}]`
 
 	for _, c := range []struct {
@@ -218,7 +229,7 @@ func TestCompleteUploadErrors(t *testing.T) {
 func TestCompleteUploadWithAnUnknownFileSharesNothing(t *testing.T) {
 	srv, tc := setupSlack(t)
 	ch := seedChannel(tc, "general")
-	_, id := uploadTicket(t, srv, "v.txt", 1)
+	id := withBytes(t, srv, "v.txt", 1)
 	form := url.Values{"files": {`[{"id":"` + id + `","title":"Changed"},{"id":"F_NOPE"}]`}, "channel_id": {ch}}
 	status, m := call(t, srv, "POST", "/api/files.completeUploadExternal", formType, form.Encode(), true)
 	wantError(t, status, m, "file_not_found")
@@ -234,7 +245,7 @@ func TestCompleteUploadWithAnUnknownFileSharesNothing(t *testing.T) {
 
 func TestCompleteUploadWithoutAChannelLeavesTheFilePrivate(t *testing.T) {
 	srv, _ := setupSlack(t)
-	_, id := uploadTicket(t, srv, "p.txt", 1)
+	id := withBytes(t, srv, "p.txt", 1)
 	status, m := call(t, srv, "POST", "/api/files.completeUploadExternal", formType,
 		url.Values{"files": {`[{"id":"` + id + `"}]`}}.Encode(), true)
 	mustOK(t, status, m)

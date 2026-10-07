@@ -56,7 +56,16 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
+	// The caller's read cursor, and for a direct or multi-person message
+	// whether it is open for them.
+	view := membershipView(r, ch)
+	rs, _ := h.store.ReadStates.Get(store.ReadStateKey(ch.ID, callerUserID(r)))
+	view.LastRead = rs.LastRead
+	if ch.IsIM || ch.IsMPIM {
+		open := !rs.Closed
+		view.IsOpen = &open
+	}
+	slackOK(w, map[string]any{"channel": view})
 }
 
 // ConversationsHistory handles POST /api/conversations.history
@@ -381,6 +390,7 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
 		Users   string `json:"users"` // comma-separated
+		Force   bool   `json:"force"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -392,10 +402,42 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
 
 	users := splitCSV(req.Users)
-	var added []string
+	if len(users) == 0 {
+		slackError(w, "no_user")
+		return
+	}
+	// Slack checks every user named and, unless force is set, invites nobody
+	// when any of them fails, answering with each failure in errors.
+	caller := callerUserID(r)
+	var valid []string
+	var failures []map[string]any
 	for _, u := range users {
+		code := ""
+		switch {
+		case u == caller:
+			code = "cant_invite_self"
+		case !h.store.KnownUser(u):
+			code = "user_not_found"
+		}
+		if code != "" {
+			failures = append(failures, map[string]any{"user": u, "ok": false, "error": code})
+			continue
+		}
+		valid = append(valid, u)
+	}
+	if len(failures) > 0 && !req.Force {
+		slackErrorWith(w, failures[0]["error"].(string), map[string]any{"errors": failures})
+		return
+	}
+
+	var added []string
+	for _, u := range valid {
 		if slices.Contains(ch.Members, u) {
 			continue
 		}
@@ -403,14 +445,19 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		ch.NumMembers++
 		added = append(added, u)
 	}
-	// Slack refuses an invite that adds nobody: every user named is already in.
-	if len(users) > 0 && len(added) == 0 {
+	if len(added) == 0 {
+		if len(valid) == 0 {
+			// force set, and every user named failed.
+			slackErrorWith(w, failures[0]["error"].(string), map[string]any{"errors": failures})
+			return
+		}
+		// Slack refuses an invite that adds nobody: every user named is already in.
 		slackError(w, "already_in_channel")
 		return
 	}
 	h.store.Channels.Set(req.Channel, ch)
 	for _, u := range added {
-		h.emitMemberJoined(ch, u, callerUserID(r))
+		h.emitMemberJoined(ch, u, caller)
 	}
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
@@ -429,6 +476,10 @@ func (h *Handler) ConversationsKick(w http.ResponseWriter, r *http.Request) {
 	ch, ok := h.store.Channels.Get(req.Channel)
 	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if req.User == callerUserID(r) {
+		slackError(w, "cant_kick_self")
 		return
 	}
 
@@ -468,6 +519,10 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
 
 	caller := callerUserID(r)
 	if slices.Contains(ch.Members, caller) {
@@ -496,6 +551,10 @@ func (h *Handler) ConversationsLeave(w http.ResponseWriter, r *http.Request) {
 	ch, ok := h.store.Channels.Get(req.Channel)
 	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
 		return
 	}
 
@@ -611,6 +670,12 @@ func (h *Handler) ConversationsOpen(w http.ResponseWriter, r *http.Request) {
 // openAnswer writes the answer to conversations.open. Without return_im, the
 // channel is answered with its id only, as the docs describe.
 func (h *Handler) openAnswer(w http.ResponseWriter, r *http.Request, ch store.Channel, existing, returnIM bool) {
+	// Opening reopens a conversation the caller closed.
+	key := store.ReadStateKey(ch.ID, callerUserID(r))
+	if rs, ok := h.store.ReadStates.Get(key); ok && rs.Closed {
+		rs.Closed = false
+		h.store.ReadStates.Set(key, rs)
+	}
 	fields := map[string]any{"channel": map[string]any{"id": ch.ID}}
 	if returnIM {
 		fields["channel"] = membershipView(r, ch)
@@ -654,7 +719,9 @@ func (h *Handler) mpimName(members []string) string {
 	return "mpdm-" + strings.Join(names, "--") + "-1"
 }
 
-// ConversationsClose handles POST /api/conversations.close
+// ConversationsClose handles POST /api/conversations.close. It closes a direct
+// or multi-person message for the caller; closing one already closed answers
+// ok with no_op and already_closed (the conversations.close docs).
 func (h *Handler) ConversationsClose(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
@@ -663,14 +730,33 @@ func (h *Handler) ConversationsClose(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if !ch.IsIM && !ch.IsMPIM {
+		slackError(w, "method_not_supported_for_channel_type")
+		return
+	}
+	caller := callerUserID(r)
+	if !slices.Contains(ch.Members, caller) {
+		slackError(w, "user_does_not_own_channel")
+		return
+	}
+	key := store.ReadStateKey(ch.ID, caller)
+	rs, _ := h.store.ReadStates.Get(key)
+	if rs.Closed {
+		slackOK(w, map[string]any{"no_op": true, "already_closed": true})
+		return
+	}
+	rs.Channel, rs.User, rs.Closed = ch.ID, caller, true
+	h.store.ReadStates.Set(key, rs)
 	slackOK(w, nil)
 }
 
-// ConversationsMark handles POST /api/conversations.mark
+// ConversationsMark handles POST /api/conversations.mark. It moves the
+// caller's read cursor, which conversations.info reports as last_read.
 func (h *Handler) ConversationsMark(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
@@ -680,10 +766,24 @@ func (h *Handler) ConversationsMark(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if !isTimestamp(req.TS) {
+		slackError(w, "invalid_timestamp")
+		return
+	}
+	caller := callerUserID(r)
+	if !slices.Contains(ch.Members, caller) {
+		slackError(w, "not_in_channel")
+		return
+	}
+	key := store.ReadStateKey(ch.ID, caller)
+	rs, _ := h.store.ReadStates.Get(key)
+	rs.Channel, rs.User, rs.LastRead = ch.ID, caller, req.TS
+	h.store.ReadStates.Set(key, rs)
 	slackOK(w, nil)
 }
 

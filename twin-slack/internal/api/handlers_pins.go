@@ -76,11 +76,25 @@ func (h *Handler) PinsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// channel is required, and names the channel whose pins are listed.
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
+
+	// A pin shows the message as it is now: an edit shows, and a deleted
+	// message is no longer pinned.
 	items := []store.Pin{}
 	for _, pin := range h.store.Pins.List() {
-		if req.Channel == "" || pin.Channel == req.Channel {
-			items = append(items, pin)
+		if pin.Channel != req.Channel {
+			continue
 		}
+		msg, _, ok := h.store.GetMessageByTS(pin.Channel, pin.Message.TS)
+		if !ok {
+			continue
+		}
+		pin.Message = *msg
+		items = append(items, pin)
 	}
 	slackOK(w, map[string]any{"items": items})
 }

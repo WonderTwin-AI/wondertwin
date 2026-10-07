@@ -195,6 +195,8 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only an admin changes an email, and never their own: "You cannot update
+	// your own email using this method" (the users.profile.set docs).
 	if code := applyProfile(&u.Profile, fields, target != caller && (me.IsAdmin || me.IsOwner)); code != "" {
 		slackError(w, code)
 		return

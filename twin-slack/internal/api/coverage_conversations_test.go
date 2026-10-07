@@ -106,6 +106,7 @@ func TestConversationsRenameErrors(t *testing.T) {
 // Kicking a member removes them; kicking a non-member is not_in_channel.
 func TestConversationsKick(t *testing.T) {
 	srv, tc := setupSlack(t)
+	seedUsers(t, srv, guestUser)
 	ch := seedChannel(tc, "kickable")
 	mustOK(t, 200, form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_GUEST"}}))
 

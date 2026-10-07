@@ -93,6 +93,8 @@ func TestScheduledMessagesPostWhenDue(t *testing.T) {
 // filtered by channel and by post_at, a page at a time.
 func TestScheduledMessagesList(t *testing.T) {
 	srv, _ := setupSlack(t)
+	// Another app: a bot token with its own bot user.
+	seedTokens(t, srv, `"xoxb-other-app":{"token":"xoxb-other-app","type":"bot","user_id":"U_OTHERBOT","bot_id":"B_OTHER"}`)
 	a, _ := postIn(t, srv, "list-a")
 	b, _ := postIn(t, srv, "list-b")
 	at := func(d time.Duration) string { return inSeconds(d) }
@@ -108,6 +110,11 @@ func TestScheduledMessagesList(t *testing.T) {
 	}
 	if n := count(nil); n != 3 {
 		t.Errorf("own scheduled messages: %d, want 3", n)
+	}
+	// Any unseeded bot token is the default bot (divergences.json), so it
+	// lists the default bot's scheduled messages.
+	if m := formAs(t, srv, "xoxb-another-unseeded", "chat.scheduledMessages.list", nil); len(m["scheduled_messages"].([]any)) != 3 {
+		t.Errorf("another unseeded bot token: %v", m["scheduled_messages"])
 	}
 	if n := count(url.Values{"channel": {a}}); n != 2 {
 		t.Errorf("in channel a: %d, want 2", n)

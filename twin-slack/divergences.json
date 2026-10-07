@@ -55,7 +55,7 @@
     },
     {
       "route": "*",
-      "reason": "Any well-formed xoxb-, xoxp- or xapp- token is accepted as the default principal of its type. Slack answers invalid_auth for a token it did not issue.",
+      "reason": "Any well-formed xoxb-, xoxp- or xapp- token is accepted as the default principal of its type, so two unseeded tokens of one type are the same caller. An xapp- app-level token is accepted on every Web API method and acts as the bot user; Slack accepts app-level tokens only on the few methods that take them. Slack answers invalid_auth for a token it did not issue.",
       "references": {
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -120,7 +120,7 @@
     },
     {
       "route": "Events API HTTP delivery and interactivity",
-      "reason": "Events API HTTP delivery is served for five events: message from chat.postMessage, message_deleted from chat.delete, reaction_added from reactions.add, member_joined_channel from conversations.join and conversations.invite, and member_left_channel from conversations.leave and conversations.kick. Each is signed and retried with x-slack-retry-num and x-slack-retry-reason, a failure answered with x-slack-no-retry: 1 is not retried, and setting a Request URL through POST /admin/events/config makes the url_verification handshake (--webhook-url at startup does not). The channel_type on member_joined_channel and member_left_channel, C for a public channel and G for a private one, is unverified because Slack's reference page for those events is not in the captured docs. Not served: the other events Slack sends for these writes (message_changed, the channel_join message, pin_added, channel and file events, app_mention and the rest), Socket Mode and interactivity payloads. too_many_redirects is never the retry reason, Delayed Events and the failure-rate disabling of subscriptions are not modelled, and every event goes to the configured Request URL whatever the app's subscriptions or channel membership. The retry schedule defaults to Slack's (nearly immediately, 1 minute, 5 minutes) and can be shortened through POST /admin/events/config.",
+      "reason": "Events API HTTP delivery is served for five events: message from chat.postMessage, chat.meMessage (me_message), files.completeUploadExternal (file_share) and scheduled-message delivery, carrying the message's subtype, files and attachments as history holds them, message_deleted from chat.delete, reaction_added from reactions.add, member_joined_channel from conversations.join and conversations.invite, and member_left_channel from conversations.leave and conversations.kick. Each is signed and retried with x-slack-retry-num and x-slack-retry-reason, a failure answered with x-slack-no-retry: 1 is not retried, and setting a Request URL through POST /admin/events/config makes the url_verification handshake (--webhook-url at startup does not). The channel_type on member_joined_channel and member_left_channel, C for a public channel and G for a private one, is unverified because Slack's reference page for those events is not in the captured docs. Not served: the other events Slack sends for these writes (message_changed, the channel_join message, pin_added, channel and file events, app_mention and the rest), Socket Mode and interactivity payloads. too_many_redirects is never the retry reason, Delayed Events and the failure-rate disabling of subscriptions are not modelled, and every event goes to the configured Request URL whatever the app's subscriptions or channel membership. The retry schedule defaults to Slack's (nearly immediately, 1 minute, 5 minutes) and can be shortened through POST /admin/events/config.",
       "references": {
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -211,7 +211,7 @@
     },
     {
       "route": "*",
-      "reason": "Optional fields with no value are omitted from answers rather than set to null, following the official SDK fixtures. Whether live Slack omits or nulls each field is unverified (the quirk is an inference awaiting a live capture).",
+      "reason": "Optional fields with no value are omitted from answers rather than set to null, following the official SDK fixtures, except where the docs show null: enterprise in the oauth.v2.access answer, and previous_view_id on a view. Whether live Slack omits or nulls each other field is unverified (the quirk is an inference awaiting a live capture).",
       "references": {
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -223,7 +223,7 @@
     },
     {
       "route": "/admin/*",
-      "reason": "Operator endpoints for seeding, inspecting and resetting state, and for fault injection. Slack has no equivalent. POST /admin/state replaces every store the body names, an empty one included, and keeps the stores it leaves out, so a seed file can name only what it fills; a snapshot taken from GET /admin/state names every store and restores the state exactly.",
+      "reason": "Operator endpoints for seeding, inspecting and resetting state, and for fault injection. Slack has no equivalent. POST /admin/state replaces every store the body names, an empty one included, and keeps the stores it leaves out, so a seed file can name only what it fills; a snapshot taken from GET /admin/state names every store and restores the state exactly. POST /admin/reset empties every store and does not reload the --seed-file the emulator started with. POST /admin/webhooks/flush waits until every queued event is delivered or has used up its retries, so with a failing receiver and the default retry schedule it answers after about six minutes.",
       "references": {
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -289,7 +289,7 @@
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
       "no_quirk_reason": "Unfurl rendering and link_shared delivery are not captured in the references; no quirk records them."
     },
     {
@@ -309,7 +309,7 @@
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "operator_note": "Operator rule, 2026-10-06: state exactly what is and is not supported, and never claim what the app emulator does not do.",
       "no_quirk_reason": "Delivery timing is a property of the emulator's lazy clock, not a documented Slack behaviour."
     },
     {
@@ -329,7 +329,7 @@
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "operator_note": "Operator rule, 2026-10-06: state exactly what is and is not supported, and never claim what the app emulator does not do.",
       "no_quirk_reason": "Workspace plan and email confirmation are outside the app emulator's single-workspace model."
     },
     {
@@ -339,7 +339,7 @@
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
       "no_quirk_reason": "The files host's unauthenticated answer is not captured; no quirk records it."
     },
     {
@@ -349,8 +349,38 @@
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
       },
-      "operator_note": "Operator approval, 2026-10-07: fix the third release-readiness audit's findings; what is not built is declared.",
+      "operator_note": "Operator rule, 2026-10-06: state exactly what is and is not supported, and never claim what the app emulator does not do.",
       "no_quirk_reason": "Unicode emoji categories and image URLs are content, not API behaviour; no quirk records them."
+    },
+    {
+      "route": "POST /api/conversations.*, chat.postMessage, users.getPresence",
+      "reason": "Some of Slack's conversation checks and shapes are not reproduced. A channel name, or a user ID for a direct message, is not accepted as channel: only a conversation ID is. A private channel is answered as is_channel false and is_group true, the legacy group shape. exclude_archived is ignored by conversations.list and users.conversations. Private channel membership is not checked on conversations.info, history and members, so any caller can read them. conversations.invite does not require the caller to be a member (not_in_channel); conversations.create and rename check only that a name is given and not taken, not Slack's naming rules (invalid_name_specials and the rest); conversations.leave never answers cant_leave_general or last_member. users.getPresence answers active for a user that does not exist.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: state exactly what is and is not supported, and never claim what the app emulator does not do.",
+      "no_quirk_reason": "Documented checks and shapes the app emulator does not reproduce; no quirk records them."
+    },
+    {
+      "route": "POST /api/conversations.replies, files.*, reactions.list, bookmarks.edit, usergroups.*",
+      "reason": "Some fields and options are not served. A thread parent carries no reply_count, reply_users or latest_reply, and a reply no parent_user_id. files.sharedPublicURL and files.revokePublicURL set is_public and permalink rather than public_url_shared and permalink_public; files carry no shares, groups or ims, and a file's permalink is https://files.slack.com/{team}/{file} rather than Slack's workspace URL. files.list lists files oldest first. reactions.list pages with cursor and limit, not count and page, and lists items oldest first. bookmarks.edit ignores emoji. usergroups.list ignores include_users and include_count, and usergroups.update ignores channels. A view's hash is drawn from the same sequence as message timestamps, so it is unique but uses up ts sequence numbers.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: state exactly what is and is not supported, and never claim what the app emulator does not do.",
+      "no_quirk_reason": "Undelivered fields and options of documented objects; no quirk records them."
+    },
+    {
+      "route": "POST /api/files.completeUploadExternal, usergroups.users.update, conversations.invite, conversations.mark, chat.postEphemeral, users.profile.set",
+      "reason": "Some answers follow the documented error list where the docs do not say which error applies. Completing a file whose bytes never reached the upload URL answers file_not_found. usergroups.users.update naming a user outside the workspace answers failed_for_some_users. conversations.invite with force invites the valid users and answers ok without listing the ones it skipped. conversations.mark checks that ts is a timestamp, not that a message has it. chat.postEphemeral with no user answers user_not_found, and a user who does not exist is user_not_in_channel. users.profile.set sets a profile field given a value of the wrong type to empty rather than answering invalid_arguments. A scheduled message is given its ts when it is delivered, not post_at.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "no_quirk_reason": "Error choices the captured docs leave open; no quirk records them."
     }
   ]
 }

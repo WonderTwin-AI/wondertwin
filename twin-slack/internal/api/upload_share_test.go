@@ -31,7 +31,7 @@ func TestUploadTicketArgumentsAndTypes(t *testing.T) {
 func TestCompleteUploadPostsAFileShareMessage(t *testing.T) {
 	srv, _ := setupSlack(t)
 	ch, parent := postIn(t, srv, "shared")
-	_, id := uploadTicket(t, srv, "report.pdf", 4)
+	id := withBytes(t, srv, "report.pdf", 4)
 	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{
 		"files": {`[{"id":"` + id + `","title":"Report"}]`}, "channel_id": {ch}, "initial_comment": {"Q3 numbers"},
 	}))
@@ -45,7 +45,7 @@ func TestCompleteUploadPostsAFileShareMessage(t *testing.T) {
 	}
 
 	// With thread_ts the share is a reply in that thread.
-	_, id2 := uploadTicket(t, srv, "b.txt", 1)
+	id2 := withBytes(t, srv, "b.txt", 1)
 	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{
 		"files": {`[{"id":"` + id2 + `"}]`}, "channel_id": {ch}, "thread_ts": {parent},
 	}))
@@ -55,7 +55,7 @@ func TestCompleteUploadPostsAFileShareMessage(t *testing.T) {
 
 	// Completing without a channel shares nowhere and posts nothing.
 	before := len(form(t, srv, "conversations.history", url.Values{"channel": {ch}})["messages"].([]any))
-	_, id3 := uploadTicket(t, srv, "c.txt", 1)
+	id3 := withBytes(t, srv, "c.txt", 1)
 	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + id3 + `"}]`}}))
 	if after := len(form(t, srv, "conversations.history", url.Values{"channel": {ch}})["messages"].([]any)); after != before {
 		t.Errorf("a private upload posted a message: %d -> %d", before, after)
@@ -67,7 +67,7 @@ func TestFilesListFilters(t *testing.T) {
 	srv, tc := setupSlack(t)
 	ch, _ := postIn(t, srv, "files")
 	share := func(name string) string {
-		_, id := uploadTicket(t, srv, name, 1)
+		id := withBytes(t, srv, name, 1)
 		mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + id + `"}]`}, "channel_id": {ch}}))
 		return id
 	}
@@ -75,10 +75,14 @@ func TestFilesListFilters(t *testing.T) {
 	created := int64(fileInfo(t, srv, img)["created"].(float64))
 	tc.Post("/admin/time/advance", map[string]any{"duration": "1h"})
 	pdf := share("b.pdf")
-	_, private := uploadTicket(t, srv, "c.zip", 1)
+	// Completed but shared nowhere, so private.
+	private := withBytes(t, srv, "c.zip", 1)
+	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + private + `"}]`}}))
 	theirs := formAs(t, srv, "xoxp-uploader", "files.getUploadURLExternal", url.Values{"filename": {"d.txt"}, "length": {"1"}})
 	mustOK(t, 200, theirs)
 	other := theirs["file_id"].(string)
+	postBytes(t, theirs["upload_url"].(string), "", []byte("d"))
+	mustOK(t, 200, formAs(t, srv, "xoxp-uploader", "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + other + `"}]`}}))
 
 	ids := func(v url.Values) []string {
 		m := form(t, srv, "files.list", v)
