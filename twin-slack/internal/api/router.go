@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -16,6 +17,8 @@ type Handler struct {
 	store  *store.MemoryStore
 	mw     *twincore.Middleware
 	events *eventBus
+	// deliverMu keeps two calls from posting the same scheduled message.
+	deliverMu sync.Mutex
 }
 
 // NewHandler creates a new Slack API handler.
@@ -48,6 +51,7 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Use(h.authMiddleware)
 			r.Use(argsErrorMiddleware)
 			r.Use(h.mw.FaultInjection)
+			r.Use(h.deliverDue)
 
 			// auth.*
 			route(r, "auth.test", h.AuthTest)
@@ -152,6 +156,9 @@ func (h *Handler) Routes(r chi.Router) {
 	// The upload step of the external file upload. It lives outside /api,
 	// as it does on Slack's upload host, and the URL itself is the credential.
 	r.Post(uploadPath+"{fileID}", h.UploadFileBytes)
+	// A file's private URLs, which serve its bytes to a caller with a token.
+	r.Get(filesPath+"{teamFile}/{name}", h.ServeFile(false))
+	r.Get(filesPath+"{teamFile}/download/{name}", h.ServeFile(true))
 
 	// Admin extras (no auth required)
 	r.Get("/admin/messages", h.AdminListMessages)

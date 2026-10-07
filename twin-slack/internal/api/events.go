@@ -417,6 +417,12 @@ func (h *Handler) emitMessage(msg store.Message) {
 	if msg.BotID != "" {
 		event["bot_id"] = msg.BotID
 	}
+	if msg.AppID != "" {
+		event["app_id"] = msg.AppID
+	}
+	if msg.BotProfile != nil {
+		event["bot_profile"] = msg.BotProfile
+	}
 	if msg.Blocks != nil {
 		event["blocks"] = msg.Blocks
 	}

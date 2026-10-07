@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
 )
@@ -140,10 +141,25 @@ func (h *Handler) ReactionsGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ReactionsList handles POST /api/reactions.list
+// pageReactions pages reactions.list, by message ts, channel and reaction.
+var pageReactions = pageSpec{kind: "reaction", def: 100, max: 1000}
+
+// reactionItem is one entry of reactions.list: a message the user reacted to,
+// once for each of the user's reactions on it, as the docs describe.
+type reactionItem struct {
+	key     string
+	channel string
+	message store.Message
+}
+
+// ReactionsList handles POST /api/reactions.list. It lists the messages the
+// user reacted to, the caller by default, a page at a time. A message the user
+// reacted to twice is listed twice, and deleted messages are left out.
 func (h *Handler) ReactionsList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		User string `json:"user"`
+		User   string `json:"user"`
+		Cursor string `json:"cursor"`
+		Limit  int    `json:"limit"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -153,28 +169,36 @@ func (h *Handler) ReactionsList(w http.ResponseWriter, r *http.Request) {
 	userID := req.User
 	if userID == "" {
 		userID = callerUserID(r)
+	} else if !h.store.KnownUser(userID) {
+		slackError(w, "user_not_found")
+		return
 	}
 
-	items := []any{}
+	var all []reactionItem
 	for _, msg := range h.store.Messages.List() {
+		if msg.IsDeleted {
+			continue
+		}
 		for _, rx := range msg.Reactions {
-			for _, u := range rx.Users {
-				if u == userID {
-					items = append(items, map[string]any{
-						"type":    "message",
-						"message": msg,
-					})
-					break
-				}
+			if slices.Contains(rx.Users, userID) {
+				all = append(all, reactionItem{key: msg.TS + "|" + msg.Channel + "|" + rx.Name, channel: msg.Channel, message: msg})
 			}
 		}
 	}
-
+	page, next, err := pageOf(all, func(it reactionItem) string { return it.key }, pageReactions, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
+	items := make([]map[string]any, len(page))
+	for i, it := range page {
+		msg := it.message
+		msg.Channel = ""
+		items[i] = map[string]any{"type": "message", "channel": it.channel, "message": msg}
+	}
 	slackOK(w, map[string]any{
-		"items": items,
-		"response_metadata": map[string]any{
-			"next_cursor": "",
-		},
+		"items":             items,
+		"response_metadata": map[string]any{"next_cursor": next},
 	})
 }
 

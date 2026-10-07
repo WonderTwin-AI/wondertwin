@@ -205,13 +205,14 @@ func TestUsersListPages(t *testing.T) {
 	}
 	testutil.NewAdminClient(tc).LoadState(map[string]any{"users": users}).AssertStatus(200)
 
-	// No limit returns everyone, as Slack documents for users.list.
+	// No limit returns everyone, as Slack documents for users.list: the five
+	// seeded users, the bot user and the default user.
 	pages, _ := walk(t, srv, "users.list", nil, "members")
-	if len(pages) != 1 || len(pages[0]) != 5 {
-		t.Errorf("no limit should return all five users on one page, got %v", sizes(pages))
+	if len(pages) != 1 || len(pages[0]) != 7 {
+		t.Errorf("no limit should return all seven users on one page, got %v", sizes(pages))
 	}
 	pages, _ = walk(t, srv, "users.list", url.Values{"limit": {"2"}}, "members")
-	if !slices.Equal(sizes(pages), []int{2, 2, 1}) {
+	if !slices.Equal(sizes(pages), []int{2, 2, 2, 1}) {
 		t.Errorf("page sizes = %v", sizes(pages))
 	}
 }

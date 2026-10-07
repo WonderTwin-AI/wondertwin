@@ -8,6 +8,7 @@ import (
 
 // AdminListMessages handles GET /admin/messages
 func (h *Handler) AdminListMessages(w http.ResponseWriter, r *http.Request) {
+	h.deliverScheduled()
 	messages := h.store.Messages.List()
 	// Filter out deleted
 	active := []any{}

@@ -134,45 +134,155 @@ func (h *Handler) UsersProfileGet(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"profile": u.Profile})
 }
 
-// UsersProfileSet handles POST /api/users.profile.set
+// UsersProfileSet handles POST /api/users.profile.set. It takes a user token,
+// and sets either the fields of profile, or the one field name names to value.
+// Another user's profile, and any email, may be set only by an admin or owner,
+// and an admin's only by an owner.
 func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Profile struct {
-			StatusText  *string `json:"status_text,omitempty"`
-			StatusEmoji *string `json:"status_emoji,omitempty"`
-			DisplayName *string `json:"display_name,omitempty"`
-			RealName    *string `json:"real_name,omitempty"`
-		} `json:"profile"`
+		Profile any    `json:"profile"`
+		Name    string `json:"name"`
+		Value   string `json:"value"`
+		User    string `json:"user"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
+	if principal(r).Type != store.TokenUser {
+		slackError(w, "not_allowed_token_type")
+		return
+	}
 
-	// Apply to the caller
-	u, ok := h.store.Users.Get(callerUserID(r))
+	fields := map[string]any{}
+	switch p := req.Profile.(type) {
+	case nil:
+		// A custom field is named by its ID, which starts with Xf.
+		if strings.HasPrefix(req.Name, "Xf") {
+			fields["fields"] = map[string]any{req.Name: map[string]any{"value": req.Value}}
+		} else if req.Name != "" {
+			fields[req.Name] = req.Value
+		}
+	case map[string]any:
+		fields = p
+	case string:
+		if p != "" {
+			slackError(w, "invalid_profile")
+			return
+		}
+	default:
+		slackError(w, "invalid_profile")
+		return
+	}
+
+	caller := callerUserID(r)
+	target := req.User
+	if target == "" {
+		target = caller
+	}
+	u, ok := h.store.Users.Get(target)
 	if !ok {
 		slackError(w, "user_not_found")
 		return
 	}
-
-	if req.Profile.StatusText != nil {
-		u.Profile.StatusText = *req.Profile.StatusText
+	me, _ := h.store.Users.Get(caller)
+	if target != caller && !me.IsAdmin && !me.IsOwner {
+		slackError(w, "not_admin")
+		return
 	}
-	if req.Profile.StatusEmoji != nil {
-		u.Profile.StatusEmoji = *req.Profile.StatusEmoji
-	}
-	if req.Profile.DisplayName != nil {
-		u.Profile.DisplayName = *req.Profile.DisplayName
-		u.Profile.DisplayNameNorm = strings.ToLower(*req.Profile.DisplayName)
-	}
-	if req.Profile.RealName != nil {
-		u.Profile.RealName = *req.Profile.RealName
-		u.Profile.RealNameNorm = strings.ToLower(*req.Profile.RealName)
+	if target != caller && (u.IsAdmin || u.IsOwner) && !me.IsOwner {
+		slackError(w, "cannot_update_admin_user")
+		return
 	}
 
-	h.store.Users.Set(callerUserID(r), u)
+	if code := applyProfile(&u.Profile, fields, target != caller && (me.IsAdmin || me.IsOwner)); code != "" {
+		slackError(w, code)
+		return
+	}
+	if email, set := fields["email"].(string); set {
+		if other, taken := h.store.GetUserByEmail(email); taken && other.ID != target {
+			slackError(w, "email_taken")
+			return
+		}
+	}
+	u.RealName = u.Profile.RealName
+	u.Updated = h.store.Clock.Now().Unix()
+	h.store.Users.Set(target, u)
 	slackOK(w, map[string]any{"profile": u.Profile})
+}
+
+// maxStatusText is the longest custom status the docs allow (too_long).
+const maxStatusText = 100
+
+// applyProfile sets the documented profile fields from a profile object. It
+// returns the Slack error for a field that cannot be set, or "". Image fields
+// are not settable here, and skype always stays empty.
+func applyProfile(p *store.UserProfile, fields map[string]any, admin bool) string {
+	str := func(k string) (string, bool) {
+		v, ok := fields[k]
+		if !ok {
+			return "", false
+		}
+		s, _ := v.(string)
+		return s, true
+	}
+	if v, ok := str("status_text"); ok {
+		if len([]rune(v)) > maxStatusText {
+			return "too_long"
+		}
+		p.StatusText = v
+	}
+	if v, ok := str("status_emoji"); ok {
+		p.StatusEmoji = v
+	}
+	if v, ok := fields["status_expiration"].(float64); ok {
+		p.StatusExpiration = int64(v)
+	}
+	if v, ok := str("email"); ok {
+		if !admin {
+			return "not_admin"
+		}
+		p.Email = v
+	}
+	if v, ok := str("display_name"); ok {
+		p.DisplayName, p.DisplayNameNorm = v, strings.ToLower(v)
+	}
+	for k, dst := range map[string]*string{"title": &p.Title, "phone": &p.Phone, "pronouns": &p.Pronouns, "start_date": &p.StartDate} {
+		if v, ok := str(k); ok {
+			*dst = v
+		}
+	}
+	if v, ok := str("real_name"); ok {
+		// Setting real_name sets first_name and last_name; a single name
+		// clears last_name.
+		first, last, _ := strings.Cut(strings.TrimSpace(v), " ")
+		p.FirstName, p.LastName = first, strings.TrimSpace(last)
+	}
+	if v, ok := str("first_name"); ok {
+		p.FirstName = v
+	}
+	if v, ok := str("last_name"); ok {
+		p.LastName = v
+	}
+	_, rn := fields["real_name"]
+	_, fn := fields["first_name"]
+	_, ln := fields["last_name"]
+	if rn || fn || ln {
+		p.RealName = strings.TrimSpace(p.FirstName + " " + p.LastName)
+		p.RealNameNorm = strings.ToLower(p.RealName)
+	}
+	if custom, ok := fields["fields"].(map[string]any); ok {
+		if p.Fields == nil {
+			p.Fields = map[string]store.ProfileField{}
+		}
+		for id, raw := range custom {
+			f, _ := raw.(map[string]any)
+			value, _ := f["value"].(string)
+			alt, _ := f["alt"].(string)
+			p.Fields[id] = store.ProfileField{Value: value, Alt: alt}
+		}
+	}
+	return ""
 }
 
 // UsersGetPresence handles POST /api/users.getPresence

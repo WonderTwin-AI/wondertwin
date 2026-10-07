@@ -3,7 +3,9 @@ package api_test
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -173,7 +175,7 @@ func TestChatScheduleMessage(t *testing.T) {
 	resp := slackPost(tc, "/api/chat.scheduleMessage", map[string]any{
 		"channel": chID,
 		"text":    "scheduled",
-		"post_at": 9999999999,
+		"post_at": time.Now().Add(time.Hour).Unix(),
 	})
 	resp.AssertStatus(200)
 	m := resp.JSONMap()
@@ -353,9 +355,14 @@ func TestUsersListAndInfo(t *testing.T) {
 	}}`)).AssertStatus(200)
 
 	resp := slackPost(tc, "/api/users.list", nil)
-	members := resp.JSONMap()["members"].([]any)
-	if len(members) != 2 {
-		t.Errorf("expected 2 users, got %d", len(members))
+	// The bot user and the default user that unseeded tokens speak for are
+	// workspace members too.
+	var ids []string
+	for _, m := range resp.JSONMap()["members"].([]any) {
+		ids = append(ids, m.(map[string]any)["id"].(string))
+	}
+	if !slices.Equal(ids, []string{"U001", "U002", "U_BOT", "U_USER"}) {
+		t.Errorf("users.list members = %v", ids)
 	}
 
 	resp = slackPost(tc, "/api/users.info", map[string]any{"user": "U001"})
