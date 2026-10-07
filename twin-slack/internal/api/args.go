@@ -250,8 +250,11 @@ func slackArgsError(w http.ResponseWriter, err error) {
 }
 
 // decodeJSONArgs decodes a JSON object into v. An explicit null leaves the
-// field at its default, which is what Slack documents for null arguments.
+// field at its default, which is what Slack documents for null arguments. A
+// number or boolean sent as a string is taken as its value, as Slack takes it
+// and as the official SDKs send some (slack_sdk's post_at is a str or int).
 func decodeJSONArgs(body []byte, v any) error {
+	body = scalarsFromStrings(body, v)
 	err := json.Unmarshal(body, v)
 	if err == nil {
 		return nil
@@ -371,4 +374,59 @@ func structuredOrString(s string) any {
 		}
 	}
 	return s
+}
+
+// scalarsFromStrings rewrites the top-level string values of a JSON object
+// whose field in v is a number or a boolean into that number or boolean, when
+// the string reads as one. Anything else is left for json.Unmarshal to judge,
+// so a string that is not a number is still invalid_arguments.
+func scalarsFromStrings(body []byte, v any) []byte {
+	rt := reflect.TypeOf(v)
+	if rt == nil || rt.Kind() != reflect.Pointer || rt.Elem().Kind() != reflect.Struct {
+		return body
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(body, &obj) != nil {
+		return body
+	}
+	changed := false
+	st := rt.Elem()
+	for i := 0; i < st.NumField(); i++ {
+		field := st.Field(i)
+		name := strings.Split(field.Tag.Get("json"), ",")[0]
+		raw, ok := obj[name]
+		if name == "" || !ok {
+			continue
+		}
+		var str string
+		if json.Unmarshal(raw, &str) != nil {
+			continue
+		}
+		ft := field.Type
+		if ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+		switch ft.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Float32, reflect.Float64, reflect.Bool:
+		default:
+			continue
+		}
+		val := reflect.New(ft).Elem()
+		if str == "" || setFromString(val, str) != nil {
+			continue
+		}
+		if lit, err := json.Marshal(val.Interface()); err == nil {
+			obj[name] = lit
+			changed = true
+		}
+	}
+	if !changed {
+		return body
+	}
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return out
 }
