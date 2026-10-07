@@ -45,6 +45,8 @@ func (h *Handler) FilesGetUploadURLExternal(w http.ResponseWriter, r *http.Reque
 		User:     callerUserID(r),
 		Created:  h.store.Clock.Now().Unix(),
 	}
+	// timestamp is the file's creation time, like created (the file object).
+	file.Timestamp = file.Created
 	h.store.Files.Set(id, file)
 
 	// Slack hands out a URL on its upload host. The emulator serves that step

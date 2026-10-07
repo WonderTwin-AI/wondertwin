@@ -478,6 +478,10 @@ func (h *Handler) ConversationsKick(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if req.User == callerUserID(r) {
+		slackError(w, "cant_kick_self")
+		return
+	}
 
 	members := make([]string, 0, len(ch.Members))
 	found := false
