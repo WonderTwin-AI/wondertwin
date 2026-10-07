@@ -41,7 +41,3 @@ func TestUsergroupUpdateAndUsers(t *testing.T) {
 		})
 	}
 }
-
-func TestUsergroupUsersListOfANewGroupIsAnEmptyList(t *testing.T) {
-	t.Skip("bug: usergroups.users.list answers users:null for a group with no members; the manifest promises [] and Slack sends []")
-}

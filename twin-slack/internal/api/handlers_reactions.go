@@ -145,7 +145,10 @@ func (h *Handler) ReactionsList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User string `json:"user"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	userID := req.User
 	if userID == "" {

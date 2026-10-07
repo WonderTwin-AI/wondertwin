@@ -67,7 +67,7 @@
     },
     {
       "route": "*",
-      "reason": "Scopes are not enforced: missing_scope is never returned and the x-accepted-oauth-scopes header is not sent.",
+      "reason": "Scopes are not enforced: missing_scope is never returned and the x-accepted-oauth-scopes header is not sent. So chat.postMessage and files.completeUploadExternal never answer not_in_channel: Slack refuses a post to a public channel the caller is not in unless the app has chat:write.public (chat.postMessage docs, Channel membership), and the app emulator lets any caller post to any channel.",
       "references": {
         "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -75,7 +75,8 @@
       "operator_note": "Deferred by the operator, 2026-10-01: scopes are PR 3b, after a refresh run captures the scope headers.",
       "quirk_ids": [
         "auth-003",
-        "auth-004"
+        "auth-004",
+        "auth-005"
       ]
     },
     {
@@ -92,7 +93,7 @@
     },
     {
       "route": "*",
-      "reason": "Rate limits are not enforced: no method answers HTTP 429 with Retry-After.",
+      "reason": "Rate limits are not enforced: no method answers HTTP 429 with Retry-After. Calling a paginated method without pagination gets no stricter limit, and no rate tier is assigned to any method, so the docs and the Java SDK disagreeing on the tier of 24 methods has no effect.",
       "references": {
         "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
@@ -100,7 +101,9 @@
       "operator_note": "Operator decision, 2026-10-02: rate limits are not simulated in the community app emulator; simulating them likely belongs to the commercial emulator. This is a decision for Slack, not a standing rule for other app emulators.",
       "quirk_ids": [
         "ratelimit-001",
-        "error-001"
+        "error-001",
+        "pagination-002",
+        "ratelimit-002"
       ]
     },
     {
@@ -147,6 +150,64 @@
       },
       "operator_note": "Operator decision, 2026-10-06: state exactly what is supported; methods outside the supported use cases are not served and are declared once here instead of one entry per method.",
       "no_quirk_reason": "A scope boundary, not a departure from a documented or observed Slack behaviour."
+    },
+    {
+      "route": "*",
+      "reason": "With a JSON body, query-string arguments are ignored. Slack's docs say not to mix a JSON body with query-string or form arguments (\"Choose one approach per request\", apis/web-api) but not how Slack answers a request that does. Mixing a query string with a form body is documented as allowed, and the app emulator merges the two.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "crud-007"
+      ]
+    },
+    {
+      "route": "POST /api/chat.postMessage",
+      "reason": "icon_url is accepted but not reflected on the message, because the captured references show no shape for it; username and icon_emoji are reflected. unfurl_links, unfurl_media and unfurl_app_links have no effect: the app emulator does not unfurl links.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "no_quirk_reason": "Gaps in the captured references and in what the app emulator renders, not a recorded Slack quirk."
+    },
+    {
+      "route": "*",
+      "reason": "There is no USLACK system user, and no system notifications are sent. Since 2026-06-17 Slack sends system notifications from USLACK rather than Slackbot.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "identity-003"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "One app state is reproduced: a granular Slack app. Behaviour that Slack varies by app creation date or app type (research versioning.md section 2) is not modelled.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "lifecycle-001"
+      ]
+    },
+    {
+      "route": "*",
+      "reason": "Optional fields with no value are omitted from answers rather than set to null, following the official SDK fixtures. Whether live Slack omits or nulls each field is unverified (the quirk is an inference awaiting a live capture).",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
+      "quirk_ids": [
+        "null-001"
+      ]
     },
     {
       "route": "/admin/*",

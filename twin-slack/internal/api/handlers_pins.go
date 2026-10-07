@@ -71,7 +71,10 @@ func (h *Handler) PinsList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	items := []store.Pin{}
 	for _, pin := range h.store.Pins.List() {

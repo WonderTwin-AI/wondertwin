@@ -178,6 +178,20 @@ func slackOK(w http.ResponseWriter, fields map[string]any) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// withWarnings adds Slack's non-fatal warnings to a success response: the
+// codes comma-separated in warning, and listed in response_metadata.warnings
+// (docs.slack.dev apis/web-api, "Evaluating responses").
+func withWarnings(fields map[string]any, codes ...string) map[string]any {
+	fields["warning"] = strings.Join(codes, ",")
+	meta, _ := fields["response_metadata"].(map[string]any)
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	meta["warnings"] = codes
+	fields["response_metadata"] = meta
+	return fields
+}
+
 // slackError writes a Slack API error response. Slack answers API errors with
 // HTTP 200, and repeats the error code in the x-slack-failure header.
 func slackError(w http.ResponseWriter, code string) {

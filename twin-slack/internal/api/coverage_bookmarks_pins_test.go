@@ -21,7 +21,7 @@ func TestBookmarksEditAndRemove(t *testing.T) {
 		t.Errorf("edit answer: %v", bm)
 	}
 	wantErrors(t, srv, "bookmarks.edit", map[string]errCase{
-		"unknown bookmark": {url.Values{"channel_id": {ch}, "bookmark_id": {"BM-nope"}, "title": {"x"}}, "bookmark_not_found"},
+		"unknown bookmark": {url.Values{"channel_id": {ch}, "bookmark_id": {"BM-nope"}, "title": {"x"}}, "not_found"},
 	})
 
 	mustOK(t, 200, form(t, srv, "bookmarks.remove", url.Values{"channel_id": {ch}, "bookmark_id": {id}}))

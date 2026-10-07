@@ -104,3 +104,29 @@ func TestInviteOfExistingMembers(t *testing.T) {
 		t.Errorf("inviting two members: %v", m)
 	}
 }
+
+// Joining a channel the caller is already in succeeds with Slack's
+// already_in_channel warning, in warning and in response_metadata.warnings.
+// A first join carries no warning.
+func TestJoinWhenAlreadyInChannelWarns(t *testing.T) {
+	srv, _ := setupSlack(t)
+	ch := form(t, srv, "conversations.create", url.Values{"name": {"warned"}})["channel"].(map[string]any)["id"].(string)
+
+	first := formAs(t, srv, "xoxp-joiner", "conversations.join", url.Values{"channel": {ch}})
+	mustOK(t, 200, first)
+	if _, ok := first["warning"]; ok {
+		t.Errorf("a first join warns: %v", first)
+	}
+	again := formAs(t, srv, "xoxp-joiner", "conversations.join", url.Values{"channel": {ch}})
+	mustOK(t, 200, again)
+	if again["warning"] != "already_in_channel" {
+		t.Errorf("warning: %v", again["warning"])
+	}
+	meta, _ := again["response_metadata"].(map[string]any)
+	if ws, _ := meta["warnings"].([]any); len(ws) != 1 || ws[0] != "already_in_channel" {
+		t.Errorf("response_metadata.warnings: %v", again["response_metadata"])
+	}
+	if again["channel"].(map[string]any)["id"] != ch {
+		t.Errorf("channel: %v", again["channel"])
+	}
+}

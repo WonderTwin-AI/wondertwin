@@ -30,15 +30,8 @@ func TestUsersMethodErrors(t *testing.T) {
 	})
 }
 
-// The round trip for a seeded user is in TestProfileAndPresenceAreTheCallers
-// (attribution_test.go).
-func TestBotPresenceIsKept(t *testing.T) {
-	t.Skip("bug: users.setPresence answers ok but keeps nothing when the caller has no user record, as for the default bot")
-}
-
-func TestGetPresenceDefaultsToTheCaller(t *testing.T) {
-	t.Skip("bug: users.getPresence with no user answers active instead of the caller's presence; Slack defaults user to the authed user")
-}
+// Presence round trips are in TestProfileAndPresenceAreTheCallers
+// (attribution_test.go) and TestPresenceIsTheCallers (coverage_fixes_test.go).
 
 func TestConversationsMethodErrors(t *testing.T) {
 	srv, _ := setupSlack(t)

@@ -59,11 +59,17 @@ func (h *Handler) BookmarksEdit(w http.ResponseWriter, r *http.Request) {
 		Title      string `json:"title,omitempty"`
 		Link       string `json:"link,omitempty"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
-	bm, ok := h.store.Bookmarks.Get(req.BookmarkID)
+	bm, ok := h.channelBookmark(w, req.ChannelID, req.BookmarkID)
 	if !ok {
-		slackError(w, "bookmark_not_found")
+		return
+	}
+	if req.Link != "" && !strings.HasPrefix(req.Link, "http://") && !strings.HasPrefix(req.Link, "https://") {
+		slackError(w, "invalid_link")
 		return
 	}
 	if req.Title != "" {
@@ -106,9 +112,31 @@ func (h *Handler) BookmarksRemove(w http.ResponseWriter, r *http.Request) {
 		BookmarkID string `json:"bookmark_id"`
 		ChannelID  string `json:"channel_id"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	if _, ok := h.channelBookmark(w, req.ChannelID, req.BookmarkID); !ok {
+		return
+	}
 	h.store.Bookmarks.Delete(req.BookmarkID)
 	slackOK(w, nil)
+}
+
+// channelBookmark finds a bookmark in a channel, answering the error Slack's
+// docs list when it cannot: channel_not_found for an unknown channel, and
+// not_found for a bookmark that does not exist or is in another channel.
+func (h *Handler) channelBookmark(w http.ResponseWriter, channelID, bookmarkID string) (store.Bookmark, bool) {
+	if _, ok := h.store.Channels.Get(channelID); !ok {
+		slackError(w, "channel_not_found")
+		return store.Bookmark{}, false
+	}
+	bm, ok := h.store.Bookmarks.Get(bookmarkID)
+	if !ok || bm.ChannelID != channelID {
+		slackError(w, "not_found")
+		return store.Bookmark{}, false
+	}
+	return bm, true
 }
 
 // --- emoji.* ---
@@ -169,7 +197,10 @@ func (h *Handler) UsergroupsCreate(w http.ResponseWriter, r *http.Request) {
 		Handle      string `json:"handle"`
 		Description string `json:"description"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	now := h.store.Clock.Now().Unix()
 	id := h.store.Usergroups.NextID()
@@ -188,7 +219,10 @@ func (h *Handler) UsergroupsUpdate(w http.ResponseWriter, r *http.Request) {
 		Handle      string `json:"handle,omitempty"`
 		Description string `json:"description,omitempty"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
@@ -213,7 +247,10 @@ func (h *Handler) UsergroupsDisable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
@@ -228,7 +265,10 @@ func (h *Handler) UsergroupsEnable(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
@@ -243,13 +283,20 @@ func (h *Handler) UsergroupsUsersList(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Usergroup string `json:"usergroup"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")
 		return
 	}
-	slackOK(w, map[string]any{"users": ug.Users})
+	users := ug.Users
+	if users == nil {
+		users = []string{}
+	}
+	slackOK(w, map[string]any{"users": users})
 }
 
 func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +304,10 @@ func (h *Handler) UsergroupsUsersUpdate(w http.ResponseWriter, r *http.Request) 
 		Usergroup string `json:"usergroup"`
 		Users     string `json:"users"` // comma-separated
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 	ug, ok := h.store.Usergroups.Get(req.Usergroup)
 	if !ok {
 		slackError(w, "not_found")

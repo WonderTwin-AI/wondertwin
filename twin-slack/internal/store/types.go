@@ -37,19 +37,29 @@ type Topic struct {
 
 // Message represents a Slack message.
 type Message struct {
-	Type      string       `json:"type"`
-	Subtype   string       `json:"subtype,omitempty"`
-	Channel   string       `json:"channel,omitempty"`
-	User      string       `json:"user,omitempty"`
-	BotID     string       `json:"bot_id,omitempty"`
-	Text      string       `json:"text"`
-	TS        string       `json:"ts"`
-	ThreadTS  string       `json:"thread_ts,omitempty"`
-	Team      string       `json:"team,omitempty"`
-	Blocks    any          `json:"blocks,omitempty"`
-	Reactions []Reaction   `json:"reactions,omitempty"`
-	Edited    *MessageEdit `json:"edited,omitempty"`
-	IsDeleted bool         `json:"-"`
+	Type     string `json:"type"`
+	Subtype  string `json:"subtype,omitempty"`
+	Channel  string `json:"channel,omitempty"`
+	User     string `json:"user,omitempty"`
+	BotID    string `json:"bot_id,omitempty"`
+	Text     string `json:"text"`
+	TS       string `json:"ts"`
+	ThreadTS string `json:"thread_ts,omitempty"`
+	Team     string `json:"team,omitempty"`
+	Blocks   any    `json:"blocks,omitempty"`
+	// Username and Icons are the per-message identity chat.postMessage sets
+	// with username and icon_emoji.
+	Username    string            `json:"username,omitempty"`
+	Icons       map[string]string `json:"icons,omitempty"`
+	Attachments []map[string]any  `json:"attachments,omitempty"`
+	// Files are the files a file_share message shares.
+	Files []File `json:"files,omitempty"`
+	// Metadata is returned by conversations.history and replies only with
+	// include_all_metadata.
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	Reactions []Reaction     `json:"reactions,omitempty"`
+	Edited    *MessageEdit   `json:"edited,omitempty"`
+	IsDeleted bool           `json:"-"`
 }
 
 // MessageEdit records who edited a message and when.
@@ -231,4 +241,11 @@ type Token struct {
 	// OAuthCode is the authorization code the token was issued for, by
 	// oauth.v2.access. A code is exchanged once.
 	OAuthCode string `json:"oauth_code,omitempty"`
+}
+
+// Presence is a user's manual presence, set with users.setPresence. Slack
+// keeps it for any user, including a bot user with no profile record here.
+type Presence struct {
+	User     string `json:"user"`
+	Presence string `json:"presence"`
 }

@@ -116,7 +116,10 @@ func (h *Handler) UsersProfileGet(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User string `json:"user"`
 	}
-	parseJSON(r, &req)
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
 
 	userID := req.User
 	if userID == "" {
@@ -177,19 +180,28 @@ func (h *Handler) UsersGetPresence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		User string `json:"user"`
 	}
-	parseJSON(r, &req)
-
-	u, ok := h.store.Users.Get(req.User)
-	if !ok {
-		slackOK(w, map[string]any{"presence": "active"})
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
 		return
 	}
-
-	presence := u.Presence
-	if presence == "" {
-		presence = "active"
+	// The user defaults to the caller.
+	user := req.User
+	if user == "" {
+		user = callerUserID(r)
 	}
-	slackOK(w, map[string]any{"presence": presence})
+	slackOK(w, map[string]any{"presence": h.presence(user)})
+}
+
+// presence is a user's presence: away when they set it manually, otherwise
+// their seeded presence, active by default.
+func (h *Handler) presence(user string) string {
+	if p, ok := h.store.Presences.Get(user); ok && p.Presence == "away" {
+		return "away"
+	}
+	if u, ok := h.store.Users.Get(user); ok && u.Presence != "" {
+		return u.Presence
+	}
+	return "active"
 }
 
 // UsersSetPresence handles POST /api/users.setPresence
@@ -201,11 +213,17 @@ func (h *Handler) UsersSetPresence(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
+	// The docs accept auto or away.
+	if req.Presence != "auto" && req.Presence != "away" {
+		slackError(w, "invalid_presence")
+		return
+	}
 
-	u, ok := h.store.Users.Get(callerUserID(r))
-	if ok {
-		u.Presence = req.Presence
-		h.store.Users.Set(callerUserID(r), u)
+	caller := callerUserID(r)
+	h.store.Presences.Set(caller, store.Presence{User: caller, Presence: req.Presence})
+	if u, ok := h.store.Users.Get(caller); ok {
+		u.Presence = map[string]string{"auto": "active", "away": "away"}[req.Presence]
+		h.store.Users.Set(caller, u)
 	}
 	slackOK(w, nil)
 }

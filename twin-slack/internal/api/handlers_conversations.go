@@ -62,9 +62,10 @@ func (h *Handler) ConversationsInfo(w http.ResponseWriter, r *http.Request) {
 // ConversationsHistory handles POST /api/conversations.history
 func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		Cursor  string `json:"cursor"`
-		Limit   int    `json:"limit"`
+		Channel            string `json:"channel"`
+		Cursor             string `json:"cursor"`
+		Limit              int    `json:"limit"`
+		IncludeAllMetadata bool   `json:"include_all_metadata"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -82,7 +83,7 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"messages":          messages,
+		"messages":          withMetadata(messages, req.IncludeAllMetadata),
 		"has_more":          next != "",
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
@@ -91,10 +92,11 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 // ConversationsReplies handles POST /api/conversations.replies
 func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		TS      string `json:"ts"`
-		Cursor  string `json:"cursor"`
-		Limit   int    `json:"limit"`
+		Channel            string `json:"channel"`
+		TS                 string `json:"ts"`
+		Cursor             string `json:"cursor"`
+		Limit              int    `json:"limit"`
+		IncludeAllMetadata bool   `json:"include_all_metadata"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -119,10 +121,24 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slackOK(w, map[string]any{
-		"messages":          replies,
+		"messages":          withMetadata(replies, req.IncludeAllMetadata),
 		"has_more":          next != "",
 		"response_metadata": map[string]any{"next_cursor": next},
 	})
+}
+
+// withMetadata returns messages with their metadata only when the caller asked
+// for it with include_all_metadata.
+func withMetadata(messages []store.Message, include bool) []store.Message {
+	if include {
+		return messages
+	}
+	out := make([]store.Message, len(messages))
+	for i, m := range messages {
+		m.Metadata = nil
+		out[i] = m
+	}
+	return out
 }
 
 // ConversationsMembers handles POST /api/conversations.members
@@ -257,6 +273,10 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 	ch, ok := h.store.Channels.Get(req.Channel)
 	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if req.Name == "" {
+		slackError(w, "invalid_name_required")
 		return
 	}
 
@@ -407,12 +427,16 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if caller := callerUserID(r); !slices.Contains(ch.Members, caller) {
-		ch.Members = append(ch.Members, caller)
-		ch.NumMembers++
-		h.store.Channels.Set(req.Channel, ch)
-		h.emitMemberJoined(ch, caller, "")
+	caller := callerUserID(r)
+	if slices.Contains(ch.Members, caller) {
+		// Slack still answers ok, with the already_in_channel warning.
+		slackOK(w, withWarnings(map[string]any{"channel": membershipView(r, ch)}, "already_in_channel"))
+		return
 	}
+	ch.Members = append(ch.Members, caller)
+	ch.NumMembers++
+	h.store.Channels.Set(req.Channel, ch)
+	h.emitMemberJoined(ch, caller, "")
 
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
@@ -597,6 +621,10 @@ func (h *Handler) ConversationsClose(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
 	slackOK(w, nil)
 }
 
@@ -608,6 +636,10 @@ func (h *Handler) ConversationsMark(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
+		return
+	}
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
 		return
 	}
 	slackOK(w, nil)
