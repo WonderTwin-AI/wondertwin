@@ -2,7 +2,9 @@ package api_test
 
 import (
 	"net/url"
+	"strconv"
 	"testing"
+	"time"
 )
 
 // Methods that act on a channel answer channel_not_found for an unknown or
@@ -16,7 +18,7 @@ func TestChannelMethodsRefuseAnUnknownChannel(t *testing.T) {
 	}{
 		{"chat.postEphemeral", url.Values{"user": {"U_USER"}, "text": {"x"}}},
 		{"chat.meMessage", url.Values{"text": {"x"}}},
-		{"chat.scheduleMessage", url.Values{"text": {"x"}, "post_at": {"4102444800"}}},
+		{"chat.scheduleMessage", url.Values{"text": {"x"}, "post_at": {strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)}}},
 		{"conversations.close", url.Values{}},
 		{"conversations.mark", url.Values{"ts": {"1.000001"}}},
 	} {

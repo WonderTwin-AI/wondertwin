@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -303,36 +305,137 @@ func (h *Handler) ChatGetPermalink(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ChatScheduleMessage handles POST /api/chat.scheduleMessage
+// maxScheduleAhead is how far ahead a message may be scheduled: 120 days
+// (time_too_far).
+const maxScheduleAhead = 120 * 24 * 60 * 60
+
+// ChatScheduleMessage handles POST /api/chat.scheduleMessage. The message is
+// posted when post_at passes on the app emulator's clock, by the next call
+// that reaches it. A message that carries metadata is accepted but never
+// posted, as the docs' bug alert says of Slack.
 func (h *Handler) ChatScheduleMessage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Channel string `json:"channel"`
-		Text    string `json:"text"`
-		PostAt  int64  `json:"post_at"`
+		Channel        string `json:"channel"`
+		Text           string `json:"text"`
+		PostAt         int64  `json:"post_at"`
+		Blocks         any    `json:"blocks,omitempty"`
+		Attachments    any    `json:"attachments,omitempty"`
+		Metadata       any    `json:"metadata,omitempty"`
+		ThreadTS       string `json:"thread_ts,omitempty"`
+		ReplyBroadcast bool   `json:"reply_broadcast,omitempty"`
+		MarkdownText   string `json:"markdown_text,omitempty"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
+	text, code := messageText(req.Text, req.Blocks, req.Attachments, req.MarkdownText)
+	if code != "" {
+		slackError(w, code)
+		return
+	}
+	now := h.store.Clock.Now().Unix()
+	switch {
+	case req.PostAt <= 0:
+		slackError(w, "invalid_time")
+		return
+	case req.PostAt <= now:
+		slackError(w, "time_in_past")
+		return
+	case req.PostAt > now+maxScheduleAhead:
+		slackError(w, "time_too_far")
+		return
+	}
+	attachments, ok := messageAttachments(req.Attachments)
+	if !ok {
+		slackError(w, "invalid_arguments")
+		return
+	}
+	if len(attachments) > maxAttachments {
+		slackError(w, "too_many_attachments")
+		return
+	}
+	metadata, ok := messageMetadata(req.Metadata)
+	if !ok {
+		slackError(w, "invalid_metadata_format")
+		return
+	}
 
+	msg := h.authored(r, store.Message{
+		Type:        "message",
+		Channel:     req.Channel,
+		Text:        text,
+		ThreadTS:    req.ThreadTS,
+		Team:        h.store.Team.ID,
+		Blocks:      req.Blocks,
+		Attachments: attachments,
+		Metadata:    metadata,
+	})
+	if req.ReplyBroadcast && req.ThreadTS != "" {
+		msg.Subtype = "thread_broadcast"
+	}
 	id := h.store.ScheduledMessages.NextID()
-	sm := store.ScheduledMessage{
+	h.store.ScheduledMessages.Set(id, store.ScheduledMessage{
 		ID:          id,
 		Channel:     req.Channel,
-		Text:        req.Text,
+		Text:        text,
 		PostAt:      req.PostAt,
-		DateCreated: h.store.Clock.Now().Unix(),
-	}
-	h.store.ScheduledMessages.Set(id, sm)
+		DateCreated: now,
+		Token:       principal(r).Token,
+		Message:     msg,
+		Hold:        metadata != nil,
+	})
 
+	// The answer shows the message as it waits, a delayed_message.
+	pending := msg
+	pending.Type = "delayed_message"
+	pending.Channel = ""
 	slackOK(w, map[string]any{
 		"channel":              req.Channel,
 		"scheduled_message_id": id,
 		"post_at":              req.PostAt,
+		"message":              pending,
+	})
+}
+
+// deliverScheduled posts every scheduled message whose post_at has passed on
+// the app emulator's clock, oldest first, and emits it as a message event.
+func (h *Handler) deliverScheduled() {
+	h.deliverMu.Lock()
+	defer h.deliverMu.Unlock()
+	now := h.store.Clock.Now().Unix()
+	due := h.store.ScheduledMessages.Filter(func(_ string, sm store.ScheduledMessage) bool {
+		return sm.PostAt <= now && !sm.Hold
+	})
+	sort.SliceStable(due, func(i, j int) bool { return due[i].PostAt < due[j].PostAt })
+	for _, sm := range due {
+		h.store.ScheduledMessages.Delete(sm.ID)
+		if _, ok := h.store.Channels.Get(sm.Channel); !ok {
+			continue
+		}
+		msg := sm.Message
+		msg.Channel = sm.Channel
+		msg.TS = h.store.NextTS()
+		h.store.Messages.Set(h.store.Messages.NextID(), msg)
+		h.emitMessage(msg)
+	}
+}
+
+// deliverDue is middleware that posts due scheduled messages before a call
+// is handled, so the call sees them.
+func (h *Handler) deliverDue(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.deliverScheduled()
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -346,8 +449,12 @@ func (h *Handler) ChatDeleteScheduledMessage(w http.ResponseWriter, r *http.Requ
 		slackArgsError(w, err)
 		return
 	}
-
-	if _, ok := h.store.ScheduledMessages.Get(req.ScheduledMessageID); !ok {
+	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+		slackError(w, "channel_not_found")
+		return
+	}
+	sm, ok := h.store.ScheduledMessages.Get(req.ScheduledMessageID)
+	if !ok || sm.Channel != req.Channel {
 		slackError(w, "invalid_scheduled_message_id")
 		return
 	}
@@ -355,12 +462,74 @@ func (h *Handler) ChatDeleteScheduledMessage(w http.ResponseWriter, r *http.Requ
 	slackOK(w, nil)
 }
 
-// ChatScheduledMessagesList handles POST /api/chat.scheduledMessages.list
+// pageScheduledMessages pages the scheduled list by message ID.
+var pageScheduledMessages = pageSpec{kind: "scheduled", def: 100, max: 1000}
+
+// ChatScheduledMessagesList handles POST /api/chat.scheduledMessages.list. It
+// lists the pending messages the calling token scheduled, in channel when
+// given, with post_at between oldest and latest.
 func (h *Handler) ChatScheduledMessagesList(w http.ResponseWriter, r *http.Request) {
-	msgs := h.store.ScheduledMessages.List()
-	slackOK(w, map[string]any{
-		"scheduled_messages": msgs,
+	var req struct {
+		Channel string `json:"channel"`
+		Cursor  string `json:"cursor"`
+		Limit   int    `json:"limit"`
+		Oldest  string `json:"oldest"`
+		Latest  string `json:"latest"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	if req.Channel != "" {
+		if _, ok := h.store.Channels.Get(req.Channel); !ok {
+			slackError(w, "invalid_channel")
+			return
+		}
+	}
+	oldest, okOldest := unixBound(req.Oldest)
+	latest, okLatest := unixBound(req.Latest)
+	if !okOldest || !okLatest {
+		slackError(w, "invalid_arguments")
+		return
+	}
+	token := principal(r).Token
+	pending := h.store.ScheduledMessages.Filter(func(_ string, sm store.ScheduledMessage) bool {
+		return sm.Token == token &&
+			(req.Channel == "" || sm.Channel == req.Channel) &&
+			(oldest == 0 || sm.PostAt >= oldest) &&
+			(latest == 0 || sm.PostAt <= latest)
 	})
+	page, next, err := pageOf(pending, func(sm store.ScheduledMessage) string { return sm.ID },
+		pageScheduledMessages, req.Cursor, req.Limit)
+	if err != nil {
+		slackError(w, "invalid_cursor")
+		return
+	}
+	items := make([]map[string]any, len(page))
+	for i, sm := range page {
+		items[i] = map[string]any{
+			"id": sm.ID, "channel_id": sm.Channel, "post_at": sm.PostAt,
+			"date_created": sm.DateCreated, "text": sm.Text,
+		}
+	}
+	slackOK(w, map[string]any{
+		"scheduled_messages": items,
+		"response_metadata":  map[string]any{"next_cursor": next},
+	})
+}
+
+// unixBound reads an optional Unix timestamp bound. It reports false for one
+// that is not a timestamp.
+func unixBound(s string) (int64, bool) {
+	if s == "" {
+		return 0, true
+	}
+	if !isTimestamp(s) {
+		return 0, false
+	}
+	sec, _, _ := strings.Cut(s, ".")
+	n, err := strconv.ParseInt(sec, 10, 64)
+	return n, err == nil
 }
 
 // ChatMeMessage handles POST /api/chat.meMessage

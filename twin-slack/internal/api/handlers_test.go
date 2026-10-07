@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -174,7 +175,7 @@ func TestChatScheduleMessage(t *testing.T) {
 	resp := slackPost(tc, "/api/chat.scheduleMessage", map[string]any{
 		"channel": chID,
 		"text":    "scheduled",
-		"post_at": 9999999999,
+		"post_at": time.Now().Add(time.Hour).Unix(),
 	})
 	resp.AssertStatus(200)
 	m := resp.JSONMap()

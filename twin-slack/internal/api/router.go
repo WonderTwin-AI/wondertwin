@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
@@ -16,6 +17,8 @@ type Handler struct {
 	store  *store.MemoryStore
 	mw     *twincore.Middleware
 	events *eventBus
+	// deliverMu keeps two calls from posting the same scheduled message.
+	deliverMu sync.Mutex
 }
 
 // NewHandler creates a new Slack API handler.
@@ -48,6 +51,7 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Use(h.authMiddleware)
 			r.Use(argsErrorMiddleware)
 			r.Use(h.mw.FaultInjection)
+			r.Use(h.deliverDue)
 
 			// auth.*
 			route(r, "auth.test", h.AuthTest)

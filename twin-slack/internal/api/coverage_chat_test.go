@@ -2,8 +2,10 @@ package api_test
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // chat.postEphemeral answers a message_ts and stores nothing in history.
@@ -91,15 +93,16 @@ func TestChatScheduledMessages(t *testing.T) {
 		t.Errorf("empty list: %v", empty["scheduled_messages"])
 	}
 
-	s := form(t, srv, "chat.scheduleMessage", url.Values{"channel": {ch}, "text": {"soon"}, "post_at": {"9999999999"}})
+	soon := time.Now().Add(time.Hour).Unix()
+	s := form(t, srv, "chat.scheduleMessage", url.Values{"channel": {ch}, "text": {"soon"}, "post_at": {strconv.FormatInt(soon, 10)}})
 	mustOK(t, 200, s)
 	id, _ := s["scheduled_message_id"].(string)
-	if id == "" || s["channel"] != ch || s["post_at"] != float64(9999999999) {
+	if id == "" || s["channel"] != ch || s["post_at"] != float64(soon) {
 		t.Errorf("scheduleMessage answer: %v", s)
 	}
 
 	wantErrors(t, srv, "chat.scheduleMessage", map[string]errCase{
-		"no channel": {url.Values{"text": {"x"}, "post_at": {"9999999999"}}, "channel_not_found"},
+		"no channel": {url.Values{"text": {"x"}, "post_at": {strconv.FormatInt(soon, 10)}}, "channel_not_found"},
 	})
 	wantErrors(t, srv, "chat.deleteScheduledMessage", map[string]errCase{
 		"unknown id": {url.Values{"channel": {ch}, "scheduled_message_id": {"Q-nope"}}, "invalid_scheduled_message_id"},
