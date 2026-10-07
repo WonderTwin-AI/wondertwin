@@ -70,10 +70,11 @@ func TestChatMeMessage(t *testing.T) {
 	}
 }
 
-// chat.unfurl acknowledges an unfurl.
+// chat.unfurl acknowledges an unfurl of a link in the message.
 func TestChatUnfurl(t *testing.T) {
 	srv, _ := setupSlack(t)
-	ch, ts := postIn(t, srv, "unfurl")
+	ch, _ := postIn(t, srv, "unfurl")
+	ts := form(t, srv, "chat.postMessage", url.Values{"channel": {ch}, "text": {"see <https://example.com>"}})["ts"].(string)
 	m := form(t, srv, "chat.unfurl", url.Values{"channel": {ch}, "ts": {ts}, "unfurls": {`{"https://example.com":{"text":"x"}}`}})
 	mustOK(t, 200, m)
 }

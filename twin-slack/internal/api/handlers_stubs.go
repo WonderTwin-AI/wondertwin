@@ -141,33 +141,67 @@ func (h *Handler) channelBookmark(w http.ResponseWriter, channelID, bookmarkID s
 
 // --- emoji.* ---
 
+// EmojiList lists the workspace's custom emoji: each name maps to its image
+// URL, or to "alias:" and the name of the emoji it stands for. A workspace has
+// none until they are seeded.
 func (h *Handler) EmojiList(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{"emoji": map[string]any{
-		"thumbsup": "alias:+1",
-		"shipit":   "alias:squirrel",
-	}})
+	var req struct {
+		IncludeCategories bool `json:"include_categories"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	emoji := map[string]string{}
+	for _, name := range h.store.Emoji.ListIDs() {
+		v, _ := h.store.Emoji.Get(name)
+		emoji[name] = v
+	}
+	slackOK(w, map[string]any{"emoji": emoji})
 }
 
-// --- team.* (expanded) ---
+// --- team.* ---
 
+// TeamInfo answers for the caller's workspace. team names a workspace by ID,
+// and domain is only for teams on an Enterprise organization, which this one
+// is not.
 func (h *Handler) TeamInfo(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{
-		"team": map[string]any{
-			"id":     h.store.Team.ID,
-			"name":   h.store.Team.Name,
-			"domain": h.store.Team.Domain,
-		},
-	})
+	var req struct {
+		Team   string `json:"team"`
+		Domain string `json:"domain"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	if req.Team != "" && req.Team != h.store.Team.ID {
+		slackError(w, "team_not_found")
+		return
+	}
+	if req.Team == "" && req.Domain != "" {
+		slackError(w, "team_not_on_enterprise")
+		return
+	}
+	slackOK(w, map[string]any{"team": h.store.Team})
 }
 
 // --- bots.* ---
 
+// BotsInfo answers for the bot that bot names, by its bot ID.
 func (h *Handler) BotsInfo(w http.ResponseWriter, r *http.Request) {
-	slackOK(w, map[string]any{
-		"bot": map[string]any{
-			"id": "B_BOT", "name": "wondertwin-bot", "deleted": false,
-		},
-	})
+	var req struct {
+		Bot string `json:"bot"`
+	}
+	if err := parseJSON(r, &req); err != nil {
+		slackArgsError(w, err)
+		return
+	}
+	b, ok := h.store.Bots.Get(req.Bot)
+	if !ok {
+		slackError(w, "bot_not_found")
+		return
+	}
+	slackOK(w, map[string]any{"bot": b})
 }
 
 // --- usergroups.* (stateful) ---

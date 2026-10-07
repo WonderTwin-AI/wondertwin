@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"net/url"
 	"testing"
 )
 
@@ -38,10 +39,10 @@ func TestWorkspaceInfoMethods(t *testing.T) {
 		t.Errorf("team.info: %v (auth.test team %v)", tm, ident["team_id"])
 	}
 
-	bot := form(t, srv, "bots.info", nil)
+	bot := form(t, srv, "bots.info", url.Values{"bot": {ident["bot_id"].(string)}})
 	mustOK(t, 200, bot)
-	if b := bot["bot"].(map[string]any); b["id"] == "" || b["deleted"] != false {
-		t.Errorf("bots.info: %v", b)
+	if b := bot["bot"].(map[string]any); b["id"] != ident["bot_id"] || b["user_id"] != ident["user_id"] || b["app_id"] == "" || b["deleted"] != false {
+		t.Errorf("bots.info: %v (auth.test %v)", b, ident)
 	}
 
 	emoji := form(t, srv, "emoji.list", nil)
@@ -50,7 +51,7 @@ func TestWorkspaceInfoMethods(t *testing.T) {
 		t.Errorf("emoji.list: %v", emoji)
 	}
 
-	id := form(t, srv, "users.identity", nil)
+	id := formAs(t, srv, "xoxp-identity", "users.identity", nil)
 	mustOK(t, 200, id)
 	if u := id["user"].(map[string]any); u["id"] == "" || id["team"].(map[string]any)["id"] != ident["team_id"] {
 		t.Errorf("users.identity: %v", id)
