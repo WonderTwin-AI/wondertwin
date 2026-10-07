@@ -108,6 +108,34 @@
       },
       "additionalProperties": false
     },
+    "references": {
+      "type": "object",
+      "description": "The reference manifest the twin was built against (wondertwin-docs architecture/twin-references-spec.md, Twin-side: provenance.json).",
+      "required": ["manifest_path", "manifest_sha256", "primary"],
+      "properties": {
+        "manifest_path": {
+          "type": "string",
+          "description": "Path of the manifest from the workspace root, e.g. wondertwin-docs/research/twins/{vendor}/references/manifest.json."
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "SHA-256 of the manifest file at build time. Any manifest change invalidates the build."
+        },
+        "primary": {
+          "type": "string",
+          "description": "Manifest entry id used as the conformance target; a tier-1 or tier-2 entry."
+        },
+        "supporting": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Other manifest entry ids that informed the build."
+        }
+      },
+      "additionalProperties": false
+    },
     "sources": {
       "oneOf": [
         {

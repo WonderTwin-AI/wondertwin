@@ -5,16 +5,19 @@
     "language": "typescript",
     "version": "8.1.1"
   },
+  "references": {
+    "manifest_path": "wondertwin-docs/research/twins/slack/references/manifest.json",
+    "manifest_sha256": "8e53c73aed150e9916c5eedfe9da49fa65b85ba4adda5cbe8c78afc219743ab2",
+    "primary": "sdk-node-web-api-v8.1.1",
+    "supporting": [
+      "sdk-python-v3.44.1",
+      "sdk-java-v1.51.0",
+      "docs-2026-09-26-pages",
+      "docs-2026-09-26-methods",
+      "docs-2026-09-26-changelog",
+      "docs-manifest-schema-v0.5.0"
+    ]
+  },
   "build": 21,
-  "generated_at": "2026-10-06T00:00:00Z",
-  "sources": {
-    "openapi": {
-      "origin": "none",
-      "url": ""
-    },
-    "sdk_analysis": {
-      "method": "manual",
-      "repo": "https://github.com/slack-go/slack"
-    }
-  }
+  "generated_at": "2026-10-06T00:00:00Z"
 }
