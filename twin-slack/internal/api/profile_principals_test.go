@@ -89,7 +89,8 @@ func TestProfileSetFields(t *testing.T) {
 }
 
 // Only an admin or owner sets another user's profile, and only an owner an
-// admin's. An admin may set another user's email, if no one else has it.
+// admin's. An admin may set another user's email, if no one else has it,
+// but not their own.
 func TestProfileSetForAnotherUser(t *testing.T) {
 	srv, _ := setupSlack(t)
 	seedUsers(t, srv, `"U_ADMIN":{"id":"U_ADMIN","name":"admin","is_admin":true},
@@ -122,6 +123,12 @@ func TestProfileSetForAnotherUser(t *testing.T) {
 		t.Errorf("an email in use: %v", m)
 	}
 	mustOK(t, 200, formAs(t, srv, "xoxp-admin", "users.profile.set", email("plain@example.com")))
+
+	// "You cannot update your own email using this method", admin or not.
+	own := url.Values{"name": {"email"}, "value": {"admin@example.com"}}
+	if m := formAs(t, srv, "xoxp-admin", "users.profile.set", own); m["error"] != "not_admin" {
+		t.Errorf("an admin setting their own email: %v", m)
+	}
 }
 
 func seedTokens(t *testing.T, srv *httptest.Server, tokens string) {
