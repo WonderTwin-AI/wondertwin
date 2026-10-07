@@ -2,7 +2,7 @@
   "twin_id": "twin-slack",
   "tier": "community",
   "vendor_api_version": "Slack Web API as documented on 2026-09-26",
-  "reviewed_at": "2026-10-06",
+  "reviewed_at": "2026-10-07",
   "divergences": [
     {
       "route": "POST /api/files.getUploadURLExternal",
@@ -104,6 +104,18 @@
         "error-001",
         "pagination-002",
         "ratelimit-002"
+      ]
+    },
+    {
+      "route": "POST /api/conversations.history, POST /api/conversations.replies",
+      "reason": "Every caller gets the documented page sizes: history defaults to 100 messages per call and replies to 1000, with no per-minute limit. Since 2025-05-29 Slack caps both methods at 15 messages per call, and one call per minute, for new commercially distributed apps not listed in the Slack Marketplace (changelog 2025-05-29). The app emulator answers as Slack does for an app the cap does not apply to, such as an internal or Marketplace app.",
+      "references": {
+        "docs": "docs-2026-09-26-pages (tree_sha256 8c045983e1fbfba2703ae128d80a94a4af926705a4d5475150d3ede773cca4ef)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-07: declare, not simulate. The cap is a rate limit tied to commercial distribution, which the community app emulator does not simulate (see the rate-limit entry), and copying it would break paging in customers' tests.",
+      "quirk_ids": [
+        "pagination-003"
       ]
     },
     {
