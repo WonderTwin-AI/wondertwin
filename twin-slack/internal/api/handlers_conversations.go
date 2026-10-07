@@ -312,6 +312,10 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
+// maxPurpose is the longest description conversations.setPurpose takes
+// (too_long).
+const maxPurpose = 250
+
 // ConversationsSetPurpose handles POST /api/conversations.setPurpose
 func (h *Handler) ConversationsSetPurpose(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -329,9 +333,20 @@ func (h *Handler) ConversationsSetPurpose(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
+	if len([]rune(req.Purpose)) > maxPurpose {
+		slackError(w, "too_long")
+		return
+	}
+
 	ch.Purpose = store.Topic{Value: req.Purpose, Creator: callerUserID(r), LastSet: h.store.Clock.Now().Unix()}
 	h.store.Channels.Set(req.Channel, ch)
-	slackOK(w, map[string]any{"purpose": req.Purpose})
+	// The method docs show the purpose string, and the SDK types the
+	// conversation; Slack's answer is given as both.
+	slackOK(w, map[string]any{"channel": membershipView(r, ch), "purpose": req.Purpose})
 }
 
 // ConversationsSetTopic handles POST /api/conversations.setTopic
@@ -351,9 +366,14 @@ func (h *Handler) ConversationsSetTopic(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
+
 	ch.Topic = store.Topic{Value: req.Topic, Creator: callerUserID(r), LastSet: h.store.Clock.Now().Unix()}
 	h.store.Channels.Set(req.Channel, ch)
-	slackOK(w, map[string]any{"topic": req.Topic})
+	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 
 // ConversationsInvite handles POST /api/conversations.invite
