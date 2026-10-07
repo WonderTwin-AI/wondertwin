@@ -20,6 +20,9 @@ const twoUsers = `"U1":{"id":"U1","name":"ana","profile":{"email":"ana@example.c
 	"U2":{"id":"U2","name":"bo","profile":{"email":"bo@example.com"}},
 	"U3":{"id":"U3","name":"gone","deleted":true}`
 
+// guestUser is a workspace member to invite; Slack refuses an unknown user.
+const guestUser = `"U_GUEST":{"id":"U_GUEST","name":"guest"}`
+
 func open(t *testing.T, srv *httptest.Server, form url.Values) map[string]any {
 	t.Helper()
 	_, m := call(t, srv, "POST", "/api/conversations.open", formType, form.Encode(), true)

@@ -224,7 +224,14 @@ const cases = {
       assert.equal(env.event.text, 'deploy started');
 
       // Inviting a user is delivered as member_joined_channel, naming the
-      // inviter.
+      // inviter. Fixture: the guest is a workspace user, seeded through the
+      // emulator's admin API; Slack refuses to invite an unknown user.
+      const guest = await fetch(`${base}/admin/state`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({users: {U_SMOKE_NODE_GUEST: {id: 'U_SMOKE_NODE_GUEST', name: 'smoke-node-guest'}}}),
+      });
+      assert.equal(guest.status, 200);
       await web.conversations.invite({channel, users: 'U_SMOKE_NODE_GUEST'});
       for (let i = 0; i < 200 && got.length < 3; i++) await new Promise((r) => setTimeout(r, 25));
       assert.equal(got.length, 3, 'member_joined_channel is delivered');

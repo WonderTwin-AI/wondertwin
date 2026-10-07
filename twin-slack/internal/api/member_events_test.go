@@ -21,6 +21,7 @@ func innerEvents(t *testing.T, got []received, secret string) []map[string]any {
 // member_joined_channel and member_left_channel, naming the member.
 func TestMembershipChangesAreDeliveredAsEvents(t *testing.T) {
 	srv, _ := setupSlack(t)
+	seedUsers(t, srv, guestUser)
 	rc := newReceiver(t)
 	ch := form(t, srv, "conversations.create", url.Values{"name": {"members"}})["channel"].(map[string]any)["id"].(string)
 	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "m3mb3rs"})
@@ -52,17 +53,18 @@ func TestMembershipChangesAreDeliveredAsEvents(t *testing.T) {
 }
 
 // A call that changes no membership sends no member event: joining a channel
-// the caller is already in, inviting a member, or leaving a channel the caller
+// the caller is already in, inviting oneself, or leaving a channel the caller
 // is not in.
 func TestNoMemberEventWithoutAMembershipChange(t *testing.T) {
 	srv, _ := setupSlack(t)
+	seedUsers(t, srv, guestUser)
 	rc := newReceiver(t)
 	ch := form(t, srv, "conversations.create", url.Values{"name": {"steady"}})["channel"].(map[string]any)["id"].(string)
 	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 
 	mustOK(t, 200, form(t, srv, "conversations.join", url.Values{"channel": {ch}}))
-	if invited := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}}); invited["ok"] != false || invited["error"] != "already_in_channel" {
-		t.Errorf("inviting a member: %v, want already_in_channel", invited)
+	if invited := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}}); invited["ok"] != false || invited["error"] != "cant_invite_self" {
+		t.Errorf("inviting oneself: %v, want cant_invite_self", invited)
 	}
 	mustOK(t, 200, formAs(t, srv, "xoxp-outsider", "conversations.leave", url.Values{"channel": {ch}}))
 
@@ -76,6 +78,7 @@ func TestNoMemberEventWithoutAMembershipChange(t *testing.T) {
 // A private channel's member events carry channel_type G.
 func TestPrivateChannelMemberEventsAreTypeG(t *testing.T) {
 	srv, _ := setupSlack(t)
+	seedUsers(t, srv, guestUser)
 	rc := newReceiver(t)
 	ch := form(t, srv, "conversations.create", url.Values{"name": {"hush"}, "is_private": {"true"}})["channel"].(map[string]any)["id"].(string)
 	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
@@ -90,17 +93,19 @@ func TestPrivateChannelMemberEventsAreTypeG(t *testing.T) {
 // invite naming members and newcomers adds only the newcomers.
 func TestInviteOfExistingMembers(t *testing.T) {
 	srv, _ := setupSlack(t)
+	seedUsers(t, srv, guestUser+`,"U_MEMBER":{"id":"U_MEMBER","name":"member"}`)
 	ch := form(t, srv, "conversations.create", url.Values{"name": {"guests"}})["channel"].(map[string]any)["id"].(string)
+	mustOK(t, 200, form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_MEMBER"}}))
 
-	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT"}}); m["ok"] != false || m["error"] != "already_in_channel" {
+	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_MEMBER"}}); m["ok"] != false || m["error"] != "already_in_channel" {
 		t.Errorf("inviting only a member: %v", m)
 	}
-	mixed := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_BOT,U_GUEST"}})
+	mixed := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_MEMBER,U_GUEST"}})
 	mustOK(t, 200, mixed)
-	if n := mixed["channel"].(map[string]any)["num_members"]; n != float64(2) {
-		t.Errorf("num_members after a mixed invite: %v, want 2", n)
+	if n := mixed["channel"].(map[string]any)["num_members"]; n != float64(3) {
+		t.Errorf("num_members after a mixed invite: %v, want 3", n)
 	}
-	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_GUEST,U_BOT"}}); m["error"] != "already_in_channel" {
+	if m := form(t, srv, "conversations.invite", url.Values{"channel": {ch}, "users": {"U_GUEST,U_MEMBER"}}); m["error"] != "already_in_channel" {
 		t.Errorf("inviting two members: %v", m)
 	}
 }

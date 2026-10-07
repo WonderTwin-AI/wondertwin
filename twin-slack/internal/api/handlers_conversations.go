@@ -381,6 +381,7 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Channel string `json:"channel"`
 		Users   string `json:"users"` // comma-separated
+		Force   bool   `json:"force"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -392,10 +393,42 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
+		return
+	}
 
 	users := splitCSV(req.Users)
-	var added []string
+	if len(users) == 0 {
+		slackError(w, "no_user")
+		return
+	}
+	// Slack checks every user named and, unless force is set, invites nobody
+	// when any of them fails, answering with each failure in errors.
+	caller := callerUserID(r)
+	var valid []string
+	var failures []map[string]any
 	for _, u := range users {
+		code := ""
+		switch {
+		case u == caller:
+			code = "cant_invite_self"
+		case !h.store.KnownUser(u):
+			code = "user_not_found"
+		}
+		if code != "" {
+			failures = append(failures, map[string]any{"user": u, "ok": false, "error": code})
+			continue
+		}
+		valid = append(valid, u)
+	}
+	if len(failures) > 0 && !req.Force {
+		slackErrorWith(w, failures[0]["error"].(string), map[string]any{"errors": failures})
+		return
+	}
+
+	var added []string
+	for _, u := range valid {
 		if slices.Contains(ch.Members, u) {
 			continue
 		}
@@ -403,14 +436,19 @@ func (h *Handler) ConversationsInvite(w http.ResponseWriter, r *http.Request) {
 		ch.NumMembers++
 		added = append(added, u)
 	}
-	// Slack refuses an invite that adds nobody: every user named is already in.
-	if len(users) > 0 && len(added) == 0 {
+	if len(added) == 0 {
+		if len(valid) == 0 {
+			// force set, and every user named failed.
+			slackErrorWith(w, failures[0]["error"].(string), map[string]any{"errors": failures})
+			return
+		}
+		// Slack refuses an invite that adds nobody: every user named is already in.
 		slackError(w, "already_in_channel")
 		return
 	}
 	h.store.Channels.Set(req.Channel, ch)
 	for _, u := range added {
-		h.emitMemberJoined(ch, u, callerUserID(r))
+		h.emitMemberJoined(ch, u, caller)
 	}
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
