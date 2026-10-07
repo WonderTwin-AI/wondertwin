@@ -542,8 +542,13 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 		slackArgsError(w, err)
 		return
 	}
-	if _, ok := h.store.Channels.Get(req.Channel); !ok {
+	ch, ok := h.store.Channels.Get(req.Channel)
+	if !ok {
 		slackError(w, "channel_not_found")
+		return
+	}
+	if ch.IsArchived {
+		slackError(w, "is_archived")
 		return
 	}
 	if req.Text == "" {
@@ -552,17 +557,17 @@ func (h *Handler) ChatMeMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts := h.store.NextTS()
-	msg := store.Message{
+	msg := h.authored(r, store.Message{
 		Type:    "message",
 		Subtype: "me_message",
 		Channel: req.Channel,
-		User:    callerUserID(r),
 		Text:    req.Text,
 		TS:      ts,
 		Team:    h.store.Team.ID,
-	}
+	})
 	id := h.store.Messages.NextID()
 	h.store.Messages.Set(id, msg)
+	h.emitMessage(msg)
 
 	slackOK(w, map[string]any{
 		"channel": req.Channel,
