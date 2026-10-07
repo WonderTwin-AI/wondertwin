@@ -66,6 +66,9 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		Cursor             string `json:"cursor"`
 		Limit              int    `json:"limit"`
 		IncludeAllMetadata bool   `json:"include_all_metadata"`
+		Oldest             string `json:"oldest"`
+		Latest             string `json:"latest"`
+		Inclusive          bool   `json:"inclusive"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -75,18 +78,28 @@ func (h *Handler) ConversationsHistory(w http.ResponseWriter, r *http.Request) {
 		slackError(w, "channel_not_found")
 		return
 	}
+	window, code := newTimeWindow(req.Oldest, req.Latest, req.Inclusive)
+	if code != "" {
+		slackError(w, code)
+		return
+	}
 
-	messages, next, err := pageOf(h.store.GetChannelMessages(req.Channel, 0), func(m store.Message) string { return m.TS },
+	messages, next, err := pageOf(window.filter(h.store.GetChannelMessages(req.Channel, 0)), func(m store.Message) string { return m.TS },
 		pageConversationsHistory, req.Cursor, req.Limit)
 	if err != nil {
 		slackError(w, "invalid_cursor")
 		return
 	}
-	slackOK(w, map[string]any{
+	out := map[string]any{
 		"messages":          withMetadata(messages, req.IncludeAllMetadata),
 		"has_more":          next != "",
 		"response_metadata": map[string]any{"next_cursor": next},
-	})
+	}
+	// The docs' example echoes latest when the call gives it.
+	if req.Latest != "" {
+		out["latest"] = req.Latest
+	}
+	slackOK(w, out)
 }
 
 // ConversationsReplies handles POST /api/conversations.replies
@@ -97,6 +110,9 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 		Cursor             string `json:"cursor"`
 		Limit              int    `json:"limit"`
 		IncludeAllMetadata bool   `json:"include_all_metadata"`
+		Oldest             string `json:"oldest"`
+		Latest             string `json:"latest"`
+		Inclusive          bool   `json:"inclusive"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -114,7 +130,13 @@ func (h *Handler) ConversationsReplies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	replies, next, err := pageOf(h.store.GetThreadReplies(req.Channel, req.TS, 0), func(m store.Message) string { return m.TS },
+	window, code := newTimeWindow(req.Oldest, req.Latest, req.Inclusive)
+	if code != "" {
+		slackError(w, code)
+		return
+	}
+
+	replies, next, err := pageOf(window.filter(h.store.GetThreadReplies(req.Channel, req.TS, 0)), func(m store.Message) string { return m.TS },
 		pageConversationsReplies, req.Cursor, req.Limit)
 	if err != nil {
 		slackError(w, "invalid_cursor")
