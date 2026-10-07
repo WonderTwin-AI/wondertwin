@@ -403,7 +403,7 @@ func (h *Handler) ChatScheduleMessage(w http.ResponseWriter, r *http.Request) {
 		Text:        text,
 		PostAt:      req.PostAt,
 		DateCreated: now,
-		Token:       principal(r).Token,
+		Scheduler:   schedulerOf(principal(r)),
 		Message:     msg,
 		Hold:        metadata != nil,
 	})
@@ -478,6 +478,13 @@ func (h *Handler) ChatDeleteScheduledMessage(w http.ResponseWriter, r *http.Requ
 // pageScheduledMessages pages the scheduled list by message ID.
 var pageScheduledMessages = pageSpec{kind: "scheduled", def: 100, max: 1000}
 
+// schedulerOf names the principal a token speaks for: its type and user.
+// Unseeded tokens of one type share the default principal of that type
+// (divergences.json), so they share its scheduled messages too.
+func schedulerOf(t store.Token) string {
+	return t.Type + ":" + t.UserID
+}
+
 // ChatScheduledMessagesList handles POST /api/chat.scheduledMessages.list. It
 // lists the pending messages the calling token scheduled, in channel when
 // given, with post_at between oldest and latest.
@@ -505,9 +512,11 @@ func (h *Handler) ChatScheduledMessagesList(w http.ResponseWriter, r *http.Reque
 		slackError(w, "invalid_arguments")
 		return
 	}
-	token := principal(r).Token
+	caller := principal(r)
+	scheduler := schedulerOf(caller)
 	pending := h.store.ScheduledMessages.Filter(func(_ string, sm store.ScheduledMessage) bool {
-		return sm.Token == token &&
+		mine := sm.Scheduler == scheduler || (sm.Scheduler == "" && sm.Token == caller.Token)
+		return mine &&
 			(req.Channel == "" || sm.Channel == req.Channel) &&
 			(oldest == 0 || sm.PostAt >= oldest) &&
 			(latest == 0 || sm.PostAt <= latest)

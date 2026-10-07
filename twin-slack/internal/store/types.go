@@ -211,8 +211,12 @@ type ScheduledMessage struct {
 	DateCreated int64  `json:"date_created"`
 	Text        string `json:"text"`
 
-	// Token is the token that scheduled the message: chat.scheduledMessages.list
-	// shows a token only the messages it scheduled.
+	// Scheduler is the principal that scheduled the message, its token type
+	// and user: chat.scheduledMessages.list shows a caller only the messages
+	// it scheduled. Any token for the same principal sees them.
+	Scheduler string `json:"scheduler,omitempty"`
+	// Token is the token that scheduled the message, kept so a snapshot taken
+	// before Scheduler existed still loads.
 	Token   string  `json:"token,omitempty"`
 	Message Message `json:"message"`
 	// Hold is set when the message will never post: Slack does not post a
