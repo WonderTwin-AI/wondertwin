@@ -94,7 +94,9 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 	files := make([]store.File, len(req.Files))
 	for i, f := range req.Files {
 		file, ok := h.store.Files.Get(f.ID)
-		if !ok {
+		// A file whose bytes never reached the upload URL cannot be completed.
+		// The code is a guess from the documented list (see divergences.json).
+		if !ok || (file.Content == nil && file.URLPrivate == "") {
 			slackError(w, "file_not_found")
 			return
 		}
@@ -153,6 +155,8 @@ func (h *Handler) FilesList(w http.ResponseWriter, r *http.Request) {
 		Types   string `json:"types"`
 		TSFrom  string `json:"ts_from"`
 		TSTo    string `json:"ts_to"`
+		Count   int    `json:"count"`
+		Page    int    `json:"page"`
 	}
 	if err := parseJSON(r, &req); err != nil {
 		slackArgsError(w, err)
@@ -176,7 +180,10 @@ func (h *Handler) FilesList(w http.ResponseWriter, r *http.Request) {
 
 	files := h.store.Files.Filter(func(_ string, f store.File) bool {
 		switch {
-		case req.Channel != "" && !slices.Contains(f.Channels, req.Channel),
+		// A file whose upload was never completed is not listed: only
+		// files.completeUploadExternal gives a file its private URL.
+		case f.URLPrivate == "",
+			req.Channel != "" && !slices.Contains(f.Channels, req.Channel),
 			req.User != "" && f.User != req.User,
 			!match(f),
 			from > 0 && f.Created < from,
@@ -185,16 +192,30 @@ func (h *Handler) FilesList(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	})
-	if files == nil {
-		files = []store.File{}
+	// Pages of count files, default 100, numbered from 1 (the files.list
+	// docs); paging.count is the page size, as the docs' example shows.
+	count, page := req.Count, req.Page
+	if count <= 0 {
+		count = 100
 	}
+	if page <= 0 {
+		page = 1
+	}
+	total := len(files)
+	pages := (total + count - 1) / count
+	if pages == 0 {
+		pages = 1
+	}
+	start := min((page-1)*count, total)
+	end := min(start+count, total)
+	pageFiles := append([]store.File{}, files[start:end]...)
 	slackOK(w, map[string]any{
-		"files": files,
+		"files": pageFiles,
 		"paging": map[string]any{
-			"count": len(files),
-			"total": len(files),
-			"page":  1,
-			"pages": 1,
+			"count": count,
+			"total": total,
+			"page":  page,
+			"pages": pages,
 		},
 	})
 }

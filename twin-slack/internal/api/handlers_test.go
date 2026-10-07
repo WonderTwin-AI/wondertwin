@@ -517,7 +517,10 @@ func TestFilesUploadFlow(t *testing.T) {
 	m := resp.JSONMap()
 	fileID := m["file_id"].(string)
 	if m["upload_url"] == nil {
-		t.Error("expected upload_url")
+		t.Fatal("expected upload_url")
+	}
+	if status := postBytes(t, m["upload_url"].(string), "", make([]byte, 1024)); status != 200 {
+		t.Fatalf("upload: HTTP %d", status)
 	}
 
 	// Complete upload
