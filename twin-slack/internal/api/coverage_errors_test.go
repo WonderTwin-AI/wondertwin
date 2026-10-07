@@ -19,9 +19,9 @@ func TestUsersMethodErrors(t *testing.T) {
 	wantErrors(t, srv, "users.profile.get", map[string]errCase{
 		"unknown user": {url.Values{"user": {"U-nope"}}, "user_not_found"},
 	})
-	wantErrors(t, srv, "users.profile.set", map[string]errCase{
-		"unknown user": {url.Values{"user": {"U-nope"}, "name": {"status_text"}, "value": {"x"}}, "user_not_found"},
-	})
+	if m := formAs(t, srv, "xoxp-errors", "users.profile.set", url.Values{"user": {"U-nope"}, "name": {"status_text"}, "value": {"x"}}); m["error"] != "user_not_found" {
+		t.Errorf("users.profile.set unknown user: %v", m)
+	}
 	wantErrors(t, srv, "users.list", map[string]errCase{
 		"bad cursor": {url.Values{"cursor": {"not-a-cursor"}}, "invalid_cursor"},
 	})
