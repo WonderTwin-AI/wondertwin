@@ -1,9 +1,9 @@
 {
   "twin": "slack",
   "sdk_target": {
-    "package": "github.com/slack-go/slack",
-    "language": "go",
-    "version": "latest"
+    "package": "@slack/web-api",
+    "language": "typescript",
+    "version": "8.1.1"
   },
   "build": 21,
   "generated_at": "2026-10-06T00:00:00Z",
