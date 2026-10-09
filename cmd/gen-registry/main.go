@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -198,8 +199,12 @@ func readManifestFrom(twin, manifestFile string) (*TwinManifest, error) {
 	return &m, nil
 }
 
+// platforms are the release targets; every other file in the checksums
+// file (the SBOM, for one) is a release asset but not an installable binary.
+var platforms = []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
+
 // parseChecksums reads a checksums file in `<sha256hex>  <filename>` format.
-// It extracts the platform from filenames matching twin-{name}-{os}-{arch}.
+// It keeps only filenames twin-{name}-{os}-{arch} for a known platform.
 func parseChecksums(path, twin string) (map[string]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -232,6 +237,9 @@ func parseChecksums(path, twin string) (map[string]string, error) {
 			continue
 		}
 		platform := strings.TrimPrefix(filename, prefix)
+		if !slices.Contains(platforms, platform) {
+			continue
+		}
 		checksums[platform] = fmt.Sprintf("sha256:%s", hex)
 	}
 	if err := scanner.Err(); err != nil {
@@ -274,7 +282,6 @@ func versionTier(tier string) string {
 }
 
 func buildVersion(twin, version, repo, tier string, manifest *TwinManifest, checksums map[string]string, lc lifecycleInputs) Version {
-	platforms := []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
 	binaryURLs := make(map[string]string, len(platforms))
 	for _, p := range platforms {
 		binaryURLs[p] = fmt.Sprintf(

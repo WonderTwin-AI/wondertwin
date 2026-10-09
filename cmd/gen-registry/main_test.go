@@ -338,6 +338,29 @@ func TestChecksumParsing(t *testing.T) {
 	}
 }
 
+func TestChecksumParsingSkipsNonPlatformAssets(t *testing.T) {
+	dir := t.TempDir()
+	// release-twin.yml appends the SBOM's checksum to the same file.
+	content := `abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890  twin-slack-linux-arm64
+1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef  twin-slack-0.1.0.cdx.json
+`
+	path := filepath.Join(dir, "checksums.txt")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	checksums, err := parseChecksums(path, "slack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(checksums) != 1 {
+		t.Fatalf("got %v, want only linux-arm64", checksums)
+	}
+	if _, ok := checksums["linux-arm64"]; !ok {
+		t.Errorf("linux-arm64 missing from %v", checksums)
+	}
+}
+
 func TestOutputMatchesSchema(t *testing.T) {
 	dir := setupManifest(t)
 	orig, _ := os.Getwd()
