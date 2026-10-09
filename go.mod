@@ -1,6 +1,6 @@
 module github.com/wondertwin-ai/wondertwin
 
-go 1.26.6
+go 1.26.9
 
 require (
 	github.com/go-chi/chi/v5 v5.3.2
