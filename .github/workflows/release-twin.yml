@@ -1,14 +1,16 @@
 name: Release Twin
 
+# A release has no hand-typed version. Its id is derived from the four
+# platform binaries it publishes (internal/releaseid): the first 12 hex
+# characters of the SHA-256 over their checksum lines. The release is named
+# localstack/app-emulator@{name}-{id}, and its tag is twin-{name}-v{id}
+# because LocalStack's plugin builds that tag from the pinned version.
+
 on:
   workflow_dispatch:
     inputs:
       twin:
         description: "Twin name (e.g., stripe)"
-        required: true
-        type: string
-      version:
-        description: "Version string without v prefix (e.g., 0.1.0)"
         required: true
         type: string
       dry_run:
@@ -54,49 +56,9 @@ jobs:
           rm -f "${RUNNER_TEMP}/syft-install.sh"
           syft version
 
-      - name: Check the tag and release do not already exist
-        working-directory: wondertwin
-        env:
-          GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
-          TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
-          DRY_RUN: ${{ inputs.dry_run }}
-        run: |
-          # A published version is immutable. Fail here with a readable
-          # message rather than letting the tag push reject opaquely, or
-          # worse, letting a force push rewrite what customers resolved.
-          TAG="twin-${TWIN}-v${VERSION}"
-          FOUND=""
-          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
-            FOUND="tag ${TAG}"
-          fi
-          if gh release view "$TAG" --repo wondertwin-ai/registry >/dev/null 2>&1; then
-            FOUND="${FOUND:+${FOUND} and }release ${TAG}"
-          fi
-          if [ -n "$FOUND" ]; then
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "::warning::${FOUND} already published; a real run would stop here."
-            else
-              echo "::error::${FOUND} already published. Bump the version."
-              exit 1
-            fi
-          else
-            echo "${TAG} is unpublished; proceeding."
-          fi
-
-      - name: Create and push twin tag
-        if: ${{ !inputs.dry_run }}
-        working-directory: wondertwin
-        env:
-          TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          TAG="twin-${TWIN}-v${VERSION}"
-          git tag "$TAG"
-          git push origin "$TAG"
-
+      # The id comes from the binaries, so building comes first. Nothing is
+      # tagged or published until the build and the OSV scan have passed, so
+      # a failed run leaves no orphan tag behind.
       - name: Build binaries
         working-directory: wondertwin
         env:
@@ -114,30 +76,111 @@ jobs:
           done
           cd dist && shasum -a 256 twin-${TWIN}-* > checksums.txt
 
+      - name: Compute release id
+        id: release_id
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: |
+          go run ./cmd/release-id --twin "$TWIN" --checksums-file dist/checksums.txt \
+            | tee -a "$GITHUB_OUTPUT"
+
+      - name: Summarize the release id
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          ID: ${{ steps.release_id.outputs.id }}
+          DIGEST: ${{ steps.release_id.outputs.digest }}
+          COORDINATE: ${{ steps.release_id.outputs.coordinate }}
+        run: |
+          {
+            echo "### ${COORDINATE}"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Release id | \`${ID}\` |"
+            echo "| Release digest | \`${DIGEST}\` |"
+            echo "| Tag | \`twin-${TWIN}-v${ID}\` |"
+            echo "| Source commit | \`$(git rev-parse HEAD)\` |"
+            echo
+            echo "Recompute from the release's checksums.txt:"
+            echo
+            echo '```'
+            echo "grep -E '  twin-${TWIN}-(darwin|linux)-(amd64|arm64)\$' checksums.txt | LC_ALL=C sort -k2 | shasum -a 256 | cut -c1-12"
+            echo '```'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the tag and release do not already exist
+        working-directory: wondertwin
+        env:
+          GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
+          TWIN: ${{ inputs.twin }}
+          ID: ${{ steps.release_id.outputs.id }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # The id is derived from the binaries, so an existing tag means
+          # this exact build is already published. A published release is
+          # immutable: fail with a readable message rather than letting the
+          # tag push reject opaquely.
+          TAG="twin-${TWIN}-v${ID}"
+          FOUND=""
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}")" ]; then
+            FOUND="tag ${TAG}"
+          fi
+          if gh release view "$TAG" --repo wondertwin-ai/registry >/dev/null 2>&1; then
+            FOUND="${FOUND:+${FOUND} and }release ${TAG}"
+          fi
+          if [ -n "$FOUND" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::${FOUND} already published; this build is already released and a real run would stop here."
+            else
+              echo "::error::${FOUND} already published; this build is already released."
+              exit 1
+            fi
+          else
+            echo "${TAG} is unpublished; proceeding."
+          fi
+
       - name: Generate SBOM
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
         run: |
           # Single canonical SBOM from linux-amd64. See
           # wondertwin-docs/security/policy/maintenance.md for SBOM policy.
-          SBOM="dist/twin-${TWIN}-${VERSION}.cdx.json"
+          # Its name carries the id, so it is appended to checksums.txt
+          # after the id is computed; the id never covers it.
+          SBOM="dist/twin-${TWIN}-${ID}.cdx.json"
           syft "dist/twin-${TWIN}-linux-amd64" \
             -o cyclonedx-json="$SBOM" --quiet
-          cd dist && shasum -a 256 "twin-${TWIN}-${VERSION}.cdx.json" >> checksums.txt
+          cd dist && shasum -a 256 "twin-${TWIN}-${ID}.cdx.json" >> checksums.txt
           echo "SBOM generated: $SBOM"
 
       - name: Verify SBOM is OSV-clean
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
         run: |
           # Final release gate: a release with known stdlib/dep CVEs in
           # its SBOM fails here, forcing an explicit fix-or-allowlist.
           go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
-          osv-scanner --sbom="dist/twin-${TWIN}-${VERSION}.cdx.json"
+          osv-scanner --sbom="dist/twin-${TWIN}-${ID}.cdx.json"
+
+      - name: Create and push twin tag
+        if: ${{ !inputs.dry_run }}
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          ID: ${{ steps.release_id.outputs.id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="twin-${TWIN}-v${ID}"
+          git tag "$TAG"
+          git push origin "$TAG"
 
       - name: Create release
         if: ${{ !inputs.dry_run }}
@@ -145,16 +188,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.WONDERTWIN_REGISTRY }}
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
+          DIGEST: ${{ steps.release_id.outputs.digest }}
+          COORDINATE: ${{ steps.release_id.outputs.coordinate }}
         run: |
-          # The SBOM (twin-<name>-<version>.cdx.json) is already matched
-          # by the dist/twin-${TWIN}-* glob; do not list it explicitly or
-          # gh will try to upload it twice and 422 on the second attempt.
-          gh release create "twin-${TWIN}-v${VERSION}" \
+          # The SBOM (twin-<name>-<id>.cdx.json) is already matched by the
+          # dist/twin-${TWIN}-* glob; do not list it explicitly or gh will
+          # try to upload it twice and 422 on the second attempt.
+          {
+            echo "${COORDINATE}"
+            echo
+            echo "- Release id: \`${ID}\`"
+            echo "- Release digest: \`${DIGEST}\`"
+            echo "- Source commit: \`$(git rev-parse HEAD)\`"
+            echo "- SBOM: \`twin-${TWIN}-${ID}.cdx.json\` (CycloneDX JSON)"
+            echo
+            echo "The id is the first 12 hex characters of the SHA-256 over the four platform binaries' checksum lines. Recompute it from checksums.txt:"
+            echo
+            echo '```'
+            echo "grep -E '  twin-${TWIN}-(darwin|linux)-(amd64|arm64)\$' checksums.txt | LC_ALL=C sort -k2 | shasum -a 256 | cut -c1-12"
+            echo '```'
+          } > "${RUNNER_TEMP}/release-notes.md"
+          gh release create "twin-${TWIN}-v${ID}" \
             dist/twin-${TWIN}-* dist/checksums.txt \
             --repo wondertwin-ai/registry \
-            --title "twin-${TWIN} v${VERSION}" \
-            --notes "Twin release for ${TWIN} v${VERSION}. SBOM: twin-${TWIN}-${VERSION}.cdx.json (CycloneDX JSON)."
+            --title "twin-${TWIN} ${ID}" \
+            --notes-file "${RUNNER_TEMP}/release-notes.md"
 
       - name: Checkout registry
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -167,12 +226,12 @@ jobs:
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
           REGISTRY_FILE: ${{ github.workspace }}/registry/registry.json
         run: |
           go run ./cmd/gen-registry \
             --twin "$TWIN" \
-            --version "$VERSION" \
+            --version "$ID" \
             --checksums-file dist/checksums.txt \
             --registry-file "$REGISTRY_FILE"
 
@@ -197,7 +256,7 @@ jobs:
         working-directory: registry
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -205,7 +264,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "registry.json unchanged, skipping commit"
           else
-            git commit -m "Update registry: twin-${TWIN} v${VERSION}"
+            git commit -m "Update registry: twin-${TWIN} ${ID}"
             git push
           fi
 
@@ -226,8 +285,8 @@ jobs:
         working-directory: wondertwin
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
-        run: ./wt-test install "${TWIN}@${VERSION}"
+          ID: ${{ steps.release_id.outputs.id }}
+        run: ./wt-test install "${TWIN}@${ID}"
 
       - name: Run conformance on installed twin
         if: ${{ !inputs.dry_run }}
@@ -246,7 +305,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           TWIN: ${{ inputs.twin }}
-          VERSION: ${{ inputs.version }}
+          ID: ${{ steps.release_id.outputs.id }}
           DOCS_TOKEN: ${{ secrets.WONDERTWIN_DOCS_TOKEN }}
         run: |
           if [ -z "$DOCS_TOKEN" ]; then
@@ -258,9 +317,9 @@ jobs:
             docs-mirror
           cd docs-mirror
           mkdir -p "security/sboms/twin-${TWIN}"
-          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${VERSION}.cdx.json" \
-             "security/sboms/twin-${TWIN}/${VERSION}.cdx.json"
-          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${VERSION}.cdx.json" \
+          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${ID}.cdx.json" \
+             "security/sboms/twin-${TWIN}/${ID}.cdx.json"
+          cp "${{ github.workspace }}/wondertwin/dist/twin-${TWIN}-${ID}.cdx.json" \
              "security/sboms/twin-${TWIN}/latest.cdx.json"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -268,6 +327,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "no SBOM changes, skipping commit"
           else
-            git commit -m "sbom: twin-${TWIN} v${VERSION} (community)"
+            git commit -m "sbom: twin-${TWIN} ${ID} (community)"
             git push
           fi
