@@ -2,10 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/internal/releaseid"
 )
 
 // setupManifest creates a twin-manifest.json in a temp twin directory and
@@ -36,18 +40,51 @@ func setupManifest(t *testing.T) string {
 	return dir
 }
 
-func writeChecksums(t *testing.T, dir string) string {
+// Community releases are keyed by the release id their checksums give,
+// so each fixture release is a set of checksums plus the id it yields.
+// fill is repeated to make every platform's sha256 hex.
+var (
+	stripeID  = fixtureID("stripe", "a")
+	stripeID2 = fixtureID("stripe", "b")
+	twilioID  = fixtureID("twilio", "c")
+)
+
+func fixtureChecksums(fill string) map[string]string {
+	checksums := make(map[string]string, len(releaseid.Platforms))
+	for _, p := range releaseid.Platforms {
+		checksums[p] = strings.Repeat(fill, 64)
+	}
+	return checksums
+}
+
+func fixtureID(twin, fill string) string {
+	digest, err := releaseid.Digest(twin, fixtureChecksums(fill))
+	if err != nil {
+		panic(err)
+	}
+	return releaseid.ID(digest)
+}
+
+func writeFixtureChecksums(t *testing.T, path, twin, fill string) string {
 	t.Helper()
-	content := `abc123def456  twin-stripe-darwin-amd64
-789ghi012jkl  twin-stripe-darwin-arm64
-mno345pqr678  twin-stripe-linux-amd64
-stu901vwx234  twin-stripe-linux-arm64
-`
-	path := filepath.Join(dir, "checksums.txt")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	var content strings.Builder
+	for _, p := range releaseid.Platforms {
+		fmt.Fprintf(&content, "%s  twin-%s-%s\n", strings.Repeat(fill, 64), twin, p)
+	}
+	if err := os.WriteFile(path, []byte(content.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// writeChecksums writes the stripe release keyed stripeID.
+func writeChecksums(t *testing.T, dir string) string {
+	return writeFixtureChecksums(t, filepath.Join(dir, "checksums.txt"), "stripe", "a")
+}
+
+// writeSecondChecksums writes a second stripe release, keyed stripeID2.
+func writeSecondChecksums(t *testing.T, dir string) string {
+	return writeFixtureChecksums(t, filepath.Join(dir, "checksums-2.txt"), "stripe", "b")
 }
 
 func writeEmptyRegistry(t *testing.T, dir string) string {
@@ -78,7 +115,7 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 
 	err := run([]string{
 		"--twin", "stripe",
-		"--version", "0.1.0",
+		"--version", stripeID,
 		"--checksums-file", checksumsPath,
 		"--registry-file", registryPath,
 	})
@@ -99,8 +136,8 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 	if !ok {
 		t.Fatal("missing twin 'stripe'")
 	}
-	if entry.Latest != "0.1.0" {
-		t.Errorf("latest = %q, want %q", entry.Latest, "0.1.0")
+	if entry.Latest != stripeID {
+		t.Errorf("latest = %q, want %q", entry.Latest, stripeID)
 	}
 	if entry.Description != "Stripe twin for testing" {
 		t.Errorf("description = %q", entry.Description)
@@ -112,7 +149,7 @@ func TestCreateRegistryFromScratch(t *testing.T) {
 		t.Errorf("author = %q", entry.Author)
 	}
 
-	ver, ok := entry.Versions["0.1.0"]
+	ver, ok := entry.Versions[stripeID]
 	if !ok {
 		t.Fatal("missing version 0.1.0")
 	}
@@ -150,7 +187,7 @@ func TestAddSecondVersion(t *testing.T) {
 
 	// First version
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -158,8 +195,8 @@ func TestAddSecondVersion(t *testing.T) {
 
 	// Second version
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.2.0",
-		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--twin", "stripe", "--version", stripeID2,
+		"--checksums-file", writeSecondChecksums(t, dir), "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -169,16 +206,16 @@ func TestAddSecondVersion(t *testing.T) {
 	json.Unmarshal(data, &reg)
 
 	entry := reg.Twins["stripe"]
-	if entry.Latest != "0.2.0" {
-		t.Errorf("latest = %q, want %q", entry.Latest, "0.2.0")
+	if entry.Latest != stripeID2 {
+		t.Errorf("latest = %q, want %q", entry.Latest, stripeID2)
 	}
 	if len(entry.Versions) != 2 {
 		t.Errorf("versions count = %d, want 2", len(entry.Versions))
 	}
-	if _, ok := entry.Versions["0.1.0"]; !ok {
+	if _, ok := entry.Versions[stripeID]; !ok {
 		t.Error("version 0.1.0 was removed")
 	}
-	if _, ok := entry.Versions["0.2.0"]; !ok {
+	if _, ok := entry.Versions[stripeID2]; !ok {
 		t.Error("version 0.2.0 not added")
 	}
 }
@@ -200,7 +237,7 @@ func TestSecondVersionRefreshesDescriptionAndCategory(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -226,8 +263,8 @@ func TestSecondVersionRefreshesDescriptionAndCategory(t *testing.T) {
 	}
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.2.0",
-		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--twin", "stripe", "--version", stripeID2,
+		"--checksums-file", writeSecondChecksums(t, dir), "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -263,13 +300,7 @@ func TestAddSecondTwin(t *testing.T) {
 	os.WriteFile(filepath.Join(twilioDir, "twin-manifest.json"), []byte(twilioManifest), 0o644)
 
 	// Twilio checksums
-	twilioChecksums := `aaa111  twin-twilio-darwin-amd64
-bbb222  twin-twilio-darwin-arm64
-ccc333  twin-twilio-linux-amd64
-ddd444  twin-twilio-linux-arm64
-`
-	twilioChecksumsPath := filepath.Join(dir, "twilio-checksums.txt")
-	os.WriteFile(twilioChecksumsPath, []byte(twilioChecksums), 0o644)
+	twilioChecksumsPath := writeFixtureChecksums(t, filepath.Join(dir, "twilio-checksums.txt"), "twilio", "c")
 
 	orig, _ := os.Getwd()
 	os.Chdir(dir)
@@ -283,13 +314,13 @@ ddd444  twin-twilio-linux-arm64
 
 	// Add stripe
 	run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	})
 
 	// Add twilio
 	if err := run([]string{
-		"--twin", "twilio", "--version", "0.1.0",
+		"--twin", "twilio", "--version", twilioID,
 		"--checksums-file", twilioChecksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -374,7 +405,7 @@ func TestOutputMatchesSchema(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	})
 
@@ -400,7 +431,7 @@ func TestOutputMatchesSchema(t *testing.T) {
 	}
 
 	versions := stripe["versions"].(map[string]interface{})
-	v010 := versions["0.1.0"].(map[string]interface{})
+	v010 := versions[stripeID].(map[string]interface{})
 
 	for _, key := range []string{"released", "sdk_package", "sdk_version", "tier", "checksums", "binary_urls"} {
 		if _, ok := v010[key]; !ok {
@@ -410,7 +441,7 @@ func TestOutputMatchesSchema(t *testing.T) {
 
 	// Verify binary URL format
 	binaryURLs := v010["binary_urls"].(map[string]interface{})
-	expectedURL := "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v0.1.0/twin-stripe-darwin-arm64"
+	expectedURL := "https://github.com/wondertwin-ai/registry/releases/download/twin-stripe-v" + stripeID + "/twin-stripe-darwin-arm64"
 	if binaryURLs["darwin-arm64"] != expectedURL {
 		t.Errorf("binary_url = %q, want %q", binaryURLs["darwin-arm64"], expectedURL)
 	}
@@ -439,7 +470,7 @@ func TestPrereleaseDoesNotUpdateLatest(t *testing.T) {
 
 	// First stable release
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -447,8 +478,8 @@ func TestPrereleaseDoesNotUpdateLatest(t *testing.T) {
 
 	// Prerelease
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.2.0-beta.1",
-		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--twin", "stripe", "--version", stripeID2,
+		"--checksums-file", writeSecondChecksums(t, dir), "--registry-file", registryPath,
 		"--prerelease",
 	}); err != nil {
 		t.Fatal(err)
@@ -459,10 +490,10 @@ func TestPrereleaseDoesNotUpdateLatest(t *testing.T) {
 	json.Unmarshal(data, &reg)
 
 	entry := reg.Twins["stripe"]
-	if entry.Latest != "0.1.0" {
-		t.Errorf("latest = %q, want %q (should not update for prerelease)", entry.Latest, "0.1.0")
+	if entry.Latest != stripeID {
+		t.Errorf("latest = %q, want %q (should not update for prerelease)", entry.Latest, stripeID)
 	}
-	if _, ok := entry.Versions["0.2.0-beta.1"]; !ok {
+	if _, ok := entry.Versions[stripeID2]; !ok {
 		t.Error("prerelease version 0.2.0-beta.1 not added")
 	}
 	if len(entry.Versions) != 2 {
@@ -484,7 +515,7 @@ func TestPrereleaseWithoutFlag(t *testing.T) {
 
 	// First version
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -492,8 +523,8 @@ func TestPrereleaseWithoutFlag(t *testing.T) {
 
 	// Second version without --prerelease
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.2.0",
-		"--checksums-file", checksumsPath, "--registry-file", registryPath,
+		"--twin", "stripe", "--version", stripeID2,
+		"--checksums-file", writeSecondChecksums(t, dir), "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -502,8 +533,8 @@ func TestPrereleaseWithoutFlag(t *testing.T) {
 	var reg Registry
 	json.Unmarshal(data, &reg)
 
-	if reg.Twins["stripe"].Latest != "0.2.0" {
-		t.Errorf("latest = %q, want %q", reg.Twins["stripe"].Latest, "0.2.0")
+	if reg.Twins["stripe"].Latest != stripeID2 {
+		t.Errorf("latest = %q, want %q", reg.Twins["stripe"].Latest, stripeID2)
 	}
 }
 
@@ -521,7 +552,7 @@ func TestPrereleaseFirstReleaseSetsLatest(t *testing.T) {
 
 	// First release is a prerelease on an empty twin
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0-alpha.1",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--prerelease",
 	}); err != nil {
@@ -533,9 +564,9 @@ func TestPrereleaseFirstReleaseSetsLatest(t *testing.T) {
 	json.Unmarshal(data, &reg)
 
 	// Should still set latest since there's no previous latest
-	if reg.Twins["stripe"].Latest != "0.1.0-alpha.1" {
+	if reg.Twins["stripe"].Latest != stripeID {
 		t.Errorf("latest = %q, want %q (first release should set latest even with --prerelease)",
-			reg.Twins["stripe"].Latest, "0.1.0-alpha.1")
+			reg.Twins["stripe"].Latest, stripeID)
 	}
 }
 
@@ -579,7 +610,7 @@ func TestAPIVersionIncludedInRegistry(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -589,7 +620,7 @@ func TestAPIVersionIncludedInRegistry(t *testing.T) {
 	var reg Registry
 	json.Unmarshal(data, &reg)
 
-	ver := reg.Twins["stripe"].Versions["0.1.0"]
+	ver := reg.Twins["stripe"].Versions[stripeID]
 	if ver.APIVersion != "2024-12-18" {
 		t.Errorf("api_version = %q, want %q", ver.APIVersion, "2024-12-18")
 	}
@@ -609,7 +640,7 @@ func TestAPIVersionOmittedWhenAbsent(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -623,7 +654,7 @@ func TestAPIVersionOmittedWhenAbsent(t *testing.T) {
 	twins := raw["twins"].(map[string]interface{})
 	stripe := twins["stripe"].(map[string]interface{})
 	versions := stripe["versions"].(map[string]interface{})
-	v010 := versions["0.1.0"].(map[string]interface{})
+	v010 := versions[stripeID].(map[string]interface{})
 
 	if _, ok := v010["api_version"]; ok {
 		t.Error("api_version should be omitted when not present in manifest")
@@ -717,6 +748,9 @@ func TestCommercialTier(t *testing.T) {
 	if ver.Tier != "commercial" {
 		t.Errorf("version tier = %q, want %q", ver.Tier, "commercial")
 	}
+	if ver.ReleaseDigest != "" {
+		t.Errorf("release_digest = %q, want none on the commercial path", ver.ReleaseDigest)
+	}
 }
 
 // TestCommunityTierPublishesFreeVersionTier is the regression guard for the
@@ -739,7 +773,7 @@ func TestCommunityTierPublishesFreeVersionTier(t *testing.T) {
 
 	err := run([]string{
 		"--twin", "stripe",
-		"--version", "0.2.0",
+		"--version", stripeID,
 		"--checksums-file", checksumsPath,
 		"--registry-file", registryPath,
 		"--tier", "community",
@@ -762,7 +796,7 @@ func TestCommunityTierPublishesFreeVersionTier(t *testing.T) {
 		t.Errorf("download_auth = %q, want empty for community", entry.DownloadAuth)
 	}
 
-	ver := entry.Versions["0.2.0"]
+	ver := entry.Versions[stripeID]
 	if ver.Tier != "free" {
 		t.Errorf("version tier = %q, want %q (community must not be license-gated)", ver.Tier, "free")
 	}
@@ -779,7 +813,7 @@ func TestInvalidTierRejected(t *testing.T) {
 
 	err := run([]string{
 		"--twin", "stripe",
-		"--version", "0.1.0",
+		"--version", stripeID,
 		"--checksums-file", checksumsPath,
 		"--registry-file", registryPath,
 		"--tier", "pro",

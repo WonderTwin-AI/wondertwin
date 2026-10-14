@@ -80,7 +80,7 @@ func TestRejectsInvalidReleaseType(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--release-type", "experimental",
 	})
@@ -99,7 +99,7 @@ func TestRejectsInvalidDate(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--maintenance-until", "next-tuesday",
 	})
@@ -118,7 +118,7 @@ func TestRejectsBSLOnFreeTier(t *testing.T) {
 	registryPath := writeEmptyRegistry(t, dir)
 
 	err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--tier", "community",
 		"--bsl-expiry-date", "2030-01-01",
@@ -155,7 +155,7 @@ func TestManifestLifecycleSeedsEmittedVersion(t *testing.T) {
 	defer func() { nowFunc = time.Now }()
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 	}); err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestManifestLifecycleSeedsEmittedVersion(t *testing.T) {
 	data, _ := os.ReadFile(registryPath)
 	var reg Registry
 	json.Unmarshal(data, &reg)
-	v := reg.Twins["stripe"].Versions["0.1.0"]
+	v := reg.Twins["stripe"].Versions[stripeID]
 	if v.ReleaseType != "rc" {
 		t.Errorf("manifest release_type not seeded; got %q", v.ReleaseType)
 	}
@@ -196,7 +196,7 @@ func TestFlagOverridesManifestLifecycle(t *testing.T) {
 	defer func() { nowFunc = time.Now }()
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--release-type", "stable",
 	}); err != nil {
@@ -206,7 +206,7 @@ func TestFlagOverridesManifestLifecycle(t *testing.T) {
 	data, _ := os.ReadFile(registryPath)
 	var reg Registry
 	json.Unmarshal(data, &reg)
-	v := reg.Twins["stripe"].Versions["0.1.0"]
+	v := reg.Twins["stripe"].Versions[stripeID]
 	if v.ReleaseType != "stable" {
 		t.Errorf("flag override failed; got %q", v.ReleaseType)
 	}
@@ -227,7 +227,7 @@ func TestChangelogFromFile(t *testing.T) {
 	defer func() { nowFunc = time.Now }()
 
 	if err := run([]string{
-		"--twin", "stripe", "--version", "0.1.0",
+		"--twin", "stripe", "--version", stripeID,
 		"--checksums-file", checksumsPath, "--registry-file", registryPath,
 		"--changelog", "@" + changelogPath,
 	}); err != nil {
@@ -237,7 +237,7 @@ func TestChangelogFromFile(t *testing.T) {
 	data, _ := os.ReadFile(registryPath)
 	var reg Registry
 	json.Unmarshal(data, &reg)
-	v := reg.Twins["stripe"].Versions["0.1.0"]
+	v := reg.Twins["stripe"].Versions[stripeID]
 	if !strings.Contains(v.Changelog, "First release") {
 		t.Errorf("changelog file not loaded; got %q", v.Changelog)
 	}
