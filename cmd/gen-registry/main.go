@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/registry"
+	"github.com/wondertwin-ai/wondertwin/internal/releaseid"
 )
 
 // Registry mirrors internal/registry.Registry for JSON serialisation.
@@ -51,6 +52,11 @@ type Version struct {
 	BSLExpiryDate     string            `json:"bsl_expiry_date,omitempty"`
 	Changelog         string            `json:"changelog,omitempty"`
 	BreakingChanges   []string          `json:"breaking_changes,omitempty"`
+	// ReleaseDigest is the digest a community release's id is derived
+	// from (internal/releaseid). It must stay on this mirror: the whole
+	// registry is rewritten through it, so a field missing here is
+	// stripped from every entry on the next release.
+	ReleaseDigest string `json:"release_digest,omitempty"`
 }
 
 // stringSliceFlag accumulates repeated --breaking-change values.
@@ -109,7 +115,7 @@ func main() {
 func run(args []string) error {
 	fs := flag.NewFlagSet("gen-registry", flag.ContinueOnError)
 	twin := fs.String("twin", "", "twin name (e.g. stripe)")
-	version := fs.String("version", "", "version string (e.g. 0.1.0)")
+	version := fs.String("version", "", "release id for a community release (see internal/releaseid); a version string for a commercial one")
 	checksumsFile := fs.String("checksums-file", "", "path to checksums file")
 	registryFile := fs.String("registry-file", "", "path to registry.json")
 	repo := fs.String("repo", "wondertwin-ai/registry", "GitHub repo for download URLs")
@@ -149,6 +155,21 @@ func run(args []string) error {
 		return fmt.Errorf("parsing checksums: %w", err)
 	}
 
+	// A community release is keyed by the id its binaries give, so the
+	// tag the workflow pushed and the registry key cannot disagree. The
+	// commercial path keeps semver until it moves onto LocalStack's
+	// licensing.
+	var releaseDigest string
+	if *tier == "community" {
+		releaseDigest, err = releaseid.Digest(*twin, checksums)
+		if err != nil {
+			return fmt.Errorf("computing release id: %w", err)
+		}
+		if id := releaseid.ID(releaseDigest); *version != id {
+			return fmt.Errorf("--version %q is not the release id %q computed from --checksums-file", *version, id)
+		}
+	}
+
 	// 3. Load existing registry
 	reg, err := loadRegistry(*registryFile)
 	if err != nil {
@@ -170,6 +191,7 @@ func run(args []string) error {
 
 	// 5. Build version entry
 	ver := buildVersion(*twin, *version, *repo, *tier, manifest, checksums, lc)
+	ver.ReleaseDigest = releaseDigest
 
 	// 6. Upsert into registry
 	upsert(reg, *twin, *version, *tier, manifest, ver, *prerelease)
@@ -179,7 +201,7 @@ func run(args []string) error {
 		return fmt.Errorf("writing registry: %w", err)
 	}
 
-	fmt.Printf("Updated registry: %s v%s (%d platforms)\n", *twin, *version, len(checksums))
+	fmt.Printf("Updated registry: %s %s (%d platforms)\n", *twin, *version, len(checksums))
 	return nil
 }
 
@@ -201,7 +223,7 @@ func readManifestFrom(twin, manifestFile string) (*TwinManifest, error) {
 
 // platforms are the release targets; every other file in the checksums
 // file (the SBOM, for one) is a release asset but not an installable binary.
-var platforms = []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64"}
+var platforms = releaseid.Platforms
 
 // parseChecksums reads a checksums file in `<sha256hex>  <filename>` format.
 // It keeps only filenames twin-{name}-{os}-{arch} for a known platform.
