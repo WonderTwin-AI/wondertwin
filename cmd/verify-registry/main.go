@@ -17,10 +17,12 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/wondertwin-ai/wondertwin/internal/httpclient"
+	"github.com/wondertwin-ai/wondertwin/internal/releaseid"
 )
 
 const defaultRegistryURL = "https://raw.githubusercontent.com/wondertwin-ai/registry/main/registry.json"
@@ -65,6 +67,7 @@ type versionDef struct {
 	BSLExpiryDate     string            `json:"bsl_expiry_date,omitempty"`
 	Changelog         string            `json:"changelog,omitempty"`
 	BreakingChanges   []string          `json:"breaking_changes,omitempty"`
+	ReleaseDigest     string            `json:"release_digest,omitempty"`
 }
 
 var (
@@ -93,6 +96,19 @@ var publicTiers = map[string]struct{}{
 var nonPublicRepos = []string{
 	"wondertwin-pro",
 	"wondertwin-intelligence",
+}
+
+// legacyReleases are the semver releases published before releases were
+// keyed by generated id (2026-10-12). The set never grows: every later
+// release is an id, so a new semver key in the public registry is a
+// release that bypassed the id pipeline.
+var legacyReleases = map[string][]string{
+	"stripe":  {"0.1.0", "0.2.0", "0.3.0", "0.3.1"},
+	"twilio":  {"0.1.0"},
+	"resend":  {"0.1.0"},
+	"posthog": {"0.1.0"},
+	"logodev": {"0.1.0"},
+	"slack":   {"0.1.0"},
 }
 
 // checkResult stores the outcome of a single check.
@@ -239,6 +255,7 @@ func validateVersion(name, ver string, vd versionDef, public bool) []checkResult
 				fmt.Sprintf("tier=%q is not publishable to the public registry", vd.Tier),
 			})
 		}
+		results = append(results, validateVersionKey(name, ver, vd)...)
 	}
 
 	// Platform entries in binary_urls
@@ -264,6 +281,45 @@ func validateVersion(name, ver string, vd versionDef, public bool) []checkResult
 	// malformed values are flagged.
 	results = append(results, validateLifecycle(prefix, vd)...)
 
+	return results
+}
+
+// validateVersionKey checks that a version key is either a release id
+// that its own checksums reproduce, or a frozen legacy semver release.
+func validateVersionKey(name, ver string, vd versionDef) []checkResult {
+	prefix := fmt.Sprintf("[%s@%s]", name, ver)
+
+	if !releaseid.IsID(ver) {
+		if slices.Contains(legacyReleases[name], ver) {
+			return []checkResult{{prefix + " version key", true, "legacy semver release"}}
+		}
+		return []checkResult{{prefix + " version key", false,
+			fmt.Sprintf("version key %q is neither a release id nor a published legacy release", ver)}}
+	}
+
+	if !ValidChecksum(vd.ReleaseDigest) {
+		return []checkResult{{prefix + " release_digest", false,
+			fmt.Sprintf("release id needs release_digest as sha256:<64 hex>, got %q", vd.ReleaseDigest)}}
+	}
+	results := []checkResult{{prefix + " release_digest format", true, vd.ReleaseDigest}}
+
+	if got := releaseid.ID(vd.ReleaseDigest); got != ver {
+		results = append(results, checkResult{prefix + " release id matches digest", false,
+			fmt.Sprintf("key %q but release_digest gives id %q", ver, got)})
+	} else {
+		results = append(results, checkResult{prefix + " release id matches digest", true, ver})
+	}
+
+	digest, err := releaseid.Digest(name, vd.Checksums)
+	switch {
+	case err != nil:
+		results = append(results, checkResult{prefix + " release_digest matches checksums", false, err.Error()})
+	case digest != vd.ReleaseDigest:
+		results = append(results, checkResult{prefix + " release_digest matches checksums", false,
+			fmt.Sprintf("checksums give %s", digest)})
+	default:
+		results = append(results, checkResult{prefix + " release_digest matches checksums", true, digest})
+	}
 	return results
 }
 
