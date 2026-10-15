@@ -14,7 +14,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: "Build, scan and diff only. Publishes nothing."
+        description: "Build, scan, verify and diff only. Publishes nothing."
         required: false
         default: false
         type: boolean
