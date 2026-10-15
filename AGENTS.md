@@ -112,9 +112,9 @@ serves; the approved build plan says how much of it a build delivers.
 7. Write tests, run the pre-push checklist, PR
 
 ### Phase 2+: Complete the plan's scope
-1. Work through the plan's remaining slices in order, one slice per PR
-2. Each commit carries the trailer `Build-Slice: {slice id}`
-3. After each slice, update the manifest's implemented and not-implemented resources
+1. Work through the plan's remaining resource areas in logical batches
+2. One PR per logical batch (not one PR per endpoint)
+3. After each phase, update the manifest's implemented and not-implemented resources
 
 ### Final Phase: Gap Audit
 Before declaring a twin complete:
