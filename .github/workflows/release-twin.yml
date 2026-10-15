@@ -57,8 +57,8 @@ jobs:
           syft version
 
       # The id comes from the binaries, so building comes first. Nothing is
-      # tagged or published until the build and the OSV scan have passed, so
-      # a failed run leaves no orphan tag behind.
+      # tagged or published until the build, the OSV scan and verification
+      # have passed, so a failed run leaves no orphan tag and no live release.
       #
       # -buildvcs=false keeps the git commit out of the binary and -trimpath
       # keeps the build directory out, so the release id changes only when the
@@ -175,6 +175,67 @@ jobs:
           go install github.com/google/osv-scanner/cmd/osv-scanner@v1.9.2
           osv-scanner --sbom="dist/twin-${TWIN}-${ID}.cdx.json"
 
+      # -- Verify before publishing -------------------------------------------
+      # The built binary is checked the way customers run it, before anything
+      # is tagged or published: LocalStack's apps plugin starts it with
+      # --port=N and treats it as ready only when /admin/health answers exactly
+      # {"status":"ok"} within 30 s. A dry run runs these too.
+      - name: Build wt CLI from source
+        working-directory: wondertwin
+        run: go build -o ./wt-test ./cmd/wt/
+
+      - name: Check the LocalStack launch contract
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: |
+          bin="dist/twin-${TWIN}-linux-amd64"
+          port=4190
+          "$bin" --port="$port" >"${RUNNER_TEMP}/launch.log" 2>&1 &
+          pid=$!
+          deadline=$((SECONDS + 30))
+          body=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            body="$(curl -s --max-time 2 "http://127.0.0.1:${port}/admin/health" || true)"
+            if [ "$body" = '{"status":"ok"}' ]; then break; fi
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+          if [ "$body" != '{"status":"ok"}' ]; then
+            echo "::error::twin-${TWIN} did not answer /admin/health with exactly {\"status\":\"ok\"} within 30 s (last answer: ${body:-none})"
+            cat "${RUNNER_TEMP}/launch.log"
+            exit 1
+          fi
+          echo "twin-${TWIN} launched with --port=${port} and answered {\"status\":\"ok\"}"
+
+      - name: Run conformance on the built binary
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+        run: ./wt-test conformance "dist/twin-${TWIN}-linux-amd64"
+
+      - name: Run the SDK smoke suite
+        working-directory: wondertwin
+        env:
+          TWIN: ${{ inputs.twin }}
+          UV_VERSION: 0.11.21
+        run: |
+          suite="twin-${TWIN}/sdk-smoke/run.sh"
+          if [ ! -x "$suite" ]; then
+            echo "::warning::twin-${TWIN} has no SDK smoke suite; only the launch contract and conformance were verified."
+            echo "No SDK smoke suite for twin-${TWIN}." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set -o pipefail
+          python3 -m pip install --user --quiet "uv==${UV_VERSION}"
+          export PATH="$HOME/.local/bin:$PATH"
+          {
+            echo "### SDK smoke: twin-${TWIN}"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          BINARY="$PWD/dist/twin-${TWIN}-linux-amd64" "$suite" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Create and push twin tag
         if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
@@ -274,14 +335,10 @@ jobs:
             git push
           fi
 
-      # -- Post-release validation ------------------------------------------
-      # Skipped on a dry run: these install the twin from the registry, and
-      # a dry run deliberately publishes nothing for them to install.
-      - name: Build wt CLI from source
-        if: ${{ !inputs.dry_run }}
-        working-directory: wondertwin
-        run: go build -o ./wt-test ./cmd/wt/
-
+      # -- Check the published asset ----------------------------------------
+      # The build was verified before publishing. These confirm the published
+      # release installs from the registry and still conforms. Skipped on a
+      # dry run, which publishes nothing to install.
       - name: Clear local twin cache
         if: ${{ !inputs.dry_run }}
         run: rm -rf ~/.wondertwin/bin/
@@ -294,7 +351,7 @@ jobs:
           ID: ${{ steps.release_id.outputs.id }}
         run: ./wt-test install "${TWIN}@${ID}"
 
-      - name: Run conformance on installed twin
+      - name: Run conformance on the installed twin
         if: ${{ !inputs.dry_run }}
         working-directory: wondertwin
         env:
