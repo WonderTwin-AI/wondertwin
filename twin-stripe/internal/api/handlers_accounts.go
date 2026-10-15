@@ -138,6 +138,12 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, acct.Metadata)
+	if !ok {
+		return
+	}
+	acct.Metadata = meta
+
 	// Update fields from form
 	if v := r.FormValue("email"); v != "" {
 		acct.Email = v
@@ -206,12 +212,6 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	meta, ok := updateMetadata(w, r, acct.Metadata)
-	if !ok {
-		return
-	}
-	acct.Metadata = meta
 
 	// Simulate KYB verification progress:
 	// If business_type, tos_acceptance, and some individual/company info is provided,

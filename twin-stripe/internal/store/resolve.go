@@ -36,10 +36,7 @@ func (s *MemoryStore) Resolve(id string) (map[string]any, bool) {
 	case "txn":
 		return resolveFrom(s.BalanceTransactions, id)
 	case "cus":
-		if m, ok := resolveFrom(s.Customers, id); ok {
-			return m, true
-		}
-		return resolveFrom(s.DeletedCustomers, id)
+		return resolveFrom(s.Customers, id)
 	case "prod":
 		return resolveFrom(s.Products, id)
 	case "price":
