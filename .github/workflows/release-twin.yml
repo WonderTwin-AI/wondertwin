@@ -228,8 +228,9 @@ jobs:
             exit 0
           fi
           set -o pipefail
-          python3 -m pip install --user --quiet "uv==${UV_VERSION}"
+          pipx install "uv==${UV_VERSION}"
           export PATH="$HOME/.local/bin:$PATH"
+          uv --version
           {
             echo "### SDK smoke: twin-${TWIN}"
             echo
