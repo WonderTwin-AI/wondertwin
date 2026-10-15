@@ -194,6 +194,20 @@ const cases = {
     assert.equal(balance.object, 'balance');
   },
 
+  async 'unset-fields-null'() {
+    const customer = await stripe.customers.create({});
+    for (const field of ['email', 'name', 'phone', 'description', 'address', 'shipping']) {
+      assert.strictEqual(customer[field], null, `customer.${field}`);
+    }
+    assert.deepEqual(customer.metadata, {});
+    assert.strictEqual(customer.invoice_settings.default_payment_method, null);
+    const pi = await stripe.paymentIntents.create({amount: 500, currency: 'usd'});
+    for (const field of ['customer', 'payment_method', 'last_payment_error', 'latest_charge', 'description']) {
+      assert.strictEqual(pi[field], null, `payment_intent.${field}`);
+    }
+    assert.deepEqual(pi.metadata, {});
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);

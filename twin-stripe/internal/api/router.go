@@ -45,6 +45,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)
 		r.Use(h.mw.FaultInjection)
+		// Unset fields returned as Stripe returns them (null, {}, [])
+		r.Use(h.fillMiddleware)
 		// Stripe-style expand[] response expansion
 		r.Use(h.expandMiddleware)
 

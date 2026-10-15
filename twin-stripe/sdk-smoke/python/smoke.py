@@ -292,6 +292,18 @@ def case_error_unsupported_version():
     eq(err.http_status, 400, "status")
 
 
+def case_unset_fields_null():
+    customer = v1.customers.create({})
+    for field in ("email", "name", "phone", "description", "address", "shipping"):
+        eq(getattr(customer, field), None, f"customer.{field}")
+    eq(customer.metadata.to_dict(), {}, "customer.metadata")
+    eq(customer.invoice_settings.default_payment_method, None, "invoice_settings.default_payment_method")
+    pi = v1.payment_intents.create({"amount": 500, "currency": "usd"})
+    for field in ("customer", "payment_method", "last_payment_error", "latest_charge", "description"):
+        eq(getattr(pi, field), None, f"payment_intent.{field}")
+    eq(pi.metadata.to_dict(), {}, "payment_intent.metadata")
+
+
 CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
@@ -302,6 +314,7 @@ CASES = {
     "stripe-expand-and-paginate": case_expand_and_paginate,
     "stripe-idempotent-retry": case_idempotent_retry,
     "stripe-connect-transfer": case_connect_transfer,
+    "unset-fields-null": case_unset_fields_null,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
     "error-declined-card": case_error_declined_card,
