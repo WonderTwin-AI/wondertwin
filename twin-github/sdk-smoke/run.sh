@@ -18,6 +18,8 @@
 # Usage:
 #   twin-github/sdk-smoke/run.sh
 #       builds twin-github, starts it with --port=N and tears it down
+#   BINARY=/path/to/twin-github twin-github/sdk-smoke/run.sh
+#       starts an existing binary instead of building one
 #   GITHUB_EMULATOR_URL=http://github.localhost.localstack.cloud:4566 twin-github/sdk-smoke/run.sh
 #       runs against an emulator that is already up (for example through lstk)
 #
@@ -37,8 +39,12 @@ trap cleanup EXIT
 
 if [ -z "${GITHUB_EMULATOR_URL:-}" ]; then
   port="${PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')}"
-  (cd "$root" && go build -o "$work/twin-github" ./twin-github/cmd/twin-github/)
-  "$work/twin-github" --port="$port" >"$work/emulator.log" 2>&1 &
+  binary="${BINARY:-}"
+  if [ -z "$binary" ]; then
+    binary="$work/twin-github"
+    (cd "$root" && go build -o "$binary" ./twin-github/cmd/twin-github/)
+  fi
+  "$binary" --port="$port" >"$work/emulator.log" 2>&1 &
   pid=$!
   export GITHUB_EMULATOR_URL="http://127.0.0.1:$port"
 fi
