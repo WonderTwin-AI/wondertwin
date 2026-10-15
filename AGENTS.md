@@ -17,11 +17,11 @@ As of 2026-08-20, product and strategy documentation is canonical in Notion, not
 
 ## Twin Coverage Policy
 
-The goal for all twins is **100% API parity** with the real service. Every endpoint, every parameter, every error shape.
+A twin build or extension delivers the scope of its **operator-approved build plan**, complete and correct: every endpoint, parameter and error shape the plan's scope names. Everything outside that scope is deferred with tracking, not silently dropped. Plans live in `wondertwin-docs/research/twins/{vendor}/build-plans/`; their format is `wondertwin-docs/research/BUILD-PLANS.md`.
 
-**You may never make scope decisions.** Do not decide what is "niche", "low priority", or "not worth implementing". If the real API supports it, the twin must support it.
+**You may never make scope decisions.** The operator makes them when approving the plan. Do not decide on your own that something is "niche", "low priority", or "not worth implementing", and do not add work the plan does not name.
 
-If you believe there is a legitimate reason to consider cutting or deferring scope, you must surface it using the template below. The decision is never yours — bring it to me.
+If you find something the plan should cover and does not, or a reason the plan's scope cannot be met, surface it using the template below. The decision is never yours; bring it to the operator.
 
 ### Scope Exception Request Template
 
@@ -99,7 +99,8 @@ This is the proven process for building a new community twin from scratch. Follo
 Before writing any code, research the full API surface of the target service. The
 `twin-researcher` skill that drives this step has moved to a private library and
 is no longer in this repo. Research artifacts still land in
-`wondertwin-docs/research/` and remain the source of truth for 100% parity.
+`wondertwin-docs/research/` and remain the source of truth for what the vendor
+serves; the approved build plan says how much of it a build delivers.
 
 ### Phase 1: Scaffold + Core
 1. Create directory structure following the standard layout
@@ -110,16 +111,16 @@ is no longer in this repo. Research artifacts still land in
 6. Include all 3 schema files (`twin.json`, `twin-manifest.json`, `provenance.json`) from commit 1
 7. Write tests, run the pre-push checklist, PR
 
-### Phase 2+: Expand to 100%
-1. Work through remaining resource areas in logical batches
-2. One PR per logical batch (not one PR per endpoint)
-3. After each phase, update the manifest with current coverage %
+### Phase 2+: Complete the plan's scope
+1. Work through the plan's remaining slices in order, one slice per PR
+2. Each commit carries the trailer `Build-Slice: {slice id}`
+3. After each slice, update the manifest's implemented and not-implemented resources
 
 ### Final Phase: Gap Audit
 Before declaring a twin complete:
-1. Run a gap audit — cross-reference every endpoint from the Phase 0 research against the router
-2. Implement every missing endpoint, no matter how niche
-3. Update manifest to `estimated_coverage_pct: 100` with empty `resources_not_implemented`
+1. Run a gap audit: cross-reference every endpoint in the plan's scope against the router
+2. Implement every scope endpoint that is missing; anything missing outside the scope is a question for the operator, not work to add
+3. List what the plan deferred under `resources_not_implemented`, and declare no coverage percentage the plan does not support
 4. Only then is the twin done
 
 ### Process Retros
