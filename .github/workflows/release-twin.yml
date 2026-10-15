@@ -222,10 +222,14 @@ jobs:
           UV_VERSION: 0.11.21
         run: |
           suite="twin-${TWIN}/sdk-smoke/run.sh"
-          if [ ! -x "$suite" ]; then
+          if [ ! -e "$suite" ]; then
             echo "::warning::twin-${TWIN} has no SDK smoke suite; only the launch contract and conformance were verified."
             echo "No SDK smoke suite for twin-${TWIN}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+          if [ ! -x "$suite" ]; then
+            echo "::error::$suite exists but is not executable; run chmod +x on it and commit the mode change."
+            exit 1
           fi
           set -o pipefail
           pipx install "uv==${UV_VERSION}"
