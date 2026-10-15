@@ -59,6 +59,12 @@ jobs:
       # The id comes from the binaries, so building comes first. Nothing is
       # tagged or published until the build and the OSV scan have passed, so
       # a failed run leaves no orphan tag behind.
+      #
+      # -buildvcs=false keeps the git commit out of the binary and -trimpath
+      # keeps the build directory out, so the release id changes only when the
+      # app emulator's code, the shared twinkit package, its Go dependencies or
+      # the toolchain does. It does not change on every merge to main or with
+      # where it was built. The release notes record the source commit.
       - name: Build binaries
         working-directory: wondertwin
         env:
@@ -70,7 +76,7 @@ jobs:
             arch="${platform#*-}"
             echo "Building twin-${TWIN}-${os}-${arch}..."
             CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-              go build -ldflags "-s -w" \
+              go build -buildvcs=false -trimpath -ldflags "-s -w" \
               -o "dist/twin-${TWIN}-${os}-${arch}" \
               "./twin-${TWIN}/cmd/twin-${TWIN}/"
           done
