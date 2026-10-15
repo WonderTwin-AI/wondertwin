@@ -351,8 +351,16 @@ func TestResetClearsTheEventBus(t *testing.T) {
 	if env["event_id"] != "Ev00000001" {
 		t.Errorf("event ids restart after reset: %v", env["event_id"])
 	}
-	_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
-	if d := m["deliveries"].([]any); len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
+	// The receiver can answer before the attempt is logged, so poll for the entry.
+	var d []any
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+		d = m["deliveries"].([]any)
+		if len(d) == 1 || time.Now().After(deadline) {
+			break
+		}
+	}
+	if len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
 		t.Errorf("delivery log after reset: %v", d)
 	}
 }
