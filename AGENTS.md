@@ -53,7 +53,7 @@ Every new community twin must include all of the following before pushing.
 
 ### Required files (3 schema files + manifest)
 - `twin-{name}/twin.json` — name, description, category, sdk, default_port
-- `twin-{name}/twin-manifest.json` — full coverage manifest
+- `twin-{name}/twin-manifest.json` — coverage manifest
 - `twin-{name}/provenance.json` — build provenance and source metadata
 
 ### Pre-push validation
