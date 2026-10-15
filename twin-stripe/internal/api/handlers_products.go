@@ -71,9 +71,11 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	} else if v == "true" {
 		prod.Active = true
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		prod.Metadata = meta
+	meta, ok := updateMetadata(w, r, prod.Metadata)
+	if !ok {
+		return
 	}
+	prod.Metadata = meta
 	prod.Updated = h.store.Now()
 
 	h.store.Products.Set(id, prod)

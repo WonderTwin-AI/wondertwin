@@ -72,9 +72,11 @@ func (h *Handler) UpdateShippingRate(w http.ResponseWriter, r *http.Request) {
 	} else if v == "false" {
 		sr.Active = false
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		sr.Metadata = meta
+	meta, ok := updateMetadata(w, r, sr.Metadata)
+	if !ok {
+		return
 	}
+	sr.Metadata = meta
 
 	h.store.ShippingRates.Set(id, sr)
 	twincore.JSON(w, http.StatusOK, sr)

@@ -100,9 +100,11 @@ func (h *Handler) UpdateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 			si.Price = price
 		}
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		si.Metadata = meta
+	meta, ok := updateMetadata(w, r, si.Metadata)
+	if !ok {
+		return
 	}
+	si.Metadata = meta
 
 	h.store.SubItems.Set(id, si)
 	twincore.JSON(w, http.StatusOK, si)

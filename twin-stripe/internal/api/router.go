@@ -41,6 +41,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.versionMiddleware)
 		// Accept name[N] array parameters, as the official SDKs send them
 		r.Use(h.arrayParamsMiddleware)
+		// Stripe's metadata limits
+		r.Use(h.metadataMiddleware)
 		// Idempotency key caching for POST requests
 		r.Use(h.idempotencyMiddleware)
 		// Fault injection for API routes (not admin)

@@ -208,6 +208,14 @@ const cases = {
     assert.deepEqual(pi.metadata, {});
   },
 
+  async 'metadata-merge'() {
+    const customer = await stripe.customers.create({metadata: {a: '1', b: '2'}});
+    const updated = await stripe.customers.update(customer.id, {metadata: {a: '', c: '3'}});
+    assert.deepEqual(updated.metadata, {b: '2', c: '3'});
+    const cleared = await stripe.customers.update(customer.id, {metadata: ''});
+    assert.deepEqual(cleared.metadata, {});
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);

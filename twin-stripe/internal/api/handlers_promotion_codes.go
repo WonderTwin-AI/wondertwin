@@ -78,9 +78,11 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 	} else if v == "false" {
 		pc.Active = false
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		pc.Metadata = meta
+	meta, ok := updateMetadata(w, r, pc.Metadata)
+	if !ok {
+		return
 	}
+	pc.Metadata = meta
 
 	h.store.PromotionCodes.Set(id, pc)
 	h.emitEvent("promotion_code.updated", mapFromJSON(pc))

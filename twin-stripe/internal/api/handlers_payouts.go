@@ -57,7 +57,7 @@ func (h *Handler) CreatePayout(w http.ResponseWriter, r *http.Request) {
 		Method:      "standard",
 		Status:      store.PayoutStatusPending,
 		Type:        "bank_account",
-		Metadata:    extractMetadata(r),
+		Metadata:    parseMetadata(r),
 		ArrivalDate: now + 86400*2, // +2 days
 		Created:     now,
 	}

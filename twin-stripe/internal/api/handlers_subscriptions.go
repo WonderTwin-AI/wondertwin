@@ -181,9 +181,11 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("collection_method"); v != "" {
 		sub.CollectionMethod = v
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		sub.Metadata = meta
+	meta, ok := updateMetadata(w, r, sub.Metadata)
+	if !ok {
+		return
 	}
+	sub.Metadata = meta
 
 	// Handle item changes (price/quantity updates) with proration.
 	prorationBehavior := r.FormValue("proration_behavior")

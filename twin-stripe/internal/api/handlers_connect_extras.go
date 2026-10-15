@@ -283,9 +283,11 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("phone"); v != "" {
 		person.Phone = v
 	}
-	if meta := parseMetadata(r); meta != nil {
-		person.Metadata = meta
+	meta, ok := updateMetadata(w, r, person.Metadata)
+	if !ok {
+		return
 	}
+	person.Metadata = meta
 
 	h.store.Persons.Set(id, person)
 	h.emitEvent("person.updated", mapFromJSON(person))

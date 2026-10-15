@@ -304,6 +304,14 @@ def case_unset_fields_null():
     eq(pi.metadata.to_dict(), {}, "payment_intent.metadata")
 
 
+def case_metadata_merge():
+    customer = v1.customers.create({"metadata": {"a": "1", "b": "2"}})
+    updated = v1.customers.update(customer.id, {"metadata": {"a": "", "c": "3"}})
+    eq(updated.metadata.to_dict(), {"b": "2", "c": "3"}, "merged metadata")
+    cleared = v1.customers.update(customer.id, {"metadata": ""})
+    eq(cleared.metadata.to_dict(), {}, "cleared metadata")
+
+
 CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
@@ -315,6 +323,7 @@ CASES = {
     "stripe-idempotent-retry": case_idempotent_retry,
     "stripe-connect-transfer": case_connect_transfer,
     "unset-fields-null": case_unset_fields_null,
+    "metadata-merge": case_metadata_merge,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
     "error-declined-card": case_error_declined_card,

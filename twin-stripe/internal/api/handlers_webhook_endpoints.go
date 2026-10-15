@@ -94,9 +94,11 @@ func (h *Handler) UpdateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 	if events := r.Form["enabled_events[]"]; len(events) > 0 {
 		we.EnabledEvents = events
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		we.Metadata = meta
+	meta, ok := updateMetadata(w, r, we.Metadata)
+	if !ok {
+		return
 	}
+	we.Metadata = meta
 
 	h.store.WebhookEndpoints.Set(id, we)
 	twincore.JSON(w, http.StatusOK, we)

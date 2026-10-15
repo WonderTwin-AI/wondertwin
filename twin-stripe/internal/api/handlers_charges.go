@@ -87,9 +87,11 @@ func (h *Handler) UpdateCharge(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("customer"); v != "" {
 		ch.Customer = v
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		ch.Metadata = meta
+	meta, ok := updateMetadata(w, r, ch.Metadata)
+	if !ok {
+		return
 	}
+	ch.Metadata = meta
 
 	h.store.Charges.Set(id, ch)
 	h.emitEvent("charge.updated", mapFromJSON(ch))

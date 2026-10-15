@@ -153,9 +153,11 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("collection_method"); v != "" {
 		inv.CollectionMethod = v
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		inv.Metadata = meta
+	meta, ok := updateMetadata(w, r, inv.Metadata)
+	if !ok {
+		return
 	}
+	inv.Metadata = meta
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.updated", mapFromJSON(inv))

@@ -68,9 +68,11 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("description"); v != "" {
 		cus.Description = v
 	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		cus.Metadata = meta
+	meta, ok := updateMetadata(w, r, cus.Metadata)
+	if !ok {
+		return
 	}
+	cus.Metadata = meta
 
 	h.store.Customers.Set(id, cus)
 	h.emitEvent("customer.updated", mapFromJSON(cus))
@@ -123,20 +125,6 @@ func (h *Handler) ListCustomers(w http.ResponseWriter, r *http.Request) {
 		"has_more": page.HasMore,
 		"data":     page.Data,
 	})
-}
-
-// parseMetadata extracts metadata[key]=value from form data.
-func parseMetadata(r *http.Request) map[string]string {
-	meta := map[string]string{}
-	for key, vals := range r.Form {
-		if len(key) > 9 && key[:9] == "metadata[" && key[len(key)-1] == ']' {
-			meta[key[9:len(key)-1]] = vals[0]
-		}
-	}
-	if len(meta) == 0 {
-		return nil
-	}
-	return meta
 }
 
 // parseLimit extracts the limit query parameter.

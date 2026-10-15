@@ -284,9 +284,11 @@ func (h *Handler) UpdateDispute(w http.ResponseWriter, r *http.Request) {
 		h.emitEvent("charge.dispute.updated", mapFromJSON(dp))
 	}
 
-	if meta := parseMetadata(r); len(meta) > 0 {
-		dp.Metadata = meta
+	meta, ok := updateMetadata(w, r, dp.Metadata)
+	if !ok {
+		return
 	}
+	dp.Metadata = meta
 
 	h.store.Disputes.Set(id, dp)
 	h.emitEvent("charge.dispute.updated", mapFromJSON(dp))

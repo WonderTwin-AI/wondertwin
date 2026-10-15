@@ -54,7 +54,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 			EventuallyDue: []string{"business_type", "external_account", "tos_acceptance.date", "tos_acceptance.ip"},
 			PastDue:       []string{},
 		},
-		Metadata: extractMetadata(r),
+		Metadata: parseMetadata(r),
 		Created:  now,
 	}
 
@@ -300,22 +300,6 @@ func (h *Handler) getExternalAccountsForAccount(accountID string) *store.Externa
 		HasMore: false,
 		URL:     "/v1/accounts/" + accountID + "/external_accounts",
 	}
-}
-
-// extractMetadata extracts metadata[key]=value from form data.
-func extractMetadata(r *http.Request) map[string]string {
-	meta := make(map[string]string)
-	for key, values := range r.Form {
-		if strings.HasPrefix(key, "metadata[") && strings.HasSuffix(key, "]") && len(values) > 0 {
-			field := strings.TrimPrefix(key, "metadata[")
-			field = strings.TrimSuffix(field, "]")
-			meta[field] = values[0]
-		}
-	}
-	if len(meta) == 0 {
-		return nil
-	}
-	return meta
 }
 
 // accountToMap converts an Account to a map for event payloads.

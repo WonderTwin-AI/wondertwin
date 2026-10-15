@@ -72,7 +72,7 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		Status:             "new",
 		DefaultForCurrency: true,
 		Fingerprint:        fingerprint,
-		Metadata:           extractMetadata(r),
+		Metadata:           parseMetadata(r),
 	}
 
 	h.store.ExternalAccts.Set(id, ea)
