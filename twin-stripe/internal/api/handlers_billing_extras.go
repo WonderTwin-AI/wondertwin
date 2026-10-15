@@ -266,6 +266,12 @@ func (h *Handler) UpdateDispute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, dp.Metadata)
+	if !ok {
+		return
+	}
+	dp.Metadata = meta
+
 	// Parse evidence fields.
 	if dp.Evidence == nil {
 		dp.Evidence = make(map[string]string)
@@ -283,12 +289,6 @@ func (h *Handler) UpdateDispute(w http.ResponseWriter, r *http.Request) {
 		dp.Status = "under_review"
 		h.emitEvent("charge.dispute.updated", mapFromJSON(dp))
 	}
-
-	meta, ok := updateMetadata(w, r, dp.Metadata)
-	if !ok {
-		return
-	}
-	dp.Metadata = meta
 
 	h.store.Disputes.Set(id, dp)
 	h.emitEvent("charge.dispute.updated", mapFromJSON(dp))

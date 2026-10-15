@@ -207,21 +207,11 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Update metadata
-	for key, values := range r.Form {
-		if strings.HasPrefix(key, "metadata[") && len(values) > 0 {
-			if acct.Metadata == nil {
-				acct.Metadata = make(map[string]string)
-			}
-			field := strings.TrimPrefix(key, "metadata[")
-			field = strings.TrimSuffix(field, "]")
-			if values[0] == "" {
-				delete(acct.Metadata, field)
-			} else {
-				acct.Metadata[field] = values[0]
-			}
-		}
+	meta, ok := updateMetadata(w, r, acct.Metadata)
+	if !ok {
+		return
 	}
+	acct.Metadata = meta
 
 	// Simulate KYB verification progress:
 	// If business_type, tos_acceptance, and some individual/company info is provided,
