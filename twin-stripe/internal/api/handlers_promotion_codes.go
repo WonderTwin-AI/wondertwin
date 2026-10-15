@@ -73,16 +73,17 @@ func (h *Handler) UpdatePromotionCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if v := r.FormValue("active"); v == "true" {
-		pc.Active = true
-	} else if v == "false" {
-		pc.Active = false
-	}
 	meta, ok := updateMetadata(w, r, pc.Metadata)
 	if !ok {
 		return
 	}
 	pc.Metadata = meta
+
+	if v := r.FormValue("active"); v == "true" {
+		pc.Active = true
+	} else if v == "false" {
+		pc.Active = false
+	}
 
 	h.store.PromotionCodes.Set(id, pc)
 	h.emitEvent("promotion_code.updated", mapFromJSON(pc))

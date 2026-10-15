@@ -61,6 +61,12 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, cus.Metadata)
+	if !ok {
+		return
+	}
+	cus.Metadata = meta
+
 	if v := r.FormValue("name"); v != "" {
 		cus.Name = v
 	}
@@ -73,11 +79,6 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("description"); v != "" {
 		cus.Description = v
 	}
-	meta, ok := updateMetadata(w, r, cus.Metadata)
-	if !ok {
-		return
-	}
-	cus.Metadata = meta
 
 	h.store.Customers.Set(id, cus)
 	h.emitEvent("customer.updated", mapFromJSON(cus))

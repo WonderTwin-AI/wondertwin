@@ -91,6 +91,12 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, price.Metadata)
+	if !ok {
+		return
+	}
+	price.Metadata = meta
+
 	if v := r.FormValue("active"); v == "false" {
 		price.Active = false
 	} else if v == "true" {
@@ -99,11 +105,6 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("nickname"); v != "" {
 		price.Nickname = v
 	}
-	meta, ok := updateMetadata(w, r, price.Metadata)
-	if !ok {
-		return
-	}
-	price.Metadata = meta
 
 	h.store.Prices.Set(id, price)
 	h.emitEvent("price.updated", mapFromJSON(price))

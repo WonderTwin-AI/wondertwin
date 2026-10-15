@@ -144,6 +144,12 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, inv.Metadata)
+	if !ok {
+		return
+	}
+	inv.Metadata = meta
+
 	if v := r.FormValue("description"); v != "" {
 		inv.Description = v
 	}
@@ -153,11 +159,6 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("collection_method"); v != "" {
 		inv.CollectionMethod = v
 	}
-	meta, ok := updateMetadata(w, r, inv.Metadata)
-	if !ok {
-		return
-	}
-	inv.Metadata = meta
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.updated", mapFromJSON(inv))

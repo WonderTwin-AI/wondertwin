@@ -199,14 +199,15 @@ func (h *Handler) UpdateFileLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if v := r.FormValue("expires_at"); v != "" {
-		fl.ExpiresAt, _ = strconv.ParseInt(v, 10, 64)
-	}
 	meta, ok := updateMetadata(w, r, fl.Metadata)
 	if !ok {
 		return
 	}
 	fl.Metadata = meta
+
+	if v := r.FormValue("expires_at"); v != "" {
+		fl.ExpiresAt, _ = strconv.ParseInt(v, 10, 64)
+	}
 
 	h.store.FileLinks.Set(id, fl)
 	twincore.JSON(w, http.StatusOK, fl)

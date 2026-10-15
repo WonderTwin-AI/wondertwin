@@ -96,3 +96,28 @@ func TestRefusedDisputeUpdateHasNoSideEffects(t *testing.T) {
 		t.Errorf("refused update emitted charge.dispute.updated: %d events before, %d after", before, after)
 	}
 }
+
+func TestRefusedPaymentIntentUpdateCreatesNoPaymentMethod(t *testing.T) {
+	_, tc := setupStripe(t)
+
+	resp := stripePost(tc, "/v1/payment_intents?amount=2000&currency=usd&"+fullMetadata().Encode(), nil)
+	resp.AssertStatus(200)
+	id := resp.JSONMap()["id"].(string)
+
+	paymentMethods := func() int {
+		resp := stripeGet(tc, "/v1/payment_methods?limit=100")
+		resp.AssertStatus(200)
+		return len(resp.JSONMap()["data"].([]any))
+	}
+	before := paymentMethods()
+
+	resp = stripePost(tc, "/v1/payment_intents/"+id+"?payment_method=pm_card_visa&metadata[new]=v", nil)
+	resp.AssertStatus(400)
+
+	if after := paymentMethods(); after != before {
+		t.Errorf("refused update created payment methods: %d before, %d after", before, after)
+	}
+	if pi := stripeGet(tc, "/v1/payment_intents/"+id).JSONMap(); pi["payment_method"] != nil {
+		t.Errorf("refused update set payment_method to %v", pi["payment_method"])
+	}
+}
