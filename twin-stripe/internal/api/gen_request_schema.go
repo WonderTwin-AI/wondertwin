@@ -4,8 +4,9 @@
 // router.go that the pinned dahlia GA spec documents, the top-level
 // parameters it accepts and the parameters that take an integer.
 //
-// It reads the same spec as gen_response_schema.go and runs from this
-// directory:
+// It reads the same spec as gen_response_schema.go, which says how to restore
+// it; the go:generate directive in request_validation.go passes that path as
+// $STRIPE_SPEC. It runs from this directory:
 //
 //	go run gen_request_schema.go -spec /path/to/stripe-v1-2026-08-26.dahlia.json
 package main
