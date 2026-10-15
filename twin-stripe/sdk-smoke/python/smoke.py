@@ -312,6 +312,13 @@ def case_metadata_merge():
     eq(cleared.metadata.to_dict(), {}, "cleared metadata")
 
 
+def case_error_invalid_parameter():
+    err = expect_error(lambda: v1.payment_intents.create({"amount": "abc", "currency": "usd"}), stripe.InvalidRequestError)
+    eq((err.http_status, err.code, err.param), (400, "parameter_invalid_integer", "amount"), "invalid integer")
+    err = expect_error(lambda: v1.customers.create({"bogus": "1"}), stripe.InvalidRequestError)
+    eq((err.http_status, err.code, err.param), (400, "parameter_unknown", "bogus"), "unknown parameter")
+
+
 CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
@@ -329,6 +336,7 @@ CASES = {
     "error-declined-card": case_error_declined_card,
     "error-idempotency-mismatch": case_error_idempotency_mismatch,
     "error-unsupported-version": case_error_unsupported_version,
+    "error-invalid-parameter": case_error_invalid_parameter,
 }
 
 

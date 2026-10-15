@@ -252,6 +252,14 @@ const cases = {
     assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
     assert.equal(err.statusCode, 400);
   },
+
+  async 'error-invalid-parameter'() {
+    let err = await expectError(() => stripe.paymentIntents.create({amount: 'abc', currency: 'usd'}));
+    assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
+    assert.deepEqual([err.statusCode, err.code, err.param], [400, 'parameter_invalid_integer', 'amount']);
+    err = await expectError(() => stripe.customers.create({bogus: '1'}));
+    assert.deepEqual([err.statusCode, err.code, err.param], [400, 'parameter_unknown', 'bogus']);
+  },
 };
 
 let failed = 0;
