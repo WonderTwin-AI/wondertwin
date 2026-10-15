@@ -93,6 +93,20 @@ func (rc *receiver) wait(t *testing.T, n int) []received {
 	return nil
 }
 
+// deliveryLog polls the delivery log until it holds n entries. The receiver can
+// answer before an attempt is logged, so a single read can come up short.
+func deliveryLog(t *testing.T, srv *httptest.Server, n int) []any {
+	t.Helper()
+	var d []any
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		_, m := call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
+		d = m["deliveries"].([]any)
+		if len(d) == n || time.Now().After(deadline) {
+			return d
+		}
+	}
+}
+
 func configureEvents(t *testing.T, srv *httptest.Server, cfg map[string]any) map[string]any {
 	t.Helper()
 	body, _ := json.Marshal(cfg)
@@ -215,8 +229,7 @@ func TestFailedDeliveryIsRetriedWithRetryHeaders(t *testing.T) {
 		verify(t, r, "slack-emulator-signing-secret")
 	}
 
-	_, m := call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
-	d := m["deliveries"].([]any)
+	d := deliveryLog(t, srv, 3)
 	if len(d) != 3 || d[2].(map[string]any)["status_code"] != float64(200) || d[1].(map[string]any)["retry_reason"] != "http_error" {
 		t.Errorf("delivery log: %v", d)
 	}
@@ -351,15 +364,7 @@ func TestResetClearsTheEventBus(t *testing.T) {
 	if env["event_id"] != "Ev00000001" {
 		t.Errorf("event ids restart after reset: %v", env["event_id"])
 	}
-	// The receiver can answer before the attempt is logged, so poll for the entry.
-	var d []any
-	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		_, m = call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
-		d = m["deliveries"].([]any)
-		if len(d) == 1 || time.Now().After(deadline) {
-			break
-		}
-	}
+	d := deliveryLog(t, srv, 1)
 	if len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
 		t.Errorf("delivery log after reset: %v", d)
 	}
