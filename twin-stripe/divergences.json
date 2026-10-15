@@ -46,8 +46,26 @@
     {
       "route": "Idempotency-Key",
       "stripe": "Saves a result only once the endpoint begins executing; a request that fails parameter validation is not saved",
-      "app_emulator": "Saves the first response for a key whatever its status",
-      "reason": "Validation and execution are not separated in the handlers"
+      "app_emulator": "Saves the first response for a key whatever its status, except a request refused by the parameter checks (unknown parameter, invalid integer, metadata limit), which is not saved",
+      "reason": "Those checks run as middleware ahead of the idempotency cache; other handler-level validation errors are still saved"
+    },
+    {
+      "route": "parameters on the spec-documented routes, unknown or pre-dahlia",
+      "stripe": "Refuses a parameter the dahlia spec does not list for the route with parameter_unknown",
+      "app_emulator": "Accepts the pre-dahlia parameters in handlerOnlyParams (request_validation.go): checkout amount_total, credit_notes currency (and its preview), promotion_codes coupon, quotes currency, amount_total and amount_subtotal",
+      "reason": "The handlers still read them, and refusing them would break those endpoints; each entry goes when its handler moves to the dahlia shape"
+    },
+    {
+      "route": "any /v1 route the dahlia spec does not document, and multipart requests",
+      "stripe": "Refuses unknown parameters and invalid integers",
+      "app_emulator": "Passes parameters through unchecked",
+      "reason": "No spec table covers these routes, and the parameter check reads form-encoded bodies only"
+    },
+    {
+      "route": "response objects, properties the handlers do not set",
+      "stripe": "Returns every documented property, including non-nullable scalars such as a subscription's currency and start_date and an invoice's attempted",
+      "app_emulator": "Fills unset nullable fields with null, string maps with {}, non-nullable arrays with [] and customer invoice_settings; omits the non-nullable scalars and customer includable fields the handlers do not set",
+      "reason": "Their values are not modelled, and inventing them would be a guess"
     },
     {
       "route": "webhook delivery",

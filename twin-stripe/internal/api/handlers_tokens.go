@@ -149,9 +149,11 @@ func (h *Handler) UpdateSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if md := parseMetadata(r); md != nil {
-		src.Metadata = md
+	meta, ok := updateMetadata(w, r, src.Metadata)
+	if !ok {
+		return
 	}
+	src.Metadata = meta
 
 	h.store.Sources.Set(id, src)
 	twincore.JSON(w, http.StatusOK, src)

@@ -60,6 +60,12 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, prod.Metadata)
+	if !ok {
+		return
+	}
+	prod.Metadata = meta
+
 	if v := r.FormValue("name"); v != "" {
 		prod.Name = v
 	}
@@ -70,9 +76,6 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		prod.Active = false
 	} else if v == "true" {
 		prod.Active = true
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		prod.Metadata = meta
 	}
 	prod.Updated = h.store.Now()
 

@@ -170,6 +170,12 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, sub.Metadata)
+	if !ok {
+		return
+	}
+	sub.Metadata = meta
+
 	if v := r.FormValue("cancel_at_period_end"); v == "true" {
 		sub.CancelAtPeriodEnd = true
 	} else if v == "false" {
@@ -180,9 +186,6 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("collection_method"); v != "" {
 		sub.CollectionMethod = v
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		sub.Metadata = meta
 	}
 
 	// Handle item changes (price/quantity updates) with proration.

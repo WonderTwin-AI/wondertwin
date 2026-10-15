@@ -271,6 +271,12 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, person.Metadata)
+	if !ok {
+		return
+	}
+	person.Metadata = meta
+
 	if v := r.FormValue("first_name"); v != "" {
 		person.FirstName = v
 	}
@@ -282,9 +288,6 @@ func (h *Handler) UpdatePerson(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("phone"); v != "" {
 		person.Phone = v
-	}
-	if meta := parseMetadata(r); meta != nil {
-		person.Metadata = meta
 	}
 
 	h.store.Persons.Set(id, person)

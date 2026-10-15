@@ -90,6 +90,12 @@ func (h *Handler) UpdateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, si.Metadata)
+	if !ok {
+		return
+	}
+	si.Metadata = meta
+
 	if v := r.FormValue("quantity"); v != "" {
 		if q, err := strconv.ParseInt(v, 10, 64); err == nil {
 			si.Quantity = q
@@ -99,9 +105,6 @@ func (h *Handler) UpdateSubscriptionItem(w http.ResponseWriter, r *http.Request)
 		if price, ok := h.store.Prices.Get(priceID); ok {
 			si.Price = price
 		}
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		si.Metadata = meta
 	}
 
 	h.store.SubItems.Set(id, si)

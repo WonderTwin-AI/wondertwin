@@ -62,7 +62,7 @@ func (h *Handler) CreateTransfer(w http.ResponseWriter, r *http.Request) {
 		Destination:       destination,
 		TransferGroup:     r.FormValue("transfer_group"),
 		SourceTransaction: r.FormValue("source_transaction"),
-		Metadata:          extractMetadata(r),
+		Metadata:          parseMetadata(r),
 		Livemode:          false,
 		Created:           h.store.Now(),
 	}

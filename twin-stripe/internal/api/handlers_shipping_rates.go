@@ -67,13 +67,16 @@ func (h *Handler) UpdateShippingRate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, sr.Metadata)
+	if !ok {
+		return
+	}
+	sr.Metadata = meta
+
 	if v := r.FormValue("active"); v == "true" {
 		sr.Active = true
 	} else if v == "false" {
 		sr.Active = false
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		sr.Metadata = meta
 	}
 
 	h.store.ShippingRates.Set(id, sr)

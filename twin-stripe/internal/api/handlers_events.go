@@ -11,6 +11,7 @@ import (
 
 // emitEvent creates a Stripe event and optionally enqueues a webhook.
 func (h *Handler) emitEvent(eventType string, objectData map[string]any) {
+	fillResponse(objectData)
 	id := h.store.StripeID(h.store.Events.NextID())
 	evt := store.Event{
 		ID:              id,

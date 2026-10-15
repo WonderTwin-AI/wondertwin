@@ -76,6 +76,12 @@ func (h *Handler) UpdateQuote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, qt.Metadata)
+	if !ok {
+		return
+	}
+	qt.Metadata = meta
+
 	if v := r.FormValue("description"); v != "" {
 		qt.Description = v
 	}
@@ -87,9 +93,6 @@ func (h *Handler) UpdateQuote(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("customer"); v != "" {
 		qt.Customer = v
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		qt.Metadata = meta
 	}
 
 	h.store.Quotes.Set(id, qt)

@@ -194,6 +194,36 @@ const cases = {
     assert.equal(balance.object, 'balance');
   },
 
+  async 'unset-fields-null'() {
+    const customer = await stripe.customers.create({});
+    for (const field of ['email', 'name', 'phone', 'description', 'address', 'shipping']) {
+      assert.strictEqual(customer[field], null, `customer.${field}`);
+    }
+    assert.deepEqual(customer.metadata, {});
+    assert.strictEqual(customer.invoice_settings.default_payment_method, null);
+    const pi = await stripe.paymentIntents.create({amount: 500, currency: 'usd'});
+    for (const field of ['customer', 'payment_method', 'last_payment_error', 'latest_charge', 'description']) {
+      assert.strictEqual(pi[field], null, `payment_intent.${field}`);
+    }
+    assert.deepEqual(pi.metadata, {});
+  },
+
+  async 'metadata-merge'() {
+    const customer = await stripe.customers.create({metadata: {a: '1', b: '2'}});
+    const updated = await stripe.customers.update(customer.id, {metadata: {a: '', c: '3'}});
+    assert.deepEqual(updated.metadata, {b: '2', c: '3'});
+    const cleared = await stripe.customers.update(customer.id, {metadata: ''});
+    assert.deepEqual(cleared.metadata, {});
+  },
+
+  async 'deleted-customer-retrieve'() {
+    const customer = await stripe.customers.create({});
+    await stripe.customers.del(customer.id);
+    const read = await stripe.customers.retrieve(customer.id);
+    assert.equal(read.id, customer.id);
+    assert.equal(read.deleted, true);
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);
@@ -229,6 +259,14 @@ const cases = {
     const err = await expectError(() => old.customers.list());
     assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
     assert.equal(err.statusCode, 400);
+  },
+
+  async 'error-invalid-parameter'() {
+    let err = await expectError(() => stripe.paymentIntents.create({amount: 'abc', currency: 'usd'}));
+    assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
+    assert.deepEqual([err.statusCode, err.code, err.param], [400, 'parameter_invalid_integer', 'amount']);
+    err = await expectError(() => stripe.customers.create({bogus: '1'}));
+    assert.deepEqual([err.statusCode, err.code, err.param], [400, 'parameter_unknown', 'bogus']);
   },
 };
 

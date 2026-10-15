@@ -113,6 +113,12 @@ func (h *Handler) UpdatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, pi.Metadata)
+	if !ok {
+		return
+	}
+	pi.Metadata = meta
+
 	if v := r.FormValue("amount"); v != "" {
 		if a, err := strconv.ParseInt(v, 10, 64); err == nil {
 			pi.Amount = a
@@ -132,9 +138,6 @@ func (h *Handler) UpdatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 		if pi.Status == "requires_payment_method" {
 			pi.Status = "requires_confirmation"
 		}
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		pi.Metadata = meta
 	}
 
 	h.store.PaymentIntents.Set(id, pi)

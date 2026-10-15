@@ -299,11 +299,14 @@ func (h *Handler) UpdatePaymentLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, pl.Metadata)
+	if !ok {
+		return
+	}
+	pl.Metadata = meta
+
 	if v := r.FormValue("active"); v != "" {
 		pl.Active = v == "true"
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		pl.Metadata = meta
 	}
 
 	h.store.PaymentLinks.Set(id, pl)

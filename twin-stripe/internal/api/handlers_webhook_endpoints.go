@@ -80,6 +80,12 @@ func (h *Handler) UpdateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, we.Metadata)
+	if !ok {
+		return
+	}
+	we.Metadata = meta
+
 	if v := r.FormValue("url"); v != "" {
 		we.URL = v
 	}
@@ -93,9 +99,6 @@ func (h *Handler) UpdateWebhookEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	if events := r.Form["enabled_events[]"]; len(events) > 0 {
 		we.EnabledEvents = events
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		we.Metadata = meta
 	}
 
 	h.store.WebhookEndpoints.Set(id, we)

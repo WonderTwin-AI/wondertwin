@@ -38,6 +38,11 @@ func (h *Handler) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cus, ok := h.store.Customers.Get(id)
 	if !ok {
+		// Stripe returns the deleted stub, not a 404, for a deleted customer.
+		if stub, deleted := h.store.DeletedCustomers.Get(id); deleted {
+			twincore.JSON(w, http.StatusOK, stub)
+			return
+		}
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
@@ -56,6 +61,12 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, cus.Metadata)
+	if !ok {
+		return
+	}
+	cus.Metadata = meta
+
 	if v := r.FormValue("name"); v != "" {
 		cus.Name = v
 	}
@@ -67,9 +78,6 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("description"); v != "" {
 		cus.Description = v
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		cus.Metadata = meta
 	}
 
 	h.store.Customers.Set(id, cus)
@@ -104,8 +112,10 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 		h.store.PaymentMethods.Set(pm.ID, pm)
 	}
 
+	stub := store.DeletedObject{ID: id, Object: "customer", Deleted: true}
+	h.store.DeletedCustomers.Set(id, stub)
 	h.emitEvent("customer.deleted", map[string]any{"id": id})
-	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "customer", "deleted": true})
+	twincore.JSON(w, http.StatusOK, stub)
 }
 
 func (h *Handler) ListCustomers(w http.ResponseWriter, r *http.Request) {
@@ -123,20 +133,6 @@ func (h *Handler) ListCustomers(w http.ResponseWriter, r *http.Request) {
 		"has_more": page.HasMore,
 		"data":     page.Data,
 	})
-}
-
-// parseMetadata extracts metadata[key]=value from form data.
-func parseMetadata(r *http.Request) map[string]string {
-	meta := map[string]string{}
-	for key, vals := range r.Form {
-		if len(key) > 9 && key[:9] == "metadata[" && key[len(key)-1] == ']' {
-			meta[key[9:len(key)-1]] = vals[0]
-		}
-	}
-	if len(meta) == 0 {
-		return nil
-	}
-	return meta
 }
 
 // parseLimit extracts the limit query parameter.

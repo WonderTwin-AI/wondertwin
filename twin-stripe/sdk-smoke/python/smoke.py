@@ -292,6 +292,40 @@ def case_error_unsupported_version():
     eq(err.http_status, 400, "status")
 
 
+def case_unset_fields_null():
+    customer = v1.customers.create({})
+    for field in ("email", "name", "phone", "description", "address", "shipping"):
+        eq(getattr(customer, field), None, f"customer.{field}")
+    eq(customer.metadata.to_dict(), {}, "customer.metadata")
+    eq(customer.invoice_settings.default_payment_method, None, "invoice_settings.default_payment_method")
+    pi = v1.payment_intents.create({"amount": 500, "currency": "usd"})
+    for field in ("customer", "payment_method", "last_payment_error", "latest_charge", "description"):
+        eq(getattr(pi, field), None, f"payment_intent.{field}")
+    eq(pi.metadata.to_dict(), {}, "payment_intent.metadata")
+
+
+def case_metadata_merge():
+    customer = v1.customers.create({"metadata": {"a": "1", "b": "2"}})
+    updated = v1.customers.update(customer.id, {"metadata": {"a": "", "c": "3"}})
+    eq(updated.metadata.to_dict(), {"b": "2", "c": "3"}, "merged metadata")
+    cleared = v1.customers.update(customer.id, {"metadata": ""})
+    eq(cleared.metadata.to_dict(), {}, "cleared metadata")
+
+
+def case_error_invalid_parameter():
+    err = expect_error(lambda: v1.payment_intents.create({"amount": "abc", "currency": "usd"}), stripe.InvalidRequestError)
+    eq((err.http_status, err.code, err.param), (400, "parameter_invalid_integer", "amount"), "invalid integer")
+    err = expect_error(lambda: v1.customers.create({"bogus": "1"}), stripe.InvalidRequestError)
+    eq((err.http_status, err.code, err.param), (400, "parameter_unknown", "bogus"), "unknown parameter")
+
+
+def case_deleted_customer_retrieve():
+    customer = v1.customers.create({})
+    v1.customers.delete(customer.id)
+    read = v1.customers.retrieve(customer.id)
+    eq((read.id, read.deleted), (customer.id, True), "deleted stub")
+
+
 CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
@@ -302,11 +336,15 @@ CASES = {
     "stripe-expand-and-paginate": case_expand_and_paginate,
     "stripe-idempotent-retry": case_idempotent_retry,
     "stripe-connect-transfer": case_connect_transfer,
+    "unset-fields-null": case_unset_fields_null,
+    "metadata-merge": case_metadata_merge,
+    "deleted-customer-retrieve": case_deleted_customer_retrieve,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
     "error-declined-card": case_error_declined_card,
     "error-idempotency-mismatch": case_error_idempotency_mismatch,
     "error-unsupported-version": case_error_unsupported_version,
+    "error-invalid-parameter": case_error_invalid_parameter,
 }
 
 

@@ -199,11 +199,14 @@ func (h *Handler) UpdateFileLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, fl.Metadata)
+	if !ok {
+		return
+	}
+	fl.Metadata = meta
+
 	if v := r.FormValue("expires_at"); v != "" {
 		fl.ExpiresAt, _ = strconv.ParseInt(v, 10, 64)
-	}
-	if meta := parseMetadata(r); len(meta) > 0 {
-		fl.Metadata = meta
 	}
 
 	h.store.FileLinks.Set(id, fl)

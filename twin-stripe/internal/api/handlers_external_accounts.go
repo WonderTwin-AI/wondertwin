@@ -72,7 +72,7 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		Status:             "new",
 		DefaultForCurrency: true,
 		Fingerprint:        fingerprint,
-		Metadata:           extractMetadata(r),
+		Metadata:           parseMetadata(r),
 	}
 
 	h.store.ExternalAccts.Set(id, ea)
@@ -112,19 +112,14 @@ func (h *Handler) UpdateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	meta, ok := updateMetadata(w, r, ea.Metadata)
+	if !ok {
+		return
+	}
+	ea.Metadata = meta
+
 	if v := r.FormValue("default_for_currency"); v == "true" {
 		ea.DefaultForCurrency = true
-	}
-
-	// Update metadata
-	for key, values := range r.Form {
-		if len(values) > 0 && len(key) > 9 && key[:9] == "metadata[" {
-			if ea.Metadata == nil {
-				ea.Metadata = make(map[string]string)
-			}
-			field := key[9 : len(key)-1]
-			ea.Metadata[field] = values[0]
-		}
 	}
 
 	h.store.ExternalAccts.Set(id, ea)
