@@ -319,6 +319,13 @@ def case_error_invalid_parameter():
     eq((err.http_status, err.code, err.param), (400, "parameter_unknown", "bogus"), "unknown parameter")
 
 
+def case_deleted_customer_retrieve():
+    customer = v1.customers.create({})
+    v1.customers.delete(customer.id)
+    read = v1.customers.retrieve(customer.id)
+    eq((read.id, read.deleted), (customer.id, True), "deleted stub")
+
+
 CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
@@ -331,6 +338,7 @@ CASES = {
     "stripe-connect-transfer": case_connect_transfer,
     "unset-fields-null": case_unset_fields_null,
     "metadata-merge": case_metadata_merge,
+    "deleted-customer-retrieve": case_deleted_customer_retrieve,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
     "error-declined-card": case_error_declined_card,

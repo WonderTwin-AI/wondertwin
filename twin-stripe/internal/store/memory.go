@@ -58,6 +58,9 @@ type MemoryStore struct {
 	Persons               *pkgstate.Store[Person]
 	TopUps                *pkgstate.Store[TopUp]
 	Discounts             *pkgstate.Store[Discount]
+	// DeletedCustomers keeps the stub Stripe returns when a deleted
+	// customer is retrieved.
+	DeletedCustomers *pkgstate.Store[DeletedObject]
 
 	// Per-account balances (account ID -> balance)
 	Balances map[string]*AccountBalance
@@ -136,6 +139,7 @@ func New() *MemoryStore {
 		Persons:               pkgstate.New[Person]("person"),
 		TopUps:                pkgstate.New[TopUp]("tu"),
 		Discounts:             pkgstate.New[Discount]("di"),
+		DeletedCustomers:      pkgstate.New[DeletedObject]("cus"),
 		Balances:              make(map[string]*AccountBalance),
 		PlatformBalance:       NewAccountBalance(),
 		Clock:                 pkgstate.NewClock(),
@@ -306,6 +310,7 @@ type stateSnapshot struct {
 	Persons               map[string]Person               `json:"persons"`
 	TopUps                map[string]TopUp                `json:"topups"`
 	Discounts             map[string]Discount             `json:"discounts"`
+	DeletedCustomers      map[string]DeletedObject        `json:"deleted_customers,omitempty"`
 	Balances              map[string]*AccountBalance      `json:"balances"`
 	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
 }
@@ -356,6 +361,7 @@ func (s *MemoryStore) Snapshot() any {
 		Persons:               s.Persons.Snapshot(),
 		TopUps:                s.TopUps.Snapshot(),
 		Discounts:             s.Discounts.Snapshot(),
+		DeletedCustomers:      s.DeletedCustomers.Snapshot(),
 		Balances:              s.snapshotBalances(),
 		PlatformBalance:       s.PlatformBalance,
 	}
@@ -421,6 +427,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Persons.LoadSnapshot(snap.Persons)
 	s.TopUps.LoadSnapshot(snap.TopUps)
 	s.Discounts.LoadSnapshot(snap.Discounts)
+	s.DeletedCustomers.LoadSnapshot(snap.DeletedCustomers)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -478,6 +485,7 @@ func (s *MemoryStore) Reset() {
 	s.Persons.Reset()
 	s.TopUps.Reset()
 	s.Discounts.Reset()
+	s.DeletedCustomers.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()

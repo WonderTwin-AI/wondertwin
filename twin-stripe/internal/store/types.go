@@ -166,6 +166,13 @@ type Customer struct {
 	Created       int64             `json:"created"`
 }
 
+// DeletedObject is the stub Stripe returns for a deleted object.
+type DeletedObject struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
 // Product represents a Stripe product.
 type Product struct {
 	ID           string            `json:"id"`

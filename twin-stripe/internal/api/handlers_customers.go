@@ -38,6 +38,11 @@ func (h *Handler) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	cus, ok := h.store.Customers.Get(id)
 	if !ok {
+		// Stripe returns the deleted stub, not a 404, for a deleted customer.
+		if stub, deleted := h.store.DeletedCustomers.Get(id); deleted {
+			twincore.JSON(w, http.StatusOK, stub)
+			return
+		}
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such customer: "+id)
 		return
 	}
@@ -106,8 +111,10 @@ func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {
 		h.store.PaymentMethods.Set(pm.ID, pm)
 	}
 
+	stub := store.DeletedObject{ID: id, Object: "customer", Deleted: true}
+	h.store.DeletedCustomers.Set(id, stub)
 	h.emitEvent("customer.deleted", map[string]any{"id": id})
-	twincore.JSON(w, http.StatusOK, map[string]any{"id": id, "object": "customer", "deleted": true})
+	twincore.JSON(w, http.StatusOK, stub)
 }
 
 func (h *Handler) ListCustomers(w http.ResponseWriter, r *http.Request) {

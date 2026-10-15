@@ -216,6 +216,14 @@ const cases = {
     assert.deepEqual(cleared.metadata, {});
   },
 
+  async 'deleted-customer-retrieve'() {
+    const customer = await stripe.customers.create({});
+    await stripe.customers.del(customer.id);
+    const read = await stripe.customers.retrieve(customer.id);
+    assert.equal(read.id, customer.id);
+    assert.equal(read.deleted, true);
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);
