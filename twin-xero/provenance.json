@@ -1,0 +1,22 @@
+{
+  "twin": "xero",
+  "sdk_target": {
+    "package": "xero-python",
+    "language": "python",
+    "version": "15.2.0"
+  },
+  "references": {
+    "manifest_path": "wondertwin-docs/research/twins/xero/references/manifest.json",
+    "manifest_sha256": "8b5546a81287f2f21cde80c0e19ccb45a54181cb1db1d9e3b0fd63759583c660",
+    "primary": "sdk-python-15.2.0",
+    "supporting": [
+      "sdk-typescript-20.0.0",
+      "openapi-accounting-19.0.0",
+      "openapi-identity-19.0.0",
+      "openapi-webhooks-19.0.0",
+      "docs-2026-09-28-pages"
+    ]
+  },
+  "build": 1,
+  "generated_at": "2026-10-16T00:00:00Z"
+}

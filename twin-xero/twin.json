@@ -1,0 +1,10 @@
+{
+  "name": "xero",
+  "description": "Simulates the Xero Accounting API, connections and OAuth for SDK-compatible local testing.",
+  "category": "accounting",
+  "sdk": {
+    "package": "xero-python",
+    "version": "15.2.0"
+  },
+  "default_port": 4115
+}

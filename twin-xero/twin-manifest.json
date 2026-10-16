@@ -1,0 +1,47 @@
+{
+  "display_name": "Xero",
+  "vendor_domain": "xero.com",
+  "tier": "community",
+  "category": "accounting",
+  "description": "Scaffold of the Xero app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). The Xero Accounting, connections and OAuth routes arrive in later slices of build plan xero-bp1.",
+  "sdk_target": {
+    "primary": {
+      "package": "xero-python",
+      "language": "python",
+      "version": "15.2.0",
+      "repo_url": "https://github.com/XeroAPI/xero-python",
+      "docs_url": "https://developer.xero.com/documentation/api/accounting/overview"
+    },
+    "additional": [
+      {
+        "package": "xero-node",
+        "language": "typescript",
+        "version": "20.0.0",
+        "repo_url": "https://github.com/XeroAPI/xero-node"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://github.com/XeroAPI/Xero-OpenAPI"
+    },
+    "auth_pattern": "oauth2",
+    "has_webhooks": true,
+    "resource_count": 0
+  },
+  "coverage": {
+    "resources_implemented": [],
+    "resources_not_implemented": []
+  },
+  "generation": {
+    "method": "wondertwin_skill"
+  },
+  "publisher": "localstack",
+  "vendor": "xero",
+  "twin_id": "twin-xero",
+  "vendor_certification": {
+    "status": "none"
+  }
+}
