@@ -13,14 +13,14 @@ import (
 // load and reset.
 type MemoryStore struct {
 	Clock *pkgstate.Clock
-	// Rand is the deterministic random source. main.go wires it to twin.Rand;
-	// left nil, a draw through it yields nothing.
+	// Rand is the deterministic random source behind NewID. New seeds it so a
+	// bare store works; main.go replaces it with twin.Rand.
 	Rand *sim.Rand
 }
 
 // New creates an empty MemoryStore.
 func New() *MemoryStore {
-	return &MemoryStore{Clock: pkgstate.NewClock()}
+	return &MemoryStore{Clock: pkgstate.NewClock(), Rand: sim.DefaultRand()}
 }
 
 // snapshot is the JSON form of the store. A field a state file leaves out
