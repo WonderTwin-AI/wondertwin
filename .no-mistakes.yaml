@@ -25,3 +25,14 @@ commands:
   test: "go test ./... -count=1 -timeout 120s"
   lint: 'golangci-lint cache clean && golangci-lint run ./... && go vet ./... && go run ./cmd/validate-schemas/ && { test -z "$(gofmt -l .)" || { echo "unformatted files (run gofmt -w .):"; gofmt -l .; exit 1; }; }'
   format: "gofmt -w ."
+
+# PRs are drafted from the LocalStack template (Motivation / Changes / Tests /
+# Related), not the gate's default narrative. The template is a separate file
+# from .github/PULL_REQUEST_TEMPLATE.md, which is what GitHub shows human
+# contributors. These keys are read only from the default branch, so they take
+# effect once this file is on main. The pasted intent is kept out of the public
+# body, and the generated evidence is folded.
+pr:
+  template: .github/pr-templates/localstack.md
+  publish_intent: false
+  appendix: collapsed
