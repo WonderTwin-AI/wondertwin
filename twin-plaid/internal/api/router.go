@@ -23,6 +23,8 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 // arrives with the slice that owns it, inside this group so every one of them
 // passes fault injection.
 func (h *Handler) Routes(r chi.Router) {
+	r.NotFound(h.notFound)
+	r.MethodNotAllowed(h.notFound)
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 	})
