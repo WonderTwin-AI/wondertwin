@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -97,7 +98,9 @@ func TestTokenErrorsUseTheIdentityShape(t *testing.T) {
 		{"no credentials", url.Values{"grant_type": {"client_credentials"}}, "", "", "invalid_client"},
 		{"empty Basic user", url.Values{"grant_type": {"client_credentials"}}, ":secret", "", "invalid_client"},
 		{"not a Basic header", url.Values{"grant_type": {"client_credentials"}, "client_id": {"x"}}, "", "Bearer abc", "invalid_client"},
-		{"code grant not yet served", url.Values{"grant_type": {"authorization_code"}}, "a:b", "", "unsupported_grant_type"},
+		{"grant not served", url.Values{"grant_type": {"device_code"}}, "a:b", "", "unsupported_grant_type"},
+		{"code grant without a code", url.Values{"grant_type": {"authorization_code"}}, "a:b", "", "invalid_request"},
+		{"refresh grant with an unknown token", url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"nope"}}, "a:b", "", "invalid_grant"},
 		{"no grant", url.Values{}, "a:b", "", "unsupported_grant_type"},
 	}
 	for _, tc := range cases {
@@ -142,5 +145,103 @@ func TestJwtIsSignedHS256(t *testing.T) {
 	mac.Write([]byte(parts[0] + "." + parts[1]))
 	if parts[2] != base64.RawURLEncoding.EncodeToString(mac.Sum(nil)) {
 		t.Fatal("signature does not verify")
+	}
+}
+
+func exchangeCode(t *testing.T, h *Handler, extra url.Values) map[string]any {
+	t.Helper()
+	form := url.Values{"grant_type": {"authorization_code"}, "code": {"any-code"}}
+	for k, v := range extra {
+		form[k] = v
+	}
+	rec := postToken(h, form, "app:secret")
+	if rec.Code != 200 {
+		t.Fatalf("code exchange status %d: %s", rec.Code, rec.Body)
+	}
+	return decode(t, rec)
+}
+
+func TestTokenCodeExchangeIssuesRefreshAndIDTokens(t *testing.T) {
+	h := newTestHandler()
+	body := exchangeCode(t, h, nil)
+
+	if body["scope"] != consentScope || body["expires_in"] != float64(1800) {
+		t.Fatalf("body = %v", body)
+	}
+	rt, _ := body["refresh_token"].(string)
+	if len(rt) != 32 {
+		t.Fatalf("refresh_token = %q, want 32 hex characters", rt)
+	}
+	if _, ok := h.store.RefreshTokens.Get(rt); !ok {
+		t.Fatal("the refresh token is not recorded")
+	}
+	if id := claimsOf(t, body["id_token"].(string)); id["aud"] != "app" || id["iss"] != issuer {
+		t.Fatalf("id_token claims = %v", id)
+	}
+}
+
+func TestTokenScopeDecidesWhichTokensComeBack(t *testing.T) {
+	body := exchangeCode(t, newTestHandler(), url.Values{"scope": {"accounting.contacts"}})
+
+	for _, k := range []string{"refresh_token", "id_token"} {
+		if _, ok := body[k]; ok {
+			t.Fatalf("without offline_access or openid there must be no %s", k)
+		}
+	}
+}
+
+func TestTokenRefreshRotatesAndKeepsTheAuthenticationEvent(t *testing.T) {
+	h := newTestHandler()
+	first := exchangeCode(t, h, nil)
+	old := first["refresh_token"].(string)
+
+	// xero-python sends client credentials in the body, not as Basic.
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {old}, "client_id": {"sdk"}, "client_secret": {"s"}}
+	rec := postToken(h, form, "")
+	if rec.Code != 200 {
+		t.Fatalf("refresh status %d: %s", rec.Code, rec.Body)
+	}
+	next := decode(t, rec)
+	if next["refresh_token"] == old || next["scope"] != first["scope"] {
+		t.Fatalf("refresh must rotate the token and keep the scope: %v", next)
+	}
+	was, now := claimsOf(t, first["access_token"].(string)), claimsOf(t, next["access_token"].(string))
+	if was["authentication_event_id"] != now["authentication_event_id"] || now["client_id"] != "app" {
+		t.Fatalf("authentication_event_id or client changed across a refresh: %v then %v", was, now)
+	}
+
+	replay := postToken(h, form, "")
+	if body := decode(t, replay); replay.Code != 400 || body["error"] != "invalid_grant" {
+		t.Fatalf("a redeemed refresh token must be refused: %d %v", replay.Code, body)
+	}
+}
+
+func TestTokenRefreshRedemptionIsSingleUseUnderConcurrency(t *testing.T) {
+	h := newTestHandler()
+	old := exchangeCode(t, h, nil)["refresh_token"].(string)
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {old}, "client_id": {"sdk"}}
+
+	const callers = 32
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var ok, refused int
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec := postToken(h, form, "")
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case rec.Code == 200:
+				ok++
+			case rec.Code == 400 && strings.Contains(rec.Body.String(), "invalid_grant"):
+				refused++
+			}
+		}()
+	}
+	wg.Wait()
+	if ok != 1 || refused != callers-1 {
+		t.Fatalf("got %d successes and %d invalid_grant of %d, want 1 and %d", ok, refused, callers, callers-1)
 	}
 }

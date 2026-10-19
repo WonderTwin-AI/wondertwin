@@ -10,3 +10,12 @@ type AccessToken struct {
 	AuthEventID string    `json:"authentication_event_id"`
 	ExpiresAt   time.Time `json:"expires_at"`
 }
+
+// RefreshToken is an issued refresh token, keyed by the token string. Xero
+// refresh tokens are single use: redeeming one marks it Used and issues the next.
+type RefreshToken struct {
+	ClientID    string `json:"client_id"`
+	Scope       string `json:"scope"`
+	AuthEventID string `json:"authentication_event_id"`
+	Used        bool   `json:"used"`
+}

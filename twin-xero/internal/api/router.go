@@ -2,6 +2,8 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
@@ -12,6 +14,8 @@ import (
 type Handler struct {
 	store *store.MemoryStore
 	mw    *twincore.Middleware
+
+	redeem sync.Mutex
 }
 
 // NewHandler creates a new Xero API handler.

@@ -72,10 +72,11 @@ func TestStoreTenantedSnapshotLoadAndReset(t *testing.T) {
 func TestStoreAccessTokensSnapshotLoadAndReset(t *testing.T) {
 	s := store.New()
 	s.AccessTokens.Set("tok", store.AccessToken{ClientID: "app", Scope: "accounting.contacts"})
+	s.RefreshTokens.Set("rt", store.RefreshToken{ClientID: "app", Used: true})
 	snap := s.Snapshot()
 
 	s.Reset()
-	if s.AccessTokens.Count() != 0 {
+	if s.AccessTokens.Count() != 0 || s.RefreshTokens.Count() != 0 {
 		t.Fatal("reset left tokens behind")
 	}
 	b, _ := json.Marshal(snap)
@@ -85,7 +86,10 @@ func TestStoreAccessTokensSnapshotLoadAndReset(t *testing.T) {
 	if got, ok := s.AccessTokens.Get("tok"); !ok || got.ClientID != "app" {
 		t.Fatalf("token = %+v, %v after load", got, ok)
 	}
-	if err := s.LoadState([]byte(`{}`)); err != nil || s.AccessTokens.Count() != 1 {
+	if got, ok := s.RefreshTokens.Get("rt"); !ok || !got.Used {
+		t.Fatalf("refresh token = %+v, %v after load", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.AccessTokens.Count() != 1 || s.RefreshTokens.Count() != 1 {
 		t.Fatal("a state file that omits the tokens must leave them alone")
 	}
 }
