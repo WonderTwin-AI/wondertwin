@@ -19,11 +19,12 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 	return &Handler{store: s, mw: mw}
 }
 
-// Routes mounts the Xero API routes. The scaffold has none: the Accounting,
-// connections and OAuth routes arrive with the slices that own them, inside
-// this group so every one of them passes fault injection.
+// Routes mounts the Xero API routes, inside one group so every one of them
+// passes fault injection. The token endpoint answers without a bearer token,
+// since it is how a client gets one.
 func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
+		r.Post("/connect/token", h.Token)
 	})
 }

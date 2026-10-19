@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"encoding/json"
 	"regexp"
 	"testing"
 
@@ -65,5 +66,26 @@ func TestStoreTenantedSnapshotLoadAndReset(t *testing.T) {
 	}
 	if n := ts.For("t1").Count(); n != 1 {
 		t.Fatalf("t1 holds %d after load, want 1", n)
+	}
+}
+
+func TestStoreAccessTokensSnapshotLoadAndReset(t *testing.T) {
+	s := store.New()
+	s.AccessTokens.Set("tok", store.AccessToken{ClientID: "app", Scope: "accounting.contacts"})
+	snap := s.Snapshot()
+
+	s.Reset()
+	if s.AccessTokens.Count() != 0 {
+		t.Fatal("reset left tokens behind")
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := s.AccessTokens.Get("tok"); !ok || got.ClientID != "app" {
+		t.Fatalf("token = %+v, %v after load", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.AccessTokens.Count() != 1 {
+		t.Fatal("a state file that omits the tokens must leave them alone")
 	}
 }
