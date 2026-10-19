@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -60,13 +61,16 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		}
 	case "refresh_token":
 		token := r.PostFormValue("refresh_token")
+		h.redeem.Lock()
 		old, found := h.store.RefreshTokens.Get(token)
 		if !found || old.Used {
+			h.redeem.Unlock()
 			oauthError(w, "invalid_grant")
 			return
 		}
 		old.Used = true
 		h.store.RefreshTokens.Set(token, old)
+		h.redeem.Unlock()
 		client, scope, authEvent = old.ClientID, old.Scope, old.AuthEventID
 	case "client_credentials":
 		user = false
@@ -97,25 +101,16 @@ func (h *Handler) issue(w http.ResponseWriter, client, scope, authEvent string, 
 		"access_token": access, "expires_in": int(accessTokenLifetime.Seconds()),
 		"token_type": "Bearer", "scope": scope,
 	}
-	if user && hasScope(scopes, "offline_access") {
+	if user && slices.Contains(scopes, "offline_access") {
 		rt := strings.ReplaceAll(h.store.NewID(), "-", "")
 		h.store.RefreshTokens.Set(rt, store.RefreshToken{ClientID: client, Scope: scope, AuthEventID: authEvent})
 		resp["refresh_token"] = rt
 	}
-	if user && hasScope(scopes, "openid") {
+	if user && slices.Contains(scopes, "openid") {
 		resp["id_token"] = signJWT(map[string]any{
 			"iss": issuer, "aud": client, "sub": authEvent, "sid": authEvent,
 			"iat": now.Unix(), "nbf": now.Unix(), "exp": exp.Unix(),
 		})
 	}
 	twincore.JSON(w, http.StatusOK, resp)
-}
-
-func hasScope(scopes []string, want string) bool {
-	for _, s := range scopes {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }
