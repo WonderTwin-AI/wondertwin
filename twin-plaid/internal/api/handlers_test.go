@@ -113,3 +113,14 @@ func TestOriginFollowsForwardedHeaders(t *testing.T) {
 		})
 	}
 }
+
+func TestUnknownRoutesAnswerPlaidNotFound(t *testing.T) {
+	tc, _, _ := setupPlaid(t)
+
+	resp := tc.Post("/does/not/exist", "{}").AssertStatus(404)
+	m := resp.JSONMap()
+	if m["error_code"] != "NOT_FOUND" || m["error_message"] != "invalid route: /does/not/exist" {
+		t.Fatalf("body = %v", m)
+	}
+	tc.Get("/accounts/get").AssertStatus(404)
+}
