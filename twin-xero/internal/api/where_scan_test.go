@@ -34,7 +34,7 @@ func TestWhereScanLiteralsAndOperators(t *testing.T) {
 		{`Name == "a == b"`, cmpExpr{"Name", "==", "a == b"}},
 	}
 	for _, tc := range cases {
-		got, err := parseComparison(tc.src)
+		got, err := ParseWhere(tc.src)
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: got %#v, %v; want %#v", tc.src, got, err, tc.want)
 		}
@@ -51,7 +51,6 @@ func TestWhereScanRefusesWhatXeroRefuses(t *testing.T) {
 		`Type == BANK`:                   "expected a value",
 		`Type == "BANK`:                  "unterminated string",
 		`Type == "BANK" extra`:           "unexpected",
-		`Type == "A" && Status == "B"`:   "unexpected", // logic is the next slice's
 		`Type == nullable`:               "expected a value",
 		`Type == truely`:                 "expected a value",
 		`D == DateTime(2015, 01)`:        "DateTime takes",
@@ -68,7 +67,7 @@ func TestWhereScanRefusesWhatXeroRefuses(t *testing.T) {
 		`Type==%22BANK%22`:               "expected a value",
 	}
 	for src, want := range cases {
-		_, err := parseComparison(src)
+		_, err := ParseWhere(src)
 		var we *WhereError
 		if !errors.As(err, &we) || !strings.Contains(we.Msg, want) {
 			t.Errorf("%q: error %v, want a WhereError containing %q", src, err, want)
