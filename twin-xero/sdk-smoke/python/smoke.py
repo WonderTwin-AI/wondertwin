@@ -89,6 +89,51 @@ def case_client_credentials():
     assert token.access_token.count(".") == 2 and token.expires_in == 1800 and token.refresh_token is None
 
 
+def set_strict_auth(on):
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request("PUT", "/admin/config", json.dumps({"strict_auth": on}), {"Content-Type": "application/json"})
+    assert conn.getresponse().status == 200, "PUT /admin/config failed"
+
+
+def made_up_client():
+    """What localstack/finance-ops seeds: a token the emulator never issued."""
+    client, token = new_client()
+    seeded = {"access_token": "xero-local-test-token", "refresh_token": "xero-local-test-refresh", "token_type": "Bearer",
+              "scope": "accounting.contacts offline_access", "expires_in": 1800}
+    token.update_token(**seeded, expires_at=time.time() + 1800)
+    client.set_oauth2_token(seeded)
+    return client, token
+
+
+def case_made_up_tokens_are_accepted_by_default():
+    client, token = made_up_client()
+    assert len(IdentityApi(client, base_url=BASE).get_connections()) == 1
+    token.expires_at = time.time() - 1  # the SDK now refreshes with the made-up refresh token
+    assert token.get_valid_access_token(client) != "xero-local-test-token"
+
+
+def case_strict_auth_refuses_made_up_tokens():
+    set_strict_auth(True)
+    try:
+        client, token = made_up_client()
+        try:
+            IdentityApi(client, base_url=BASE).get_connections()
+            raise AssertionError("strict auth let a made-up bearer token through")
+        except AssertionError:
+            raise
+        except Exception as e:  # the SDK raises on a 401
+            assert "401" in str(e) or "nauthorized" in str(e), str(e)
+        try:
+            token.refresh_access_token(client)
+            raise AssertionError("strict auth let a made-up refresh token through")
+        except AssertionError:
+            raise
+        except Exception as e:
+            assert "invalid_grant" in str(e), str(e)
+    finally:
+        set_strict_auth(False)
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, then list the connected
     tenants. The SDK calls GET /Connections and parses the zoneless ISO dates."""
@@ -101,6 +146,8 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
+    ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
     ("connect: a code exchange, then get_connections returns the tenant", case_connect_tenant),
     ("refresh rotates the token", case_refresh_rotates_the_token),
     ("a replayed refresh token is refused", case_replayed_refresh_token_is_refused),

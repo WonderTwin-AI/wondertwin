@@ -106,6 +106,7 @@ func TestTokenErrorsUseTheIdentityShape(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newTestHandler()
+			h.store.StrictAuth.Store(true)
 			req := httptest.NewRequest(http.MethodPost, "/connect/token", strings.NewReader(tc.form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			if tc.basic != "" {

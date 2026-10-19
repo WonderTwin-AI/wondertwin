@@ -63,15 +63,24 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		token := r.PostFormValue("refresh_token")
 		h.redeem.Lock()
 		old, found := h.store.RefreshTokens.Get(token)
-		if !found || old.Used {
+		// A redeemed token is always refused. One this emulator never issued is
+		// refused only under StrictAuth; otherwise it is taken as a fresh sign-in.
+		if (found && old.Used) || (!found && (token == "" || h.store.StrictAuth.Load())) {
 			h.redeem.Unlock()
 			oauthError(w, "invalid_grant")
 			return
 		}
-		old.Used = true
-		h.store.RefreshTokens.Set(token, old)
+		if found {
+			old.Used = true
+			h.store.RefreshTokens.Set(token, old)
+			client, scope, authEvent = old.ClientID, old.Scope, old.AuthEventID
+		} else {
+			authEvent = store.DefaultAuthEventID
+			if scope == "" {
+				scope = consentScope
+			}
+		}
 		h.redeem.Unlock()
-		client, scope, authEvent = old.ClientID, old.Scope, old.AuthEventID
 	case "client_credentials":
 		user = false
 		if scope == "" {

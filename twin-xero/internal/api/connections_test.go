@@ -69,6 +69,7 @@ func TestConnectionsListTheDefaultTenantUnderBothCasings(t *testing.T) {
 
 func TestConnectionsNeedAValidUnexpiredBearerToken(t *testing.T) {
 	h := newTestHandler()
+	h.store.StrictAuth.Store(true)
 	good := tokenFor(t, h)
 	cases := []struct {
 		name    string

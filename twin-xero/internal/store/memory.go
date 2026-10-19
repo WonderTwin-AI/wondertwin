@@ -3,6 +3,7 @@ package store
 
 import (
 	"encoding/json"
+	"sync/atomic"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -15,6 +16,11 @@ type MemoryStore struct {
 	AccessTokens  *pkgstate.Store[AccessToken]
 	RefreshTokens *pkgstate.Store[RefreshToken]
 	Connections   *pkgstate.Store[Connection]
+	// StrictAuth makes the emulator refuse bearer and refresh tokens it did not
+	// issue, as Xero does. Off by default: localstack/finance-ops seeds made-up
+	// tokens and relies on xero-local accepting any. It is configuration, so
+	// neither reset nor a state file touches it.
+	StrictAuth atomic.Bool
 	// Rand is the deterministic random source behind NewID. New seeds it so a
 	// bare store works; main.go replaces it with twin.Rand.
 	Rand *sim.Rand
