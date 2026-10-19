@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,8 +31,16 @@ type (
 	andExpr  struct{ l, r Where }
 )
 
+// Getter reads a field by dotted path (Contact.ContactID) from a record. A value
+// is a string, a number (float64, int or int64), a bool, a time.Time or nil; ok
+// is false for a path the record does not have, which reads as null.
+type Getter func(path string) (value any, ok bool)
+
 // Where is a parsed where expression.
 type Where interface {
+	// Match reports whether a record satisfies the expression. A WhereError
+	// means the expression compares a field with a literal of another type.
+	Match(get Getter) (bool, error)
 	// String renders the expression fully parenthesised, so a test can see how
 	// it was grouped.
 	String() string
@@ -269,4 +278,111 @@ func litString(lit any) string {
 		return fmt.Sprintf("DateTime(%d,%d,%d,%d,%d,%d)", l.Year(), l.Month(), l.Day(), l.Hour(), l.Minute(), l.Second())
 	}
 	return fmt.Sprint(lit)
+}
+
+func (e orExpr) Match(g Getter) (bool, error) {
+	if ok, err := e.l.Match(g); ok || err != nil {
+		return ok, err
+	}
+	return e.r.Match(g)
+}
+
+func (e andExpr) Match(g Getter) (bool, error) {
+	if ok, err := e.l.Match(g); !ok || err != nil {
+		return false, err
+	}
+	return e.r.Match(g)
+}
+
+// Match applies a string call. A field that is not a string never matches.
+func (e callExpr) Match(g Getter) (bool, error) {
+	v, _ := g(e.path)
+	s, ok := v.(string)
+	switch {
+	case !ok:
+		return false, nil
+	case e.method == "Contains":
+		return strings.Contains(s, e.arg), nil
+	case e.method == "StartsWith":
+		return strings.HasPrefix(s, e.arg), nil
+	}
+	return strings.HasSuffix(s, e.arg), nil
+}
+
+func (e cmpExpr) Match(g Getter) (bool, error) {
+	if _, isBool := e.lit.(bool); isBool && e.op != "==" && e.op != "!=" {
+		return false, werr("cannot compare %s: booleans only support == and !=", e.path)
+	}
+	v, _ := g(e.path)
+	c, err := compare(v, e.lit)
+	if err != nil {
+		return false, werr("cannot compare %s: %v", e.path, err)
+	}
+	switch e.op {
+	case "==":
+		return c == 0, nil
+	case "!=":
+		return c != 0, nil
+	case "<":
+		return c == -1, nil
+	case "<=":
+		return c == -1 || c == 0, nil
+	case ">":
+		return c == 1, nil
+	}
+	return c == 1 || c == 0, nil // >=
+}
+
+// unordered is compare's answer when exactly one side is null: such values are
+// neither equal nor ordered, so only != holds.
+const unordered = 2
+
+// compare orders a record value against a literal: -1, 0 or 1, or unordered. A
+// number is compared as a float, a Guid without regard to case, a string
+// byte for byte, and a bool for equality only (Match refuses to order one).
+func compare(v, lit any) (int, error) {
+	if v == nil || lit == nil {
+		if v == nil && lit == nil {
+			return 0, nil
+		}
+		return unordered, nil
+	}
+	switch l := lit.(type) {
+	case guid:
+		if s, ok := v.(string); ok {
+			return strings.Compare(strings.ToLower(s), strings.ToLower(string(l))), nil
+		}
+	case string:
+		if s, ok := v.(string); ok {
+			return strings.Compare(s, l), nil
+		}
+	case bool:
+		if b, ok := v.(bool); ok {
+			if b == l {
+				return 0, nil
+			}
+			return 1, nil // unequal; a bool has no order
+		}
+	case time.Time:
+		if t, ok := v.(time.Time); ok {
+			return t.Compare(l), nil
+		}
+	case float64:
+		if f, ok := toFloat(v); ok {
+			return cmp.Compare(f, l), nil
+		}
+	}
+	return 0, fmt.Errorf("%T against %T", v, lit)
+}
+
+func toFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
 }
