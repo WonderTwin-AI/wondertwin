@@ -1,0 +1,21 @@
+{
+  "twin": "plaid",
+  "sdk_target": {
+    "package": "plaid-python",
+    "language": "python",
+    "version": "44.0.0"
+  },
+  "references": {
+    "manifest_path": "wondertwin-docs/research/twins/plaid/references/manifest.json",
+    "manifest_sha256": "232bfb48d420d93d89b1cd98abb4e43ba0467a582d44178509c7c0379bf0afbf",
+    "primary": "sdk-python-44.0.0",
+    "supporting": [
+      "sdk-typescript-47.0.0",
+      "sdk-go-v47.0.0",
+      "openapi-2020-09-14_1.740.1",
+      "docs-2026-09-28-pages"
+    ]
+  },
+  "build": 1,
+  "generated_at": "2026-10-19T00:00:00Z"
+}
