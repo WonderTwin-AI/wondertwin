@@ -176,5 +176,10 @@ func (p *whereParser) dateTime() (any, error) {
 		return nil, werr("DateTime takes year, month, day and optionally hour, minute, second")
 	}
 	part = append(part, 0, 0, 0)
-	return time.Date(part[0], time.Month(part[1]), part[2], part[3], part[4], part[5], 0, time.UTC), nil
+	t := time.Date(part[0], time.Month(part[1]), part[2], part[3], part[4], part[5], 0, time.UTC)
+	y, mo, d := t.Date()
+	if y != part[0] || int(mo) != part[1] || d != part[2] || t.Hour() != part[3] || t.Minute() != part[4] || t.Second() != part[5] {
+		return nil, werr("DateTime(%d,%d,%d,%d,%d,%d) is not a date", part[0], part[1], part[2], part[3], part[4], part[5])
+	}
+	return t, nil
 }
