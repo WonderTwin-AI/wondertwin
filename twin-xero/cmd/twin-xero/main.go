@@ -8,6 +8,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	strict := flag.Bool("strict-auth", false, "refuse bearer and refresh tokens this emulator did not issue, as Xero does")
 	cfg := twincore.ParseFlags("twin-xero")
 	if cfg.Port == 0 {
 		cfg.Port = 4115
@@ -26,12 +28,13 @@ func main() {
 	twin := twincore.New(cfg)
 	memStore := store.New()
 	memStore.Rand = twin.Rand
+	memStore.StrictAuth.Store(*strict)
 
 	apiHandler := api.NewHandler(memStore, twin.Middleware())
 	apiHandler.Routes(twin.Router)
 
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
-	adminHandler.SetConfigProvider(twin)
+	adminHandler.SetConfigProvider(api.NewConfig(twin, memStore))
 	adminHandler.Routes(twin.Router)
 
 	if cfg.SeedFile != "" {
