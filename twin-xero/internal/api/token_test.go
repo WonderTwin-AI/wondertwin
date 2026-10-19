@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -212,5 +213,35 @@ func TestTokenRefreshRotatesAndKeepsTheAuthenticationEvent(t *testing.T) {
 	replay := postToken(h, form, "")
 	if body := decode(t, replay); replay.Code != 400 || body["error"] != "invalid_grant" {
 		t.Fatalf("a redeemed refresh token must be refused: %d %v", replay.Code, body)
+	}
+}
+
+func TestTokenRefreshRedemptionIsSingleUseUnderConcurrency(t *testing.T) {
+	h := newTestHandler()
+	old := exchangeCode(t, h, nil)["refresh_token"].(string)
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {old}, "client_id": {"sdk"}}
+
+	const callers = 32
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var ok, refused int
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec := postToken(h, form, "")
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case rec.Code == 200:
+				ok++
+			case rec.Code == 400 && strings.Contains(rec.Body.String(), "invalid_grant"):
+				refused++
+			}
+		}()
+	}
+	wg.Wait()
+	if ok != 1 || refused != callers-1 {
+		t.Fatalf("got %d successes and %d invalid_grant of %d, want 1 and %d", ok, refused, callers, callers-1)
 	}
 }
