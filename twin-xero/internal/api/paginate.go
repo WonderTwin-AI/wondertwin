@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math"
 	"net/http"
 	"slices"
 	"sort"
@@ -13,6 +14,7 @@ import (
 const (
 	defaultPageSize = 100
 	maxPageSize     = 1000
+	maxPage         = math.MaxInt / maxPageSize
 )
 
 // pagination is the object Xero returns beside a page of results.
@@ -50,7 +52,7 @@ func paginate[T any](r *http.Request, items []T, key func(T) (time.Time, string)
 		return out, nil
 	}
 	size := min(max(intOr(q.Get("pageSize"), defaultPageSize), 1), maxPageSize)
-	p := kitpage.PagePaginate(sorted, intOr(q.Get("page"), 1), size)
+	p := kitpage.PagePaginate(sorted, min(intOr(q.Get("page"), 1), maxPage), size)
 	return p.Data, &pagination{Page: p.Page, PageSize: p.PageSize, PageCount: p.TotalPages, ItemCount: p.TotalCount}
 }
 

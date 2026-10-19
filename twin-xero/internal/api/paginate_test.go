@@ -102,6 +102,15 @@ func TestPaginatePageSizeIsClamped(t *testing.T) {
 	}
 }
 
+func TestPaginateHugePageIsEmptyNotAPanic(t *testing.T) {
+	for _, size := range []string{"", "&pageSize=1000"} {
+		got, pg := page(t, rows(5), "?page=9223372036854775807"+size)
+		if len(got) != 0 || pg == nil || pg.ItemCount != 5 {
+			t.Errorf("pageSize%q: got %d items, %+v, want an empty page and itemCount 5", size, len(got), pg)
+		}
+	}
+}
+
 func TestPaginateEnvelopeCarriesThePaginationObjectBeforeTheArray(t *testing.T) {
 	h := newTestHandler()
 	rec := httptest.NewRecorder()
