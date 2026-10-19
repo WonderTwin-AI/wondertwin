@@ -1,0 +1,53 @@
+{
+  "display_name": "Plaid",
+  "vendor_domain": "plaid.com",
+  "tier": "community",
+  "category": "fintech",
+  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). The Plaid API routes arrive in later slices of build plan plaid-bp1.",
+  "sdk_target": {
+    "primary": {
+      "package": "plaid-python",
+      "language": "python",
+      "version": "44.0.0",
+      "repo_url": "https://github.com/plaid/plaid-python",
+      "docs_url": "https://plaid.com/docs/api/"
+    },
+    "additional": [
+      {
+        "package": "plaid-node",
+        "language": "typescript",
+        "version": "47.0.0",
+        "repo_url": "https://github.com/plaid/plaid-node"
+      },
+      {
+        "package": "plaid-go",
+        "language": "go",
+        "version": "47.0.0",
+        "repo_url": "https://github.com/plaid/plaid-go"
+      }
+    ]
+  },
+  "service_surface": {
+    "openapi_spec": {
+      "available": true,
+      "origin": "vendor_published",
+      "url": "https://github.com/plaid/plaid-openapi"
+    },
+    "auth_pattern": "custom",
+    "has_webhooks": true,
+    "resource_count": 0
+  },
+  "coverage": {
+    "resources_implemented": [],
+    "resources_not_implemented": []
+  },
+  "generation": {
+    "method": "wondertwin_skill"
+  },
+  "publisher": "localstack",
+  "vendor": "plaid",
+  "twin_id": "twin-plaid",
+  "vendor_certification": {
+    "status": "none"
+  }
+}

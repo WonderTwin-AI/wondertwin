@@ -1,0 +1,10 @@
+{
+  "name": "plaid",
+  "description": "Simulates the Plaid API (Items, Accounts, Transactions, Institutions, webhooks) for SDK-compatible local testing.",
+  "category": "fintech",
+  "sdk": {
+    "package": "plaid-python",
+    "version": "44.0.0"
+  },
+  "default_port": 4116
+}
