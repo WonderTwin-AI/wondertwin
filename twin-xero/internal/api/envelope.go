@@ -16,6 +16,12 @@ const providerName = "WonderTwin"
 // Id, Status, ProviderName and DateTimeUTC, so a read of one invoice is still
 // {"Invoices": [..]}. A nil list is written as [], never null.
 func (h *Handler) writeEnvelope(w http.ResponseWriter, status int, plural string, items any) {
+	h.writeListEnvelope(w, status, plural, items, nil)
+}
+
+// writeListEnvelope is writeEnvelope with the pagination object Xero puts
+// between DateTimeUTC and the array when a list was asked for by page.
+func (h *Handler) writeListEnvelope(w http.ResponseWriter, status int, plural string, items any, pg *pagination) {
 	body, err := json.Marshal(items)
 	if err != nil || bytes.Equal(body, []byte("null")) {
 		body = []byte("[]")
@@ -28,6 +34,11 @@ func (h *Handler) writeEnvelope(w http.ResponseWriter, status int, plural string
 	out.WriteString(`,"DateTimeUTC":`)
 	out.Write(mustJSON(Msdate(h.store.Clock.Now().UTC().Truncate(time.Millisecond))))
 	out.WriteByte(',')
+	if pg != nil {
+		out.WriteString(`"pagination":`)
+		out.Write(mustJSON(pg))
+		out.WriteByte(',')
+	}
 	out.Write(mustJSON(plural))
 	out.WriteByte(':')
 	out.Write(body)
