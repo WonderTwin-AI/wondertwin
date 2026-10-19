@@ -12,7 +12,9 @@
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added for the named target localstack/finance-ops, which seeds a made-up token per test (tests/conftest.py seed_xero_token) and relies on xero-local accepting any bearer. Becomes operator-approved when WonderTwin-AI/wondertwin-docs#261, which adds slice xero-bp1-s24, is merged.",
-      "quirk_ids": ["auth-007"]
+      "quirk_ids": [
+        "auth-007"
+      ]
     },
     {
       "route": "POST /connect/token (refresh_token grant)",
@@ -22,7 +24,21 @@
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Same reason as the bearer divergence: localstack/finance-ops seeds xero-local-test-refresh. Becomes operator-approved when WonderTwin-AI/wondertwin-docs#261 is merged.",
-      "quirk_ids": ["auth-003"]
+      "quirk_ids": [
+        "auth-003"
+      ]
+    },
+    {
+      "route": "every /api.xro/2.0 route (xero-tenant-id)",
+      "reason": "A xero-tenant-id header is required, as on Xero, but by default an unknown tenant id is accepted and sees an empty tenant. Xero refuses a tenant the token cannot reach with a 403. strict_auth restores the 403. The 403 body itself is a guess at Xero's problem-details shape: the real one is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json auth-001",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Same reason as the bearer divergence: localstack/finance-ops sends its own tenant id (tests/conftest.py XERO_TENANT_ID) and relies on xero-local not checking it. The default tenant id is finance-ops's value, so its own calls reach seeded data.",
+      "quirk_ids": [
+        "auth-001"
+      ]
     }
   ]
 }

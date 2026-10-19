@@ -111,3 +111,25 @@ func TestStoreDefaultConnectionSurvivesResetAndLoad(t *testing.T) {
 		t.Fatal("a seeded connections map replaces the store")
 	}
 }
+
+func TestStoreDefaultOrganisationBelongsToTheTenantFinanceOpsSeeds(t *testing.T) {
+	if store.DefaultTenantID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("the default tenant id must be the one localstack/finance-ops seeds, got %s", store.DefaultTenantID)
+	}
+	s := store.New()
+	o, ok := s.Organisations.Get(store.DefaultTenantID)
+	if !ok || o.Name != store.DefaultTenantName || o.Version != "GLOBAL" {
+		t.Fatalf("organisation = %+v, %v", o, ok)
+	}
+	s.Organisations.Set("other", store.Organisation{Name: "x"})
+	s.Reset()
+	if _, ok := s.Organisations.Get("other"); ok || s.Organisations.Count() != 1 {
+		t.Fatal("reset must leave exactly the default organisation")
+	}
+	if err := s.LoadState([]byte(`{"organisations":{"t1":{"Name":"Seeded"}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.Organisations.Get("t1"); got.Name != "Seeded" || s.Organisations.Count() != 1 {
+		t.Fatal("a seeded organisations map replaces the store")
+	}
+}

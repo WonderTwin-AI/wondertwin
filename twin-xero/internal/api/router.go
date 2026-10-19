@@ -35,6 +35,11 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Use(h.bearer)
 			r.Get("/connections", h.Connections)
 			r.Get("/Connections", h.Connections)
+
+			r.Route("/api.xro/2.0", func(r chi.Router) {
+				r.Use(h.tenant)
+				r.Get("/Organisation", h.Organisation)
+			})
 		})
 	})
 }
