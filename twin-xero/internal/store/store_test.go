@@ -93,3 +93,21 @@ func TestStoreAccessTokensSnapshotLoadAndReset(t *testing.T) {
 		t.Fatal("a state file that omits the tokens must leave them alone")
 	}
 }
+
+func TestStoreDefaultConnectionSurvivesResetAndLoad(t *testing.T) {
+	s := store.New()
+	if c, ok := s.Connections.Get(store.DefaultConnectionID); !ok || c.TenantID != store.DefaultTenantID {
+		t.Fatalf("a new store must hold the default connection, got %+v %v", c, ok)
+	}
+	s.Connections.Set("extra", store.Connection{ID: "extra"})
+	s.Reset()
+	if s.Connections.Count() != 1 {
+		t.Fatalf("reset must leave exactly the default connection, found %d", s.Connections.Count())
+	}
+	if err := s.LoadState([]byte(`{"connections":{"c1":{"id":"c1","tenantId":"t1"}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := s.Connections.Get("c1"); !ok || s.Connections.Count() != 1 {
+		t.Fatal("a seeded connections map replaces the store")
+	}
+}
