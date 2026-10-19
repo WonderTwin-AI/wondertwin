@@ -39,6 +39,7 @@ func (h *Handler) Routes(r chi.Router) {
 			r.Route("/api.xro/2.0", func(r chi.Router) {
 				r.Use(h.tenant)
 				r.Get("/Organisation", h.Organisation)
+				r.Get("/Accounts", h.Accounts)
 			})
 		})
 	})

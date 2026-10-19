@@ -135,6 +135,17 @@ def case_strict_auth_refuses_made_up_tokens():
         set_strict_auth(False)
 
 
+def case_chart_of_accounts():
+    client, token, _ = signed_in()
+    tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
+    accounts = AccountingApi(client, base_url=f"{BASE}/api.xro/2.0").get_accounts(tenant).accounts
+    by_code = {a.code: a for a in accounts}
+    for code in ("090", "200", "201", "404"):  # the accounts localstack/finance-ops posts to
+        assert code in by_code, f"account {code} is missing from the chart"
+    assert by_code["090"].type.value == "BANK", "the SDK parsed Type into its AccountType enum"
+    assert by_code["200"].updated_date_utc.year >= 2026, "the SDK parsed UpdatedDateUTC as a /Date()/ value"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -152,6 +163,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
     ("connect: a code exchange, then get_connections returns the tenant", case_connect_tenant),
