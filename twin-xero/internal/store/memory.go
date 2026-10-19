@@ -16,6 +16,8 @@ type MemoryStore struct {
 	AccessTokens  *pkgstate.Store[AccessToken]
 	RefreshTokens *pkgstate.Store[RefreshToken]
 	Connections   *pkgstate.Store[Connection]
+	// Organisations is keyed by tenant id.
+	Organisations *pkgstate.Store[Organisation]
 	// StrictAuth makes the emulator refuse bearer and refresh tokens it did not
 	// issue, as Xero does. Off by default: localstack/finance-ops seeds made-up
 	// tokens and relies on xero-local accepting any. It is configuration, so
@@ -33,9 +35,11 @@ func New() *MemoryStore {
 		AccessTokens:  pkgstate.New[AccessToken]("at"),
 		RefreshTokens: pkgstate.New[RefreshToken]("rt"),
 		Connections:   pkgstate.New[Connection]("conn"),
+		Organisations: pkgstate.New[Organisation]("org"),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
+	s.seedTenant()
 	return s
 }
 
@@ -45,6 +49,7 @@ type snapshot struct {
 	AccessTokens  map[string]AccessToken  `json:"access_tokens"`
 	RefreshTokens map[string]RefreshToken `json:"refresh_tokens"`
 	Connections   map[string]Connection   `json:"connections"`
+	Organisations map[string]Organisation `json:"organisations"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -53,6 +58,7 @@ func (s *MemoryStore) Snapshot() any {
 		AccessTokens:  s.AccessTokens.Snapshot(),
 		RefreshTokens: s.RefreshTokens.Snapshot(),
 		Connections:   s.Connections.Snapshot(),
+		Organisations: s.Organisations.Snapshot(),
 	}
 }
 
@@ -71,6 +77,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Connections != nil {
 		s.Connections.LoadSnapshot(snap.Connections)
 	}
+	if snap.Organisations != nil {
+		s.Organisations.LoadSnapshot(snap.Organisations)
+	}
 	return nil
 }
 
@@ -81,5 +90,7 @@ func (s *MemoryStore) Reset() {
 	s.AccessTokens.Reset()
 	s.RefreshTokens.Reset()
 	s.Connections.Reset()
+	s.Organisations.Reset()
 	s.seedConnection()
+	s.seedTenant()
 }

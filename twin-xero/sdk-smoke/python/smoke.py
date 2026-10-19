@@ -19,6 +19,7 @@ import urllib.parse
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
+from xero_python.accounting import AccountingApi
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -135,14 +136,19 @@ def case_strict_auth_refuses_made_up_tokens():
 
 
 def case_connect_tenant():
-    """The xero-connect-tenant flow: exchange a code, then list the connected
-    tenants. The SDK calls GET /Connections and parses the zoneless ISO dates."""
+    """The xero-connect-tenant flow: exchange a code, list the connected tenants
+    (GET /Connections, zoneless ISO dates), then read the organisation with the
+    tenant id from the connection."""
     client, _, _ = signed_in()
     connections = IdentityApi(client, base_url=BASE).get_connections()
     assert len(connections) == 1, f"expected the one default tenant, got {len(connections)}"
     c = connections[0]
     assert c.tenant_type == "ORGANISATION" and c.tenant_id and c.id and c.auth_event_id
     assert c.created_date_utc.year >= 2026 and c.created_date_utc.tzinfo is not None
+    # The tenant id comes from the connection, as it does for a real client (auth-001).
+    orgs = AccountingApi(client, base_url=f"{BASE}/api.xro/2.0").get_organisations(c.tenant_id).organisations
+    assert len(orgs) == 1 and orgs[0].name and orgs[0].version == "GLOBAL"
+    assert orgs[0].created_date_utc.year >= 2026, "the SDK parsed CreatedDateUTC as a /Date()/ value"
 
 
 CASES = [

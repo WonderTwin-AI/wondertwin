@@ -6,7 +6,7 @@ import "time"
 // they survive a reset: a client that stored the tenant id keeps a valid one.
 const (
 	DefaultConnectionID  = "4ae5e1de-8c3d-4d3e-9d2a-0a6f1c0de001"
-	DefaultTenantID      = "9d1b6c5e-2f4a-4b7c-8e1d-3c0de0000001"
+	DefaultTenantID      = "00000000-0000-0000-0000-000000000001" // the tenant localstack/finance-ops seeds
 	DefaultAuthEventID   = "7c2f1a9b-5d3e-4f60-a1b2-c3d4e5f60001"
 	DefaultTenantName    = "Demo Company (Global)"
 	defaultTenantTypeOrg = "ORGANISATION"
