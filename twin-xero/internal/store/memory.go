@@ -16,8 +16,9 @@ type MemoryStore struct {
 	AccessTokens  *pkgstate.Store[AccessToken]
 	RefreshTokens *pkgstate.Store[RefreshToken]
 	Connections   *pkgstate.Store[Connection]
-	// Organisations is keyed by tenant id.
+	// Organisations is keyed by tenant id; Accounts holds one chart per tenant.
 	Organisations *pkgstate.Store[Organisation]
+	Accounts      *Tenanted[Account]
 	// StrictAuth makes the emulator refuse bearer and refresh tokens it did not
 	// issue, as Xero does. Off by default: localstack/finance-ops seeds made-up
 	// tokens and relies on xero-local accepting any. It is configuration, so
@@ -36,6 +37,7 @@ func New() *MemoryStore {
 		RefreshTokens: pkgstate.New[RefreshToken]("rt"),
 		Connections:   pkgstate.New[Connection]("conn"),
 		Organisations: pkgstate.New[Organisation]("org"),
+		Accounts:      NewTenanted[Account](),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -46,10 +48,11 @@ func New() *MemoryStore {
 // snapshot is the JSON form of the store. A field a state file leaves out
 // leaves that store as it is.
 type snapshot struct {
-	AccessTokens  map[string]AccessToken  `json:"access_tokens"`
-	RefreshTokens map[string]RefreshToken `json:"refresh_tokens"`
-	Connections   map[string]Connection   `json:"connections"`
-	Organisations map[string]Organisation `json:"organisations"`
+	AccessTokens  map[string]AccessToken        `json:"access_tokens"`
+	RefreshTokens map[string]RefreshToken       `json:"refresh_tokens"`
+	Connections   map[string]Connection         `json:"connections"`
+	Organisations map[string]Organisation       `json:"organisations"`
+	Accounts      map[string]map[string]Account `json:"accounts"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -59,6 +62,7 @@ func (s *MemoryStore) Snapshot() any {
 		RefreshTokens: s.RefreshTokens.Snapshot(),
 		Connections:   s.Connections.Snapshot(),
 		Organisations: s.Organisations.Snapshot(),
+		Accounts:      s.Accounts.Snapshot(),
 	}
 }
 
@@ -80,6 +84,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Organisations != nil {
 		s.Organisations.LoadSnapshot(snap.Organisations)
 	}
+	if snap.Accounts != nil {
+		s.Accounts.Load(snap.Accounts)
+	}
 	return nil
 }
 
@@ -91,6 +98,7 @@ func (s *MemoryStore) Reset() {
 	s.RefreshTokens.Reset()
 	s.Connections.Reset()
 	s.Organisations.Reset()
+	s.Accounts.Reset()
 	s.seedConnection()
 	s.seedTenant()
 }

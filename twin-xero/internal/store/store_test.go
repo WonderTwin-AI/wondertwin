@@ -133,3 +133,21 @@ func TestStoreDefaultOrganisationBelongsToTheTenantFinanceOpsSeeds(t *testing.T)
 		t.Fatal("a seeded organisations map replaces the store")
 	}
 }
+
+func TestStoreChartIsSeededResetAndLoadedPerTenant(t *testing.T) {
+	s := store.New()
+	if n := s.Accounts.For(store.DefaultTenantID).Count(); n != 8 {
+		t.Fatalf("the default chart holds %d accounts, want 8", n)
+	}
+	s.Accounts.For("other").Set("x", store.Account{Code: "999"})
+	s.Reset()
+	if s.Accounts.For("other").Count() != 0 || s.Accounts.For(store.DefaultTenantID).Count() != 8 {
+		t.Fatal("reset must restore exactly the default chart")
+	}
+	if err := s.LoadState([]byte(`{"accounts":{"t1":{"a":{"Code":"1"}}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if s.Accounts.For("t1").Count() != 1 || s.Accounts.For(store.DefaultTenantID).Count() != 0 {
+		t.Fatal("a seeded accounts map replaces every tenant's chart")
+	}
+}

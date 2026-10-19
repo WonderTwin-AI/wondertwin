@@ -83,8 +83,8 @@ type PaymentTerm struct {
 
 const defaultOrganisationID = "00000001-0000-4000-8000-000000000001"
 
-// seedTenant restores the default tenant's organisation. The edition is GLOBAL
-// until the operator picks one (OD-4).
+// seedTenant restores the default tenant's organisation and chart of accounts.
+// The edition is GLOBAL until the operator picks one (OD-4).
 func (s *MemoryStore) seedTenant() {
 	now := s.Clock.Now().UTC()
 	s.Organisations.Set(DefaultTenantID, Organisation{
@@ -95,4 +95,5 @@ func (s *MemoryStore) seedTenant() {
 		CreatedDateUTC: now, Timezone: "UTC", OrganisationEntityType: "COMPANY", ShortCode: "!demo01", Class: "DEMO", Edition: "BUSINESS",
 		Addresses: []Address{{AddressType: "POBOX"}}, Phones: []Phone{{PhoneType: "OFFICE"}}, ExternalLinks: []ExternalLink{},
 	})
+	s.seedChart(now)
 }
