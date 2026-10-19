@@ -10,12 +10,12 @@ refresh token comes from a plain form POST. Prints one JSON line per case
 ({"sdk","case","pass","detail"}) and exits non-zero if any case fails.
 """
 
+import http.client
 import json
 import os
 import sys
 import time
 import urllib.parse
-import urllib.request
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
@@ -41,8 +41,11 @@ def new_client():
 def code_exchange():
     body = urllib.parse.urlencode({"grant_type": "authorization_code", "code": "smoke", "client_id": CLIENT_ID,
                                    "client_secret": CLIENT_SECRET}).encode()
-    with urllib.request.urlopen(urllib.request.Request(f"{BASE}/connect/token", data=body)) as res:
-        return json.load(res)
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request("POST", "/connect/token", body, {"Content-Type": "application/x-www-form-urlencoded"})
+    res = conn.getresponse()
+    assert res.status == 200, f"code exchange failed: {res.status}"
+    return json.load(res)
 
 
 def signed_in():
