@@ -14,19 +14,23 @@ type MemoryStore struct {
 	Clock         *pkgstate.Clock
 	AccessTokens  *pkgstate.Store[AccessToken]
 	RefreshTokens *pkgstate.Store[RefreshToken]
+	Connections   *pkgstate.Store[Connection]
 	// Rand is the deterministic random source behind NewID. New seeds it so a
 	// bare store works; main.go replaces it with twin.Rand.
 	Rand *sim.Rand
 }
 
-// New creates an empty MemoryStore.
+// New creates a MemoryStore holding the default connection.
 func New() *MemoryStore {
-	return &MemoryStore{
+	s := &MemoryStore{
 		Clock:         pkgstate.NewClock(),
 		AccessTokens:  pkgstate.New[AccessToken]("at"),
 		RefreshTokens: pkgstate.New[RefreshToken]("rt"),
+		Connections:   pkgstate.New[Connection]("conn"),
 		Rand:          sim.DefaultRand(),
 	}
+	s.seedConnection()
+	return s
 }
 
 // snapshot is the JSON form of the store. A field a state file leaves out
@@ -34,6 +38,7 @@ func New() *MemoryStore {
 type snapshot struct {
 	AccessTokens  map[string]AccessToken  `json:"access_tokens"`
 	RefreshTokens map[string]RefreshToken `json:"refresh_tokens"`
+	Connections   map[string]Connection   `json:"connections"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -41,6 +46,7 @@ func (s *MemoryStore) Snapshot() any {
 	return snapshot{
 		AccessTokens:  s.AccessTokens.Snapshot(),
 		RefreshTokens: s.RefreshTokens.Snapshot(),
+		Connections:   s.Connections.Snapshot(),
 	}
 }
 
@@ -56,12 +62,18 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.RefreshTokens != nil {
 		s.RefreshTokens.LoadSnapshot(snap.RefreshTokens)
 	}
+	if snap.Connections != nil {
+		s.Connections.LoadSnapshot(snap.Connections)
+	}
 	return nil
 }
 
-// Reset clears every store and the simulated clock.
+// Reset clears every store and the simulated clock, and restores the default
+// connection.
 func (s *MemoryStore) Reset() {
 	s.Clock.Reset()
 	s.AccessTokens.Reset()
 	s.RefreshTokens.Reset()
+	s.Connections.Reset()
+	s.seedConnection()
 }

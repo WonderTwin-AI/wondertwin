@@ -25,10 +25,16 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 
 // Routes mounts the Xero API routes, inside one group so every one of them
 // passes fault injection. The token endpoint answers without a bearer token,
-// since it is how a client gets one.
+// since it is how a client gets one; everything else sits behind bearer.
 func (h *Handler) Routes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 		r.Post("/connect/token", h.Token)
+
+		r.Group(func(r chi.Router) {
+			r.Use(h.bearer)
+			r.Get("/connections", h.Connections)
+			r.Get("/Connections", h.Connections)
+		})
 	})
 }

@@ -1,5 +1,5 @@
-"""SDK smoke suite: runs the Xero app emulator's token flows through the
-official xero-python SDK against a running binary.
+"""SDK smoke suite: runs the Xero app emulator's token and connection flows
+through the official xero-python SDK against a running binary.
 
     XERO_EMULATOR_URL=http://localhost:4195 uv run smoke.py
 
@@ -19,6 +19,7 @@ import urllib.parse
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
+from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
 SDK = "xero-python 15.2.0"
@@ -88,7 +89,19 @@ def case_client_credentials():
     assert token.access_token.count(".") == 2 and token.expires_in == 1800 and token.refresh_token is None
 
 
+def case_connect_tenant():
+    """The xero-connect-tenant flow: exchange a code, then list the connected
+    tenants. The SDK calls GET /Connections and parses the zoneless ISO dates."""
+    client, _, _ = signed_in()
+    connections = IdentityApi(client, base_url=BASE).get_connections()
+    assert len(connections) == 1, f"expected the one default tenant, got {len(connections)}"
+    c = connections[0]
+    assert c.tenant_type == "ORGANISATION" and c.tenant_id and c.id and c.auth_event_id
+    assert c.created_date_utc.year >= 2026 and c.created_date_utc.tzinfo is not None
+
+
 CASES = [
+    ("connect: a code exchange, then get_connections returns the tenant", case_connect_tenant),
     ("refresh rotates the token", case_refresh_rotates_the_token),
     ("a replayed refresh token is refused", case_replayed_refresh_token_is_refused),
     ("an expired token refreshes on demand", case_expired_token_refreshes_on_demand),
