@@ -84,3 +84,30 @@ func TestWhereEvalReportsTypeMismatches(t *testing.T) {
 		}
 	}
 }
+
+func TestWhereEvalBoolsOnlyCompareForEquality(t *testing.T) {
+	for _, field := range []bool{true, false} {
+		rec := map[string]any{"Flag": field}
+		for _, lit := range []bool{true, false} {
+			src := "Flag==" + map[bool]string{true: "true", false: "false"}[lit]
+			if got, err := matches(t, src, rec); err != nil || got != (field == lit) {
+				t.Errorf("%s with Flag=%v: got %v, %v", src, field, got, err)
+			}
+			if got, err := matches(t, strings.Replace(src, "==", "!=", 1), rec); err != nil || got != (field != lit) {
+				t.Errorf("%s with Flag=%v: got %v, %v", strings.Replace(src, "==", "!=", 1), field, got, err)
+			}
+			for _, op := range []string{"<", "<=", ">", ">="} {
+				for _, r := range []map[string]any{rec, {"Flag": nil}, {}} { // a null or missing field is refused too
+					_, err := matches(t, "Flag"+op+map[bool]string{true: "true", false: "false"}[lit], r)
+					var we *WhereError
+					if !errors.As(err, &we) || !strings.Contains(we.Msg, "cannot compare") {
+						t.Errorf("Flag%s%v on %v: error %v, want a WhereError saying cannot compare", op, lit, r, err)
+					}
+				}
+			}
+		}
+	}
+	if got, err := matches(t, `A==1 or Flag > true`, map[string]any{"A": 1, "Flag": true}); err != nil || !got {
+		t.Errorf("an or whose left side matches must skip the bool-ordering error: %v, %v", got, err)
+	}
+}

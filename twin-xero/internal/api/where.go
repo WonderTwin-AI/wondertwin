@@ -310,6 +310,9 @@ func (e callExpr) Match(g Getter) (bool, error) {
 }
 
 func (e cmpExpr) Match(g Getter) (bool, error) {
+	if _, isBool := e.lit.(bool); isBool && e.op != "==" && e.op != "!=" {
+		return false, werr("cannot compare %s: booleans only support == and !=", e.path)
+	}
 	v, _ := g(e.path)
 	c, err := compare(v, e.lit)
 	if err != nil {
@@ -336,7 +339,7 @@ const unordered = 2
 
 // compare orders a record value against a literal: -1, 0 or 1, or unordered. A
 // number is compared as a float, a Guid without regard to case, a string
-// byte for byte, and a bool with false before true.
+// byte for byte, and a bool for equality only (Match refuses to order one).
 func compare(v, lit any) (int, error) {
 	if v == nil || lit == nil {
 		if v == nil && lit == nil {
@@ -355,7 +358,10 @@ func compare(v, lit any) (int, error) {
 		}
 	case bool:
 		if b, ok := v.(bool); ok {
-			return cmp.Compare(boolInt(b), boolInt(l)), nil
+			if b == l {
+				return 0, nil
+			}
+			return 1, nil // unequal; a bool has no order
 		}
 	case time.Time:
 		if t, ok := v.(time.Time); ok {
@@ -367,13 +373,6 @@ func compare(v, lit any) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("%T against %T", v, lit)
-}
-
-func boolInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 func toFloat(v any) (float64, bool) {
