@@ -17,28 +17,43 @@ func werr(format string, a ...any) error { return &WhereError{Msg: fmt.Sprintf(f
 // guid is a Guid("...") literal; it compares without regard to case.
 type guid string
 
-// cmpExpr is one comparison of a field with a literal. The literal is a string,
-// a float64, a bool, nil, a time.Time (DateTime) or a guid.
-type cmpExpr struct {
-	path, op string
-	lit      any
+type (
+	// cmpExpr is one comparison of a field with a literal. The literal is a
+	// string, a float64, a bool, nil, a time.Time (DateTime) or a guid.
+	cmpExpr struct {
+		path, op string
+		lit      any
+	}
+	// callExpr is a string call on a field: path.Contains("arg").
+	callExpr struct{ path, method, arg string }
+	orExpr   struct{ l, r Where }
+	andExpr  struct{ l, r Where }
+)
+
+// Where is a parsed where expression.
+type Where interface {
+	// String renders the expression fully parenthesised, so a test can see how
+	// it was grouped.
+	String() string
 }
 
-// parseComparison reads one comparison of Xero's C#-like where language (quirk
-// query-001): a field path, one of ==, !=, <, <=, > or >=, and a literal. Literals
-// are "strings", numbers, true, false, null, DateTime(y, m, d[, h, m, s]) and
+// ParseWhere reads Xero's C#-like where language (quirk query-001): comparisons
+// of a field path with a literal (==, !=, <, <=, > and >=), the string calls
+// .Contains, .StartsWith and .EndsWith, parentheses, and expressions joined by
+// and, or, AND, OR, && or ||, where and binds tighter than or. Literals are
+// "strings", numbers, true, false, null, DateTime(y, m, d[, h, m, s]) and
 // Guid("..."). A double-encoded value (%2522) reaches the parser still encoded
 // and is a syntax error, as in Xero.
-func parseComparison(src string) (cmpExpr, error) {
+func ParseWhere(src string) (Where, error) {
 	p := &whereParser{src: src}
-	c, err := p.comparison()
+	e, err := p.or()
 	if err != nil {
-		return cmpExpr{}, err
+		return nil, err
 	}
 	if p.skip(); p.pos < len(p.src) {
-		return cmpExpr{}, werr("unexpected %q at position %d", p.src[p.pos:p.pos+1], p.pos)
+		return nil, werr("unexpected %q at position %d", p.src[p.pos:p.pos+1], p.pos)
 	}
-	return c, nil
+	return e, nil
 }
 
 type whereParser struct {
@@ -75,17 +90,68 @@ func (p *whereParser) accept(words ...string) string {
 	return ""
 }
 
-func (p *whereParser) comparison() (cmpExpr, error) {
+func (p *whereParser) or() (Where, error) {
+	l, err := p.and()
+	for err == nil && p.accept("||", "or", "OR") != "" {
+		var r Where
+		if r, err = p.and(); err == nil {
+			l = orExpr{l, r}
+		}
+	}
+	return l, err
+}
+
+func (p *whereParser) and() (Where, error) {
+	l, err := p.term()
+	for err == nil && p.accept("&&", "and", "AND") != "" {
+		var r Where
+		if r, err = p.term(); err == nil {
+			l = andExpr{l, r}
+		}
+	}
+	return l, err
+}
+
+// term is a parenthesised expression, a string call or a comparison.
+func (p *whereParser) term() (Where, error) {
+	if p.accept("(") != "" {
+		e, err := p.or()
+		if err == nil && p.accept(")") == "" {
+			err = werr("missing ) at position %d", p.pos)
+		}
+		return e, err
+	}
 	path := p.path()
 	if path == "" {
-		return cmpExpr{}, werr("expected a field name at position %d", p.pos)
+		return nil, werr("expected a field name at position %d", p.pos)
+	}
+	if i := strings.LastIndexByte(path, '.'); i > 0 && p.accept("(") != "" {
+		method := path[i+1:]
+		if method != "Contains" && method != "StartsWith" && method != "EndsWith" {
+			return nil, werr("unknown method %s", method)
+		}
+		arg, err := p.callArg()
+		return callExpr{path[:i], method, arg}, err
 	}
 	op := p.accept("==", "!=", "<=", ">=", "<", ">")
 	if op == "" {
-		return cmpExpr{}, werr("expected a comparison after %s at position %d", path, p.pos)
+		return nil, werr("expected a comparison after %s at position %d", path, p.pos)
 	}
 	lit, err := p.literal()
 	return cmpExpr{path, op, lit}, err
+}
+
+// callArg reads the single string argument of a call, after its (.
+func (p *whereParser) callArg() (string, error) {
+	p.skip()
+	if p.pos >= len(p.src) || p.src[p.pos] != '"' {
+		return "", werr("a string call takes one string, at position %d", p.pos)
+	}
+	s, err := p.str()
+	if err == nil && p.accept(")") == "" {
+		err = werr("missing ) at position %d", p.pos)
+	}
+	return s, err
 }
 
 func (p *whereParser) path() string {
@@ -182,4 +248,25 @@ func (p *whereParser) dateTime() (any, error) {
 		return nil, werr("DateTime(%d,%d,%d,%d,%d,%d) is not a date", part[0], part[1], part[2], part[3], part[4], part[5])
 	}
 	return t, nil
+}
+
+func (e orExpr) String() string  { return "(" + e.l.String() + " or " + e.r.String() + ")" }
+func (e andExpr) String() string { return "(" + e.l.String() + " and " + e.r.String() + ")" }
+func (e callExpr) String() string {
+	return fmt.Sprintf("%s.%s(%q)", e.path, e.method, e.arg)
+}
+func (e cmpExpr) String() string { return e.path + e.op + litString(e.lit) }
+
+func litString(lit any) string {
+	switch l := lit.(type) {
+	case nil:
+		return "null"
+	case string:
+		return strconv.Quote(l)
+	case guid:
+		return fmt.Sprintf("Guid(%q)", string(l))
+	case time.Time:
+		return fmt.Sprintf("DateTime(%d,%d,%d,%d,%d,%d)", l.Year(), l.Month(), l.Day(), l.Hour(), l.Minute(), l.Second())
+	}
+	return fmt.Sprint(lit)
 }
