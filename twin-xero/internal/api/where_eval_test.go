@@ -76,7 +76,7 @@ func TestWhereEvalLogicShortCircuits(t *testing.T) {
 
 func TestWhereEvalReportsTypeMismatches(t *testing.T) {
 	rec := map[string]any{"Total": 5.0, "Name": "x", "Date": time.Now(), "Flag": true}
-	for _, src := range []string{`Total == "5"`, `Name > 1`, `Date == "2026-10-19"`, `Flag == 1`, `Name == DateTime(2026,1,1)`, `A==1 or Total == "5"`} {
+	for _, src := range []string{`Total == "5"`, `Name > 1`, `Date == "2026-10-19"`, `Flag == 1`, `Name == DateTime(2026,1,1)`, `A==1 or Total == "5"`, `Total == Guid("5")`, `Flag == Guid("true")`, `Date == Guid("x")`} {
 		_, err := matches(t, src, rec)
 		var we *WhereError
 		if !errors.As(err, &we) || !strings.Contains(we.Msg, "cannot compare") {

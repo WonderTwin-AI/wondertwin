@@ -346,7 +346,9 @@ func compare(v, lit any) (int, error) {
 	}
 	switch l := lit.(type) {
 	case guid:
-		return strings.Compare(strings.ToLower(fmt.Sprint(v)), strings.ToLower(string(l))), nil
+		if s, ok := v.(string); ok {
+			return strings.Compare(strings.ToLower(s), strings.ToLower(string(l))), nil
+		}
 	case string:
 		if s, ok := v.(string); ok {
 			return strings.Compare(s, l), nil
