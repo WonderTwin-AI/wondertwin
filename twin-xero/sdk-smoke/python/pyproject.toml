@@ -1,0 +1,10 @@
+[project]
+name = "twin-xero-sdk-smoke-python"
+version = "0.0.0"
+description = "Runs the Xero app emulator's use cases through the official xero-python SDK."
+requires-python = ">=3.10"
+dependencies = ["xero-python==15.2.0"]
+
+[tool.uv]
+package = false
+exclude-newer = "7 days"
