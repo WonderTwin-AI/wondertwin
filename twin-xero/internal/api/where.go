@@ -336,7 +336,7 @@ const unordered = 2
 
 // compare orders a record value against a literal: -1, 0 or 1, or unordered. A
 // number is compared as a float, a Guid without regard to case, a string
-// byte for byte, and a bool only for equality (true sorts after false).
+// byte for byte, and a bool with false before true.
 func compare(v, lit any) (int, error) {
 	if v == nil || lit == nil {
 		if v == nil && lit == nil {
