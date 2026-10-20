@@ -69,7 +69,7 @@ func (h *Handler) CreateInvoices(w http.ResponseWriter, r *http.Request) {
 // ACCREC number of INV- and four digits.
 func (h *Handler) buildInvoice(tenant string, in store.Invoice, existing []store.Invoice, unitdp int) (store.Invoice, []string) {
 	now := h.store.Clock.Now().UTC()
-	var msgs []string
+	msgs := h.validateInvoice(tenant, in, existing)
 
 	lines, t, lineMsgs := computeLines(in.LineAmountTypes, in.LineItems, unitdp)
 	msgs = append(msgs, lineMsgs...)

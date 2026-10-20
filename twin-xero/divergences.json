@@ -64,6 +64,54 @@
         "webhook-006",
         "webhook-004"
       ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Invoices (Contact)",
+      "reason": "Only Contact.ContactID is read. Xero looks a contact up or creates one by name when no ContactID is sent, and updates the contact record from any other contact field sent in the document. Here an invoice with no ContactID, or an unknown one, is refused, and the other contact fields are ignored. localstack/finance-ops always sends a bare ContactID, because the second behaviour is why it reduces the contact to its id.",
+      "references": {
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-005"
+      },
+      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "quirk_ids": [
+        "crud-005"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Invoices (tax)",
+      "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0. Xero computes it from the tenant's tax rate for the line's TaxType, and tax rates (TaxRates) are not modelled in xero-bp1, so no rate is applied and Total equals SubTotal unless TaxAmount is sent. TaxType values are accepted unvalidated.",
+      "references": {
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004"
+      },
+      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "quirk_ids": [
+        "crud-004"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Invoices (EnteredTotal, RoundingAmount)",
+      "reason": "EnteredTotal and RoundingAmount (new in spec 19.0.0) are stored as sent and not used: Xero checks the computed total against EnteredTotal and applies RoundingAmount, which this build does not.",
+      "references": {
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
+        "docs": "research/twins/xero/record-type-catalog.json type Invoice"
+      },
+      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "quirk_ids": [
+        "crud-004"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Invoices (discount without UnitAmount)",
+      "reason": "A line with no UnitAmount and any DiscountRate or DiscountAmount is refused with a validation error. Xero's LineAmount is net of discount, so the gross cannot be recovered from LineAmount alone; what Xero does with this shape is unverified, so refusing is a guess.",
+      "references": {
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004"
+      },
+      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "quirk_ids": [
+        "crud-004"
+      ]
     }
   ]
 }

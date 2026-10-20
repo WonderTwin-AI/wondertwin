@@ -240,6 +240,29 @@ def case_create_invoices_computes_the_totals():
     assert created.contact.contact_id and created.invoice_number.startswith("INV-")
 
 
+def case_create_invoices_refusals():
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    bad = finance_ops_invoice(contact)
+    bad.line_items[0].account_code = "999"
+    try:
+        api.create_invoices(tenant, Invoices(invoices=[bad]))
+        raise AssertionError("an unknown account code was accepted")
+    except AssertionError:
+        raise
+    except Exception as e:  # the SDK raises on a 400 with the body in the message
+        assert "not a valid code" in str(e), str(e)
+    number = f"SMOKE-{uuid.uuid4().hex[:6]}"
+    api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact, invoice_number=number)]))
+    try:
+        api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact, invoice_number=number)]))
+        raise AssertionError("a duplicate invoice number was accepted")
+    except AssertionError:
+        raise
+    except Exception as e:  # finance-ops looks for these words to add a suffix and retry
+        assert "Invoice # must be unique" in str(e), str(e)
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -258,6 +281,7 @@ def case_connect_tenant():
 
 CASES = [
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
+    ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("get_contacts parses with and without page", case_get_contacts_parses_with_and_without_page),
     ("get_contacts with where AccountNumber, as finance-ops calls it", case_get_contacts_as_finance_ops_calls_it),
     ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
