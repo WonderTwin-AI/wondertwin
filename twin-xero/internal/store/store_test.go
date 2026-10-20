@@ -197,3 +197,21 @@ func TestStoreContactsAreKeptPerTenantAndSnapshotLoadAndReset(t *testing.T) {
 		t.Fatal("a state file that omits contacts must leave them alone")
 	}
 }
+
+func TestStoreInvoicesSnapshotLoadAndResetPerTenant(t *testing.T) {
+	s := store.New()
+	s.Invoices.For("t1").Set("i1", store.Invoice{InvoiceID: "i1", Contact: &store.ContactRef{ContactID: "c1"}})
+	snap := s.Snapshot()
+
+	s.Reset()
+	if s.Invoices.For("t1").Count() != 0 {
+		t.Fatal("reset left invoices behind")
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := s.Invoices.For("t1").Get("i1"); !ok || got.Contact == nil || got.Contact.ContactID != "c1" {
+		t.Fatalf("invoice = %+v, %v after load: the contact link must survive a snapshot", got, ok)
+	}
+}
