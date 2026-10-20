@@ -8,6 +8,7 @@ import (
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	pkgwh "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // Handler holds the Xero API state.
@@ -16,11 +17,16 @@ type Handler struct {
 	mw    *twincore.Middleware
 
 	redeem sync.Mutex
+
+	dispatcher *pkgwh.Dispatcher
+	deliver    sync.Mutex // keeps events queued and flushed in order
 }
 
 // NewHandler creates a new Xero API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw, dispatcher: newDispatcher(s)}
+	s.OnReset(h.dispatcher.Reset)
+	return h
 }
 
 // Routes mounts the Xero API routes, inside one group so every one of them
