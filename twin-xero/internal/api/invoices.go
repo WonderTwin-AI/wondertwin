@@ -14,7 +14,8 @@ import (
 // CreateInvoices serves PUT /api.xro/2.0/Invoices: it creates the invoices in
 // {"Invoices": [...]} or the one invoice sent bare (crud-001), and answers the
 // plural envelope with status 200. If any is invalid nothing is created and the
-// answer is a 400 ValidationException that echoes every submitted invoice.
+// answer is a 400 ValidationException that echoes every submitted invoice,
+// unless summarizeErrors=false (see below).
 func (h *Handler) CreateInvoices(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	var in struct{ Invoices []json.RawMessage }
