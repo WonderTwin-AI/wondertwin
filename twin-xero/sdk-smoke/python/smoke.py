@@ -21,7 +21,8 @@ import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import Account, AccountingApi, Address, Contact, Contacts, CurrencyCode, Invoice, Invoices, LineItem, Payment
+from xero_python.accounting import (Account, AccountingApi, Address, Contact, Contacts, CreditNote, CreditNotes, CurrencyCode, Invoice,
+                                    Invoices, LineItem, Payment)
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -368,6 +369,27 @@ def case_void_and_delete_invoices_as_finance_ops_does():
         assert "cannot be updated" in str(e), str(e)
 
 
+def finance_ops_credit_note(contact_id, amount=20.0, **kw):
+    """The shape localstack/finance-ops sends for a Stripe refund: its own number, one line with an empty
+    LineItemID, and a client-side Total and SubTotal that Xero ignores."""
+    return CreditNote(
+        type="ACCRECCREDIT", status="AUTHORISED", contact=Contact(contact_id=contact_id), currency_code=CurrencyCode("USD"),
+        credit_note_number=f"Stripe refund re_{uuid.uuid4().hex[:8]}", date=datetime.date(2026, 9, 10), reference="in_smoke",
+        total=amount, sub_total=amount,
+        line_items=[LineItem(line_item_id="", quantity=1, unit_amount=amount, line_amount=amount, account_code="200",
+                             tax_type="NONE", description="Stripe refund")], **kw)
+
+
+def case_create_credit_notes():
+    api, tenant = accounting_api()
+    created = api.create_credit_notes(tenant, CreditNotes(credit_notes=[finance_ops_credit_note(new_contact(api, tenant), amount=20)])).credit_notes[0]
+    assert created.credit_note_id and created.status == "AUTHORISED" and not created.has_errors
+    assert created.total == 20 and created.remaining_credit == 20 and not created.applied_amount and not created.allocations
+    assert created.date == datetime.date(2026, 9, 10) and created.updated_date_utc.year >= 2026, "the SDK parsed the msdates"
+    assert created.credit_note_number.startswith("Stripe refund re_") and created.contact.contact_id
+    assert created.line_items[0].line_item_id, "an empty LineItemID is replaced"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -393,6 +415,7 @@ CASES = [
 
 
     ("create_payment pays the invoice, as finance-ops calls it", case_create_payment_pays_the_invoice),
+    ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),
