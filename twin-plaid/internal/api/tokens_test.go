@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	publicRE = regexp.MustCompile(`^public-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	accessRE = regexp.MustCompile(`^access-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	idRE     = regexp.MustCompile(`^[0-9A-Za-z]{37}$`)
+	publicRE   = regexp.MustCompile(`^public-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	accessRE   = regexp.MustCompile(`^access-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	idRE       = regexp.MustCompile(`^[0-9A-Za-z]{37}$`)
+	regexpLink = regexp.MustCompile(`^link-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 )
 
 func creds(m map[string]any) map[string]any {

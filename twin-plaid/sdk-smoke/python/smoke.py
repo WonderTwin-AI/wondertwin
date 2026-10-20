@@ -15,8 +15,12 @@ import sys
 
 import plaid
 from plaid.api import plaid_api
+from plaid.model.country_code import CountryCode
 from plaid.model.item_get_request import ItemGetRequest
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.link_token_get_request import LinkTokenGetRequest
 from plaid.model.products import Products
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
 
@@ -30,6 +34,31 @@ client = plaid_api.PlaidApi(plaid.ApiClient(plaid.Configuration(
 def public_token(**kwargs):
     req = SandboxPublicTokenCreateRequest(institution_id="ins_109508", initial_products=[Products("auth")], **kwargs)
     return client.sandbox_public_token_create(req)
+
+
+def link_token(**kwargs):
+    return client.link_token_create(LinkTokenCreateRequest(
+        client_name="Acme", language="en", country_codes=[CountryCode("US")], products=[Products("auth")],
+        user=LinkTokenCreateRequestUser(client_user_id="smoke-user"), **kwargs))
+
+
+def case_link_token_create():
+    res = link_token()
+    assert res.link_token.startswith("link-sandbox-") and res.expiration and res.request_id
+
+
+def case_link_token_get():
+    created = link_token(webhook="http://hooks.test/plaid")
+    got = client.link_token_get(LinkTokenGetRequest(link_token=created.link_token))
+    assert got.link_token == created.link_token and got.expiration == created.expiration
+    assert got.metadata.client_name == "Acme" and got.metadata.webhook == "http://hooks.test/plaid"
+    assert got.metadata.redirect_uri is None and [str(p) for p in got.metadata.initial_products] == ["auth"]
+
+
+def case_link_token_then_exchange():
+    link_token()
+    assert client.item_public_token_exchange(
+        ItemPublicTokenExchangeRequest(public_token=public_token().public_token)).access_token
 
 
 def case_sandbox_public_token_create():
