@@ -29,8 +29,9 @@ func CallFrom(r *http.Request) (Call, bool) {
 	return c, ok
 }
 
-// SetCredentials makes the emulator enforce one client_id and secret pair.
-// Left unset, any non-empty pair is accepted.
+// SetCredentials makes the emulator enforce a client_id and a secret. Each is
+// enforced independently: a non-empty value must match, and an empty one
+// accepts any value. With both empty, any non-empty pair is accepted.
 func (h *Handler) SetCredentials(clientID, secret string) {
 	h.clientID, h.secret = clientID, secret
 }

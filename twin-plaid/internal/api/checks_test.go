@@ -157,3 +157,27 @@ func TestVersionOtherValuesAreADeclared400(t *testing.T) {
 		}
 	}
 }
+
+func TestCredentialsEachConfiguredValueIsEnforcedIndependently(t *testing.T) {
+	secretOnly := newTestHandler(1)
+	secretOnly.SetCredentials("", "good-secret")
+	srv := probeServer(secretOnly)
+	status, out := probe{body: `{"client_id":"anything","secret":"wrong"}`}.do(t, srv)
+	if status != 400 || out["error_code"] != "INVALID_API_KEYS" {
+		t.Fatalf("wrong secret accepted: %d %v", status, out)
+	}
+	if status, _ := (probe{body: `{"client_id":"anything","secret":"good-secret"}`}).do(t, srv); status != 200 {
+		t.Fatalf("any client_id refused when only secret is set: %d", status)
+	}
+
+	idOnly := newTestHandler(1)
+	idOnly.SetCredentials("good-id", "")
+	srv = probeServer(idOnly)
+	status, out = probe{body: `{"client_id":"wrong","secret":"anything"}`}.do(t, srv)
+	if status != 400 || out["error_code"] != "INVALID_API_KEYS" {
+		t.Fatalf("wrong client_id accepted: %d %v", status, out)
+	}
+	if status, _ := (probe{body: `{"client_id":"good-id","secret":"anything"}`}).do(t, srv); status != 200 {
+		t.Fatalf("any secret refused when only client_id is set: %d", status)
+	}
+}

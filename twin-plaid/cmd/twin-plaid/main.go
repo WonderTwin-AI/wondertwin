@@ -29,8 +29,9 @@ func main() {
 	memStore.Rand = twin.Rand
 
 	apiHandler := api.NewHandler(memStore, twin.Middleware())
-	// PLAID_CLIENT_ID and PLAID_SECRET, when both are set, are the only pair
-	// the emulator accepts; unset, any non-empty pair is accepted.
+	// PLAID_CLIENT_ID and PLAID_SECRET are enforced independently: each, when
+	// set, must match; an unset one accepts any value. With neither set, any
+	// non-empty pair is accepted.
 	apiHandler.SetCredentials(os.Getenv("PLAID_CLIENT_ID"), os.Getenv("PLAID_SECRET"))
 	apiHandler.Routes(twin.Router)
 
