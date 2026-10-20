@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
@@ -33,7 +34,7 @@ func validateContact(c store.Contact, existing []store.Contact) []string {
 		msgs = append(msgs, "Please enter a contact name.")
 	}
 	for _, f := range maxLengths {
-		if len(f.get(c)) > f.max {
+		if utf8.RuneCountInString(f.get(c)) > f.max {
 			msgs = append(msgs, fmt.Sprintf("%s must be %d characters or fewer.", f.field, f.max))
 		}
 	}

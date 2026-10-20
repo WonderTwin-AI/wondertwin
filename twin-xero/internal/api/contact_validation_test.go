@@ -52,6 +52,10 @@ func TestContactValidationKeepsFieldsToTheirLengths(t *testing.T) {
 			t.Fatalf("%s over %d: messages = %q", field, max, got)
 		}
 	}
+	putContacts(t, h, `{"Name":"`+strings.Repeat("é", 255)+`"}`) // characters, not bytes
+	if got := messages(refusal(t, h, `{"Name":"`+strings.Repeat("é", 256)+`"}`)[0]); !strings.Contains(got, "Name must be") {
+		t.Fatalf("256 multi-byte characters: messages = %q", got)
+	}
 	putContacts(t, h, `{"Name":"`+strings.Repeat("y", 255)+`","AccountNumber":"`+strings.Repeat("9", 50)+`"}`) // at the limit is fine
 }
 
