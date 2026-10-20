@@ -263,6 +263,19 @@ def case_create_invoices_refusals():
         assert "Invoice # must be unique" in str(e), str(e)
 
 
+def case_create_invoices_summarize_errors_false():
+    """With summarize_errors=False one invalid invoice does not fail the batch: the SDK gets 200 and each
+    invoice back, the bad one with has_errors and its validation errors (what finance-ops checks for)."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    bad = finance_ops_invoice(contact)
+    bad.line_items[0].account_code = "999"
+    result = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact), bad]), summarize_errors=False).invoices
+    assert len(result) == 2 and result[0].invoice_id and not result[0].has_errors
+    assert result[1].has_errors and result[1].validation_errors and "not a valid code" in result[1].validation_errors[0].message
+    assert not result[1].invoice_id, "a refused invoice is not created"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -282,6 +295,7 @@ def case_connect_tenant():
 CASES = [
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
+    ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),
     ("get_contacts parses with and without page", case_get_contacts_parses_with_and_without_page),
     ("get_contacts with where AccountNumber, as finance-ops calls it", case_get_contacts_as_finance_ops_calls_it),
     ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
