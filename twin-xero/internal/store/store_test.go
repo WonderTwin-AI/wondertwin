@@ -151,3 +151,27 @@ func TestStoreChartIsSeededResetAndLoadedPerTenant(t *testing.T) {
 		t.Fatal("a seeded accounts map replaces every tenant's chart")
 	}
 }
+
+func TestStoreWebhookEmitStateSurvivesSnapshotAndResets(t *testing.T) {
+	s := store.New()
+	s.Webhooks.Set("w1", store.Webhook{ID: "w1", URL: "http://r", Key: "k", Categories: []string{"CONTACT"}, Status: store.WebhookOK})
+	snap := s.Snapshot()
+
+	var hooked int
+	s.OnReset(func() { hooked++ })
+	s.WebhookSeq.Store(9)
+	s.Reset()
+	if s.Webhooks.Count() != 0 || s.WebhookSeq.Load() != 0 || hooked != 1 {
+		t.Fatalf("reset: %d subscriptions, sequence %d, hook ran %d times", s.Webhooks.Count(), s.WebhookSeq.Load(), hooked)
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	if w, ok := s.Webhooks.Get("w1"); !ok || w.Key != "k" || w.Status != store.WebhookOK {
+		t.Fatalf("subscription = %+v, %v after load", w, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.Webhooks.Count() != 1 {
+		t.Fatal("a state file that omits webhooks must leave them alone")
+	}
+}
