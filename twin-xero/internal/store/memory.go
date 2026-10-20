@@ -19,6 +19,10 @@ type MemoryStore struct {
 	// Organisations is keyed by tenant id; Accounts holds one chart per tenant.
 	Organisations *pkgstate.Store[Organisation]
 	Accounts      *Tenanted[Account]
+	Webhooks      *pkgstate.Store[Webhook]
+	// WebhookSeq numbers the events of every delivery, in order.
+	WebhookSeq atomic.Int64
+	onReset    []func()
 	// StrictAuth makes the emulator refuse bearer and refresh tokens it did not
 	// issue, as Xero does. Off by default: localstack/finance-ops seeds made-up
 	// tokens and relies on xero-local accepting any. It is configuration, so
@@ -38,6 +42,7 @@ func New() *MemoryStore {
 		Connections:   pkgstate.New[Connection]("conn"),
 		Organisations: pkgstate.New[Organisation]("org"),
 		Accounts:      NewTenanted[Account](),
+		Webhooks:      pkgstate.New[Webhook]("wh"),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -53,6 +58,7 @@ type snapshot struct {
 	Connections   map[string]Connection         `json:"connections"`
 	Organisations map[string]Organisation       `json:"organisations"`
 	Accounts      map[string]map[string]Account `json:"accounts"`
+	Webhooks      map[string]Webhook            `json:"webhooks"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -63,6 +69,7 @@ func (s *MemoryStore) Snapshot() any {
 		Connections:   s.Connections.Snapshot(),
 		Organisations: s.Organisations.Snapshot(),
 		Accounts:      s.Accounts.Snapshot(),
+		Webhooks:      s.Webhooks.Snapshot(),
 	}
 }
 
@@ -87,6 +94,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Accounts != nil {
 		s.Accounts.Load(snap.Accounts)
 	}
+	if snap.Webhooks != nil {
+		s.Webhooks.LoadSnapshot(snap.Webhooks)
+	}
 	return nil
 }
 
@@ -99,6 +109,15 @@ func (s *MemoryStore) Reset() {
 	s.Connections.Reset()
 	s.Organisations.Reset()
 	s.Accounts.Reset()
+	s.Webhooks.Reset()
+	s.WebhookSeq.Store(0)
+	for _, f := range s.onReset {
+		f()
+	}
 	s.seedConnection()
 	s.seedTenant()
 }
+
+// OnReset registers a function Reset calls last, so state the store does not own
+// (the webhook dispatcher's queue and delivery log) is cleared with it.
+func (s *MemoryStore) OnReset(f func()) { s.onReset = append(s.onReset, f) }
