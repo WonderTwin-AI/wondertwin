@@ -189,3 +189,34 @@ func TestWebhookRegisterRoutesCoexistWithTheKitsAdminRoutes(t *testing.T) {
 		resp.Body.Close()
 	}
 }
+
+func TestWebhookIntentDeleteDuringTheCheckIsNotUndone(t *testing.T) {
+	h := newTestHandler(t)
+	entered, release := make(chan struct{}, 8), make(chan struct{})
+	rcv := &checkingReceiver{key: "k"}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		entered <- struct{}{}
+		<-release
+		rcv.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	var once sync.Once
+	free := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(free)
+
+	done := make(chan *httptest.ResponseRecorder)
+	go func() { done <- call(h, "POST", "/admin/webhooks", `{"url":"`+srv.URL+`","key":"k"}`) }()
+	<-entered // the check is now running, and the subscription is stored but disabled
+	list := h.store.Webhooks.List()
+	if len(list) != 1 || list[0].Status != store.WebhookFailed {
+		t.Fatalf("during the check the subscription must be stored disabled, got %+v", list)
+	}
+	if call(h, "DELETE", "/admin/webhooks/"+list[0].ID, "").Code != 200 {
+		t.Fatal("delete during the check must succeed")
+	}
+	free()
+	<-done
+	if h.store.Webhooks.Count() != 0 {
+		t.Fatal("a delete during the check was undone when the check finished")
+	}
+}

@@ -180,7 +180,10 @@ func (h *Handler) verify(w store.Webhook) store.Webhook {
 	if err := h.intentToReceive(w.URL, w.Key); err != nil {
 		w.Status, w.Reason = store.WebhookFailed, err.Error()
 	}
-	h.store.Webhooks.Set(w.ID, w)
+	// The check can take seconds. A subscription deleted meanwhile stays deleted.
+	if _, ok := h.store.Webhooks.Get(w.ID); ok {
+		h.store.Webhooks.Set(w.ID, w)
+	}
 	return w
 }
 
@@ -216,6 +219,9 @@ func (h *Handler) RegisterWebhook(rw http.ResponseWriter, r *http.Request) {
 	}
 	wh := store.Webhook{ID: h.store.NewID(), URL: in.URL, Key: in.Key, Categories: in.Categories, Status: store.WebhookOK, CreatedDateUTC: h.store.Clock.Now().UTC()}
 	if in.IntentToReceive == nil || *in.IntentToReceive {
+		// Stored disabled until the check passes, so it cannot deliver meanwhile.
+		wh.Status, wh.Reason = store.WebhookFailed, "intent-to-receive check in progress"
+		h.store.Webhooks.Set(wh.ID, wh)
 		wh = h.verify(wh)
 	} else {
 		h.store.Webhooks.Set(wh.ID, wh)
