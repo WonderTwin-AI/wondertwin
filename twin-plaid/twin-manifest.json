@@ -35,11 +35,39 @@
     },
     "auth_pattern": "custom",
     "has_webhooks": true,
-    "resource_count": 0
+    "resource_count": 2
   },
   "coverage": {
-    "resources_implemented": [],
-    "resources_not_implemented": []
+    "resources_implemented": [
+      "sandbox/public_token/create",
+      "item/public_token/exchange"
+    ],
+    "resources_not_implemented": [
+      "item/get",
+      "auth/get",
+      "transactions/get",
+      "transactions/refresh",
+      "sandbox/transactions/create",
+      "transactions/recurring/get",
+      "transactions/sync",
+      "institutions/get",
+      "institutions/search",
+      "institutions/get_by_id",
+      "item/remove",
+      "accounts/get",
+      "sandbox/item/fire_webhook",
+      "accounts/balance/get",
+      "identity/get",
+      "identity/match",
+      "item/webhook/update",
+      "item/access_token/invalidate",
+      "webhook_verification_key/get",
+      "sandbox/item/reset_login",
+      "processor/token/create",
+      "processor/stripe/bank_account_token/create",
+      "link/token/create",
+      "link/token/get"
+    ]
   },
   "generation": {
     "method": "wondertwin_skill"
