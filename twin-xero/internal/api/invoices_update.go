@@ -8,20 +8,30 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
+// statusChanges are the status changes Xero documents as valid when updating an
+// invoice. A PAID, VOIDED or DELETED invoice has none, and an authorised one can
+// only be voided: deleting is for drafts and submitted invoices (crud-002).
+var statusChanges = map[string][]string{
+	"DRAFT":      {"DRAFT", "SUBMITTED", "AUTHORISED", "DELETED"},
+	"SUBMITTED":  {"SUBMITTED", "AUTHORISED", "DRAFT", "DELETED"},
+	"AUTHORISED": {"AUTHORISED", "VOIDED"},
+}
+
 // UpdateInvoice serves POST /api.xro/2.0/Invoices/{InvoiceID}. The path names the
 // invoice by ID or by number (ident-004). The body is a partial update: only the
-// fields it carries change, and a whole invoice read earlier can be sent back
-// with one field changed, as localstack/finance-ops does. The answer is the
-// plural envelope; a refused update is a 400 ValidationException, or with
-// summarizeErrors=false a 200 with the errors in place. An unknown invoice is a
-// 404 whose body is a guess. Status changes are a later slice, so until it lands
-// the Status a body carries is ignored.
+// fields it carries change, so {"InvoiceNumber": "INV-239", "Status": "DELETED"}
+// deletes and {"Status": "VOIDED"} voids, and a whole invoice read earlier can be
+// sent back with one field changed, as localstack/finance-ops does to void.
+// Deletes are status writes (crud-002). The answer is the plural envelope; a
+// refused update is a 400 ValidationException, or with summarizeErrors=false a 200
+// with the errors in place. An unknown invoice is a 404 whose body is a guess.
 func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	one, keys, err := readOneInvoice(r)
 	var sent invoice
@@ -109,6 +119,9 @@ func findInvoice(all []store.Invoice, ref string) (store.Invoice, []store.Invoic
 // without one is new, and a stored line left out is deleted, so LineItems sent
 // without IDs replace every line (crud-005). The wording of the refusals is a guess.
 func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys map[string]json.RawMessage, others []store.Invoice, unitdp int) (store.Invoice, []string) {
+	if old.Status == "VOIDED" || old.Status == "DELETED" {
+		return old, []string{fmt.Sprintf("An invoice with the status %s cannot be updated.", old.Status)}
+	}
 	out, msgs := old, []string(nil)
 	set := func(key string, apply func()) {
 		if _, ok := keys[key]; ok {
@@ -118,6 +131,15 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 	set("Type", func() {
 		if in.Type != old.Type {
 			msgs = append(msgs, "The Type of an invoice cannot be changed.")
+		}
+	})
+	set("Status", func() {
+		switch {
+		case in.Status == "" || in.Status == old.Status:
+		case !slices.Contains(statusChanges[old.Status], in.Status):
+			msgs = append(msgs, fmt.Sprintf("An invoice cannot change from %s to %s.", old.Status, in.Status))
+		default:
+			out.Status = in.Status
 		}
 	})
 	set("Reference", func() { out.Reference = in.Reference })
@@ -139,6 +161,10 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 	if v, ok := keys["SentToContact"]; ok && string(v) != "null" { // null leaves it unchanged (null-001)
 		out.SentToContact = in.SentToContact
 	}
+	if out.Status == "VOIDED" && (old.AmountPaid > 0 || len(old.Payments) > 0) {
+		msgs = append(msgs, "An invoice with payments applied cannot be voided; delete the payments first.")
+	}
+
 	_, linesSent := keys["LineItems"]
 	if linesSent {
 		known := map[string]bool{}
@@ -177,13 +203,26 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 		out.SubTotal, out.TotalTax, out.Total, out.TotalDiscount = t.SubTotal, t.TotalTax, t.Total, t.TotalDiscount
 		out.IsDiscounted = t.TotalDiscount > 0
 	}
-	msgs = append(msgs, h.validateInvoice(tenant, out, others)...)
+	if old.AmountPaid > 0 && (out.Status != old.Status || out.Total != old.Total || out.LineAmountTypes != old.LineAmountTypes ||
+		out.CurrencyCode != old.CurrencyCode || !sameTime(out.Date, old.Date)) {
+		msgs = append(msgs, "An invoice that has been paid can only have its Reference, DueDate, InvoiceNumber, BrandingThemeID, Contact, Url, and line descriptions, account codes and tracking updated.")
+	}
+	if out.Status != "VOIDED" && out.Status != "DELETED" {
+		chk := out
+		if chk.Status == "PAID" {
+			chk.Status = "AUTHORISED" // validateInvoice only knows the statuses a new invoice can have
+		}
+		msgs = append(msgs, h.validateInvoice(tenant, chk, others)...)
+	}
 	if len(msgs) > 0 {
 		return old, msgs
 	}
 
 	now := h.store.Clock.Now().UTC()
 	out.AmountDue = round(out.Total-out.AmountPaid-out.AmountCredited, 2)
+	if out.Status == "VOIDED" || out.Status == "DELETED" {
+		out.AmountDue = 0
+	}
 	if out.SentToContact && out.Status != "AUTHORISED" && out.Status != "PAID" {
 		out.SentToContact, out.StatusAttributeString = false, "WARNING"
 		out.Warnings = []store.ValidationError{{Message: "An invoice can only be marked as sent when it is authorised."}}
@@ -192,4 +231,8 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 	}
 	out.UpdatedDateUTC, out.UpdatedDateUTCString = now, now.Format("2006-01-02T15:04:05.000")
 	return out, nil
+}
+
+func sameTime(a, b *time.Time) bool {
+	return (a == nil && b == nil) || (a != nil && b != nil && a.Equal(*b))
 }

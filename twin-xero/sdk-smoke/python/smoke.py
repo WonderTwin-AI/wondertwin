@@ -347,6 +347,27 @@ def case_update_invoice_line_items():
     assert updated.total != created.total and updated.amount_due == updated.total, "the totals are recomputed"
 
 
+def case_void_and_delete_invoices_as_finance_ops_does():
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact)])).invoices[0]
+    created.status = "VOIDED"  # finance-ops delete_invoice(): set the status and post the whole model back
+    voided = api.update_invoice(tenant, invoice_id=created.invoice_id, invoices=Invoices(invoices=[created])).invoices[0]
+    assert voided.status == "VOIDED" and voided.amount_due == 0 and voided.total == 15.5
+    draft = finance_ops_invoice(contact)
+    draft.status = "DRAFT"
+    made = api.create_invoices(tenant, Invoices(invoices=[draft])).invoices[0]
+    gone = api.update_invoice(tenant, invoice_id=made.invoice_number, invoices=Invoices(invoices=[Invoice(invoice_number=made.invoice_number, status="DELETED")]))
+    assert gone.invoices[0].status == "DELETED", "deleting a draft is a status write"
+    try:
+        api.update_invoice(tenant, invoice_id=created.invoice_id, invoices=Invoices(invoices=[Invoice(reference="too late")]))
+        raise AssertionError("a voided invoice was updated")
+    except AssertionError:
+        raise
+    except Exception as e:
+        assert "cannot be updated" in str(e), str(e)
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -364,6 +385,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("update_invoice voids and deletes as finance-ops does", case_void_and_delete_invoices_as_finance_ops_does),
     ("update_invoice recomputes the totals when a line changes", case_update_invoice_line_items),
     ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
     ("get_invoices as finance-ops calls it, by contact with page=1", case_get_invoices_as_finance_ops_calls_it),
