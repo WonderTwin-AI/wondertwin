@@ -98,7 +98,7 @@ func TestInvoiceCreateIgnoresWhatXeroComputes(t *testing.T) {
 	_, forged := putInvoices(t, h, "", fmt.Sprintf(`{"Type":"ACCREC","Contact":{"ContactID":%q},"Payments":[{"Amount":40}],"RepeatingInvoiceID":"r","StatusAttributeString":"WARNING",
 		"LineItems":[{"AccountID":"x","LineAmount":40}]}`, cid))
 	fi := firstInvoice(t, forged)
-	if p, _ := fi["Payments"].([]any); len(p) != 0 || fi["RepeatingInvoiceID"] != nil || fi["StatusAttributeString"] != nil || fi["AmountPaid"] != 0.0 {
+	if p, _ := fi["Payments"].([]any); len(p) != 0 || fi["RepeatingInvoiceID"] != nil || fi["StatusAttributeString"] != "OK" || fi["AmountPaid"] != 0.0 {
 		t.Errorf("client-sent read-only fields must not be echoed: %v", fi)
 	}
 	if l := fi["LineItems"].([]any)[0].(map[string]any); l["AccountID"] != nil {
