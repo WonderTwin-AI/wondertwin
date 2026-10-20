@@ -32,6 +32,11 @@ func TestWhereScanLiteralsAndOperators(t *testing.T) {
 		{`D == DateTime(2024,2,29)`, cmpExpr{"D", "==", utc(2024, 2, 29, 0, 0, 0)}},
 		{`Name == ""`, cmpExpr{"Name", "==", ""}},
 		{`Name == "a == b"`, cmpExpr{"Name", "==", "a == b"}},
+		// A single = is an equality too: localstack/finance-ops looks a contact up with
+		// where=AccountNumber="cus_1" against the real Xero.
+		{`AccountNumber="cus_1"`, cmpExpr{"AccountNumber", "==", "cus_1"}},
+		{`Type = "BANK"`, cmpExpr{"Type", "==", "BANK"}},
+		{`Name="a=b"`, cmpExpr{"Name", "==", "a=b"}},
 	}
 	for _, tc := range cases {
 		got, err := ParseWhere(tc.src)
@@ -46,7 +51,6 @@ func TestWhereScanRefusesWhatXeroRefuses(t *testing.T) {
 		"":                               "expected a field name",
 		`== 1`:                           "expected a field name",
 		`Type`:                           "expected a comparison after Type",
-		`Type = "BANK"`:                  "expected a comparison after Type",
 		`Type == `:                       "expected a value",
 		`Type == BANK`:                   "expected a value",
 		`Type == "BANK`:                  "unterminated string",

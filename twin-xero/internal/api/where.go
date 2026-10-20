@@ -142,9 +142,12 @@ func (p *whereParser) term() (Where, error) {
 		arg, err := p.callArg()
 		return callExpr{path[:i], method, arg}, err
 	}
-	op := p.accept("==", "!=", "<=", ">=", "<", ">")
+	op := p.accept("==", "!=", "<=", ">=", "<", ">", "=")
 	if op == "" {
 		return nil, werr("expected a comparison after %s at position %d", path, p.pos)
+	}
+	if op == "=" { // localstack/finance-ops sends AccountNumber="..." against Xero
+		op = "=="
 	}
 	lit, err := p.literal()
 	return cmpExpr{path, op, lit}, err
