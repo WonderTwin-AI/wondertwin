@@ -238,3 +238,24 @@ func TestStoreCreditNotesSnapshotLoadAndResetPerTenant(t *testing.T) {
 		t.Fatal("a state file that omits credit notes must leave them alone")
 	}
 }
+
+func TestStorePaymentsSnapshotLoadAndResetPerTenant(t *testing.T) {
+	s := store.New()
+	s.Payments.For("t1").Set("p1", store.Payment{PaymentID: "p1", Amount: 10, Invoice: &store.PaymentInvoice{InvoiceID: "i1"}})
+	snap := s.Snapshot()
+	s.Reset()
+	if s.Payments.For("t1").Count() != 0 {
+		t.Fatal("reset left payments behind")
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := s.Payments.For("t1").Get("p1")
+	if !ok || got.Amount != 10 || got.Invoice == nil || got.Invoice.InvoiceID != "i1" {
+		t.Fatalf("payment = %+v, %v after load: the invoice link must survive a snapshot", got, ok)
+	}
+	if s.Payments.For("t2").Count() != 0 {
+		t.Fatal("a payment leaked into another tenant")
+	}
+}
