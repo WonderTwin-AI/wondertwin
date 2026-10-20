@@ -336,6 +336,17 @@ def case_create_payment_pays_the_invoice():
         assert "not of valid status" in str(e), str(e)
 
 
+def case_update_invoice_line_items():
+    """The SDK posts the lines back with their IDs: an edited line keeps its ID and the totals are recomputed."""
+    api, tenant = accounting_api()
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(new_contact(api, tenant))])).invoices[0]
+    first = created.line_items[0]
+    first.quantity, first.line_amount = (first.quantity or 1) + 1, None  # a client that edits a line drops its stale LineAmount
+    updated = api.update_invoice(tenant, invoice_id=created.invoice_id, invoices=Invoices(invoices=[created])).invoices[0]
+    assert updated.line_items[0].line_item_id == first.line_item_id, "an edited line keeps its LineItemID"
+    assert updated.total != created.total and updated.amount_due == updated.total, "the totals are recomputed"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -353,6 +364,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("update_invoice recomputes the totals when a line changes", case_update_invoice_line_items),
     ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
     ("get_invoices as finance-ops calls it, by contact with page=1", case_get_invoices_as_finance_ops_calls_it),
     ("get_invoices by number and where, get_invoice, and the unpaged summary form", case_get_invoices_by_number_where_and_read),
