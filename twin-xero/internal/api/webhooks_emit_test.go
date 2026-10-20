@@ -173,3 +173,34 @@ func TestWebhookEmitStateIsClearedByReset(t *testing.T) {
 		t.Fatal("reset must clear the delivery log, the sequence and the subscriptions")
 	}
 }
+
+func TestWebhookSlowReceiverNeverDelaysASecondEmit(t *testing.T) {
+	h := newTestHandler(t)
+	release := make(chan struct{})
+	got := make(chan received, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		got <- received{r.Header.Get("x-xero-signature"), b}
+		<-release
+	}))
+	t.Cleanup(srv.Close)
+	var once sync.Once
+	free := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(free)
+	subscribe(h, "w1", srv.URL, "k", store.WebhookOK, "CONTACT")
+
+	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "UPDATE", "c", nil)
+	first := next(t, got) // first delivery is now in flight and blocked
+
+	start := time.Now()
+	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "UPDATE", "c", nil)
+	if d := time.Since(start); d > 200*time.Millisecond {
+		t.Fatalf("second emit took %v while a delivery was in flight", d)
+	}
+	free()
+	second := next(t, got)
+	var a, b struct{ FirstEventSequence int }
+	if json.Unmarshal(first.body, &a) != nil || json.Unmarshal(second.body, &b) != nil || a.FirstEventSequence != 1 || b.FirstEventSequence != 2 {
+		t.Fatalf("want sequences 1 then 2, got %d then %d", a.FirstEventSequence, b.FirstEventSequence)
+	}
+}
