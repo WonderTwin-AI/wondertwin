@@ -13,7 +13,7 @@ type Handler struct {
 	store *store.MemoryStore
 	mw    *twincore.Middleware
 
-	// clientID and secret, when set, are the only pair accepted.
+	// clientID and secret are each enforced when non-empty; see SetCredentials.
 	clientID, secret string
 }
 
