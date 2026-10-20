@@ -10,16 +10,18 @@ refresh token comes from a plain form POST. Prints one JSON line per case
 ({"sdk","case","pass","detail"}) and exits non-zero if any case fails.
 """
 
+import datetime
 import http.client
 import json
 import os
 import sys
 import time
 import urllib.parse
+import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import AccountingApi, Contact, Contacts, Address
+from xero_python.accounting import Address, AccountingApi, Contact, Contacts, CurrencyCode, Invoice, Invoices, LineItem
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -204,6 +206,40 @@ def case_chart_of_accounts():
     assert by_code["200"].updated_date_utc.year >= 2026, "the SDK parsed UpdatedDateUTC as a /Date()/ value"
 
 
+def accounting_api():
+    """An AccountingApi signed in as a code exchange, and the tenant id from the connection."""
+    client, _, _ = signed_in()
+    tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
+    return AccountingApi(client, base_url=f"{BASE}/api.xro/2.0"), tenant
+
+
+def new_contact(api, tenant):
+    name = f"Smoke {uuid.uuid4().hex[:8]}"
+    return api.create_contacts(tenant, Contacts(contacts=[Contact(name=name)])).contacts[0].contact_id
+
+
+def finance_ops_invoice(contact_id, **kw):
+    """The shape localstack/finance-ops sends: fee and negative lines carrying only a LineAmount,
+    and a client-side Total that Xero ignores."""
+    return Invoice(
+        type="ACCREC", contact=Contact(contact_id=contact_id), status="AUTHORISED", currency_code=CurrencyCode("USD"),
+        date=datetime.date(2026, 9, 1), due_date=datetime.date(2026, 9, 30), total=999,
+        line_items=[LineItem(description="Subscription fee", line_amount=25.5, account_code="201", tax_type="TAX019"),
+                    LineItem(description="Prorated credit", line_amount=-10, account_code="200", tax_type="NONE")],
+        **kw)
+
+
+def case_create_invoices_computes_the_totals():
+    api, tenant = accounting_api()
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(new_contact(api, tenant))])).invoices[0]
+    assert created.invoice_id and created.status == "AUTHORISED" and not created.has_errors
+    assert created.total == 15.5 and created.amount_due == 15.5 and created.sub_total == 15.5, "Xero computes the totals; the client's 999 is ignored"
+    assert created.date == datetime.date(2026, 9, 1) and created.due_date == datetime.date(2026, 9, 30), "the SDK parsed the msdates"
+    assert created.updated_date_utc.year >= 2026 and created.currency_code.value == "USD"
+    assert [round(l.line_amount, 2) for l in created.line_items] == [25.5, -10.0] and all(l.line_item_id for l in created.line_items)
+    assert created.contact.contact_id and created.invoice_number.startswith("INV-")
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -221,6 +257,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("get_contacts parses with and without page", case_get_contacts_parses_with_and_without_page),
     ("get_contacts with where AccountNumber, as finance-ops calls it", case_get_contacts_as_finance_ops_calls_it),
     ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
