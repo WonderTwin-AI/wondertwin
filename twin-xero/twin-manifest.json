@@ -3,7 +3,7 @@
   "vendor_domain": "xero.com",
   "tier": "community",
   "category": "accounting",
-  "description": "Scaffold of the Xero app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks), issues tokens at POST /connect/token for the authorization_code, refresh_token and client_credentials grants, and lists tenant connections at GET /connections (bearer-authenticated). Under /api.xro/2.0 it serves GET Organisation and GET Accounts (a seeded demo chart of 8 accounts, per tenant). The remaining Xero Accounting routes arrive in later slices of build plan xero-bp1.",
+  "description": "Scaffold of the Xero app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks), issues tokens at POST /connect/token for the authorization_code, refresh_token and client_credentials grants, and lists tenant connections at GET /connections (bearer-authenticated). Under /api.xro/2.0 it serves GET Organisation and GET Accounts (a seeded demo chart of 8 accounts, per tenant) and PUT Contacts (creates contacts per tenant, accepting {Contacts:[...]} or a bare contact; the emulator assigns ContactID and defaults status to ACTIVE; no validation yet). The remaining Xero Accounting routes arrive in later slices of build plan xero-bp1.",
   "sdk_target": {
     "primary": {
       "package": "xero-python",
