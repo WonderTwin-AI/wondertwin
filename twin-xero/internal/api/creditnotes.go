@@ -47,13 +47,17 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 	var elements []validationElement
 	var made []store.CreditNote
 	invalid := false
+	due := map[string]float64{}
 	for i := range sent {
 		cn, msgs := h.buildCreditNote(tenant, inCreditNote(sent[i]), existing, unitdp)
+		if len(msgs) == 0 {
+			msgs = h.planAllocations(tenant, cn, due)
+		}
 		invalid = invalid || len(msgs) > 0
 		elements = append(elements, validationElement{Object: in.CreditNotes[i], Messages: msgs})
 		made = append(made, cn)
 		if len(msgs) == 0 {
-			existing = append(existing, cn) // later credit notes in the request see it
+			existing = append(existing, cn) // a duplicate within the request is a duplicate
 		}
 	}
 	if invalid && !strings.EqualFold(r.URL.Query().Get("summarizeErrors"), "false") {
@@ -66,6 +70,7 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 			out[i] = erroredInvoice(in.CreditNotes[i], msgs)
 			continue
 		}
+		h.applyAllocations(tenant, &cn)
 		notes.Set(cn.CreditNoteID, cn)
 		out[i] = h.wireCreditNote(tenant, cn)
 	}
