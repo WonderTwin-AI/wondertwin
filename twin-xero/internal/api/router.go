@@ -65,6 +65,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Get("/Contacts", h.Contacts)
 				r.Put("/Contacts", h.CreateContacts)
 				r.Put("/Invoices", h.CreateInvoices)
+				r.Put("/CreditNotes", h.CreateCreditNotes)
 			})
 		})
 	})
