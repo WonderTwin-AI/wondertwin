@@ -22,6 +22,7 @@ type MemoryStore struct {
 	Contacts      *Tenanted[Contact]
 	Invoices      *Tenanted[Invoice]
 	CreditNotes   *Tenanted[CreditNote]
+	Payments      *Tenanted[Payment]
 	Webhooks      *pkgstate.Store[Webhook]
 	// WebhookSeq numbers the events of every delivery, in order.
 	WebhookSeq atomic.Int64
@@ -49,6 +50,7 @@ func New() *MemoryStore {
 		Contacts:      NewTenanted[Contact](),
 		Invoices:      NewTenanted[Invoice](),
 		CreditNotes:   NewTenanted[CreditNote](),
+		Payments:      NewTenanted[Payment](),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -68,6 +70,7 @@ type snapshot struct {
 	Contacts      map[string]map[string]Contact    `json:"contacts"`
 	Invoices      map[string]map[string]Invoice    `json:"invoices"`
 	CreditNotes   map[string]map[string]CreditNote `json:"credit_notes"`
+	Payments      map[string]map[string]Payment    `json:"payments"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -82,6 +85,7 @@ func (s *MemoryStore) Snapshot() any {
 		Contacts:      s.Contacts.Snapshot(),
 		Invoices:      s.Invoices.Snapshot(),
 		CreditNotes:   s.CreditNotes.Snapshot(),
+		Payments:      s.Payments.Snapshot(),
 	}
 }
 
@@ -118,6 +122,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.CreditNotes != nil {
 		s.CreditNotes.Load(snap.CreditNotes)
 	}
+	if snap.Payments != nil {
+		s.Payments.Load(snap.Payments)
+	}
 	return nil
 }
 
@@ -138,6 +145,7 @@ func (s *MemoryStore) Reset() {
 	s.Contacts.Reset()
 	s.Invoices.Reset()
 	s.CreditNotes.Reset()
+	s.Payments.Reset()
 	s.seedConnection()
 	s.seedTenant()
 }
