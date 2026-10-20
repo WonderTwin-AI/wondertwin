@@ -34,14 +34,14 @@ func messages(el map[string]any) string {
 
 func TestContactValidationRequiresAName(t *testing.T) {
 	for _, body := range []string{`{"Contacts":[{"AccountNumber":"x"}]}`, `{"Contacts":[{"Name":"   "}]}`} {
-		if got := messages(refusal(t, newTestHandler(), body)[0]); !strings.Contains(got, "contact name") {
+		if got := messages(refusal(t, newTestHandler(t), body)[0]); !strings.Contains(got, "contact name") {
 			t.Fatalf("%s: messages = %q", body, got)
 		}
 	}
 }
 
 func TestContactValidationKeepsFieldsToTheirLengths(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	for field, max := range map[string]int{"Name": 255, "FirstName": 255, "LastName": 255, "EmailAddress": 255,
 		"ContactNumber": 50, "AccountNumber": 50, "CompanyNumber": 50, "TaxNumber": 50} {
 		over := `{"Name":"n","` + field + `":"` + strings.Repeat("x", max+1) + `"}`
@@ -60,7 +60,7 @@ func TestContactValidationKeepsFieldsToTheirLengths(t *testing.T) {
 }
 
 func TestContactValidationNameIsUniqueAmongActiveContacts(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	putContacts(t, h, `{"Contacts":[{"Name":"Acme"},{"Name":"Gone","ContactStatus":"ARCHIVED"}]}`)
 
 	got := messages(refusal(t, h, `{"Name":"ACME"}`)[0])
@@ -72,7 +72,7 @@ func TestContactValidationNameIsUniqueAmongActiveContacts(t *testing.T) {
 }
 
 func TestContactValidationAccountNumberIsUnique(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	putContacts(t, h, `{"Name":"First","AccountNumber":"cus_1"}`)
 
 	got := messages(refusal(t, h, `{"Name":"Second","AccountNumber":"cus_1"}`)[0])
@@ -83,7 +83,7 @@ func TestContactValidationAccountNumberIsUnique(t *testing.T) {
 }
 
 func TestContactValidationRefusesTheWholeRequestAndEchoesEveryContact(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	els := refusal(t, h, `{"Contacts":[{"Name":"Fine"},{"Name":"Twin"},{"Name":"twin"},{"AccountNumber":"a"}]}`)
 
 	if len(els) != 4 || els[0]["Name"] != "Fine" || messages(els[0]) != "" {

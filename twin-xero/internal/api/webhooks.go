@@ -1,13 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 	xerowh "github.com/wondertwin-ai/wondertwin/twin-xero/internal/webhook"
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 	pkgwh "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
@@ -48,6 +54,9 @@ func (e endpoints) ActiveEndpoints() []pkgwh.Endpoint {
 	}
 	return out
 }
+
+// Dispatcher is the webhook dispatcher, for the admin flush route.
+func (h *Handler) Dispatcher() *pkgwh.Dispatcher { return h.dispatcher }
 
 func (h *Handler) entropy() string { return strings.ToUpper(sim.NewIDGenerator(h.store.Rand).Hex(10)) }
 
@@ -134,4 +143,116 @@ func (h *Handler) Close() {
 	}
 	h.pend.Unlock()
 	h.worker.Wait()
+}
+
+// intentToReceive is Xero's check of a new subscription: payloads with no
+// events, some signed with the key and some not. The receiver must answer 2xx
+// to the first and 401 to the second, within 5 seconds and with no cookies.
+func (h *Handler) intentToReceive(target, key string) error {
+	client := &http.Client{Timeout: 5 * time.Second}
+	for i, signedRight := range []bool{true, false, true, false} {
+		body := xerowh.Payload{Entropy: h.entropy()}.Body()
+		signKey := key
+		if !signedRight {
+			signKey += "-wrong"
+		}
+		req, _ := http.NewRequest(http.MethodPost, target, strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(xerowh.SignatureHeader, xerowh.Signature(body, signKey))
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("check %d: %v", i+1, err)
+		}
+		resp.Body.Close()
+		if signedRight && (resp.StatusCode < 200 || resp.StatusCode > 299) {
+			return fmt.Errorf("check %d: a correctly signed payload answered %d, want 2xx", i+1, resp.StatusCode)
+		}
+		if !signedRight && resp.StatusCode != http.StatusUnauthorized {
+			return fmt.Errorf("check %d: an incorrectly signed payload answered %d, want 401", i+1, resp.StatusCode)
+		}
+	}
+	return nil
+}
+
+// verify runs the check and records its outcome on the subscription.
+func (h *Handler) verify(w store.Webhook) store.Webhook {
+	w.Status, w.Reason = store.WebhookOK, ""
+	if err := h.intentToReceive(w.URL, w.Key); err != nil {
+		w.Status, w.Reason = store.WebhookFailed, err.Error()
+	}
+	h.store.Webhooks.Set(w.ID, w)
+	return w
+}
+
+// RegisterWebhook serves POST /admin/webhooks, which stands in for Xero's
+// developer portal. The key is generated when none is given, categories default
+// to all, and intent_to_receive (default true) runs the check before the
+// subscription may deliver.
+func (h *Handler) RegisterWebhook(rw http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URL, Key        string
+		Categories      []string
+		IntentToReceive *bool `json:"intent_to_receive"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		twincore.Error(rw, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
+	}
+	if u, err := url.Parse(in.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		twincore.Error(rw, http.StatusBadRequest, "url must be an http or https URL")
+		return
+	}
+	if len(in.Categories) == 0 {
+		in.Categories = []string{"CONTACT", "INVOICE", "CREDITNOTE", "PREPAYMENT", "OVERPAYMENT"}
+	}
+	for _, c := range in.Categories {
+		if _, ok := categoryPaths[c]; !ok {
+			twincore.Error(rw, http.StatusBadRequest, "unknown category "+c)
+			return
+		}
+	}
+	if in.Key == "" {
+		in.Key = h.entropy() + h.entropy()
+	}
+	wh := store.Webhook{ID: h.store.NewID(), URL: in.URL, Key: in.Key, Categories: in.Categories, Status: store.WebhookOK, CreatedDateUTC: h.store.Clock.Now().UTC()}
+	if in.IntentToReceive == nil || *in.IntentToReceive {
+		wh = h.verify(wh)
+	} else {
+		h.store.Webhooks.Set(wh.ID, wh)
+	}
+	twincore.JSON(rw, http.StatusCreated, wh)
+}
+
+// ListWebhooks serves GET /admin/webhooks.
+func (h *Handler) ListWebhooks(w http.ResponseWriter, r *http.Request) {
+	out := h.store.Webhooks.List()
+	if out == nil {
+		out = []store.Webhook{}
+	}
+	twincore.JSON(w, http.StatusOK, out)
+}
+
+// DeleteWebhook serves DELETE /admin/webhooks/{id}.
+func (h *Handler) DeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	if !h.store.Webhooks.Delete(chi.URLParam(r, "id")) {
+		twincore.Error(w, http.StatusNotFound, "no such webhook")
+		return
+	}
+	twincore.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// VerifyWebhook serves POST /admin/webhooks/{id}/verify: the check run again, as
+// when Xero re-enables a subscription.
+func (h *Handler) VerifyWebhook(w http.ResponseWriter, r *http.Request) {
+	wh, ok := h.store.Webhooks.Get(chi.URLParam(r, "id"))
+	if !ok {
+		twincore.Error(w, http.StatusNotFound, "no such webhook")
+		return
+	}
+	twincore.JSON(w, http.StatusOK, h.verify(wh))
+}
+
+// WebhookDeliveries serves GET /admin/webhooks/deliveries: every attempt made.
+func (h *Handler) WebhookDeliveries(w http.ResponseWriter, r *http.Request) {
+	twincore.JSON(w, http.StatusOK, h.dispatcher.Deliveries())
 }

@@ -39,6 +39,31 @@
       "quirk_ids": [
         "auth-001"
       ]
+    },
+    {
+      "route": "outbound webhook deliveries: failure handling",
+      "reason": "A delivery that fails is retried a fixed number of times, at a fixed delay, by the kit's dispatcher, and then dropped. A subscription is never disabled and missed events are never held or replayed. Xero retries immediately, then every 15 minutes for up to 24 hours, then disables the subscription and replays held events for 31 days on re-enable.",
+      "references": {
+        "docs": "research/twins/xero/feature-gap-register.md GAP-001; research/twins/xero/quirk-hypotheses.json webhook-005",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Scope exception granted by the operator on 2026-10-19: deferred to xero-bp2 (WonderTwin-AI/wondertwin-docs#270). The named target localstack/finance-ops uses no Xero webhooks.",
+      "quirk_ids": [
+        "webhook-005"
+      ]
+    },
+    {
+      "route": "outbound webhook deliveries: payload shape and intent to receive",
+      "reason": "Details the research does not settle are guessed. Each delivery carries one event, with firstEventSequence equal to lastEventSequence. eventType is uppercase (CREATE, UPDATE). eventDateUtc has three fractional digits, as in the documented example. The intent-to-receive check sends four requests (signed, unsigned, signed, unsigned) and enables the subscription only if the receiver answers 2xx to the signed and 401 to the unsigned.",
+      "references": {
+        "docs": "research/twins/xero/feature-gap-register.md GAP-005; research/twins/xero/quirk-hypotheses.json webhook-004, webhook-006",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Settling these needs a live delivery (quirk observe_via: traffic). Recorded in WonderTwin-AI/wondertwin-docs#270.",
+      "quirk_ids": [
+        "webhook-006",
+        "webhook-004"
+      ]
     }
   ]
 }

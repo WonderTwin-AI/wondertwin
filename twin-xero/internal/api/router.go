@@ -45,6 +45,14 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 		r.Post("/connect/token", h.Token)
 
+		// Xero registers a webhook in its developer portal, so the emulator has an
+		// admin route instead.
+		r.Post("/admin/webhooks", h.RegisterWebhook)
+		r.Get("/admin/webhooks", h.ListWebhooks)
+		r.Get("/admin/webhooks/deliveries", h.WebhookDeliveries)
+		r.Delete("/admin/webhooks/{id}", h.DeleteWebhook)
+		r.Post("/admin/webhooks/{id}/verify", h.VerifyWebhook)
+
 		r.Group(func(r chi.Router) {
 			r.Use(h.bearer)
 			r.Get("/connections", h.Connections)
