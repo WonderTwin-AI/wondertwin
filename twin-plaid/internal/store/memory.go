@@ -17,6 +17,7 @@ type MemoryStore struct {
 	Institutions *pkgstate.Store[Institution]
 	PublicTokens *pkgstate.Store[PublicToken]
 	AccessTokens *pkgstate.Store[AccessToken]
+	LinkTokens   *pkgstate.Store[LinkToken]
 	// Rand is the deterministic random source. main.go replaces the default
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
@@ -33,6 +34,7 @@ func New() *MemoryStore {
 		Institutions: pkgstate.New[Institution]("ins"),
 		PublicTokens: pkgstate.New[PublicToken]("public"),
 		AccessTokens: pkgstate.New[AccessToken]("access"),
+		LinkTokens:   pkgstate.New[LinkToken]("link"),
 		Rand:         sim.DefaultRand(),
 	}
 }
@@ -45,6 +47,7 @@ type snapshot struct {
 	Institutions map[string]Institution `json:"institutions,omitempty"`
 	PublicTokens map[string]PublicToken `json:"public_tokens,omitempty"`
 	AccessTokens map[string]AccessToken `json:"access_tokens,omitempty"`
+	LinkTokens   map[string]LinkToken   `json:"link_tokens,omitempty"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -55,6 +58,7 @@ func (s *MemoryStore) Snapshot() any {
 		Institutions: s.Institutions.Snapshot(),
 		PublicTokens: s.PublicTokens.Snapshot(),
 		AccessTokens: s.AccessTokens.Snapshot(),
+		LinkTokens:   s.LinkTokens.Snapshot(),
 	}
 }
 
@@ -79,6 +83,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.AccessTokens != nil {
 		s.AccessTokens.LoadSnapshot(snap.AccessTokens)
 	}
+	if snap.LinkTokens != nil {
+		s.LinkTokens.LoadSnapshot(snap.LinkTokens)
+	}
 	return nil
 }
 
@@ -90,4 +97,5 @@ func (s *MemoryStore) Reset() {
 	s.Institutions.Reset()
 	s.PublicTokens.Reset()
 	s.AccessTokens.Reset()
+	s.LinkTokens.Reset()
 }
