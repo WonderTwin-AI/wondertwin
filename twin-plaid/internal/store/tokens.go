@@ -51,6 +51,8 @@ func (s *MemoryStore) CreatePublicToken(institutionID string, products []string,
 // ExchangePublicToken spends a public token: it creates the Item and its
 // access token. A public token works once; an expired one is spent too.
 func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, error) {
+	s.exchangeMu.Lock()
+	defer s.exchangeMu.Unlock()
 	pt, ok := s.PublicTokens.Get(token)
 	if !ok {
 		return Item{}, AccessToken{}, ErrUnknownToken

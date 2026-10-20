@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -42,5 +43,33 @@ func TestTokensResetClearsThem(t *testing.T) {
 	s.Reset()
 	if _, ok := s.PublicTokens.Get(pt.Token); ok || s.AccessTokens.Count() != 0 {
 		t.Fatal("Reset left tokens behind")
+	}
+}
+
+func TestTokensConcurrentExchangeSpendsThePublicTokenOnce(t *testing.T) {
+	s := seeded(1)
+	pt := s.CreatePublicToken("ins_1", []string{"auth"}, "")
+	const n = 20
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, _, errs[i] = s.ExchangePublicToken(pt.Token)
+		}(i)
+	}
+	wg.Wait()
+	ok := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			ok++
+		case !errors.Is(err, ErrUnknownToken):
+			t.Fatalf("losing exchange error = %v, want ErrUnknownToken", err)
+		}
+	}
+	if ok != 1 || s.Items.Count() != 1 {
+		t.Fatalf("%d exchanges succeeded, %d Items; want 1 and 1", ok, s.Items.Count())
 	}
 }

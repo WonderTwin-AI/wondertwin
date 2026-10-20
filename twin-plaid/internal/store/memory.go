@@ -3,6 +3,7 @@ package store
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -19,6 +20,8 @@ type MemoryStore struct {
 	// Rand is the deterministic random source. main.go replaces the default
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
+
+	exchangeMu sync.Mutex
 }
 
 // New creates an empty MemoryStore.
