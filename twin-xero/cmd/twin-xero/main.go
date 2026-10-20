@@ -35,6 +35,7 @@ func main() {
 
 	adminHandler := admin.NewHandler(memStore, twin.Middleware(), memStore.Clock)
 	adminHandler.SetConfigProvider(api.NewConfig(twin, memStore))
+	adminHandler.SetFlusher(apiHandler.Dispatcher())
 	adminHandler.Routes(twin.Router)
 
 	if cfg.SeedFile != "" {

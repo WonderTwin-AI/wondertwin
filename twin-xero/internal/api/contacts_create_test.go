@@ -38,7 +38,7 @@ func putContacts(t *testing.T, h *Handler, body string) map[string]any {
 var guidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 func TestContactCreateAnswersThePluralEnvelopeWithTheFieldsXeroAssigns(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	body := putContacts(t, h, `{"Contacts":[{"Name":"Acme","AccountNumber":"cus_1","EmailAddress":"a@acme.test","IsCustomer":true,
 		"Addresses":[{"AddressType":"STREET","City":"Zurich"}],"Phones":[{"PhoneType":"DEFAULT","PhoneNumber":"555"}]}]}`)
 
@@ -72,7 +72,7 @@ func TestContactCreateAnswersThePluralEnvelopeWithTheFieldsXeroAssigns(t *testin
 }
 
 func TestContactCreateTakesABareContactOrAnArrayAndAssignsItsOwnID(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	one := putContacts(t, h, `{"Name":"Solo","ContactID":"11111111-1111-4111-8111-111111111111"}`)["Contacts"].([]any)
 	if len(one) != 1 || one[0].(map[string]any)["ContactID"] == "11111111-1111-4111-8111-111111111111" {
 		t.Fatalf("a bare contact is created, and its ContactID is assigned here, not taken: %v", one)
@@ -86,7 +86,7 @@ func TestContactCreateTakesABareContactOrAnArrayAndAssignsItsOwnID(t *testing.T)
 }
 
 func TestContactCreateKeepsTenantsApart(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	putContacts(t, h, `{"Name":"Mine"}`)
 	if n := h.store.Contacts.For("0f0f0f0f-0000-4000-8000-00000000dead").Count(); n != 0 {
 		t.Fatalf("another tenant holds %d contacts, want 0", n)
@@ -94,7 +94,7 @@ func TestContactCreateKeepsTenantsApart(t *testing.T) {
 }
 
 func TestContactCreateRefusesBodiesThatAreNotJSON(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	for _, body := range []string{`{not json`, ``, `[1,2]`} {
 		rec := do(h, http.MethodPut, "/api.xro/2.0/Contacts", body, accounting(t, h, store.DefaultTenantID))
 		if rec.Code != 400 || !json.Valid(rec.Body.Bytes()) {

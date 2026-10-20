@@ -13,7 +13,7 @@ import (
 // seededContacts creates four contacts a minute apart, so UpdatedDateUTC orders them.
 func seededContacts(t *testing.T) (*Handler, map[string]string) {
 	t.Helper()
-	h, ids := newTestHandler(), map[string]string{}
+	h, ids := newTestHandler(t), map[string]string{}
 	for _, c := range []string{
 		`{"Name":"Acme Ltd","AccountNumber":"cus_1","IsCustomer":true,"EmailAddress":"ap@acme.test"}`,
 		`{"Name":"Bolt Co","AccountNumber":"cus_2","IsSupplier":true,"FirstName":"Bo","ContactPersons":[{"FirstName":"P"}]}`,
