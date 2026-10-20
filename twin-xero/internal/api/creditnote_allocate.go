@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
@@ -29,6 +30,7 @@ func (h *Handler) planAllocations(tenant string, cn store.CreditNote, due map[st
 	if cn.Status != "AUTHORISED" {
 		return []string{"Allocations can only be applied to an authorised credit note."}
 	}
+	before := maps.Clone(due)
 	var msgs []string
 	strict := h.store.StrictAuth.Load()
 	remaining := cn.Total
@@ -64,6 +66,10 @@ func (h *Handler) planAllocations(tenant string, cn store.CreditNote, due map[st
 		default:
 			remaining, due[inv.InvoiceID] = remaining-a.Amount, due[inv.InvoiceID]-a.Amount
 		}
+	}
+	if len(msgs) > 0 {
+		clear(due)
+		maps.Copy(due, before)
 	}
 	return msgs
 }
