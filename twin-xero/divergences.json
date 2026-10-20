@@ -136,6 +136,18 @@
       "quirk_ids": [
         "crud-004"
       ]
+    },
+    {
+      "route": "PUT /CreditNotes (inline Allocations)",
+      "reason": "By default an inline Allocation is accepted against an AUTHORISED or PAID invoice of the same contact and type, bounded only by the credit note's total: AmountCredited grows, AmountDue never goes below zero and a PAID invoice stays PAID. Both rules are guesses; the research has one example (part of an AUTHORISED credit note against an outstanding invoice) and does not say what Xero does with a PAID invoice or an amount above AmountDue. strict_auth (the --strict-auth flag, or PUT /admin/config) refuses an invoice that is not AUTHORISED and an amount above its AmountDue.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
+      },
+      "operator_note": "Added for the named target localstack/finance-ops, whose refund flow (backend/stripe_xero_lambda/xero_client.py _create_refund_credit_note) allocates the whole refund to an invoice that is normally already PAID. Whether real Xero accepts that is unverified.",
+      "quirk_ids": [
+        "alloc-001",
+        "alloc-002"
+      ]
     }
   ]
 }
