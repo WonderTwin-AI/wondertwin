@@ -51,8 +51,8 @@ func computeLines(lineAmountTypes string, lines []store.LineItem, unitdp int) ([
 		case l.UnitAmount != nil:
 			l.UnitAmount = ptr(round(*l.UnitAmount, unitdp))
 			gross = qty * *l.UnitAmount
-		case l.LineAmount != nil && l.DiscountRate != nil:
-			msgs = append(msgs, fmt.Sprintf("Line %d: a UnitAmount is required with a DiscountRate.", i+1))
+		case l.DiscountRate != nil || l.DiscountAmount != nil:
+			msgs = append(msgs, fmt.Sprintf("Line %d: a UnitAmount is required with a DiscountRate or DiscountAmount.", i+1))
 		case l.LineAmount != nil:
 			gross = *l.LineAmount
 			if qty != 0 {

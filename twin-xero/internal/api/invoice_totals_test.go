@@ -73,10 +73,12 @@ func TestInvoiceTotalsRefuseWhatDoesNotAddUp(t *testing.T) {
 		line  store.LineItem
 		want  string
 	}{
-		"a LineAmount that disagrees":        {"Exclusive", line(ptr(2), ptr(50), ptr(90), nil), "does not equal Quantity x UnitAmount"},
-		"a discount with no UnitAmount":      {"Exclusive", line(nil, nil, ptr(90), ptr(10)), "UnitAmount is required with a DiscountRate"},
-		"an unknown LineAmountTypes":         {"Tax Free", line(ptr(1), ptr(1), nil, nil), "LineAmountTypes must be"},
-		"a LineAmount that agrees is silent": {"Exclusive", line(ptr(2), ptr(50), ptr(100), nil), ""},
+		"a LineAmount that disagrees":         {"Exclusive", line(ptr(2), ptr(50), ptr(90), nil), "does not equal Quantity x UnitAmount"},
+		"a discount with no UnitAmount":       {"Exclusive", line(nil, nil, ptr(90), ptr(10)), "UnitAmount is required with a DiscountRate"},
+		"a DiscountAmount with no UnitAmount": {"Exclusive", store.LineItem{LineAmount: ptr(100), DiscountAmount: ptr(10)}, "UnitAmount is required with a DiscountRate or DiscountAmount"},
+		"a LineAmount alone is silent":        {"Exclusive", line(nil, nil, ptr(100), nil), ""},
+		"an unknown LineAmountTypes":          {"Tax Free", line(ptr(1), ptr(1), nil, nil), "LineAmountTypes must be"},
+		"a LineAmount that agrees is silent":  {"Exclusive", line(ptr(2), ptr(50), ptr(100), nil), ""},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
