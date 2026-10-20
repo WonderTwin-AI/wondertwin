@@ -149,11 +149,21 @@ func TestBotPostsCarryTheBotIdentity(t *testing.T) {
 		t.Errorf("a user's post carries a bot: %v", userMsg)
 	}
 
-	ev := innerEvents(t, rc.wait(t, 2), "b0t")
-	if ev[0]["bot_id"] != "B_BOT" || ev[0]["app_id"] != "A_SIM" || ev[0]["bot_profile"] == nil {
-		t.Errorf("bot message event: %v", ev[0])
+	// The two events come from separate deliveries, so their order is not fixed:
+	// tell them apart by their text.
+	byText := map[string]map[string]any{}
+	for _, e := range innerEvents(t, rc.wait(t, 2), "b0t") {
+		text, _ := e["text"].(string)
+		byText[text] = e
 	}
-	if _, ok := ev[1]["bot_id"]; ok {
-		t.Errorf("a user's message event carries a bot: %v", ev[1])
+	botEv, personEv := byText["from the bot"], byText["from a person"]
+	if botEv == nil || personEv == nil {
+		t.Fatalf("want one event for each post, got %v", byText)
+	}
+	if botEv["bot_id"] != "B_BOT" || botEv["app_id"] != "A_SIM" || botEv["bot_profile"] == nil {
+		t.Errorf("bot message event: %v", botEv)
+	}
+	if _, ok := personEv["bot_id"]; ok {
+		t.Errorf("a user's message event carries a bot: %v", personEv)
 	}
 }
