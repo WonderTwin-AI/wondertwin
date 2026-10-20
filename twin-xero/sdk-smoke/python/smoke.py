@@ -276,6 +276,18 @@ def case_create_invoices_summarize_errors_false():
     assert not result[1].invoice_id, "a refused invoice is not created"
 
 
+def case_update_invoice_as_finance_ops_does():
+    """finance-ops reads an invoice, changes a field and posts the whole model back with update_invoice."""
+    api, tenant = accounting_api()
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(new_contact(api, tenant))])).invoices[0]
+    created.reference = "updated by smoke"
+    updated = api.update_invoice(tenant, invoice_id=created.invoice_id, invoices=Invoices(invoices=[created])).invoices[0]
+    assert updated.reference == "updated by smoke" and updated.invoice_id == created.invoice_id and updated.total == created.total
+    assert updated.updated_date_utc >= created.updated_date_utc
+    by_number = api.update_invoice(tenant, invoice_id=created.invoice_number, invoices=Invoices(invoices=[Invoice(reference="by number")]))
+    assert by_number.invoices[0].reference == "by number", "the path may name the invoice by its number"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -293,6 +305,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),
