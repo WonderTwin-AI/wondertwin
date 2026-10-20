@@ -112,7 +112,7 @@ func TestPaginateHugePageIsEmptyNotAPanic(t *testing.T) {
 }
 
 func TestPaginateEnvelopeCarriesThePaginationObjectBeforeTheArray(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	rec := httptest.NewRecorder()
 	h.writeListEnvelope(rec, 200, "Invoices", []string{"a"}, &pagination{1, 100, 1, 1})
 

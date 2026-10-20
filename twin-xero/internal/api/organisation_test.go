@@ -18,7 +18,7 @@ func accounting(t *testing.T, h *Handler, tenant string) map[string]string {
 }
 
 func TestOrganisationIsTheDefaultTenantsInThePluralEnvelope(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	rec := get(h, "/api.xro/2.0/Organisation", accounting(t, h, store.DefaultTenantID))
 	if rec.Code != 200 {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
@@ -52,7 +52,7 @@ func TestOrganisationIsTheDefaultTenantsInThePluralEnvelope(t *testing.T) {
 }
 
 func TestTenantHeaderIsRequiredAfterTheToken(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	if rec := get(h, "/api.xro/2.0/Organisation", accounting(t, h, "")); rec.Code != 403 {
 		t.Fatalf("no xero-tenant-id: want 403, got %d", rec.Code)
 	}
@@ -70,7 +70,7 @@ func TestTenantHeaderIsRequiredAfterTheToken(t *testing.T) {
 }
 
 func TestTenantUnknownIdIsEmptyUnlessStrict(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	rec := get(h, "/api.xro/2.0/Organisation", accounting(t, h, "0f0f0f0f-0000-4000-8000-00000000dead"))
 	if rec.Code != 200 || !json.Valid(rec.Body.Bytes()) {
 		t.Fatalf("lenient: an unknown tenant is accepted, got %d", rec.Code)
