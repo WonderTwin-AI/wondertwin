@@ -134,3 +134,23 @@ func TestCreditNoteAllocationStrictRefusesWhatXeroWouldRefuse(t *testing.T) {
 		t.Fatalf("a refused request must change nothing (the one credit note is the setup): invoice %v, %d credit notes", stored.AmountDue, h.store.CreditNotes.For(store.DefaultTenantID).Count())
 	}
 }
+
+func TestCreditNoteStrictRefusedAllocationsDoNotConsumeTheInvoiceDue(t *testing.T) {
+	h := newTestHandler(t)
+	h.store.StrictAuth.Store(true)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid)
+
+	// The first credit note is refused on its second allocation (no date) after its first
+	// took 60 off the shared due map; the second must still find the whole 100 due.
+	_, body := putCreditNotes(t, h, "?summarizeErrors=false", `{"CreditNotes":[`+
+		creditNoteWithAllocations(cid, 100, allocJSON(inv, 60)+","+fmt.Sprintf(`{"Invoice":{"InvoiceID":%q},"Amount":40}`, inv))+","+
+		creditNoteWithAllocations(cid, 100, allocJSON(inv, 100))+`]}`)
+	list := body["CreditNotes"].([]any)
+	if list[0].(map[string]any)["HasErrors"] != true || list[1].(map[string]any)["HasErrors"] == true {
+		t.Fatalf("credit notes = %v, want the first refused and the second created", list)
+	}
+	if stored, _ := h.store.Invoices.For(store.DefaultTenantID).Get(inv); stored.AmountDue != 0 || stored.AmountCredited != 100 {
+		t.Errorf("invoice due %v credited %v, want 0 and 100", stored.AmountDue, stored.AmountCredited)
+	}
+}
