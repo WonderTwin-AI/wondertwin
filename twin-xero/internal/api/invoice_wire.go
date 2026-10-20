@@ -28,8 +28,9 @@ func tm(m *Msdate) *time.Time {
 	return &t
 }
 
-// inInvoice reads the part of a wire invoice a client may set; everything
-// computed or read-only is dropped. The contact is kept as a reference.
+// inInvoice returns the submitted invoice whole, with the contact kept as a
+// reference. It does not strip anything: the create handler (s39 buildInvoice)
+// owns resetting every computed or read-only field.
 func inInvoice(w invoice) store.Invoice {
 	in := w.Invoice
 	if w.Contact != nil {
