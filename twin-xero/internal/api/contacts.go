@@ -1,0 +1,74 @@
+package api
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+
+	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
+)
+
+// contact is a Contact on the wire, in and out: UpdatedDateUTC is /Date(ms+0000)/,
+// and a client that reads a contact and sends it back sends that form.
+type contact struct {
+	store.Contact
+	UpdatedDateUTC Msdate `json:"UpdatedDateUTC"`
+}
+
+// wireContact readies a stored contact for the wire: the lists Xero always
+// returns are [], never null.
+func wireContact(c store.Contact) contact {
+	if c.ContactPersons == nil {
+		c.ContactPersons = []store.ContactPerson{}
+	}
+	if c.Addresses == nil {
+		c.Addresses = []store.Address{}
+	}
+	if c.Phones == nil {
+		c.Phones = []store.Phone{}
+	}
+	if c.SalesTrackingCategories == nil {
+		c.SalesTrackingCategories = []store.TrackingCategoryOf{}
+	}
+	if c.PurchasesTrackingCategories == nil {
+		c.PurchasesTrackingCategories = []store.TrackingCategoryOf{}
+	}
+	if c.ContactGroups == nil {
+		c.ContactGroups = []store.ContactGroup{}
+	}
+	return contact{c, Msdate(c.UpdatedDateUTC)}
+}
+
+// CreateContacts serves PUT /api.xro/2.0/Contacts: it creates the contacts in
+// {"Contacts": [...]} or the one contact sent bare (crud-001). The emulator
+// assigns the ContactID, so one sent is ignored, and a contact with no status is
+// ACTIVE.
+func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
+	var in struct{ Contacts []contact }
+	if err == nil {
+		err = json.Unmarshal(raw, &in)
+	}
+	if err == nil && in.Contacts == nil {
+		var one contact
+		if err = json.Unmarshal(raw, &one); err == nil {
+			in.Contacts = []contact{one}
+		}
+	}
+	if err != nil {
+		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		return
+	}
+
+	contacts := h.store.Contacts.For(tenantID(r))
+	now, out := h.store.Clock.Now().UTC(), make([]contact, len(in.Contacts))
+	for i, c := range in.Contacts {
+		c.Contact.ContactID, c.Contact.UpdatedDateUTC = h.store.NewID(), now
+		if c.Contact.ContactStatus == "" {
+			c.Contact.ContactStatus = "ACTIVE"
+		}
+		contacts.Set(c.Contact.ContactID, c.Contact)
+		out[i] = wireContact(c.Contact)
+	}
+	h.writeEnvelope(w, http.StatusOK, "Contacts", out)
+}
