@@ -75,7 +75,7 @@ func (h *Handler) buildInvoice(tenant string, in store.Invoice, existing []store
 	msgs = append(msgs, lineMsgs...)
 	chart := h.store.Accounts.For(tenant)
 	for i := range lines {
-		lines[i].LineItemID = h.store.NewID()
+		lines[i].LineItemID, lines[i].AccountID = h.store.NewID(), ""
 		for _, a := range chart.List() {
 			if a.Code == lines[i].AccountCode {
 				lines[i].AccountID = a.AccountID
@@ -113,6 +113,8 @@ func (h *Handler) buildInvoice(tenant string, in store.Invoice, existing []store
 	in.IsDiscounted = t.TotalDiscount > 0
 	in.AmountDue, in.AmountPaid, in.AmountCredited, in.FullyPaidOnDate = t.Total, 0, 0, nil
 	in.HasErrors, in.HasAttachments = false, false
+	in.Payments, in.Prepayments, in.Overpayments, in.CreditNotes, in.Attachments = nil, nil, nil, nil, nil
+	in.ValidationErrors, in.Warnings, in.StatusAttributeString, in.RepeatingInvoiceID = nil, nil, "", ""
 	in.SentToContact = in.SentToContact && in.Status == "AUTHORISED" // only an authorised invoice can be marked sent (null-001)
 	in.UpdatedDateUTC, in.UpdatedDateUTCString = now, now.Format("2006-01-02T15:04:05.000")
 	return in, nil

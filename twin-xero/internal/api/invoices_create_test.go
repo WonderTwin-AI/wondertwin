@@ -95,6 +95,15 @@ func TestInvoiceCreateIgnoresWhatXeroComputes(t *testing.T) {
 	if _, ok := inv["FullyPaidOnDate"]; ok || inv["SentToContact"] != true {
 		t.Errorf("FullyPaidOnDate must be dropped and an authorised invoice may be marked sent: %v", inv)
 	}
+	_, forged := putInvoices(t, h, "", fmt.Sprintf(`{"Type":"ACCREC","Contact":{"ContactID":%q},"Payments":[{"Amount":40}],"RepeatingInvoiceID":"r","StatusAttributeString":"WARNING",
+		"LineItems":[{"AccountCode":"nope","AccountID":"x","LineAmount":40}]}`, cid))
+	fi := firstInvoice(t, forged)
+	if p, _ := fi["Payments"].([]any); len(p) != 0 || fi["RepeatingInvoiceID"] != nil || fi["StatusAttributeString"] != nil || fi["AmountPaid"] != 0.0 {
+		t.Errorf("client-sent read-only fields must not be echoed: %v", fi)
+	}
+	if l := fi["LineItems"].([]any)[0].(map[string]any); l["AccountID"] != nil {
+		t.Errorf("AccountID comes only from the chart: %v", l)
+	}
 	_, draft := putInvoices(t, h, "", fmt.Sprintf(`{"Type":"ACCREC","Contact":{"ContactID":%q},"SentToContact":true}`, cid))
 	if firstInvoice(t, draft)["SentToContact"] != false {
 		t.Error("only an authorised invoice can be marked sent (null-001)")
