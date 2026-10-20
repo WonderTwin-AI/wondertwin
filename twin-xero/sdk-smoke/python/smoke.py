@@ -288,6 +288,34 @@ def case_update_invoice_as_finance_ops_does():
     assert by_number.invoices[0].reference == "by number", "the path may name the invoice by its number"
 
 
+def case_get_invoices_as_finance_ops_calls_it():
+    """finance-ops looks for an existing invoice with get_invoices(contact_i_ds=[...], page=1) and matches by number."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    number = f"LIST-{uuid.uuid4().hex[:6]}"
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact, invoice_number=number)])).invoices[0]
+    found = api.get_invoices(tenant, contact_i_ds=[contact], page=1)
+    assert [i.invoice_number for i in found.invoices] == [number] and found.invoices[0].invoice_id == created.invoice_id
+    assert found.pagination.page == 1 and found.pagination.item_count == 1, "the SDK parsed the pagination object"
+    assert found.invoices[0].line_items and found.invoices[0].total == 15.5 and found.invoices[0].date == datetime.date(2026, 9, 1)
+    assert api.get_invoices(tenant, contact_i_ds=[new_contact(api, tenant)], page=1).invoices == [], "an unrelated contact has none"
+
+
+def case_get_invoices_by_number_where_and_read():
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    number = f"READ-{uuid.uuid4().hex[:6]}"
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact, invoice_number=number)])).invoices[0]
+    by_number = api.get_invoices(tenant, invoice_numbers=[number], page=1).invoices
+    assert [i.invoice_id for i in by_number] == [created.invoice_id], "the migration oracle's lookup by InvoiceNumber"
+    by_where = api.get_invoices(tenant, where=f'InvoiceNumber="{number}"', page=1).invoices
+    assert [i.invoice_id for i in by_where] == [created.invoice_id]
+    single = api.get_invoice(tenant, created.invoice_id).invoices[0]
+    assert single.invoice_number == number and single.line_items and single.contact.contact_id == contact
+    unpaged = api.get_invoices(tenant, invoice_numbers=[number])
+    assert unpaged.pagination is None and not unpaged.invoices[0].line_items, "no page: summary form, and no [] for the SDK to choke on"
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -306,6 +334,8 @@ def case_connect_tenant():
 
 CASES = [
     ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
+    ("get_invoices as finance-ops calls it, by contact with page=1", case_get_invoices_as_finance_ops_calls_it),
+    ("get_invoices by number and where, get_invoice, and the unpaged summary form", case_get_invoices_by_number_where_and_read),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),
