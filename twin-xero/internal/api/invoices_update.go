@@ -223,7 +223,7 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 	if out.Status == "VOIDED" || out.Status == "DELETED" {
 		out.AmountDue = 0
 	}
-	if out.SentToContact && out.Status != "AUTHORISED" && out.Status != "PAID" {
+	if out.SentToContact && out.Status != "AUTHORISED" && out.Status != "PAID" && out.Status != "VOIDED" && out.Status != "DELETED" {
 		out.SentToContact, out.StatusAttributeString = false, "WARNING"
 		out.Warnings = []store.ValidationError{{Message: "An invoice can only be marked as sent when it is authorised."}}
 	} else {
