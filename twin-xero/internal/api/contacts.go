@@ -40,9 +40,10 @@ func wireContact(c store.Contact) contact {
 }
 
 // CreateContacts serves PUT /api.xro/2.0/Contacts: it creates the contacts in
-// {"Contacts": [...]} or the one contact sent bare (crud-001). The emulator
-// assigns the ContactID, so one sent is ignored, and a contact with no status is
-// ACTIVE.
+// {"Contacts": [...]} or the one contact sent bare (crud-001). If any is invalid
+// nothing is created and the answer is a 400 ValidationException that echoes
+// every submitted contact (err-001). The emulator assigns the ContactID, so one
+// sent is ignored, and a contact with no status is ACTIVE.
 func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	var in struct{ Contacts []contact }
@@ -61,6 +62,19 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contacts := h.store.Contacts.For(tenantID(r))
+	existing := contacts.List()
+	var elements []validationElement
+	invalid := false
+	for _, c := range in.Contacts {
+		msgs := validateContact(c.Contact, existing)
+		invalid = invalid || len(msgs) > 0
+		elements = append(elements, validationElement{Object: c, Messages: msgs})
+		existing = append(existing, c.Contact) // a duplicate within the request is a duplicate
+	}
+	if invalid {
+		writeValidationException(w, elements...)
+		return
+	}
 	now, out := h.store.Clock.Now().UTC(), make([]contact, len(in.Contacts))
 	for i, c := range in.Contacts {
 		c.Contact.ContactID, c.Contact.UpdatedDateUTC = h.store.NewID(), now

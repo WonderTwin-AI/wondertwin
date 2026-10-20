@@ -152,6 +152,20 @@ def case_create_contacts():
     assert created[0].updated_date_utc.year >= 2026, "the SDK parsed UpdatedDateUTC as a /Date()/ value"
 
 
+def case_duplicate_contact_name_is_refused():
+    """finance-ops retries a name collision by matching 'contact name' and 'unique' in the SDK's error."""
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    api.create_contacts(tenant, Contacts(contacts=[Contact(name="Smoke Dup", account_number="dup_1")]))
+    try:
+        api.create_contacts(tenant, Contacts(contacts=[Contact(name="smoke dup")]))
+    except Exception as e:  # the SDK raises on a 400
+        text = str(e).lower()
+        assert "contact name" in text and "unique" in text, text[:300]
+        return
+    raise AssertionError("a second contact with the same name was accepted")
+
+
 def case_chart_of_accounts():
     client, token, _ = signed_in()
     tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
@@ -180,6 +194,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
     ("create_contacts sends PUT /Contacts and the SDK parses the contact", case_create_contacts),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
