@@ -166,6 +166,33 @@ def case_duplicate_contact_name_is_refused():
     raise AssertionError("a second contact with the same name was accepted")
 
 
+def case_get_contacts_as_finance_ops_calls_it():
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    made = api.create_contacts(tenant, Contacts(contacts=[Contact(name="Lookup Me", account_number="cus_lookup")])).contacts[0]
+    # finance-ops: get_contacts(tenant, where='AccountNumber="cus_x"', page=1), with a single =
+    found = api.get_contacts(tenant, where='AccountNumber="cus_lookup"', page=1)
+    assert [c.contact_id for c in found.contacts] == [made.contact_id], "the single = where finds the contact"
+    assert found.pagination.page == 1 and found.pagination.item_count == 1, "the SDK parsed the pagination object"
+    assert [c.contact_id for c in api.get_contacts(tenant, where='AccountNumber=="cus_lookup"').contacts] == [made.contact_id]
+    assert [c.contact_id for c in api.get_contacts(tenant, i_ds=[made.contact_id]).contacts] == [made.contact_id]
+    assert api.get_contacts(tenant, where='AccountNumber="nobody"', page=1).contacts == []
+
+
+def case_get_contacts_parses_with_and_without_page():
+    """finance-ops passes page=1 to dodge an xero-python bug: an empty pagination
+    field comes back as [] and raises ValueError. So without page the field must be
+    omitted or null, never [], and with page=1 it must be the object the SDK parses."""
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    api.create_contacts(tenant, Contacts(contacts=[Contact(name="Paging A"), Contact(name="Paging B")]))
+    plain = api.get_contacts(tenant)  # no page: must parse, and carry no pagination
+    assert len(plain.contacts) >= 2 and plain.pagination is None, f"pagination without page = {plain.pagination!r}"
+    paged = api.get_contacts(tenant, page=1, page_size=1)
+    p = paged.pagination
+    assert (p.page, p.page_size, len(paged.contacts)) == (1, 1, 1) and p.item_count >= 2 and p.page_count >= 2, p
+
+
 def case_chart_of_accounts():
     client, token, _ = signed_in()
     tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
@@ -194,6 +221,8 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("get_contacts parses with and without page", case_get_contacts_parses_with_and_without_page),
+    ("get_contacts with where AccountNumber, as finance-ops calls it", case_get_contacts_as_finance_ops_calls_it),
     ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
     ("create_contacts sends PUT /Contacts and the SDK parses the contact", case_create_contacts),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
