@@ -51,21 +51,87 @@ func (e endpoints) ActiveEndpoints() []pkgwh.Endpoint {
 
 func (h *Handler) entropy() string { return strings.ToUpper(sim.NewIDGenerator(h.store.Rand).Hex(10)) }
 
-// emit reports a change to every subscription that wants its category. The
-// event is queued in sequence under one lock, so deliveries keep their order,
-// and delivered in the background: a slow receiver never slows the write.
+type pendingEvent struct {
+	category string
+	payload  map[string]any
+}
+
+// emit reports a change to every subscription that wants its category. It only
+// appends to a FIFO under a short lock; one worker delivers the events in that
+// order, so a slow receiver delays later deliveries but never a write.
 func (h *Handler) emit(r *http.Request, tenant, category, eventType, resourceID string, data map[string]any) {
 	ev := xerowh.Event{
 		ResourceURL: fmt.Sprintf("%s/api.xro/2.0/%s/%s", Origin(r), categoryPaths[category], resourceID), ResourceID: resourceID,
 		EventDateUTC: h.store.Clock.Now().UTC().Format(eventDate), EventType: eventType, EventCategory: category,
 		TenantID: tenant, TenantType: "ORGANISATION", Data: data,
 	}
-	h.deliver.Lock()
-	h.dispatcher.Enqueue(category, map[string]any{"event": ev, "seq": h.store.WebhookSeq.Add(1), "entropy": h.entropy()})
-	h.deliver.Unlock()
-	go func() {
-		h.deliver.Lock()
-		defer h.deliver.Unlock()
+	h.pend.Lock()
+	defer h.pend.Unlock()
+	if h.closed {
+		return
+	}
+	h.pending = append(h.pending, pendingEvent{category, map[string]any{"event": ev, "seq": h.store.WebhookSeq.Add(1), "entropy": h.entropy()}})
+	if !h.started {
+		h.started = true
+		h.worker.Add(1)
+		go h.deliverLoop()
+	}
+	select {
+	case h.wake <- struct{}{}:
+	default:
+	}
+}
+
+// deliverLoop hands the dispatcher one event at a time, so its queue never
+// holds more than the event being delivered and none is dropped by Flush.
+func (h *Handler) deliverLoop() {
+	defer h.worker.Done()
+	for {
+		h.pend.Lock()
+		if len(h.pending) == 0 {
+			h.pend.Unlock()
+			select {
+			case <-h.wake:
+				continue
+			case <-h.stop:
+				return
+			}
+		}
+		evt, gen := h.pending[0], h.gen
+		h.pending = h.pending[1:]
+		h.pend.Unlock()
+
+		h.dispatcher.Enqueue(evt.category, evt.payload)
 		_ = h.dispatcher.Flush()
-	}()
+
+		h.pend.Lock()
+		if h.gen != gen {
+			h.dispatcher.Reset()
+		}
+		h.pend.Unlock()
+		select {
+		case <-h.stop:
+			return
+		default:
+		}
+	}
+}
+
+// resetWebhooks drops the events not yet delivered and the dispatcher's state.
+func (h *Handler) resetWebhooks() {
+	h.pend.Lock()
+	h.pending, h.gen = nil, h.gen+1
+	h.pend.Unlock()
+	h.dispatcher.Reset()
+}
+
+// Close stops the delivery worker once the delivery in flight, if any, ends.
+func (h *Handler) Close() {
+	h.pend.Lock()
+	if !h.closed {
+		h.closed = true
+		close(h.stop)
+	}
+	h.pend.Unlock()
+	h.worker.Wait()
 }

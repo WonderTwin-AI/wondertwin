@@ -45,7 +45,7 @@ func claimsOf(t *testing.T, jwt string) map[string]any {
 }
 
 func TestTokenClientCredentialsIssuesAJWT(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	rec := postToken(h, url.Values{"grant_type": {"client_credentials"}}, "app:secret")
 
 	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
@@ -76,7 +76,7 @@ func TestTokenClientCredentialsIssuesAJWT(t *testing.T) {
 func TestTokenAcceptsCredentialsInTheFormBody(t *testing.T) {
 	// xero-python sends client_id and client_secret in the body, not as Basic.
 	form := url.Values{"grant_type": {"client_credentials"}, "client_id": {"sdk"}, "client_secret": {"s"}, "scope": {"accounting.contacts"}}
-	rec := postToken(newTestHandler(), form, "")
+	rec := postToken(newTestHandler(t), form, "")
 
 	body := decode(t, rec)
 	if rec.Code != 200 || body["scope"] != "accounting.contacts" {
@@ -105,7 +105,7 @@ func TestTokenErrorsUseTheIdentityShape(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newTestHandler()
+			h := newTestHandler(t)
 			h.store.StrictAuth.Store(true)
 			req := httptest.NewRequest(http.MethodPost, "/connect/token", strings.NewReader(tc.form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -126,7 +126,7 @@ func TestTokenErrorsUseTheIdentityShape(t *testing.T) {
 }
 
 func TestTokenExpiryFollowsTheSimulatedClock(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	h.store.Clock.Advance(24 * time.Hour)
 	body := decode(t, postToken(h, url.Values{"grant_type": {"client_credentials"}}, "a:b"))
 
@@ -163,7 +163,7 @@ func exchangeCode(t *testing.T, h *Handler, extra url.Values) map[string]any {
 }
 
 func TestTokenCodeExchangeIssuesRefreshAndIDTokens(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	body := exchangeCode(t, h, nil)
 
 	if body["scope"] != consentScope || body["expires_in"] != float64(1800) {
@@ -182,7 +182,7 @@ func TestTokenCodeExchangeIssuesRefreshAndIDTokens(t *testing.T) {
 }
 
 func TestTokenScopeDecidesWhichTokensComeBack(t *testing.T) {
-	body := exchangeCode(t, newTestHandler(), url.Values{"scope": {"accounting.contacts"}})
+	body := exchangeCode(t, newTestHandler(t), url.Values{"scope": {"accounting.contacts"}})
 
 	for _, k := range []string{"refresh_token", "id_token"} {
 		if _, ok := body[k]; ok {
@@ -192,7 +192,7 @@ func TestTokenScopeDecidesWhichTokensComeBack(t *testing.T) {
 }
 
 func TestTokenRefreshRotatesAndKeepsTheAuthenticationEvent(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	first := exchangeCode(t, h, nil)
 	old := first["refresh_token"].(string)
 
@@ -218,7 +218,7 @@ func TestTokenRefreshRotatesAndKeepsTheAuthenticationEvent(t *testing.T) {
 }
 
 func TestTokenRefreshRedemptionIsSingleUseUnderConcurrency(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	old := exchangeCode(t, h, nil)["refresh_token"].(string)
 	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {old}, "client_id": {"sdk"}}
 

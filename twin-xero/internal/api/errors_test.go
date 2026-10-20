@@ -13,8 +13,11 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
-func newTestHandler() *Handler {
-	return NewHandler(store.New(), twincore.New(&twincore.Config{Name: "twin-xero-test"}).Middleware())
+func newTestHandler(t testing.TB) *Handler {
+	t.Helper()
+	h := NewHandler(store.New(), twincore.New(&twincore.Config{Name: "twin-xero-test"}).Middleware())
+	t.Cleanup(h.Close)
+	return h
 }
 
 func decode(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
@@ -40,7 +43,7 @@ func TestErrorsUnauthorizedIsProblemDetailsWithAChallenge(t *testing.T) {
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api.xro/2.0/Invoices", nil)
 			req.Header.Set("Accept", "text/xml") // Xero answers JSON regardless
-			newTestHandler().writeUnauthorized(rec, req, tc.tokenSent)
+			newTestHandler(t).writeUnauthorized(rec, req, tc.tokenSent)
 
 			if rec.Code != 401 {
 				t.Fatalf("status = %d", rec.Code)
@@ -72,7 +75,7 @@ func TestErrorsInstanceIsTheCorrelationID(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(twincore.ContextWithCorrelationID(req.Context(), "corr-123"))
-	newTestHandler().writeUnauthorized(rec, req, false)
+	newTestHandler(t).writeUnauthorized(rec, req, false)
 
 	if got := decode(t, rec)["Instance"]; got != "corr-123" {
 		t.Fatalf("Instance = %v, want corr-123", got)
@@ -117,7 +120,7 @@ func TestErrorsValidationExceptionEchoesTheSubmittedObject(t *testing.T) {
 var msdateValue = regexp.MustCompile(`^/Date\(-?\d+\+0000\)/$`)
 
 func TestEnvelopeWrapsAPluralArray(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	rec := httptest.NewRecorder()
 	h.writeEnvelope(rec, http.StatusOK, "Invoices", []map[string]string{{"InvoiceID": "abc"}})
 
@@ -139,7 +142,7 @@ func TestEnvelopeWrapsAPluralArray(t *testing.T) {
 func TestEnvelopeNilListIsAnEmptyArray(t *testing.T) {
 	var none []string
 	rec := httptest.NewRecorder()
-	newTestHandler().writeEnvelope(rec, http.StatusOK, "Contacts", none)
+	newTestHandler(t).writeEnvelope(rec, http.StatusOK, "Contacts", none)
 
 	if got, ok := decode(t, rec)["Contacts"].([]any); !ok || len(got) != 0 {
 		t.Fatalf("Contacts = %v, want []", decode(t, rec)["Contacts"])
@@ -147,7 +150,7 @@ func TestEnvelopeNilListIsAnEmptyArray(t *testing.T) {
 }
 
 func TestEnvelopeKeepsTheStatusAndFollowsTheSimulatedClock(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	h.store.Clock.Advance(24 * time.Hour)
 	rec := httptest.NewRecorder()
 	h.writeEnvelope(rec, http.StatusAccepted, "Payments", []string{})

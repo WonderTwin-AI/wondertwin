@@ -74,7 +74,7 @@ func emitRequest() *http.Request {
 }
 
 func TestWebhookEmitDeliversASignedEnvelopeToASubscription(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	srv, got := receiver(t)
 	subscribe(h, "w1", srv.URL, "the-key", store.WebhookOK, "CONTACT")
 	h.store.Clock.Advance(48 * time.Hour)
@@ -116,7 +116,7 @@ func TestWebhookEmitDeliversASignedEnvelopeToASubscription(t *testing.T) {
 }
 
 func TestWebhookEmitOnlyReachesSubscribedCategoriesAndPassingSubscriptions(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	invoices, invGot := receiver(t)
 	failed, failedGot := receiver(t)
 	subscribe(h, "w1", invoices.URL, "k", store.WebhookOK, "INVOICE")
@@ -130,7 +130,7 @@ func TestWebhookEmitOnlyReachesSubscribedCategoriesAndPassingSubscriptions(t *te
 }
 
 func TestWebhookEmitKeepsEventsInOrder(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	srv, got := receiver(t)
 	subscribe(h, "w1", srv.URL, "k", store.WebhookOK, "CONTACT")
 	for i := 0; i < 6; i++ {
@@ -145,7 +145,7 @@ func TestWebhookEmitKeepsEventsInOrder(t *testing.T) {
 }
 
 func TestWebhookEmitRetriesAFailedDeliveryThenStops(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	srv, got := receiver(t, http.StatusInternalServerError)
 	subscribe(h, "w1", srv.URL, "k", store.WebhookOK, "CONTACT")
 	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "CREATE", "c", nil)
@@ -161,7 +161,7 @@ func TestWebhookEmitRetriesAFailedDeliveryThenStops(t *testing.T) {
 }
 
 func TestWebhookEmitStateIsClearedByReset(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	srv, got := receiver(t)
 	subscribe(h, "w1", srv.URL, "k", store.WebhookOK, "CONTACT")
 	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "CREATE", "c", nil)

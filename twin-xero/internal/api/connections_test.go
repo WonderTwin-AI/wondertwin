@@ -37,7 +37,7 @@ func tokenFor(t *testing.T, h *Handler) string {
 var zonelessISO = regexp.MustCompile(`^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{7}$`)
 
 func TestConnectionsListTheDefaultTenantUnderBothCasings(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	auth := map[string]string{"Authorization": "Bearer " + tokenFor(t, h)}
 
 	var bodies []string
@@ -68,7 +68,7 @@ func TestConnectionsListTheDefaultTenantUnderBothCasings(t *testing.T) {
 }
 
 func TestConnectionsNeedAValidUnexpiredBearerToken(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	h.store.StrictAuth.Store(true)
 	good := tokenFor(t, h)
 	cases := []struct {

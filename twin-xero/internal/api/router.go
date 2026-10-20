@@ -19,13 +19,21 @@ type Handler struct {
 	redeem sync.Mutex
 
 	dispatcher *pkgwh.Dispatcher
-	deliver    sync.Mutex // keeps events queued and flushed in order
+
+	pend    sync.Mutex // guards the fields below; never held across a delivery
+	pending []pendingEvent
+	gen     uint64 // bumped by reset, so a delivery in flight can tell it is stale
+	wake    chan struct{}
+	stop    chan struct{}
+	started bool
+	closed  bool
+	worker  sync.WaitGroup
 }
 
 // NewHandler creates a new Xero API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	h := &Handler{store: s, mw: mw, dispatcher: newDispatcher(s)}
-	s.OnReset(h.dispatcher.Reset)
+	h := &Handler{store: s, mw: mw, dispatcher: newDispatcher(s), wake: make(chan struct{}, 1), stop: make(chan struct{})}
+	s.OnReset(h.resetWebhooks)
 	return h
 }
 

@@ -26,7 +26,7 @@ func listAccounts(t *testing.T, h *Handler, tenant string) accountsBody {
 }
 
 func TestAccountsChartCarriesTheAccountsFinanceOpsPostsTo(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	b := listAccounts(t, h, store.DefaultTenantID)
 	if b.Status != "OK" {
 		t.Fatalf("status = %q", b.Status)
@@ -54,7 +54,7 @@ func TestAccountsChartCarriesTheAccountsFinanceOpsPostsTo(t *testing.T) {
 }
 
 func TestAccountsAreKeptPerTenantAndStableAcrossReset(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	if got := listAccounts(t, h, "0f0f0f0f-0000-4000-8000-00000000dead").Accounts; got == nil || len(got) != 0 {
 		t.Fatalf("an unknown tenant must see an empty chart, got %v", got)
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 func TestLenientBearerAcceptsAnyNonEmptyToken(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	if rec := get(h, "/connections", map[string]string{"Authorization": "Bearer xero-local-test-token"}); rec.Code != 200 {
 		t.Fatalf("a made-up token must pass by default, got %d", rec.Code)
 	}
@@ -29,7 +29,7 @@ func TestLenientBearerAcceptsAnyNonEmptyToken(t *testing.T) {
 }
 
 func TestLenientRefreshTakesAnUnknownTokenAsASignIn(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"xero-local-test-refresh"}, "client_id": {"app"}}
 	rec := postToken(h, form, "")
 	if rec.Code != 200 {
