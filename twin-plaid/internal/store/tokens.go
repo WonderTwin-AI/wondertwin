@@ -71,3 +71,12 @@ func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, erro
 	s.AccessTokens.Set(at.Token, at)
 	return it, at, nil
 }
+
+// ItemForAccessToken returns the Item an access token is bound to.
+func (s *MemoryStore) ItemForAccessToken(token string) (Item, bool) {
+	at, ok := s.AccessTokens.Get(token)
+	if !ok {
+		return Item{}, false
+	}
+	return s.GetItem(at.ItemID)
+}
