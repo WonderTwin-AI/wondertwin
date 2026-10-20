@@ -21,6 +21,7 @@ type MemoryStore struct {
 	Accounts      *Tenanted[Account]
 	Contacts      *Tenanted[Contact]
 	Invoices      *Tenanted[Invoice]
+	CreditNotes   *Tenanted[CreditNote]
 	Webhooks      *pkgstate.Store[Webhook]
 	// WebhookSeq numbers the events of every delivery, in order.
 	WebhookSeq atomic.Int64
@@ -47,6 +48,7 @@ func New() *MemoryStore {
 		Webhooks:      pkgstate.New[Webhook]("wh"),
 		Contacts:      NewTenanted[Contact](),
 		Invoices:      NewTenanted[Invoice](),
+		CreditNotes:   NewTenanted[CreditNote](),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -57,14 +59,15 @@ func New() *MemoryStore {
 // snapshot is the JSON form of the store. A field a state file leaves out
 // leaves that store as it is.
 type snapshot struct {
-	AccessTokens  map[string]AccessToken        `json:"access_tokens"`
-	RefreshTokens map[string]RefreshToken       `json:"refresh_tokens"`
-	Connections   map[string]Connection         `json:"connections"`
-	Organisations map[string]Organisation       `json:"organisations"`
-	Accounts      map[string]map[string]Account `json:"accounts"`
-	Webhooks      map[string]Webhook            `json:"webhooks"`
-	Contacts      map[string]map[string]Contact `json:"contacts"`
-	Invoices      map[string]map[string]Invoice `json:"invoices"`
+	AccessTokens  map[string]AccessToken           `json:"access_tokens"`
+	RefreshTokens map[string]RefreshToken          `json:"refresh_tokens"`
+	Connections   map[string]Connection            `json:"connections"`
+	Organisations map[string]Organisation          `json:"organisations"`
+	Accounts      map[string]map[string]Account    `json:"accounts"`
+	Webhooks      map[string]Webhook               `json:"webhooks"`
+	Contacts      map[string]map[string]Contact    `json:"contacts"`
+	Invoices      map[string]map[string]Invoice    `json:"invoices"`
+	CreditNotes   map[string]map[string]CreditNote `json:"credit_notes"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -78,6 +81,7 @@ func (s *MemoryStore) Snapshot() any {
 		Webhooks:      s.Webhooks.Snapshot(),
 		Contacts:      s.Contacts.Snapshot(),
 		Invoices:      s.Invoices.Snapshot(),
+		CreditNotes:   s.CreditNotes.Snapshot(),
 	}
 }
 
@@ -111,6 +115,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Invoices != nil {
 		s.Invoices.Load(snap.Invoices)
 	}
+	if snap.CreditNotes != nil {
+		s.CreditNotes.Load(snap.CreditNotes)
+	}
 	return nil
 }
 
@@ -130,6 +137,7 @@ func (s *MemoryStore) Reset() {
 	}
 	s.Contacts.Reset()
 	s.Invoices.Reset()
+	s.CreditNotes.Reset()
 	s.seedConnection()
 	s.seedTenant()
 }
