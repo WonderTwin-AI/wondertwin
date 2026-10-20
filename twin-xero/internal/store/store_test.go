@@ -175,3 +175,25 @@ func TestStoreWebhookEmitStateSurvivesSnapshotAndResets(t *testing.T) {
 		t.Fatal("a state file that omits webhooks must leave them alone")
 	}
 }
+
+func TestStoreContactsAreKeptPerTenantAndSnapshotLoadAndReset(t *testing.T) {
+	s := store.New()
+	s.Contacts.For("t1").Set("c1", store.Contact{ContactID: "c1", Name: "One"})
+	s.Contacts.For("t2").Set("c2", store.Contact{ContactID: "c2", Name: "Two"})
+	snap := s.Snapshot()
+
+	s.Reset()
+	if s.Contacts.For("t1").Count() != 0 {
+		t.Fatal("reset must clear contacts")
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := s.Contacts.For("t2").Get("c2"); !ok || got.Name != "Two" || s.Contacts.For("t1").Count() != 1 {
+		t.Fatalf("contacts did not round trip: %+v %v", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.Contacts.For("t1").Count() != 1 {
+		t.Fatal("a state file that omits contacts must leave them alone")
+	}
+}

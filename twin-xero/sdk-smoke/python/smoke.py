@@ -19,7 +19,7 @@ import urllib.parse
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import AccountingApi
+from xero_python.accounting import AccountingApi, Contact, Contacts, Address
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -135,6 +135,23 @@ def case_strict_auth_refuses_made_up_tokens():
         set_strict_auth(False)
 
 
+def accounting_for(client):
+    tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
+    return AccountingApi(client, base_url=f"{BASE}/api.xro/2.0"), tenant
+
+
+def case_create_contacts():
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    contact = Contact(name="Smoke Customer", first_name="smoke@example.test", last_name="Customer (cus_smoke)",
+                      account_number="cus_smoke", is_customer=True,
+                      addresses=[Address(address_type="STREET", city="Zurich", country="CH")])
+    created = api.create_contacts(tenant, Contacts(contacts=[contact])).contacts  # sends PUT /Contacts
+    assert len(created) == 1 and created[0].contact_id, "the SDK parsed the created contact"
+    assert created[0].contact_status == "ACTIVE" and created[0].account_number == "cus_smoke"
+    assert created[0].updated_date_utc.year >= 2026, "the SDK parsed UpdatedDateUTC as a /Date()/ value"
+
+
 def case_chart_of_accounts():
     client, token, _ = signed_in()
     tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
@@ -163,6 +180,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("create_contacts sends PUT /Contacts and the SDK parses the contact", case_create_contacts),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),

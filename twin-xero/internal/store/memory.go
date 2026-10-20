@@ -19,6 +19,7 @@ type MemoryStore struct {
 	// Organisations is keyed by tenant id; Accounts holds one chart per tenant.
 	Organisations *pkgstate.Store[Organisation]
 	Accounts      *Tenanted[Account]
+	Contacts      *Tenanted[Contact]
 	Webhooks      *pkgstate.Store[Webhook]
 	// WebhookSeq numbers the events of every delivery, in order.
 	WebhookSeq atomic.Int64
@@ -43,6 +44,7 @@ func New() *MemoryStore {
 		Organisations: pkgstate.New[Organisation]("org"),
 		Accounts:      NewTenanted[Account](),
 		Webhooks:      pkgstate.New[Webhook]("wh"),
+		Contacts:      NewTenanted[Contact](),
 		Rand:          sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -59,6 +61,7 @@ type snapshot struct {
 	Organisations map[string]Organisation       `json:"organisations"`
 	Accounts      map[string]map[string]Account `json:"accounts"`
 	Webhooks      map[string]Webhook            `json:"webhooks"`
+	Contacts      map[string]map[string]Contact `json:"contacts"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -70,6 +73,7 @@ func (s *MemoryStore) Snapshot() any {
 		Organisations: s.Organisations.Snapshot(),
 		Accounts:      s.Accounts.Snapshot(),
 		Webhooks:      s.Webhooks.Snapshot(),
+		Contacts:      s.Contacts.Snapshot(),
 	}
 }
 
@@ -97,6 +101,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Webhooks != nil {
 		s.Webhooks.LoadSnapshot(snap.Webhooks)
 	}
+	if snap.Contacts != nil {
+		s.Contacts.Load(snap.Contacts)
+	}
 	return nil
 }
 
@@ -114,6 +121,7 @@ func (s *MemoryStore) Reset() {
 	for _, f := range s.onReset {
 		f()
 	}
+	s.Contacts.Reset()
 	s.seedConnection()
 	s.seedTenant()
 }

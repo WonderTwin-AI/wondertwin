@@ -40,6 +40,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Use(h.tenant)
 				r.Get("/Organisation", h.Organisation)
 				r.Get("/Accounts", h.Accounts)
+				r.Put("/Contacts", h.CreateContacts)
 			})
 		})
 	})
