@@ -3,7 +3,7 @@
   "vendor_domain": "plaid.com",
   "tier": "community",
   "category": "fintech",
-  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). The Plaid API routes arrive in later slices of build plan plaid-bp1.",
+  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). Sandbox public token creation and public token exchange (Item and access token creation) are served; the remaining Plaid API routes arrive in later slices of build plan plaid-bp1.",
   "sdk_target": {
     "primary": {
       "package": "plaid-python",
