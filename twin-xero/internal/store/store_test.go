@@ -215,3 +215,26 @@ func TestStoreInvoicesSnapshotLoadAndResetPerTenant(t *testing.T) {
 		t.Fatalf("invoice = %+v, %v after load: the contact link must survive a snapshot", got, ok)
 	}
 }
+
+func TestStoreCreditNotesSnapshotLoadAndResetPerTenant(t *testing.T) {
+	s := store.New()
+	s.CreditNotes.For("t1").Set("c1", store.CreditNote{CreditNoteID: "c1", RemainingCredit: 12.5,
+		Allocations: []store.Allocation{{AllocationID: "a1", Amount: 7.5, Invoice: &store.InvoiceRef{InvoiceID: "i1"}}}})
+	snap := s.Snapshot()
+
+	s.Reset()
+	if s.CreditNotes.For("t1").Count() != 0 {
+		t.Fatal("reset must clear every tenant's credit notes")
+	}
+	b, _ := json.Marshal(snap)
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := s.CreditNotes.For("t1").Get("c1")
+	if !ok || got.RemainingCredit != 12.5 || len(got.Allocations) != 1 || got.Allocations[0].Invoice.InvoiceID != "i1" {
+		t.Fatalf("the credit note and its allocation must survive a snapshot: %+v %v", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.CreditNotes.For("t1").Count() != 1 {
+		t.Fatal("a state file that omits credit notes must leave them alone")
+	}
+}
