@@ -33,3 +33,9 @@ func (h *Handler) notFound(w http.ResponseWriter, r *http.Request) {
 	h.writeError(w, http.StatusNotFound, "INVALID_REQUEST", "NOT_FOUND",
 		"invalid route: "+r.URL.Path)
 }
+
+// writeMissing answers 400 MISSING_FIELDS naming the missing fields.
+func (h *Handler) writeMissing(w http.ResponseWriter, fields []string) {
+	h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "MISSING_FIELDS",
+		"the following required fields are missing: "+strings.Join(fields, ", "))
+}

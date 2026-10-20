@@ -7,7 +7,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"strings"
 )
 
 // supportedVersion is the one Plaid-Version the emulator serves (OD-3).
@@ -87,8 +86,7 @@ func (h *Handler) checkRequest(next http.Handler) http.Handler {
 			}
 		}
 		if len(missing) > 0 {
-			h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "MISSING_FIELDS",
-				"the following required fields are missing: "+strings.Join(missing, ", "))
+			h.writeMissing(w, missing)
 			return
 		}
 
