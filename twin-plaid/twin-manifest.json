@@ -3,7 +3,7 @@
   "vendor_domain": "plaid.com",
   "tier": "community",
   "category": "fintech",
-  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). Sandbox public token creation and public token exchange (Item and access token creation) are served; the remaining Plaid API routes arrive in later slices of build plan plaid-bp1.",
+  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). Sandbox public token creation, public token exchange (Item and access token creation) and Item reads (item/get) are served; the remaining Plaid API routes arrive in later slices of build plan plaid-bp1.",
   "sdk_target": {
     "primary": {
       "package": "plaid-python",
@@ -35,15 +35,15 @@
     },
     "auth_pattern": "custom",
     "has_webhooks": true,
-    "resource_count": 2
+    "resource_count": 3
   },
   "coverage": {
     "resources_implemented": [
       "sandbox/public_token/create",
-      "item/public_token/exchange"
+      "item/public_token/exchange",
+      "item/get"
     ],
     "resources_not_implemented": [
-      "item/get",
       "auth/get",
       "transactions/get",
       "transactions/refresh",
