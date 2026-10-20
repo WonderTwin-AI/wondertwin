@@ -8,4 +8,5 @@ dependencies = ["xero-python==15.2.0"]
 [tool.uv]
 package = false
 exclude-newer = "7 days"
-exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
+# certifi is held to the newest release so a published CVE fix is never delayed by the 7 day window.
+exclude-newer-package = { certifi = "0 days" }
