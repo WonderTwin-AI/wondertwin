@@ -3,6 +3,7 @@ package store
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -14,9 +15,13 @@ type MemoryStore struct {
 	Items        *pkgstate.Store[Item]
 	Accounts     *pkgstate.Store[Account]
 	Institutions *pkgstate.Store[Institution]
+	PublicTokens *pkgstate.Store[PublicToken]
+	AccessTokens *pkgstate.Store[AccessToken]
 	// Rand is the deterministic random source. main.go replaces the default
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
+
+	exchangeMu sync.Mutex
 }
 
 // New creates an empty MemoryStore.
@@ -26,6 +31,8 @@ func New() *MemoryStore {
 		Items:        pkgstate.New[Item]("item"),
 		Accounts:     pkgstate.New[Account]("acct"),
 		Institutions: pkgstate.New[Institution]("ins"),
+		PublicTokens: pkgstate.New[PublicToken]("public"),
+		AccessTokens: pkgstate.New[AccessToken]("access"),
 		Rand:         sim.DefaultRand(),
 	}
 }
@@ -36,6 +43,8 @@ type snapshot struct {
 	Items        map[string]Item        `json:"items,omitempty"`
 	Accounts     map[string]Account     `json:"accounts,omitempty"`
 	Institutions map[string]Institution `json:"institutions,omitempty"`
+	PublicTokens map[string]PublicToken `json:"public_tokens,omitempty"`
+	AccessTokens map[string]AccessToken `json:"access_tokens,omitempty"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -44,6 +53,8 @@ func (s *MemoryStore) Snapshot() any {
 		Items:        s.Items.Snapshot(),
 		Accounts:     s.Accounts.Snapshot(),
 		Institutions: s.Institutions.Snapshot(),
+		PublicTokens: s.PublicTokens.Snapshot(),
+		AccessTokens: s.AccessTokens.Snapshot(),
 	}
 }
 
@@ -62,6 +73,12 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Institutions != nil {
 		s.Institutions.LoadSnapshot(snap.Institutions)
 	}
+	if snap.PublicTokens != nil {
+		s.PublicTokens.LoadSnapshot(snap.PublicTokens)
+	}
+	if snap.AccessTokens != nil {
+		s.AccessTokens.LoadSnapshot(snap.AccessTokens)
+	}
 	return nil
 }
 
@@ -71,4 +88,6 @@ func (s *MemoryStore) Reset() {
 	s.Items.Reset()
 	s.Accounts.Reset()
 	s.Institutions.Reset()
+	s.PublicTokens.Reset()
+	s.AccessTokens.Reset()
 }
