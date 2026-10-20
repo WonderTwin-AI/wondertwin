@@ -96,7 +96,7 @@ func TestInvoiceCreateIgnoresWhatXeroComputes(t *testing.T) {
 		t.Errorf("FullyPaidOnDate must be dropped and an authorised invoice may be marked sent: %v", inv)
 	}
 	_, forged := putInvoices(t, h, "", fmt.Sprintf(`{"Type":"ACCREC","Contact":{"ContactID":%q},"Payments":[{"Amount":40}],"RepeatingInvoiceID":"r","StatusAttributeString":"WARNING",
-		"LineItems":[{"AccountCode":"nope","AccountID":"x","LineAmount":40}]}`, cid))
+		"LineItems":[{"AccountID":"x","LineAmount":40}]}`, cid))
 	fi := firstInvoice(t, forged)
 	if p, _ := fi["Payments"].([]any); len(p) != 0 || fi["RepeatingInvoiceID"] != nil || fi["StatusAttributeString"] != nil || fi["AmountPaid"] != 0.0 {
 		t.Errorf("client-sent read-only fields must not be echoed: %v", fi)

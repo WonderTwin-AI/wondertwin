@@ -8,3 +8,4 @@ dependencies = ["stripe==15.6.1"]
 [tool.uv]
 package = false
 exclude-newer = "7 days"
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
