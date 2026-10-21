@@ -44,10 +44,9 @@ func (h *Handler) linkTokenCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	var itemID string
 	if update != "" {
-		it, found := h.store.ItemForAccessToken(update)
-		if !found {
-			h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCESS_TOKEN",
-				"provided access token is invalid. Access tokens are in the format: access-<environment>-<identifier>")
+		it, err := h.store.ItemForAccessToken(update)
+		if err != nil {
+			h.writeAccessTokenError(w, err)
 			return
 		}
 		itemID = it.ID

@@ -17,7 +17,9 @@ import plaid
 from plaid.api import plaid_api
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.country_code import CountryCode
+from plaid.model.item_access_token_invalidate_request import ItemAccessTokenInvalidateRequest
 from plaid.model.item_get_request import ItemGetRequest
+from plaid.model.item_remove_request import ItemRemoveRequest
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
@@ -81,6 +83,33 @@ def case_accounts_get():
         assert "persistent_account_id" not in account.to_dict(), "persistent_account_id must be absent, never null"
     checking = res.accounts[0]
     assert str(checking.type) == "depository" and checking.balances.available == 100 and checking.balances.limit is None
+
+
+def linked_access_token():
+    return client.item_public_token_exchange(
+        ItemPublicTokenExchangeRequest(public_token=public_token().public_token)).access_token
+
+
+def api_error(call):
+    try:
+        call()
+    except plaid.ApiException as e:
+        return e.status, json.loads(e.body)["error_code"]
+    raise AssertionError("the call was accepted")
+
+
+def case_item_remove_then_item_get_is_item_not_found():
+    token = linked_access_token()
+    assert client.item_remove(ItemRemoveRequest(access_token=token)).request_id
+    assert api_error(lambda: client.item_get(ItemGetRequest(access_token=token))) == (400, "ITEM_NOT_FOUND")
+
+
+def case_item_access_token_invalidate_issues_a_new_token():
+    old = linked_access_token()
+    new = client.item_access_token_invalidate(ItemAccessTokenInvalidateRequest(access_token=old)).new_access_token
+    assert new.startswith("access-sandbox-") and new != old
+    assert api_error(lambda: client.item_get(ItemGetRequest(access_token=old))) == (400, "INVALID_ACCESS_TOKEN")
+    assert client.item_get(ItemGetRequest(access_token=new)).item.item_id
 
 
 def case_item_get():
