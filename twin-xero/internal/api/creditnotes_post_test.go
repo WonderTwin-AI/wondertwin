@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -194,7 +195,6 @@ func TestPostRefusesWhatAnUpdateMayNotDo(t *testing.T) {
 		"new lines on a credit note with credit":    `"LineItems":[{"AccountCode":"200","Quantity":1,"UnitAmount":5}]`,
 		"changing the Type":                         `"Type":"ACCPAYCREDIT"`,
 		"a contact that does not exist":             `"Reference":"x","Contact":{"ContactID":"no-such"}`,
-		"allocations on an existing credit note":    `"Allocations":[` + allocJSON(inv, 10) + `]`,
 	} {
 		if code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,%s}`, id, change)); code != 400 || body["Type"] != "ValidationException" {
 			t.Errorf("%s = %d %v, want a 400 ValidationException", name, code, body)
@@ -247,4 +247,96 @@ func TestPostWithAnUnknownCreditNoteIDIsA404AndWritesNothing(t *testing.T) {
 		t.Fatalf("status %d, %d credit notes", code, n)
 	}
 	none(t, got)
+}
+
+func TestPostAddsAllocationsToAnAuthorisedCreditNoteUpToWhatIsLeft(t *testing.T) {
+	h := newTestHandler(t)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid)
+	id := storedNote(t, h, cid, "AUTHORISED", 50)
+	got := subscribed(t, h)
+
+	code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, id, allocJSON(inv, 30)))
+	cn := firstCreditNote(t, body)
+	if code != 200 || cn["RemainingCredit"] != 20.0 || cn["AppliedAmount"] != 30.0 || len(cn["Allocations"].([]any)) != 1 || storedInvoice(h, inv).AmountCredited != 30 {
+		t.Fatalf("%d %v", code, body)
+	}
+	events := eventsOf(t, got, 2)
+	wantEvent(t, events[0], "CREDITNOTE", "UPDATE", id)
+	wantEvent(t, events[1], "INVOICE", "UPDATE", inv)
+
+	if code, _ := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, id, allocJSON(inv, 30))); code != 400 {
+		t.Errorf("an allocation above the credit left = %d, want 400", code)
+	}
+	if after := storedCreditNote(h, id); after.RemainingCredit != 20 || len(after.Allocations) != 1 || storedInvoice(h, inv).AmountCredited != 30 {
+		t.Errorf("a refused allocation changed the store: %+v", after)
+	}
+}
+
+func TestPostSpendingTheLastOfTheCreditPaysTheCreditNote(t *testing.T) {
+	h := newTestHandler(t)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid)
+	id := storedNote(t, h, cid, "AUTHORISED", 50)
+
+	postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, id, allocJSON(inv, 20)))
+	code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, id, allocJSON(inv, 30)))
+	cn := firstCreditNote(t, body)
+	if code != 200 || cn["Status"] != "PAID" || cn["RemainingCredit"] != 0.0 || cn["AppliedAmount"] != 50.0 || len(cn["Allocations"].([]any)) != 2 {
+		t.Fatalf("%d %v", code, body)
+	}
+	if got := storedInvoice(h, inv); got.AmountCredited != 50 || got.AmountDue != 50 {
+		t.Errorf("invoice = credited %v due %v, want 50 and 50", got.AmountCredited, got.AmountDue)
+	}
+}
+
+func TestPostIgnoresAllocationsItAlreadyHasWhenACreditNoteIsSentBack(t *testing.T) {
+	h := newTestHandler(t)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid)
+	_, made := putCreditNotes(t, h, "", creditNoteWithAllocations(cid, 50, allocJSON(inv, 30)))
+	cn := firstCreditNote(t, made)
+	known, _ := json.Marshal(cn["Allocations"])
+
+	code, _ := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Reference":"again","Allocations":%s}`, cn["CreditNoteID"], known))
+	if after := storedCreditNote(h, cn["CreditNoteID"].(string)); code != 200 || after.AppliedAmount != 30 || len(after.Allocations) != 1 || storedInvoice(h, inv).AmountCredited != 30 {
+		t.Errorf("%d: a credit note read and sent back was allocated again: %+v", code, after)
+	}
+}
+
+func TestPostRefusesAnAllocationThatTheCreateRulesRefuse(t *testing.T) {
+	h := newTestHandler(t)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid)
+	authorised, draft := storedNote(t, h, cid, "AUTHORISED", 50), storedNote(t, h, cid, "DRAFT", 50)
+
+	for name, c := range map[string]struct{ id, alloc string }{
+		"a credit note that is not authorised": {draft, allocJSON(inv, 10)},
+		"an invoice that does not exist":       {authorised, allocJSON("no-such", 10)},
+		"an invoice of another contact":        {authorised, allocJSON(refundableInvoice(t, h, newContactID(t, h, "Beta")), 10)},
+		"an amount of zero":                    {authorised, allocJSON(inv, 0)},
+		"no date":                              {authorised, fmt.Sprintf(`{"Invoice":{"InvoiceID":%q},"Amount":10}`, inv)},
+	} {
+		if code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, c.id, c.alloc)); code != 400 || body["Type"] != "ValidationException" {
+			t.Errorf("%s = %d %v, want a 400 ValidationException", name, code, body)
+		}
+	}
+	if after := storedCreditNote(h, authorised); after.AppliedAmount != 0 || storedInvoice(h, inv).AmountCredited != 0 {
+		t.Errorf("a refused allocation changed the store: %+v", after)
+	}
+}
+
+func TestPostUnderStrictAuthKeepsAllocationsWithinTheInvoicesAmountDue(t *testing.T) {
+	h := newTestHandler(t)
+	h.store.StrictAuth.Store(true)
+	cid := newContactID(t, h, "Acme")
+	inv := refundableInvoice(t, h, cid) // 100 due
+	id := storedNote(t, h, cid, "AUTHORISED", 150)
+
+	if code, _ := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s,%s]}`, id, allocJSON(inv, 60), allocJSON(inv, 60))); code != 400 {
+		t.Errorf("two allocations that together pass the amount due = %d, want 400 under strict_auth", code)
+	}
+	if code, _ := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Allocations":[%s]}`, id, allocJSON(inv, 100))); code != 200 {
+		t.Errorf("an allocation of the whole amount due = %d, want 200", code)
+	}
 }

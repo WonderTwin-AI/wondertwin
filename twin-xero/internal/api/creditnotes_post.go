@@ -23,15 +23,15 @@ var creditNoteStatusChanges = map[string][]string{
 // UpdateOrCreateCreditNotes serves POST /api.xro/2.0/CreditNotes (crud-011): a
 // credit note that carries the CreditNoteID of a stored one is updated, and one
 // with no CreditNoteID is created by the rules of PUT /CreditNotes. An update is
-// partial (only the fields the body carries change) and may move the status as
-// creditNoteStatusChanges allows; the lines and totals of a credit note that has
-// credit applied are fixed. Whether
+// partial (only the fields the body carries change), may move the status as
+// creditNoteStatusChanges allows, and may add Allocations as a create does; the
+// lines and totals of a credit note that has credit applied are fixed. Whether
 // Xero also matches on CreditNoteNumber is not settled, so this does not. Refusals
 // follow PUT: one invalid credit note fails the request with the 400
 // ValidationException, or with summarizeErrors=false the others are written and it
 // is answered in place. A CreditNoteID that matches nothing is a 404 whose body is
 // a guess and nothing is written. Each write sends a CREDITNOTE event, CREATE or
-// UPDATE, and a create's inline Allocations send one INVOICE UPDATE per invoice.
+// UPDATE, and one INVOICE UPDATE per invoice an allocation reached.
 func (h *Handler) UpdateOrCreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	var in struct{ CreditNotes []json.RawMessage }
@@ -72,6 +72,7 @@ func (h *Handler) UpdateOrCreateCreditNotes(w http.ResponseWriter, r *http.Reque
 
 	type result struct {
 		cn      store.CreditNote
+		fresh   store.CreditNote // an update's new allocations, with Total as the credit it may spend
 		msgs    []string
 		created bool
 	}
@@ -90,7 +91,7 @@ func (h *Handler) UpdateOrCreateCreditNotes(w http.ResponseWriter, r *http.Reque
 			}
 		} else {
 			at := slices.IndexFunc(existing, func(e store.CreditNote) bool { return strings.EqualFold(e.CreditNoteID, one.CreditNoteID) })
-			res.cn, res.msgs = h.updateCreditNote(tenant, existing[at], one, keys[i], slices.Concat(existing[:at], existing[at+1:]), unitdp)
+			res.cn, res.fresh, res.msgs = h.updateCreditNote(tenant, existing[at], one, keys[i], slices.Concat(existing[:at], existing[at+1:]), unitdp, due)
 			if len(res.msgs) == 0 {
 				existing[at] = res.cn
 			}
@@ -111,18 +112,25 @@ func (h *Handler) UpdateOrCreateCreditNotes(w http.ResponseWriter, r *http.Reque
 			continue
 		}
 		cn, eventType := res.cn, "UPDATE"
+		fresh := cn.Allocations
 		if res.created {
 			h.applyAllocations(tenant, &cn)
 			eventType = "CREATE"
+		} else if len(res.fresh.Allocations) > 0 {
+			h.applyAllocations(tenant, &res.fresh)
+			fresh = res.fresh.Allocations
+			cn.Allocations = slices.Concat(cn.Allocations, fresh)
+			cn.AppliedAmount = round(cn.AppliedAmount+res.fresh.AppliedAmount, 2)
+			cn.RemainingCredit, cn.Status, cn.FullyPaidOnDate = res.fresh.RemainingCredit, res.fresh.Status, res.fresh.FullyPaidOnDate
+		} else {
+			fresh = nil
 		}
 		notes.Set(cn.CreditNoteID, cn)
 		h.emit(r, tenant, "CREDITNOTE", eventType, cn.CreditNoteID, creditNoteEventData(cn))
-		if res.created {
-			for _, a := range cn.Allocations {
-				if !reached[a.Invoice.InvoiceID] {
-					reached[a.Invoice.InvoiceID] = true
-					h.emit(r, tenant, "INVOICE", "UPDATE", a.Invoice.InvoiceID, nil)
-				}
+		for _, a := range fresh {
+			if !reached[a.Invoice.InvoiceID] {
+				reached[a.Invoice.InvoiceID] = true
+				h.emit(r, tenant, "INVOICE", "UPDATE", a.Invoice.InvoiceID, nil)
 			}
 		}
 		out[i] = h.wireCreditNote(tenant, cn)
@@ -131,10 +139,11 @@ func (h *Handler) UpdateOrCreateCreditNotes(w http.ResponseWriter, r *http.Reque
 }
 
 // updateCreditNote overlays the fields an update carries on the stored credit note
-// and returns the result, or the reasons it is refused. The wording of the refusals is a guess.
-func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys map[string]json.RawMessage, others []store.CreditNote, unitdp int) (store.CreditNote, []string) {
+// and returns the result, the allocations it adds (planned, not applied), or the
+// reasons it is refused. The wording of the refusals is a guess.
+func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys map[string]json.RawMessage, others []store.CreditNote, unitdp int, due map[string]float64) (store.CreditNote, store.CreditNote, []string) {
 	if old.Status == "VOIDED" || old.Status == "DELETED" {
-		return old, []string{fmt.Sprintf("A credit note with the status %s cannot be updated.", old.Status)}
+		return old, store.CreditNote{}, []string{fmt.Sprintf("A credit note with the status %s cannot be updated.", old.Status)}
 	}
 	out, msgs := old, []string(nil)
 	set := func(key string, apply func()) {
@@ -196,9 +205,6 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 			out.LineItems, out.SubTotal, out.TotalTax, out.Total, out.RemainingCredit = lines, t.SubTotal, t.TotalTax, t.Total, t.Total
 		}
 	}
-	if a, ok := keys["Allocations"]; ok && string(a) != "null" && string(a) != "[]" {
-		msgs = append(msgs, "Allocations cannot yet be added to an existing credit note.")
-	}
 	if out.Status == "VOIDED" && spent {
 		msgs = append(msgs, "A credit note with credit applied or paid cannot be voided.")
 	}
@@ -210,8 +216,26 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 		msgs = append(msgs, h.validateCreditNote(tenant, chk, others)...)
 	}
 
+	var fresh store.CreditNote
+	if _, ok := keys["Allocations"]; ok {
+		known := map[string]bool{}
+		for _, a := range old.Allocations {
+			known[a.AllocationID] = true
+		}
+		fresh = out
+		fresh.Allocations = nil
+		for _, a := range in.Allocations {
+			if !known[a.AllocationID] {
+				fresh.Allocations = append(fresh.Allocations, a)
+			}
+		}
+		fresh.Total = out.RemainingCredit // an allocation may spend what is left, not the whole
+		if len(msgs) == 0 {
+			msgs = append(msgs, h.planAllocations(tenant, fresh, due)...)
+		}
+	}
 	if len(msgs) > 0 {
-		return old, msgs
+		return old, store.CreditNote{}, msgs
 	}
 
 	out.UpdatedDateUTC = h.store.Clock.Now().UTC()
@@ -223,5 +247,6 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 		out.SentToContact, out.StatusAttributeString = false, "WARNING"
 		out.Warnings = []store.ValidationError{{Message: "A credit note can only be marked as sent when it is authorised."}}
 	}
-	return out, nil
+	fresh.UpdatedDateUTC, fresh.UpdatedDateUTCString = out.UpdatedDateUTC, out.UpdatedDateUTCString
+	return out, fresh, nil
 }

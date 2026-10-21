@@ -639,6 +639,9 @@ def case_update_or_create_invoices():
 def case_update_or_create_credit_notes():
     api, tenant = accounting_api()
     contact = new_contact(api, tenant)
+    invoice = api.create_invoices(tenant, Invoices(invoices=[Invoice(
+        type="ACCREC", status="AUTHORISED", contact=Contact(contact_id=contact), date=datetime.date(2026, 9, 1),
+        due_date=datetime.date(2026, 9, 30), line_items=[LineItem(quantity=1, unit_amount=100, account_code="200")])])).invoices[0]
     draft = finance_ops_credit_note(contact, amount=50)
     draft.status = "DRAFT"
     created = api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[draft])).credit_notes
@@ -646,6 +649,12 @@ def case_update_or_create_credit_notes():
     moved = api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[CreditNote(
         credit_note_id=created[0].credit_note_id, status="AUTHORISED", reference="posted")])).credit_notes[0]
     assert moved.status == "AUTHORISED" and moved.reference == "posted" and moved.total == 50, "an update leaves the other fields"
+    allocated = api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[CreditNote(
+        credit_note_id=created[0].credit_note_id,
+        allocations=[Allocation(invoice=Invoice(invoice_id=invoice.invoice_id), amount=30, date=datetime.date(2026, 9, 11))])])).credit_notes[0]
+    assert allocated.remaining_credit == 20 and allocated.applied_amount == 30 and len(allocated.allocations) == 1
+    after = stored_invoice(invoice.invoice_id)
+    assert after["AmountCredited"] == 30 and after["AmountDue"] == 70, after
 
 
 CASES = [
@@ -663,7 +672,7 @@ CASES = [
     ("create_credit_notes with an inline Allocation against an invoice", case_create_credit_notes_with_allocation),
     ("create_credit_notes refuses an unknown account and answers in place with summarize_errors=False", case_create_credit_notes_refusals),
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
-    ("update_or_create_credit_notes creates, then moves the status by CreditNoteID", case_update_or_create_credit_notes),
+    ("update_or_create_credit_notes creates, moves the status and adds an allocation by CreditNoteID", case_update_or_create_credit_notes),
     ("delete_payment restores the invoice", case_delete_payment_restores_the_invoice),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("update_or_create_invoices creates, then updates and voids by InvoiceID", case_update_or_create_invoices),
