@@ -444,6 +444,20 @@ def case_create_credit_notes_with_allocation():
     assert after["AmountCredited"] == 130 and after["AmountDue"] == 0 and after["Status"] == "PAID", after
 
 
+def case_get_credit_notes_as_finance_ops_calls_it():
+    """finance-ops checks whether a refund was booked: get_credit_notes(page=1), then a number match."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    refund = finance_ops_credit_note(contact)
+    api.create_credit_notes(tenant, CreditNotes(credit_notes=[refund]))
+    existing = api.get_credit_notes(tenant, page=1)
+    assert existing.pagination.page == 1 and existing.pagination.item_count >= 1
+    match = [cn for cn in existing.credit_notes if refund.credit_note_number in str(cn.credit_note_number)]
+    assert match and match[0].contact.contact_id == contact and match[0].line_items and match[0].total == 20
+    filtered = api.get_credit_notes(tenant, where=f'Contact.ContactID==Guid("{contact}")').credit_notes
+    assert [cn.credit_note_number for cn in filtered] == [refund.credit_note_number]
+
+
 def case_create_credit_notes_refusals():
     api, tenant = accounting_api()
     contact = new_contact(api, tenant)
@@ -477,6 +491,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("get_credit_notes page=1 as finance-ops calls it, and where by contact", case_get_credit_notes_as_finance_ops_calls_it),
     ("update_invoice voids and deletes as finance-ops does", case_void_and_delete_invoices_as_finance_ops_does),
     ("update_invoice recomputes the totals when a line changes", case_update_invoice_line_items),
     ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
