@@ -31,6 +31,10 @@ var (
 	ErrUnknownToken = errors.New("unknown public token")
 	// ErrExpiredToken is a public token past its 30 minutes.
 	ErrExpiredToken = errors.New("expired public token")
+	// ErrUnknownAccessToken is an access token that was never issued or was replaced.
+	ErrUnknownAccessToken = errors.New("unknown access token")
+	// ErrItemRemoved is an access token whose Item was removed (quirk LIFECYCLE-002).
+	ErrItemRemoved = errors.New("item removed")
 )
 
 // newToken is {kind}-sandbox-{uuid}, the Sandbox token form (quirk IDENTITY-004).
@@ -51,8 +55,8 @@ func (s *MemoryStore) CreatePublicToken(institutionID string, products []string,
 // ExchangePublicToken spends a public token: it creates the Item and its
 // access token. A public token works once; an expired one is spent too.
 func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, error) {
-	s.exchangeMu.Lock()
-	defer s.exchangeMu.Unlock()
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
 	pt, ok := s.PublicTokens.Get(token)
 	if !ok {
 		return Item{}, AccessToken{}, ErrUnknownToken
@@ -72,11 +76,32 @@ func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, erro
 	return it, at, nil
 }
 
-// ItemForAccessToken returns the Item an access token is bound to.
-func (s *MemoryStore) ItemForAccessToken(token string) (Item, bool) {
+// ItemForAccessToken returns the Item an access token is bound to. A removed
+// Item keeps its token record, so it reads as ErrItemRemoved and not as an
+// unknown token.
+func (s *MemoryStore) ItemForAccessToken(token string) (Item, error) {
 	at, ok := s.AccessTokens.Get(token)
 	if !ok {
-		return Item{}, false
+		return Item{}, ErrUnknownAccessToken
 	}
-	return s.GetItem(at.ItemID)
+	it, ok := s.GetItem(at.ItemID)
+	if !ok {
+		return Item{}, ErrItemRemoved
+	}
+	return it, nil
+}
+
+// RotateAccessToken replaces an access token with a new one for the same Item;
+// the old token stops working at once.
+func (s *MemoryStore) RotateAccessToken(token string) (AccessToken, error) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	it, err := s.ItemForAccessToken(token)
+	if err != nil {
+		return AccessToken{}, err
+	}
+	s.AccessTokens.Delete(token)
+	at := AccessToken{Token: s.newToken("access"), ItemID: it.ID}
+	s.AccessTokens.Set(at.Token, at)
+	return at, nil
 }

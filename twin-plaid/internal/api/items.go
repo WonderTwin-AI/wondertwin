@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
@@ -8,7 +9,8 @@ import (
 
 // itemFor resolves the access_token in the request body to its Item. When it
 // cannot, the error is written and ok is false: an absent token is
-// MISSING_FIELDS, an unknown or removed one INVALID_ACCESS_TOKEN.
+// MISSING_FIELDS, an unknown one INVALID_ACCESS_TOKEN, and one whose Item was
+// removed ITEM_NOT_FOUND.
 func (h *Handler) itemFor(w http.ResponseWriter, r *http.Request) (it store.Item, ok bool) {
 	call, _ := CallFrom(r)
 	token, isStr := asString(call.Body["access_token"])
@@ -18,12 +20,25 @@ func (h *Handler) itemFor(w http.ResponseWriter, r *http.Request) (it store.Item
 	case token == "":
 		h.writeMissing(w, []string{"access_token"})
 	default:
-		if it, ok = h.store.ItemForAccessToken(token); !ok {
-			h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCESS_TOKEN",
-				"provided access token is invalid. Access tokens are in the format: access-<environment>-<identifier>")
+		var err error
+		if it, err = h.store.ItemForAccessToken(token); err != nil {
+			h.writeAccessTokenError(w, err)
+			return it, false
 		}
+		return it, true
 	}
-	return it, ok
+	return it, false
+}
+
+// writeAccessTokenError answers a token that does not resolve to a live Item.
+func (h *Handler) writeAccessTokenError(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrItemRemoved) {
+		h.writeError(w, http.StatusBadRequest, "ITEM_ERROR", "ITEM_NOT_FOUND",
+			"the Item you requested cannot be found. This Item does not exist, has been previously removed via /item/remove, or has had access removed by the user")
+		return
+	}
+	h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCESS_TOKEN",
+		"provided access token is invalid. Access tokens are in the format: access-<environment>-<identifier>")
 }
 
 // itemJSON is the Item object. The tags carry the presence rules (quirk
@@ -66,4 +81,28 @@ func (h *Handler) itemGet(w http.ResponseWriter, r *http.Request) {
 	if it, ok := h.itemFor(w, r); ok {
 		h.writeJSON(w, http.StatusOK, map[string]any{"item": newItemJSON(it)})
 	}
+}
+
+// itemRemove is POST /item/remove. The Item and its accounts go; the access
+// token stays on record so later calls answer ITEM_NOT_FOUND (quirk LIFECYCLE-002).
+func (h *Handler) itemRemove(w http.ResponseWriter, r *http.Request) {
+	if it, ok := h.itemFor(w, r); ok {
+		h.store.RemoveItem(it.ID)
+		h.writeJSON(w, http.StatusOK, map[string]any{})
+	}
+}
+
+// itemAccessTokenInvalidate is POST /item/access_token/invalidate: it swaps the
+// access token for a new one, and the old one stops working.
+func (h *Handler) itemAccessTokenInvalidate(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.itemFor(w, r); !ok {
+		return
+	}
+	call, _ := CallFrom(r)
+	at, err := h.store.RotateAccessToken(call.Body["access_token"].(string))
+	if err != nil {
+		h.writeAccessTokenError(w, err)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"new_access_token": at.Token})
 }

@@ -22,7 +22,7 @@ type MemoryStore struct {
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
 
-	exchangeMu sync.Mutex
+	tokenMu sync.Mutex
 }
 
 // New creates an empty MemoryStore.

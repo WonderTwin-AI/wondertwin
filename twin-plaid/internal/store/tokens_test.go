@@ -73,3 +73,44 @@ func TestTokensConcurrentExchangeSpendsThePublicTokenOnce(t *testing.T) {
 		t.Fatalf("%d exchanges succeeded, %d Items; want 1 and 1", ok, s.Items.Count())
 	}
 }
+
+func TestTokensRotateIsAtomicUnderConcurrency(t *testing.T) {
+	s := seeded(1)
+	_, at, _ := s.ExchangePublicToken(s.CreatePublicToken("ins_1", []string{"auth"}, "").Token)
+
+	var wg sync.WaitGroup
+	results := make(chan error, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := s.RotateAccessToken(at.Token)
+			results <- err
+		}()
+	}
+	wg.Wait()
+	close(results)
+	ok := 0
+	for err := range results {
+		if err == nil {
+			ok++
+		} else if !errors.Is(err, ErrUnknownAccessToken) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+	if ok != 1 || s.AccessTokens.Count() != 1 {
+		t.Fatalf("%d rotations succeeded and %d tokens exist, want 1 and 1", ok, s.AccessTokens.Count())
+	}
+}
+
+func TestTokensRemovedItemReadsAsRemovedNotUnknown(t *testing.T) {
+	s := seeded(1)
+	it, at, _ := s.ExchangePublicToken(s.CreatePublicToken("ins_1", []string{"auth"}, "").Token)
+	s.RemoveItem(it.ID)
+	if _, err := s.ItemForAccessToken(at.Token); !errors.Is(err, ErrItemRemoved) {
+		t.Fatalf("removed Item error = %v, want ErrItemRemoved", err)
+	}
+	if _, err := s.ItemForAccessToken("access-sandbox-nope"); !errors.Is(err, ErrUnknownAccessToken) {
+		t.Fatalf("unknown token error = %v, want ErrUnknownAccessToken", err)
+	}
+}
