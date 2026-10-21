@@ -126,6 +126,22 @@ func TestCreditNotePaymentsReportTheCreditNoteTheyChange(t *testing.T) {
 	none(t, got) // no invoice is touched by a credit note payment
 }
 
+func TestACreditNoteReachedTwiceInOneRequestIsReportedOnceWithItsFinalStatus(t *testing.T) {
+	h := newTestHandler(t)
+	id := creditNoteFor(t, h, false)
+	got := subscribed(t, h)
+
+	if code, body := postPayment(t, h, fmt.Sprintf(`{"Payments":[%s,%s]}`, payCreditNote(id, 10), payCreditNote(id, 10))); code != 200 {
+		t.Fatalf("payments: %d %v", code, body)
+	}
+	e := eventsOf(t, got, 1)[0]
+	wantEvent(t, e, "CREDITNOTE", "UPDATE", id)
+	if d, _ := e["data"].(map[string]any); d["Status"] != "PAID" {
+		t.Errorf("data = %v, want the status after the last payment", e["data"])
+	}
+	none(t, got)
+}
+
 func TestAnInvoiceReachedTwiceInOneRequestIsReportedOnce(t *testing.T) {
 	h := newTestHandler(t)
 	id := makeInvoice(t, h, "ACCREC", "AUTHORISED")
