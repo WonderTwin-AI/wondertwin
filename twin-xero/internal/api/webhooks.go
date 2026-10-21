@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,9 +30,9 @@ const eventDate = "2006-01-02T15:04:05.000"
 
 // newDispatcher builds the kit's dispatcher for Xero: the body is Xero's
 // envelope, signed as it is sent, and the endpoints are the OK subscriptions.
-func newDispatcher(s *store.MemoryStore) *pkgwh.Dispatcher {
+func newDispatcher(s *store.MemoryStore, target func(id string) bool) *pkgwh.Dispatcher {
 	d := pkgwh.NewDispatcher(pkgwh.Config{EventPrefix: "xero", Signer: xerowh.Signer{}, Encode: encodeEvent})
-	d.SetEndpointProvider(endpoints{s})
+	d.SetEndpointProvider(endpoints{s, target})
 	return d
 }
 
@@ -42,13 +43,17 @@ func encodeEvent(evt pkgwh.Event) ([]byte, error) {
 	return xerowh.Payload{Events: []xerowh.Event{ev}, FirstEventSequence: seq, LastEventSequence: seq, Entropy: entropy}.Body(), nil
 }
 
-type endpoints struct{ s *store.MemoryStore }
+type endpoints struct {
+	s      *store.MemoryStore
+	target func(id string) bool
+}
 
-// ActiveEndpoints lists the subscriptions that passed their intent-to-receive check.
+// ActiveEndpoints lists the subscriptions that passed their intent-to-receive
+// check and that the event being delivered is for.
 func (e endpoints) ActiveEndpoints() []pkgwh.Endpoint {
 	var out []pkgwh.Endpoint
 	for _, w := range e.s.Webhooks.List() {
-		if w.Status == store.WebhookOK {
+		if w.Status == store.WebhookOK && e.target(w.ID) {
 			out = append(out, pkgwh.Endpoint{URL: w.URL, Secret: w.Key, EnabledEvents: w.Categories, Enabled: true})
 		}
 	}
@@ -63,12 +68,36 @@ func (h *Handler) entropy() string { return strings.ToUpper(sim.NewIDGenerator(h
 type pendingEvent struct {
 	category string
 	payload  map[string]any
+	subs     map[string]bool // the subscriptions that existed, and wanted the category, when it was emitted
+}
+
+// isDeliveryTarget reports whether the event being delivered is for a subscription.
+func (h *Handler) isDeliveryTarget(id string) bool {
+	subs := h.deliverTo.Load()
+	return subs != nil && (*subs)[id]
+}
+
+// subscribersOf is the subscriptions an event of the category goes to now. An
+// event is for those and no others: a subscription registered after the write
+// never hears of it, however long the delivery queue is.
+func (h *Handler) subscribersOf(category string) map[string]bool {
+	subs := map[string]bool{}
+	for _, w := range h.store.Webhooks.List() {
+		if w.Status == store.WebhookOK && slices.Contains(w.Categories, category) {
+			subs[w.ID] = true
+		}
+	}
+	return subs
 }
 
 // emit reports a change to every subscription that wants its category. It only
 // appends to a FIFO under a short lock; one worker delivers the events in that
 // order, so a slow receiver delays later deliveries but never a write.
 func (h *Handler) emit(r *http.Request, tenant, category, eventType, resourceID string, data map[string]any) {
+	subs := h.subscribersOf(category)
+	if len(subs) == 0 {
+		return
+	}
 	ev := xerowh.Event{
 		ResourceURL: fmt.Sprintf("%s/api.xro/2.0/%s/%s", Origin(r), categoryPaths[category], resourceID), ResourceID: resourceID,
 		EventDateUTC: h.store.Clock.Now().UTC().Format(eventDate), EventType: eventType, EventCategory: category,
@@ -79,7 +108,7 @@ func (h *Handler) emit(r *http.Request, tenant, category, eventType, resourceID 
 	if h.closed {
 		return
 	}
-	h.pending = append(h.pending, pendingEvent{category, map[string]any{"event": ev, "seq": h.store.WebhookSeq.Add(1), "entropy": h.entropy()}})
+	h.pending = append(h.pending, pendingEvent{category, map[string]any{"event": ev, "seq": h.store.WebhookSeq.Add(1), "entropy": h.entropy()}, subs})
 	if !h.started {
 		h.started = true
 		h.worker.Add(1)
@@ -110,6 +139,7 @@ func (h *Handler) deliverLoop() {
 		h.pending = h.pending[1:]
 		h.pend.Unlock()
 
+		h.deliverTo.Store(&evt.subs)
 		h.dispatcher.Enqueue(evt.category, evt.payload)
 		_ = h.dispatcher.Flush()
 

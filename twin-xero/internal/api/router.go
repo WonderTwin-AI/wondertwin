@@ -3,6 +3,7 @@ package api
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 
@@ -19,6 +20,7 @@ type Handler struct {
 	redeem sync.Mutex
 
 	dispatcher *pkgwh.Dispatcher
+	deliverTo  atomic.Pointer[map[string]bool] // the subscriptions the event being delivered is for
 
 	pend    sync.Mutex // guards the fields below; never held across a delivery
 	pending []pendingEvent
@@ -32,7 +34,8 @@ type Handler struct {
 
 // NewHandler creates a new Xero API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	h := &Handler{store: s, mw: mw, dispatcher: newDispatcher(s), wake: make(chan struct{}, 1), stop: make(chan struct{})}
+	h := &Handler{store: s, mw: mw, wake: make(chan struct{}, 1), stop: make(chan struct{})}
+	h.dispatcher = newDispatcher(s, h.isDeliveryTarget)
 	s.OnReset(h.resetWebhooks)
 	return h
 }
