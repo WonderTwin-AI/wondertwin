@@ -35,6 +35,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/sandbox/public_token/create", h.sandboxPublicTokenCreate)
 		r.Post("/item/public_token/exchange", h.itemPublicTokenExchange)
 		r.Post("/item/get", h.itemGet)
+		r.Post("/accounts/get", h.accountsGet)
 		r.Post("/link/token/create", h.linkTokenCreate)
 		r.Post("/link/token/get", h.linkTokenGet)
 	})

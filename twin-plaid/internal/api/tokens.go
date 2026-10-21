@@ -83,6 +83,7 @@ func (h *Handler) itemPublicTokenExchange(w http.ResponseWriter, r *http.Request
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_PUBLIC_TOKEN",
 			"provided public token has expired; public tokens expire 30 minutes after creation")
 	default:
+		h.seedAccounts(it.ID)
 		h.writeJSON(w, http.StatusOK, map[string]any{"access_token": at.Token, "item_id": it.ID})
 	}
 }
