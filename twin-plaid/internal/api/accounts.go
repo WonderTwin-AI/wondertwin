@@ -59,7 +59,7 @@ func newAccountJSON(a store.Account) accountJSON {
 
 // accountsGet is POST /accounts/get: an Item's accounts, with the Item.
 func (h *Handler) accountsGet(w http.ResponseWriter, r *http.Request) {
-	it, ok := h.itemFor(w, r)
+	it, ok := h.liveItemFor(w, r)
 	if !ok {
 		return
 	}

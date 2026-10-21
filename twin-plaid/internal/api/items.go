@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
@@ -59,7 +60,7 @@ type itemJSON struct {
 
 func newItemJSON(it store.Item) itemJSON {
 	out := itemJSON{
-		ItemID: it.ID, InstitutionID: it.InstitutionID, Error: nil,
+		ItemID: it.ID, InstitutionID: it.InstitutionID, Error: itemErrorObject(it.ErrorCode),
 		AvailableProducts: []string{}, BilledProducts: orEmpty(it.BilledProducts),
 		Products: it.Products, ConsentedProducts: it.ConsentedProducts, UpdateType: it.UpdateType,
 	}
@@ -67,6 +68,39 @@ func newItemJSON(it store.Item) itemJSON {
 		out.Webhook = &it.Webhook
 	}
 	return out
+}
+
+// itemErrorObject is the Item's error field: null when healthy, else the
+// documented error without a request_id, as Plaid omits it where an error is
+// not an answer to a request.
+func itemErrorObject(code string) any {
+	e, ok := seed.LookupItemError(code)
+	if !ok {
+		return nil
+	}
+	return map[string]any{"error_type": e.Type, "error_code": e.Code, "error_message": e.Message,
+		"display_message": e.DisplayMessage}
+}
+
+// writeItemError answers with a documented error at its documented status.
+func (h *Handler) writeItemError(w http.ResponseWriter, e seed.ItemError) {
+	h.writeJSON(w, e.HTTP, map[string]any{
+		"display_message": e.DisplayMessage, "documentation_url": documentationURL(e.Type, e.Code),
+		"error_code": e.Code, "error_message": e.Message, "error_type": e.Type, "suggested_action": nil,
+	})
+}
+
+// liveItemFor is itemFor for routes that read an Item's data: an Item in an
+// error state answers that error instead (quirk LIFECYCLE-005).
+func (h *Handler) liveItemFor(w http.ResponseWriter, r *http.Request) (store.Item, bool) {
+	it, ok := h.itemFor(w, r)
+	if ok && it.ErrorCode != "" {
+		if e, found := seed.LookupItemError(it.ErrorCode); found {
+			h.writeItemError(w, e)
+			return it, false
+		}
+	}
+	return it, ok
 }
 
 func orEmpty(s []string) []string {
@@ -105,4 +139,13 @@ func (h *Handler) itemAccessTokenInvalidate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"new_access_token": at.Token})
+}
+
+// sandboxItemResetLogin is POST /sandbox/item/reset_login: it forces an Item
+// into ITEM_LOGIN_REQUIRED, the state update mode repairs.
+func (h *Handler) sandboxItemResetLogin(w http.ResponseWriter, r *http.Request) {
+	if it, ok := h.itemFor(w, r); ok {
+		h.store.SetItemError(it.ID, "ITEM_LOGIN_REQUIRED")
+		h.writeJSON(w, http.StatusOK, map[string]any{"reset_login": true})
+	}
 }

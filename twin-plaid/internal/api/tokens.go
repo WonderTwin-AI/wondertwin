@@ -3,7 +3,9 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 
+	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
@@ -42,7 +44,9 @@ func (h *Handler) sandboxPublicTokenCreate(w http.ResponseWriter, r *http.Reques
 	products, ok2 := asStrings(call.Body["initial_products"])
 	opts, isObj := call.Body["options"].(map[string]any)
 	webhook, ok3 := asString(opts["webhook"])
-	if !ok1 || !ok2 || !ok3 || (call.Body["options"] != nil && !isObj) {
+	user, ok4 := asString(opts["override_username"])
+	password, ok5 := asString(opts["override_password"])
+	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || (call.Body["options"] != nil && !isObj) {
 		h.invalidBody(w)
 		return
 	}
@@ -56,6 +60,14 @@ func (h *Handler) sandboxPublicTokenCreate(w http.ResponseWriter, r *http.Reques
 	if len(missing) > 0 {
 		h.writeMissing(w, missing)
 		return
+	}
+	// The error_{CODE} password, with user_good, fails the create with that
+	// documented error (quirk LIFECYCLE-005).
+	if code, isErr := strings.CutPrefix(password, "error_"); isErr && (user == "" || user == "user_good") {
+		if e, found := seed.LookupPasswordError(code); found {
+			h.writeItemError(w, e)
+			return
+		}
 	}
 	pt := h.store.CreatePublicToken(inst, products, webhook)
 	h.writeJSON(w, http.StatusOK, map[string]any{"public_token": pt.Token})

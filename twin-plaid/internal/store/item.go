@@ -33,3 +33,13 @@ func (s *MemoryStore) RemoveItem(id string) bool {
 	}
 	return true
 }
+
+// SetItemError puts an Item into an error state, by code; an empty code clears it.
+func (s *MemoryStore) SetItemError(id, code string) bool {
+	it, ok := s.Items.Get(id)
+	if ok {
+		it.ErrorCode = code
+		s.Items.Set(id, it)
+	}
+	return ok
+}
