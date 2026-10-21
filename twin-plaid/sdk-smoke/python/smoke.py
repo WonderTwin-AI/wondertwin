@@ -15,6 +15,7 @@ import sys
 
 import plaid
 from plaid.api import plaid_api
+from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.country_code import CountryCode
 from plaid.model.item_get_request import ItemGetRequest
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
@@ -69,6 +70,17 @@ def case_sandbox_public_token_create():
 def case_item_public_token_exchange():
     res = client.item_public_token_exchange(ItemPublicTokenExchangeRequest(public_token=public_token().public_token))
     assert res.access_token.startswith("access-sandbox-") and len(res.item_id) == 37
+
+
+def case_accounts_get():
+    exchanged = client.item_public_token_exchange(ItemPublicTokenExchangeRequest(public_token=public_token().public_token))
+    res = client.accounts_get(AccountsGetRequest(access_token=exchanged.access_token))
+    assert res.item.item_id == exchanged.item_id
+    assert [a.name for a in res.accounts] == ["Plaid Checking", "Plaid 401k", "Plaid Student Loan"]
+    for account in res.accounts:
+        assert "persistent_account_id" not in account.to_dict(), "persistent_account_id must be absent, never null"
+    checking = res.accounts[0]
+    assert str(checking.type) == "depository" and checking.balances.available == 100 and checking.balances.limit is None
 
 
 def case_item_get():
