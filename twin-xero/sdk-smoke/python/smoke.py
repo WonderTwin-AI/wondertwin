@@ -371,6 +371,24 @@ def case_delete_payment_restores_the_invoice():
         assert "already been deleted" in str(e), str(e)
 
 
+def case_refund_credit_note_payment_as_finance_ops_does():
+    """The Stripe refund sequence in xero_client.py: the invoice is already paid, one create_credit_notes carries the
+    full Allocation (the invoice object as read back), then create_payment(credit_note, account) pays the credit
+    note's total as ARCREDITPAYMENT, with the credit note object as the create call returned it."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    invoice = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact)])).invoices[0]
+    api.create_payment(tenant, Payment(amount=invoice.total, account=Account(code="090"), date=invoice.date, payment_type="ACCRECPAYMENT", invoice=invoice))
+    refund = finance_ops_credit_note(contact, amount=invoice.total)
+    refund.allocations = [Allocation(invoice=invoice, amount=invoice.total, date=datetime.date(2026, 9, 11))]
+    credit_note = api.create_credit_notes(tenant, CreditNotes(credit_notes=[refund])).credit_notes[0]
+    payment = Payment(amount=credit_note.total, account=Account(code="090"), date=credit_note.date, credit_note=credit_note, payment_type="ARCREDITPAYMENT")
+    paid = api.create_payment(tenant, payment).payments[0]
+    assert paid.payment_id and paid.payment_type == "ARCREDITPAYMENT" and paid.amount == invoice.total and paid.has_account
+    assert paid.credit_note.credit_note_id == credit_note.credit_note_id and paid.credit_note.status == "PAID", paid.credit_note
+    assert paid.credit_note.remaining_credit == 0 and len(paid.credit_note.payments) == 1 and paid.invoice is None
+
+
 def case_update_invoice_line_items():
     """The SDK posts the lines back with their IDs: an edited line keeps its ID and the totals are recomputed."""
     api, tenant = accounting_api()
@@ -491,6 +509,7 @@ def case_connect_tenant():
 
 
 CASES = [
+    ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
     ("get_credit_notes page=1 as finance-ops calls it, and where by contact", case_get_credit_notes_as_finance_ops_calls_it),
     ("update_invoice voids and deletes as finance-ops does", case_void_and_delete_invoices_as_finance_ops_does),
     ("update_invoice recomputes the totals when a line changes", case_update_invoice_line_items),

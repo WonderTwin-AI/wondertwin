@@ -8,6 +8,7 @@ import "github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 type payment struct {
 	store.Payment
 	Invoice        *invoice              `json:"Invoice,omitempty"`
+	CreditNote     *creditNote           `json:"CreditNote,omitempty"`
 	Account        *store.PaymentAccount `json:"Account,omitempty"`
 	Date           Msdate                `json:"Date"`
 	UpdatedDateUTC Msdate                `json:"UpdatedDateUTC"`

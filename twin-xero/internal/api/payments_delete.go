@@ -67,6 +67,18 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 	p.Status, p.UpdatedDateUTC, p.UpdatedDateUTCString = "DELETED", now, now.Format("2006-01-02T15:04:05.000")
 	payments.Set(p.PaymentID, p)
 
+	if p.CreditNote != nil {
+		cn, _ := h.store.CreditNotes.For(tenant).Get(p.CreditNote.CreditNoteID)
+		cn.Payments = slices.DeleteFunc(slices.Clone(cn.Payments), func(e map[string]any) bool { return e["PaymentID"] == p.PaymentID })
+		cn.RemainingCredit = max(round(cn.Total-cn.AppliedAmount-paymentsTotal(cn.Payments), 2), 0)
+		if cn.Status == "PAID" && cn.RemainingCredit > 0 {
+			cn.Status, cn.FullyPaidOnDate = "AUTHORISED", nil
+		}
+		cn.UpdatedDateUTC, cn.UpdatedDateUTCString = now, p.UpdatedDateUTCString
+		h.store.CreditNotes.For(tenant).Set(cn.CreditNoteID, cn)
+		h.writeEnvelope(w, http.StatusOK, "Payments", []payment{h.wireCreditNotePayment(tenant, p, cn)})
+		return
+	}
 	var inv store.Invoice
 	if p.Invoice != nil {
 		invoices := h.store.Invoices.For(tenant)

@@ -126,8 +126,8 @@
       ]
     },
     {
-      "route": "POST /api.xro/2.0/Payments (credit notes, prepayments, overpayments)",
-      "reason": "Only a payment against an invoice is supported: a payment that names a CreditNote, Prepayment or Overpayment is refused with a ValidationException. Xero records these too (localstack/finance-ops pays credit notes through the same call as ARCREDITPAYMENT). Credit notes arrive in xero-bp1-s14, and their payments are not in the plan.",
+      "route": "POST /api.xro/2.0/Payments (prepayments, overpayments)",
+      "reason": "Only a payment against an invoice or a credit note is supported: a payment that names a Prepayment or Overpayment is refused with a ValidationException. Xero records these too; the plan does not cover them.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-004",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
@@ -156,6 +156,18 @@
         "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
       },
       "operator_note": "Added for the named target localstack/finance-ops, whose refund flow (backend/stripe_xero_lambda/xero_client.py _create_refund_credit_note) allocates the whole refund to an invoice that is normally already PAID. Whether real Xero accepts that is unverified.",
+      "quirk_ids": [
+        "alloc-001",
+        "alloc-002"
+      ]
+    },
+    {
+      "route": "POST /Payments (payments on credit notes)",
+      "reason": "By default a payment on a credit note is accepted when the credit note is AUTHORISED or already PAID and the payments on it add up to no more than its Total; the payment lowers RemainingCredit (never below zero) and the credit note becomes PAID at zero. Both rules are guesses; the research does not cover refund payments. strict_auth (the --strict-auth flag, or PUT /admin/config) requires an AUTHORISED credit note and an amount within RemainingCredit.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
+      },
+      "operator_note": "Added for the named target localstack/finance-ops, whose refund flow (backend/stripe_xero_lambda/xero_client.py create_payment) allocates a credit note to an invoice in full and then pays the credit note's whole total as ARCREDITPAYMENT. Whether real Xero accepts that sequence is unverified.",
       "quirk_ids": [
         "alloc-001",
         "alloc-002"

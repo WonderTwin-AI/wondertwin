@@ -72,7 +72,7 @@ func TestPaymentRefusals(t *testing.T) {
 		"a paid invoice":    {pay(paid, 10), "not of valid status"},
 		"more than is due":  {pay(authorised, 100.01), "exceeds the amount outstanding"},
 		"a revenue account": {fmt.Sprintf(`{"Invoice":{"InvoiceID":%q},"Account":{"Code":"200"},"Date":"2026-09-15","Amount":10}`, authorised), "not a bank account"},
-		"a credit note":     {fmt.Sprintf(`{"CreditNote":{"CreditNoteID":"x"},"Account":{"Code":"090"},"Date":"2026-09-15","Amount":10,"Invoice":{"InvoiceID":%q}}`, authorised), "Only payments against an invoice"},
+		"a prepayment":      {fmt.Sprintf(`{"Prepayment":{"PrepaymentID":"x"},"Account":{"Code":"090"},"Date":"2026-09-15","Amount":10,"Invoice":{"InvoiceID":%q}}`, authorised), "Only payments against an invoice"},
 	} {
 		code, resp := postPayment(t, h, tc.body)
 		if code != 400 || !strings.Contains(fmt.Sprint(resp), tc.want) {
