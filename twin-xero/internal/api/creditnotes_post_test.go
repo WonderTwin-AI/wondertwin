@@ -143,6 +143,21 @@ func TestPostMarksAnAuthorisedCreditNoteSentButWarnsForADraft(t *testing.T) {
 	}
 }
 
+func TestPostVoidingASentCreditNoteLeavesSentToContactAlone(t *testing.T) {
+	h := newTestHandler(t)
+	id := storedNote(t, h, newContactID(t, h, "Acme"), "AUTHORISED", 50)
+	if code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"SentToContact":true}`, id)); code != 200 {
+		t.Fatalf("%d %v", code, body)
+	}
+
+	if code, body := postCreditNotes(t, h, "", fmt.Sprintf(`{"CreditNoteID":%q,"Status":"VOIDED"}`, id)); code != 200 {
+		t.Fatalf("%d %v", code, body)
+	}
+	if cn := storedCreditNote(h, id); cn.Status != "VOIDED" || !cn.SentToContact || len(cn.Warnings) != 0 || cn.StatusAttributeString == "WARNING" {
+		t.Errorf("voiding changed SentToContact it was not sent: %+v", cn)
+	}
+}
+
 func TestPostAppliesSeveralItemsForOneCreditNoteInOrder(t *testing.T) {
 	h := newTestHandler(t)
 	id := storedNote(t, h, newContactID(t, h, "Acme"), "AUTHORISED", 50)

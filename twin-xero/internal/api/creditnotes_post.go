@@ -219,7 +219,7 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 	if out.Status == "VOIDED" || out.Status == "DELETED" {
 		out.RemainingCredit = 0
 	}
-	if out.SentToContact && out.Status != "AUTHORISED" && out.Status != "PAID" { // only an authorised credit note can be marked sent (null-001)
+	if v, ok := keys["SentToContact"]; ok && string(v) != "null" && out.SentToContact && out.Status != "AUTHORISED" && out.Status != "PAID" { // only an authorised credit note can be marked sent (null-001)
 		out.SentToContact, out.StatusAttributeString = false, "WARNING"
 		out.Warnings = []store.ValidationError{{Message: "A credit note can only be marked as sent when it is authorised."}}
 	}
