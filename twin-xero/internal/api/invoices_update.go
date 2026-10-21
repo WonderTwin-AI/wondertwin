@@ -86,6 +86,12 @@ func readOneInvoice(r *http.Request) (json.RawMessage, map[string]json.RawMessag
 		}
 		one = in.Invoices[0]
 	}
+	return normalizeInvoice(one)
+}
+
+// normalizeInvoice returns one invoice as sent and the names of the fields it
+// carries, with SentToContact read as a boolean however it was written.
+func normalizeInvoice(one json.RawMessage) (json.RawMessage, map[string]json.RawMessage, error) {
 	keys := map[string]json.RawMessage{}
 	if err := json.Unmarshal(one, &keys); err != nil {
 		return nil, nil, err
