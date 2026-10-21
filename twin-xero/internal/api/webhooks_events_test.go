@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
+	pkgwh "github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // subscribed registers a receiver for every category and returns what it gets.
@@ -214,4 +215,48 @@ func firstContactID(t *testing.T, body map[string]any) string {
 		t.Fatalf("no contacts in %v", body)
 	}
 	return list[0].(map[string]any)["ContactID"].(string)
+}
+
+// gated holds every endpoint lookup until release is closed, so a test decides
+// when the delivery worker resolves its recipients.
+type gated struct {
+	inner   pkgwh.EndpointProvider
+	release chan struct{}
+}
+
+func (g gated) ActiveEndpoints() []pkgwh.Endpoint {
+	<-g.release
+	return g.inner.ActiveEndpoints()
+}
+
+func TestAnEventIsNotDeliveredToASubscriptionRegisteredAfterTheWrite(t *testing.T) {
+	h := newTestHandler(t)
+	release := make(chan struct{})
+	h.dispatcher.SetEndpointProvider(gated{endpoints{h.store, h.isDeliveryTarget}, release})
+	srv, got := receiver(t)
+	subscribe(h, "early", "http://127.0.0.1:1/", "k", store.WebhookOK, "CONTACT") // lets the first write be queued
+
+	putContacts(t, h, `{"Contacts":[{"Name":"Before"}]}`) // the worker is now held in its lookup
+	h.store.Webhooks.Delete("early")
+	subscribe(h, "late", srv.URL, "k", store.WebhookOK, "CONTACT")
+	close(release)
+	after := firstContactID(t, putContacts(t, h, `{"Contacts":[{"Name":"After"}]}`))
+
+	// Events arrive in write order, so a stale one would come first.
+	wantEvent(t, eventsOf(t, got, 1)[0], "CONTACT", "CREATE", after)
+	none(t, got)
+}
+
+func TestAWriteWithNoSubscriberQueuesNothing(t *testing.T) {
+	h := newTestHandler(t)
+	putContacts(t, h, `{"Contacts":[{"Name":"Nobody listens"}]}`)
+
+	h.pend.Lock()
+	defer h.pend.Unlock()
+	if len(h.pending) != 0 || h.started {
+		t.Fatalf("queued %d events, worker started %v, want neither", len(h.pending), h.started)
+	}
+	if n := h.store.WebhookSeq.Load(); n != 0 {
+		t.Errorf("a dropped event used sequence number %d", n)
+	}
 }
