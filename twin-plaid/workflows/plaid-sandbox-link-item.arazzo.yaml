@@ -1,0 +1,124 @@
+arazzo: 1.0.1
+info:
+  title: Plaid - create a Sandbox Item without Link and read it
+  version: 1.0.0
+  summary: sandbox public token, exchange, item/get, accounts/get
+  description: |
+    Use case plaid-sandbox-link-item (scope-recommendation.json).
+    Scenario evidence 01999336-8f00-7000-8a00-000000000001 (plaid.com/docs/sandbox 'Bypassing Link')
+    and 01999336-8f00-7000-8a00-000000000007 (plaid/quickstart python/server.py).
+    The outcome step is where the 2026-09-26 smoke failed: plaid-python must deserialize the response,
+    so optional non-nullable fields (persistent_account_id) must be absent, not null.
+sourceDescriptions:
+  - name: plaid
+    url: manifest:openapi-2020-09-14_1.740.1
+    type: openapi
+workflows:
+  - workflowId: sandbox-link-item
+    summary: sandbox public token, exchange, item/get, accounts/get
+    inputs:
+      type: object
+      required: [clientId, secret]
+      properties:
+        clientId:
+          type: string
+        secret:
+          type: string
+    steps:
+      - stepId: create-public-token
+        operationId: $sourceDescriptions.plaid.sandboxPublicTokenCreate
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            institution_id: ins_109508
+            initial_products: [transactions, auth]
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body#/public_token
+            condition: ^public-sandbox-[0-9a-f-]{36}$
+            type: regex
+        outputs:
+          publicToken: $response.body#/public_token
+      - stepId: exchange
+        operationId: $sourceDescriptions.plaid.itemPublicTokenExchange
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            public_token: $steps.create-public-token.outputs.publicToken
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body#/access_token
+            condition: ^access-sandbox-[0-9a-f-]{36}$
+            type: regex
+        outputs:
+          accessToken: $response.body#/access_token
+          itemId: $response.body#/item_id
+      - stepId: item-get
+        operationId: $sourceDescriptions.plaid.itemGet
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/item/item_id == $steps.exchange.outputs.itemId
+          - condition: $response.body#/item/institution_id == "ins_109508"
+      - stepId: outcome-accounts
+        description: "Outcome oracle. The exchanged token reads the Item's accounts."
+        operationId: $sourceDescriptions.plaid.accountsGet
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/item/item_id == $steps.exchange.outputs.itemId
+          - condition: $response.body#/accounts/0/account_id != null
+          - context: $response.body#/request_id
+            condition: ^[0-9a-zA-Z]+$
+            type: regex
+        outputs:
+          accountId: $response.body#/accounts/0/account_id
+    outputs:
+      accessToken: $steps.exchange.outputs.accessToken
+      accountId: $steps.outcome-accounts.outputs.accountId
