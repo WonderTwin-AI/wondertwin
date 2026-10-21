@@ -73,6 +73,7 @@ type Dispatcher struct {
 	endpointProvider EndpointProvider
 	encode           func(Event) ([]byte, error)
 	headers          func(Event) map[string]string
+	signWithoutKey   bool
 }
 
 // Config configures the webhook dispatcher.
@@ -99,6 +100,12 @@ type Config struct {
 
 	// Timeout bounds each delivery attempt. Zero keeps the 30 second default.
 	Timeout time.Duration
+
+	// SignWithoutSecret runs the Signer even when no shared secret is set.
+	// A vendor that signs with a key the Signer holds, such as an ES256 JWT,
+	// has no secret to configure; the Signer then receives an empty secret.
+	// Left false, a Signer runs only when a secret is set, as before.
+	SignWithoutSecret bool
 }
 
 // NewDispatcher creates a new webhook dispatcher.
@@ -133,6 +140,8 @@ func NewDispatcher(cfg Config) *Dispatcher {
 		autoDeliver: cfg.AutoDeliver,
 		encode:      cfg.Encode,
 		headers:     cfg.Headers,
+
+		signWithoutKey: cfg.SignWithoutSecret,
 	}
 }
 
@@ -279,7 +288,7 @@ func (d *Dispatcher) deliverToURL(evt Event, url, secret string, signer Signer) 
 			}
 		}
 
-		if signer != nil && secret != "" {
+		if signer != nil && (secret != "" || d.signWithoutKey) {
 			for k, v := range signer.Sign(payload, secret) {
 				req.Header.Set(k, v)
 			}
