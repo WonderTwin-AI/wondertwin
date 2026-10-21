@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/url"
+	"reflect"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
@@ -99,4 +100,19 @@ func TestPostWithOneInvalidContactWritesNoneAndSendsNoEvent(t *testing.T) {
 		t.Fatalf("a refused request changed the store: %v", names(list))
 	}
 	none(t, got)
+}
+
+func TestPostRefusedForAnInvalidNameLeavesTheStoredAddressesAndPhonesUnchanged(t *testing.T) {
+	h := newTestHandler(t)
+	id := firstContactID(t, putContacts(t, h, `{"Contacts":[{"Name":"Acme","Addresses":[{"AddressType":"STREET","City":"Dublin"},{"AddressType":"POBOX","City":"Cork"}],"Phones":[{"PhoneType":"DEFAULT","PhoneNumber":"1234"}]}]}`))
+	_, before := listContacts(t, h, url.Values{})
+
+	code, _ := postContacts(t, h, `{"ContactID":"`+id+`","Name":"","Addresses":[{"AddressType":"STREET","City":"Galway"}],"Phones":[{"PhoneType":"MOBILE","PhoneNumber":"9999"}]}`)
+	if code != 400 {
+		t.Fatalf("status %d, want 400", code)
+	}
+	_, after := listContacts(t, h, url.Values{})
+	if !reflect.DeepEqual(before["Contacts"], after["Contacts"]) {
+		t.Fatalf("a refused request changed the stored contact:\nbefore %v\nafter  %v", before["Contacts"], after["Contacts"])
+	}
 }

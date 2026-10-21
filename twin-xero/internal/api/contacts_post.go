@@ -59,7 +59,10 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 			h.writeProblem(w, r, http.StatusNotFound, "Not Found", "The resource you have specified cannot be found")
 			return
 		}
-		merged := contact{old, Msdate(old.UpdatedDateUTC)}
+		var copied store.Contact
+		kept, _ := json.Marshal(old)
+		_ = json.Unmarshal(kept, &copied)
+		merged := contact{copied, Msdate(old.UpdatedDateUTC)}
 		_ = json.Unmarshal(one, &merged) // only the fields the body carries replace the stored ones
 		merged.Contact.ContactID = old.ContactID
 		writes[i] = write{c: merged}
