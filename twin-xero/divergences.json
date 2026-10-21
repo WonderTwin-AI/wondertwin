@@ -194,6 +194,17 @@
       "quirk_ids": [
         "crud-009"
       ]
+    },
+    {
+      "route": "POST /Invoices (updateOrCreateInvoices)",
+      "reason": "An invoice that carries the InvoiceID of a stored invoice is updated by the rules of POST /Invoices/{InvoiceID}, and one with no InvoiceID is created by the rules of PUT /Invoices. Whether Xero also matches on InvoiceNumber is not settled by the research, so this emulator does not: a number that belongs to another invoice is refused as PUT refuses it. An InvoiceID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-010"
+      },
+      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced; finance-ops test_create_invoice_and_payment posts to the collection.",
+      "quirk_ids": [
+        "crud-010"
+      ]
     }
   ]
 }

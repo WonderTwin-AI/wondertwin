@@ -563,6 +563,12 @@ def case_webhook_events_follow_the_writes():
                 break
             time.sleep(0.05)
         assert ("CONTACT", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == contact_id}
+        api.update_or_create_invoices(tenant, Invoices(invoices=[Invoice(invoice_id=invoice_id, reference="events")]))
+        for _ in range(100):
+            if ("INVOICE", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == invoice_id}:
+                break
+            time.sleep(0.05)
+        assert ("INVOICE", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == invoice_id}
     finally:
         if subscription:  # later cases write too, and must not queue deliveries for a receiver that is gone
             conn.request("DELETE", f"/admin/webhooks/{subscription['id']}")
@@ -612,6 +618,18 @@ def case_update_or_create_contacts_never_upserts_by_name():
     raise AssertionError("POST /Contacts upserted by Name")
 
 
+def case_update_or_create_invoices():
+    api, tenant = accounting_api()
+    contact_id = new_contact(api, tenant)
+    created = api.update_or_create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact_id)])).invoices
+    assert len(created) == 1 and created[0].invoice_id and created[0].status == "AUTHORISED" and created[0].invoice_number
+    updated = api.update_or_create_invoices(tenant, Invoices(invoices=[Invoice(invoice_id=created[0].invoice_id, reference="posted")])).invoices
+    assert len(updated) == 1 and updated[0].invoice_id == created[0].invoice_id and updated[0].reference == "posted"
+    assert updated[0].invoice_number == created[0].invoice_number and updated[0].total == created[0].total, "an update leaves the other fields"
+    voided = api.update_or_create_invoices(tenant, Invoices(invoices=[Invoice(invoice_id=created[0].invoice_id, status="VOIDED")])).invoices[0]
+    assert voided.status == "VOIDED" and voided.amount_due == 0, "the item route's status rules apply"
+
+
 CASES = [
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
@@ -629,6 +647,7 @@ CASES = [
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
     ("delete_payment restores the invoice", case_delete_payment_restores_the_invoice),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
+    ("update_or_create_invoices creates, then updates and voids by InvoiceID", case_update_or_create_invoices),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),
     ("get_contacts parses with and without page", case_get_contacts_parses_with_and_without_page),
