@@ -22,7 +22,7 @@ import uuid
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
 from xero_python.accounting import (Account, AccountingApi, Address, Allocation, Contact, Contacts, CreditNote, CreditNotes,
-                                    CurrencyCode, Invoice, Invoices, LineItem, Payment)
+                                    CurrencyCode, Invoice, Invoices, LineItem, Payment, PaymentDelete)
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -353,6 +353,24 @@ def case_create_payment_pays_the_invoice():
         assert "not of valid status" in str(e), str(e)
 
 
+def case_delete_payment_restores_the_invoice():
+    """delete_payment posts {Status: DELETED} to /Payments/{id}: the invoice goes back to AUTHORISED with its amount due."""
+    api, tenant = accounting_api()
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(new_contact(api, tenant))])).invoices[0]
+    paid = api.create_payment(tenant, Payment(amount=created.total, account=Account(code="090"), date=created.date, invoice=created)).payments[0]
+    gone = api.delete_payment(tenant, payment_id=paid.payment_id, payment_delete=PaymentDelete(status="DELETED")).payments[0]
+    assert gone.status == "DELETED" and gone.payment_id == paid.payment_id
+    assert gone.invoice.status == "AUTHORISED" and gone.invoice.amount_due == created.total and gone.invoice.amount_paid == 0
+    assert api.get_invoice(tenant, created.invoice_id).invoices[0].status == "AUTHORISED"
+    try:
+        api.delete_payment(tenant, payment_id=paid.payment_id, payment_delete=PaymentDelete(status="DELETED"))
+        raise AssertionError("a payment was deleted twice")
+    except AssertionError:
+        raise
+    except Exception as e:
+        assert "already been deleted" in str(e), str(e)
+
+
 def case_update_invoice_line_items():
     """The SDK posts the lines back with their IDs: an edited line keeps its ID and the totals are recomputed."""
     api, tenant = accounting_api()
@@ -470,6 +488,7 @@ CASES = [
     ("create_credit_notes with an inline Allocation against an invoice", case_create_credit_notes_with_allocation),
     ("create_credit_notes refuses an unknown account and answers in place with summarize_errors=False", case_create_credit_notes_refusals),
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
+    ("delete_payment restores the invoice", case_delete_payment_restores_the_invoice),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),

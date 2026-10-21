@@ -114,6 +114,18 @@
       ]
     },
     {
+      "route": "POST /api.xro/2.0/Payments/{PaymentID} (Status DELETED)",
+      "reason": "Only Status DELETED is read from a payment update; any other status is refused, and other updatable fields are ignored. A payment that is already DELETED or reconciled is refused, and an unknown payment is a 404. The wording of these refusals is a guess. The deleted payment stays in the tenant, and its invoice returns to AUTHORISED with the amount due restored; whether Xero keeps the deleted payment in the invoice's Payments is unverified, and here it is dropped.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-002",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Raised while building s13 (delete payments). Becomes operator-approved when s13 is reviewed.",
+      "quirk_ids": [
+        "crud-002"
+      ]
+    },
+    {
       "route": "POST /api.xro/2.0/Payments (credit notes, prepayments, overpayments)",
       "reason": "Only a payment against an invoice is supported: a payment that names a CreditNote, Prepayment or Overpayment is refused with a ValidationException. Xero records these too (localstack/finance-ops pays credit notes through the same call as ARCREDITPAYMENT). Credit notes arrive in xero-bp1-s14, and their payments are not in the plan.",
       "references": {
