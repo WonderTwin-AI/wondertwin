@@ -68,6 +68,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Get("/Invoices/{InvoiceID}", h.Invoice)
 				r.Put("/Invoices", h.CreateInvoices)
 				r.Post("/Invoices/{InvoiceID}", h.UpdateInvoice)
+				r.Post("/Payments", h.CreatePayment)
 			})
 		})
 	})
