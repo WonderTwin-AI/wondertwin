@@ -1,0 +1,143 @@
+{
+  "_source": "Sample error bodies from Plaid's public error pages (plaid.com/docs/errors/{item,institution,payment,api}/), fetched 2026-10-20, not the pinned 2026-09-28 docs capture. Verbatim: http status, error_type, error_message, display_message. Codes listed as Sandbox error passwords on plaid.com/docs/sandbox/test-credentials but absent here have no published sample: COUNTRY_NOT_SUPPORTED, USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS. ITEM_LOGIN_REQUIRED is here for /sandbox/item/reset_login; it is not a listed error password.",
+  "errors": {
+    "ACCESS_NOT_GRANTED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "access to this product was not granted for the account",
+      "display_message": "The user did not grant the necessary permissions for this product on their account."
+    },
+    "INSTITUTION_NOT_RESPONDING": {
+      "http": 400,
+      "error_type": "INSTITUTION_ERROR",
+      "error_message": "this institution is not currently responding to this request. please try again soon",
+      "display_message": "This financial institution is not currently responding to requests. We apologize for the inconvenience."
+    },
+    "INSTITUTION_NO_LONGER_SUPPORTED": {
+      "http": 400,
+      "error_type": "INSTITUTION_ERROR",
+      "error_message": "this institution is no longer supported",
+      "display_message": "This financial institution is no longer supported. We apologize for the inconvenience."
+    },
+    "INSTITUTION_REGISTRATION_REQUIRED": {
+      "http": 400,
+      "error_type": "INSTITUTION_ERROR",
+      "error_message": "not yet registered to create items for this institution",
+      "display_message": "You must register your application with this institution before you can create items for it."
+    },
+    "INSUFFICIENT_CREDENTIALS": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "insufficient authorization was provided to complete the request",
+      "display_message": "INSUFFICIENT_CREDENTIALS"
+    },
+    "INTERNAL_SERVER_ERROR": {
+      "http": 500,
+      "error_type": "API_ERROR",
+      "error_message": "an unexpected error occurred",
+      "display_message": null
+    },
+    "INVALID_CREDENTIALS": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the provided credentials were not correct",
+      "display_message": "The provided credentials were not correct. Please try again."
+    },
+    "INVALID_MFA": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the provided MFA response(s) were not correct",
+      "display_message": "The provided MFA responses were not correct. Please try again."
+    },
+    "INVALID_SEND_METHOD": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the provided MFA send_method was invalid",
+      "display_message": null
+    },
+    "ITEM_LOCKED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the account is locked. prompt the user to visit the institution's site and unlock their account",
+      "display_message": "The given account has been locked by the financial institution. Please visit your financial institution's website to unlock your account."
+    },
+    "ITEM_LOGIN_REQUIRED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the login details of this item have changed (credentials, MFA, or required user action) and a user login is required to update this information. use Link's update mode to restore the item to a good state",
+      "display_message": null
+    },
+    "ITEM_NOT_SUPPORTED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "this account is currently not supported",
+      "display_message": "The given account is not currently supported for this financial institution. We apologize for the inconvenience."
+    },
+    "MFA_NOT_SUPPORTED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "this account requires a MFA type that we do not currently support for the institution",
+      "display_message": "The multi-factor security features enabled on this account are not currently supported for this financial institution. We apologize for the inconvenience."
+    },
+    "NO_ACCOUNTS": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "no valid accounts were found for this item",
+      "display_message": "No valid accounts were found at the financial institution. Please visit your financial institution's website to confirm accounts are available."
+    },
+    "PAYMENT_INSUFFICIENT_FUNDS": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "insufficient funds to complete the request",
+      "display_message": "There isn't enough money in this account to complete the payment. Try again, or select another account or bank."
+    },
+    "PAYMENT_INVALID_RECIPIENT": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "payment recipient invalid",
+      "display_message": "The payment recipient is invalid for the selected institution. Create a new payment with a different recipient."
+    },
+    "PAYMENT_INVALID_REFERENCE": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "payment reference invalid",
+      "display_message": "The payment reference is invalid for the selected institution. Create a new payment with a different reference."
+    },
+    "PAYMENT_INVALID_SCHEDULE": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "payment schedule invalid",
+      "display_message": "The payment schedule is invalid for the selected institution. Create a new payment with a different schedule."
+    },
+    "PAYMENT_REJECTED": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "payment rejected",
+      "display_message": "The payment was rejected by the institution. Try again, or select another account or bank."
+    },
+    "PAYMENT_SCHEME_NOT_SUPPORTED": {
+      "http": 400,
+      "error_type": "PAYMENT_ERROR",
+      "error_message": "payment scheme not supported",
+      "display_message": "The payment scheme is not supported by the institution. Either change scheme or select another institution."
+    },
+    "UNAUTHORIZED_INSTITUTION": {
+      "http": 400,
+      "error_type": "INSTITUTION_ERROR",
+      "error_message": "not authorized to create items for this institution",
+      "display_message": "You are not authorized to create items for this institution at this time."
+    },
+    "USER_INPUT_TIMEOUT": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "user must retry this operation",
+      "display_message": "The application timed out waiting for user input"
+    },
+    "USER_SETUP_REQUIRED": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "the account has not been fully set up. prompt the user to visit the issuing institution's site and finish the setup process",
+      "display_message": "The given account is not fully setup. Please visit your financial institution's website to setup your account."
+    }
+  }
+}

@@ -25,7 +25,9 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.link_token_get_request import LinkTokenGetRequest
 from plaid.model.products import Products
+from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
+from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
 
 BASE = os.environ.get("PLAID_EMULATOR_URL", "http://localhost:4196").rstrip("/")
 SDK = "plaid-python 44.0.0"
@@ -110,6 +112,19 @@ def case_item_access_token_invalidate_issues_a_new_token():
     assert new.startswith("access-sandbox-") and new != old
     assert api_error(lambda: client.item_get(ItemGetRequest(access_token=old))) == (400, "INVALID_ACCESS_TOKEN")
     assert client.item_get(ItemGetRequest(access_token=new)).item.item_id
+
+
+def case_error_password_fails_the_create():
+    options = SandboxPublicTokenCreateRequestOptions(override_username="user_good", override_password="error_ITEM_LOCKED")
+    assert api_error(lambda: public_token(options=options)) == (400, "ITEM_LOCKED")
+
+
+def case_reset_login_puts_the_item_in_login_required():
+    token = linked_access_token()
+    assert client.sandbox_item_reset_login(SandboxItemResetLoginRequest(access_token=token)).reset_login is True
+    assert client.item_get(ItemGetRequest(access_token=token)).item.error.error_code == "ITEM_LOGIN_REQUIRED"
+    assert api_error(lambda: client.accounts_get(AccountsGetRequest(access_token=token))) == (400, "ITEM_LOGIN_REQUIRED")
+    assert link_token(access_token=token).link_token.startswith("link-sandbox-"), "update mode must still work"
 
 
 def case_item_get():
