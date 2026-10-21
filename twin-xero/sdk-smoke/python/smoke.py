@@ -21,7 +21,7 @@ import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import Address, AccountingApi, Contact, Contacts, CurrencyCode, Invoice, Invoices, LineItem
+from xero_python.accounting import Account, AccountingApi, Address, Contact, Contacts, CurrencyCode, Invoice, Invoices, LineItem, Payment
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -316,6 +316,26 @@ def case_get_invoices_by_number_where_and_read():
     assert unpaged.pagination is None and not unpaged.invoices[0].line_items, "no page: summary form, and no [] for the SDK to choke on"
 
 
+def case_create_payment_pays_the_invoice():
+    """create_payment as localstack/finance-ops calls it: the amount is the invoice total, the account
+    is by code, the whole invoice is nested, and the payment type is ACCRECPAYMENT."""
+    api, tenant = accounting_api()
+    created = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(new_contact(api, tenant))])).invoices[0]
+    payment = Payment(amount=created.total, account=Account(code="090"), date=created.date, payment_type="ACCRECPAYMENT", invoice=created)
+    paid = api.create_payment(tenant, payment).payments[0]
+    assert paid.payment_id and paid.status == "AUTHORISED" and paid.payment_type == "ACCRECPAYMENT" and paid.has_account
+    assert paid.date == created.date and paid.updated_date_utc.year >= 2026, "the SDK parsed the msdates"
+    assert paid.invoice.status == "PAID" and paid.invoice.amount_due == 0 and paid.invoice.amount_paid == created.total
+    assert paid.invoice.fully_paid_on_date == created.date
+    try:
+        api.create_payment(tenant, payment)
+        raise AssertionError("a second payment against a paid invoice was accepted")
+    except AssertionError:
+        raise
+    except Exception as e:  # the SDK raises on a 400 with the body in the message
+        assert "not of valid status" in str(e), str(e)
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -336,6 +356,9 @@ CASES = [
     ("update_invoice takes a whole invoice back, by ID or number", case_update_invoice_as_finance_ops_does),
     ("get_invoices as finance-ops calls it, by contact with page=1", case_get_invoices_as_finance_ops_calls_it),
     ("get_invoices by number and where, get_invoice, and the unpaged summary form", case_get_invoices_by_number_where_and_read),
+
+
+    ("create_payment pays the invoice, as finance-ops calls it", case_create_payment_pays_the_invoice),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
     ("create_invoices with summarize_errors=False answers each invoice in place", case_create_invoices_summarize_errors_false),

@@ -112,6 +112,30 @@
       "quirk_ids": [
         "crud-004"
       ]
+    },
+    {
+      "route": "POST /api.xro/2.0/Payments (credit notes, prepayments, overpayments)",
+      "reason": "Only a payment against an invoice is supported: a payment that names a CreditNote, Prepayment or Overpayment is refused with a ValidationException. Xero records these too (localstack/finance-ops pays credit notes through the same call as ARCREDITPAYMENT). Credit notes arrive in xero-bp1-s14, and their payments are not in the plan.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A scope boundary of xero-bp1, not a decision about Xero. Tracked for xero-bp2 in the plan's deferred list.",
+      "quirk_ids": [
+        "crud-004"
+      ]
+    },
+    {
+      "route": "POST /api.xro/2.0/Payments (BankAmount, CurrencyRate)",
+      "reason": "BankAmount equals Amount and CurrencyRate is stored as sent, so a payment never converts between the invoice currency and the bank account's currency. Xero converts by the rate.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess made where the research is silent; multi-currency payments are not modelled.",
+      "quirk_ids": [
+        "crud-004"
+      ]
     }
   ]
 }
