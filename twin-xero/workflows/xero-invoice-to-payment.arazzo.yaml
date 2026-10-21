@@ -1,0 +1,105 @@
+arazzo: 1.0.1
+info:
+  title: Xero - bill a customer and pay the invoice in full
+  version: 1.0.0
+  summary: Create a contact and an AUTHORISED invoice, pay the amount due, read the invoice back PAID.
+  description: |
+    Use case xero-invoice-to-payment (scope-recommendation.json).
+    Scenario evidence 01a0f1e2-0c01-7c00-8a00-000000000002 (developer.xero.com Payments, Invoices).
+    Dates are sent as YYYY-MM-DD and must come back as /Date(ms)/ (x-is-msdate): the outcome step's
+    FullyPaidOnDate check is a string-prefix check because xero-python rejects anything else.
+sourceDescriptions:
+  - name: xeroAccounting
+    url: manifest:openapi-accounting-19.0.0
+    type: openapi
+workflows:
+  - workflowId: invoice-to-payment
+    summary: PUT /Contacts, PUT /Invoices, PUT /Payments, GET /Invoices/{InvoiceID}
+    inputs:
+      type: object
+      required: [accessToken, tenantId, salesAccountCode, bankAccountCode]
+      properties:
+        accessToken: {type: string}
+        tenantId: {type: string}
+        salesAccountCode: {type: string, default: "200"}
+        bankAccountCode: {type: string, default: "090"}
+    steps:
+      - stepId: create-contact
+        operationId: $sourceDescriptions.xeroAccounting.createContacts
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Contacts:
+              - Name: Arazzo Customer Ltd
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          contactId: $response.body#/Contacts/0/ContactID
+      - stepId: create-invoice
+        operationId: $sourceDescriptions.xeroAccounting.createInvoices
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Invoices:
+              - Type: ACCREC
+                Contact:
+                  ContactID: $steps.create-contact.outputs.contactId
+                Date: "2026-09-01"
+                DueDate: "2026-09-30"
+                LineAmountTypes: NoTax
+                Status: AUTHORISED
+                LineItems:
+                  - Description: Consulting
+                    Quantity: 1
+                    UnitAmount: 100
+                    AccountCode: $inputs.salesAccountCode
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Invoices/0/Status == "AUTHORISED"
+          - condition: $response.body#/Invoices/0/AmountDue == 100
+        outputs:
+          invoiceId: $response.body#/Invoices/0/InvoiceID
+      - stepId: pay-invoice
+        operationId: $sourceDescriptions.xeroAccounting.createPayments
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Payments:
+              - Invoice:
+                  InvoiceID: $steps.create-invoice.outputs.invoiceId
+                Account:
+                  Code: $inputs.bankAccountCode
+                Date: "2026-09-15"
+                Amount: 100
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Payments/0/Status == "AUTHORISED"
+      - stepId: outcome-invoice-paid
+        description: Outcome oracle. The invoice is PAID, nothing is due, and the paid date is an msdate string.
+        operationId: $sourceDescriptions.xeroAccounting.getInvoice
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: InvoiceID, in: path, value: $steps.create-invoice.outputs.invoiceId}
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Invoices/0/Status == "PAID"
+          - condition: $response.body#/Invoices/0/AmountDue == 0
+          - context: $response.body#/Invoices/0/FullyPaidOnDate
+            condition: ^/Date\(-?\d+([+-]\d{4})?\)/$
+            type: regex
+    outputs:
+      invoiceId: $steps.create-invoice.outputs.invoiceId
