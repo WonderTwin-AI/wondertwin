@@ -10,11 +10,16 @@ refresh token comes from a plain form POST. Prints one JSON line per case
 ({"sdk","case","pass","detail"}) and exits non-zero if any case fails.
 """
 
+import base64
 import datetime
+import hashlib
+import hmac
 import http.client
+import http.server
 import json
 import os
 import sys
+import threading
 import time
 import urllib.parse
 import uuid
@@ -508,7 +513,59 @@ def case_connect_tenant():
     assert orgs[0].created_date_utc.year >= 2026, "the SDK parsed CreatedDateUTC as a /Date()/ value"
 
 
+def case_webhook_events_follow_the_writes():
+    """A receiver registered the way the developer portal would, the way a Xero app answers the
+    intent-to-receive check, then writes through the SDK and signed events back."""
+    key, events, subscription = "smoke-webhook-key", [], None
+
+    class Receiver(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            want = base64.b64encode(hmac.new(key.encode(), body, hashlib.sha256).digest()).decode()
+            ok = hmac.compare_digest(want, self.headers.get("x-xero-signature", ""))
+            self.send_response(200 if ok else 401)
+            self.end_headers()
+            if ok:
+                events.extend(json.loads(body)["events"])
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+        conn.request("POST", "/admin/webhooks", json.dumps({"url": f"http://127.0.0.1:{server.server_port}/", "key": key}),
+                     {"Content-Type": "application/json"})
+        registered = conn.getresponse()
+        subscription = json.loads(registered.read())
+        assert registered.status == 201 and subscription["status"] == "OK", "the intent-to-receive check passed"
+
+        api, tenant = accounting_api()
+        contact_id = new_contact(api, tenant)
+        invoice_id = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact_id)])).invoices[0].invoice_id
+        note_id = api.create_credit_notes(tenant, CreditNotes(credit_notes=[finance_ops_credit_note(contact_id)])).credit_notes[0].credit_note_id
+        for _ in range(100):
+            if {e["resourceId"] for e in events} >= {contact_id, invoice_id, note_id}:
+                break
+            time.sleep(0.05)
+        seen = {(e["eventCategory"], e["eventType"]): e for e in events if e["resourceId"] in (contact_id, invoice_id, note_id)}
+        assert set(seen) == {("CONTACT", "CREATE"), ("INVOICE", "CREATE"), ("CREDITNOTE", "CREATE")}, seen
+        assert seen[("CONTACT", "CREATE")]["resourceId"] == contact_id and seen[("INVOICE", "CREATE")]["resourceId"] == invoice_id
+        assert seen[("CREDITNOTE", "CREATE")]["data"] == {"Type": "ACCRECCREDIT", "Status": "AUTHORISED"}
+        assert all(e["tenantId"] == tenant and e["tenantType"] == "ORGANISATION" for e in seen.values())
+        assert seen[("INVOICE", "CREATE")]["resourceUrl"].endswith(f"/api.xro/2.0/Invoices/{invoice_id}")
+        called_back = api.get_invoice(tenant, invoice_id).invoices[0]
+        assert called_back.invoice_id == invoice_id, "resourceUrl points at a resource the SDK can read back"
+    finally:
+        if subscription:  # later cases write too, and must not queue deliveries for a receiver that is gone
+            conn.request("DELETE", f"/admin/webhooks/{subscription['id']}")
+            conn.getresponse().read()
+        server.shutdown()
+
+
 CASES = [
+    ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
     ("get_credit_notes page=1 as finance-ops calls it, and where by contact", case_get_credit_notes_as_finance_ops_calls_it),
     ("update_invoice voids and deletes as finance-ops does", case_void_and_delete_invoices_as_finance_ops_does),

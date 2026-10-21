@@ -82,6 +82,7 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 			c.Contact.ContactStatus = "ACTIVE"
 		}
 		contacts.Set(c.Contact.ContactID, c.Contact)
+		h.emit(r, tenantID(r), "CONTACT", "CREATE", c.Contact.ContactID, nil)
 		out[i] = wireContact(c.Contact)
 	}
 	h.writeEnvelope(w, http.StatusOK, "Contacts", out)

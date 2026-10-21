@@ -83,14 +83,23 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	}
 	payments := h.store.Payments.For(tenant)
 	out := make([]payment, len(made))
+	updated := map[string]bool{} // an invoice or credit note several payments reach is reported once
 	for i, p := range made {
 		payments.Set(p.PaymentID, p)
 		if notes[i] != nil {
 			h.store.CreditNotes.For(tenant).Set(notes[i].CreditNoteID, *notes[i])
+			if !updated[notes[i].CreditNoteID] {
+				updated[notes[i].CreditNoteID] = true
+				h.emitCreditNoteUpdate(r, tenant, *notes[i])
+			}
 			out[i] = h.wireCreditNotePayment(tenant, p, *notes[i])
 			continue
 		}
 		invoices.Set(touched[i].InvoiceID, touched[i])
+		if !updated[touched[i].InvoiceID] {
+			updated[touched[i].InvoiceID] = true
+			h.emit(r, tenant, "INVOICE", "UPDATE", touched[i].InvoiceID, nil)
+		}
 		out[i] = h.wirePayment(tenant, p, touched[i])
 	}
 	h.writeEnvelope(w, http.StatusOK, "Payments", out)

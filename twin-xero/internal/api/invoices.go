@@ -69,6 +69,7 @@ func (h *Handler) CreateInvoices(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		invoices.Set(inv.InvoiceID, inv)
+		h.emit(r, tenant, "INVOICE", "CREATE", inv.InvoiceID, nil)
 		out[i] = h.wireInvoice(tenant, inv)
 	}
 	h.writeEnvelope(w, http.StatusOK, "Invoices", out)
