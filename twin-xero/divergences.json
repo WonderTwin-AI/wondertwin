@@ -205,6 +205,17 @@
       "quirk_ids": [
         "crud-010"
       ]
+    },
+    {
+      "route": "POST /CreditNotes (updateOrCreateCreditNotes)",
+      "reason": "A credit note that carries the CreditNoteID of a stored one is updated, and one with no CreditNoteID is created by the rules of PUT /CreditNotes. An update is partial, may move the status DRAFT or SUBMITTED to AUTHORISED or DELETED, SUBMITTED back to DRAFT, and AUTHORISED to VOIDED, and the lines, totals and status of a credit note with credit applied or paid are fixed and it cannot be voided. Allocations sent on an update are refused for now (a later slice adds them); inline Allocations on a create work as on PUT. Whether Xero also matches on CreditNoteNumber, and every one of these update rules, are guesses: the research has no example of a credit note update. A CreditNoteID that matches nothing answers a 404 whose body is a guess and writes nothing.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-011, alloc-001, alloc-002"
+      },
+      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced; finance-ops test_create_credit_note posts to the collection.",
+      "quirk_ids": [
+        "crud-011"
+      ]
     }
   ]
 }

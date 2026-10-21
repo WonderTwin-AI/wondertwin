@@ -569,6 +569,12 @@ def case_webhook_events_follow_the_writes():
                 break
             time.sleep(0.05)
         assert ("INVOICE", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == invoice_id}
+        api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[CreditNote(credit_note_id=note_id, reference="events")]))
+        for _ in range(100):
+            if ("CREDITNOTE", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == note_id}:
+                break
+            time.sleep(0.05)
+        assert ("CREDITNOTE", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == note_id}
     finally:
         if subscription:  # later cases write too, and must not queue deliveries for a receiver that is gone
             conn.request("DELETE", f"/admin/webhooks/{subscription['id']}")
@@ -630,6 +636,18 @@ def case_update_or_create_invoices():
     assert voided.status == "VOIDED" and voided.amount_due == 0, "the item route's status rules apply"
 
 
+def case_update_or_create_credit_notes():
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    draft = finance_ops_credit_note(contact, amount=50)
+    draft.status = "DRAFT"
+    created = api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[draft])).credit_notes
+    assert len(created) == 1 and created[0].credit_note_id and created[0].status == "DRAFT"
+    moved = api.update_or_create_credit_notes(tenant, CreditNotes(credit_notes=[CreditNote(
+        credit_note_id=created[0].credit_note_id, status="AUTHORISED", reference="posted")])).credit_notes[0]
+    assert moved.status == "AUTHORISED" and moved.reference == "posted" and moved.total == 50, "an update leaves the other fields"
+
+
 CASES = [
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
@@ -645,6 +663,7 @@ CASES = [
     ("create_credit_notes with an inline Allocation against an invoice", case_create_credit_notes_with_allocation),
     ("create_credit_notes refuses an unknown account and answers in place with summarize_errors=False", case_create_credit_notes_refusals),
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
+    ("update_or_create_credit_notes creates, then moves the status by CreditNoteID", case_update_or_create_credit_notes),
     ("delete_payment restores the invoice", case_delete_payment_restores_the_invoice),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("update_or_create_invoices creates, then updates and voids by InvoiceID", case_update_or_create_invoices),
