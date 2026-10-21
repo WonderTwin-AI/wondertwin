@@ -8,6 +8,7 @@ import "time"
 type Payment struct {
 	PaymentID             string            `json:"PaymentID"`
 	Invoice               *PaymentInvoice   `json:"Invoice,omitempty"`
+	CreditNote            *CreditNoteRef    `json:"CreditNote,omitempty"`
 	Account               *PaymentAccount   `json:"Account,omitempty"`
 	Date                  time.Time         `json:"Date"`
 	CurrencyRate          *float64          `json:"CurrencyRate,omitempty"`
@@ -41,4 +42,10 @@ type PaymentInvoice struct {
 type PaymentAccount struct {
 	AccountID string `json:"AccountID,omitempty"`
 	Code      string `json:"Code,omitempty"`
+}
+
+// CreditNoteRef is the credit note a payment is for: by ID, or by number.
+type CreditNoteRef struct {
+	CreditNoteID     string `json:"CreditNoteID,omitempty"`
+	CreditNoteNumber string `json:"CreditNoteNumber,omitempty"`
 }

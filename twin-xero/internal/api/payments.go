@@ -13,17 +13,18 @@ import (
 // invoice, as localstack/finance-ops sends it, so only its ID and number are read.
 type paymentIn struct {
 	store.Payment
-	Invoice *store.PaymentInvoice `json:"Invoice,omitempty"`
-	Date    *Msdate               `json:"Date,omitempty"`
+	Invoice    *store.PaymentInvoice `json:"Invoice,omitempty"`
+	Date       *Msdate               `json:"Date,omitempty"`
+	CreditNote *store.CreditNoteRef  `json:"CreditNote,omitempty"`
 	// Payments against these are not supported; a payment that names one is refused.
-	CreditNote  json.RawMessage `json:"CreditNote,omitempty"`
 	Prepayment  json.RawMessage `json:"Prepayment,omitempty"`
 	Overpayment json.RawMessage `json:"Overpayment,omitempty"`
 }
 
 // CreatePayment serves POST /api.xro/2.0/Payments, the call xero-python's
 // create_payment makes: one payment sent bare, or {"Payments": [...]}. Each is
-// recorded against an invoice, which then carries the paid amount, and the
+// recorded against an invoice, which then carries the paid amount, or against a
+// credit note, which then carries it as a refund (creditnote_payment.go), and the
 // answer is the plural envelope with status 200. If any payment is invalid none
 // is recorded and the answer is a 400 ValidationException (crud-001, crud-004).
 func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
@@ -52,14 +53,28 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	var elements []validationElement
 	var made []store.Payment
 	var touched []store.Invoice
+	var notes []*store.CreditNote // the credit note a payment is for; nil for an invoice payment
+	workingNotes := map[string]store.CreditNote{}
 	invalid := false
 	for i := range sent {
-		p, inv, msgs := h.buildPayment(tenant, sent[i], working)
+		var p store.Payment
+		var inv store.Invoice
+		var cn *store.CreditNote
+		var msgs []string
+		if sent[i].CreditNote != nil {
+			p, cn, msgs = h.buildCreditNotePayment(tenant, sent[i], workingNotes)
+		} else {
+			p, inv, msgs = h.buildPayment(tenant, sent[i], working)
+		}
 		invalid = invalid || len(msgs) > 0
 		elements = append(elements, validationElement{Object: in.Payments[i], Messages: msgs})
 		if len(msgs) == 0 {
-			working[inv.InvoiceID] = inv
-			made, touched = append(made, p), append(touched, inv)
+			if cn != nil {
+				workingNotes[cn.CreditNoteID] = *cn
+			} else {
+				working[inv.InvoiceID] = inv
+			}
+			made, touched, notes = append(made, p), append(touched, inv), append(notes, cn)
 		}
 	}
 	if invalid {
@@ -70,6 +85,11 @@ func (h *Handler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 	out := make([]payment, len(made))
 	for i, p := range made {
 		payments.Set(p.PaymentID, p)
+		if notes[i] != nil {
+			h.store.CreditNotes.For(tenant).Set(notes[i].CreditNoteID, *notes[i])
+			out[i] = h.wireCreditNotePayment(tenant, p, *notes[i])
+			continue
+		}
 		invoices.Set(touched[i].InvoiceID, touched[i])
 		out[i] = h.wirePayment(tenant, p, touched[i])
 	}
@@ -84,8 +104,8 @@ func (h *Handler) buildPayment(tenant string, in paymentIn, working map[string]s
 	var msgs []string
 	inv, found := h.findInvoice(tenant, in.Invoice, working)
 	switch {
-	case in.CreditNote != nil || in.Prepayment != nil || in.Overpayment != nil:
-		msgs = append(msgs, "Only payments against an invoice are supported.")
+	case in.Prepayment != nil || in.Overpayment != nil:
+		msgs = append(msgs, "Only payments against an invoice or a credit note are supported.")
 	case in.Invoice == nil || (in.Invoice.InvoiceID == "" && in.Invoice.InvoiceNumber == ""):
 		msgs = append(msgs, "Invoice must be specified, with its InvoiceID or InvoiceNumber.")
 	case !found:
@@ -93,19 +113,9 @@ func (h *Handler) buildPayment(tenant string, in paymentIn, working map[string]s
 	case inv.Status != "AUTHORISED":
 		msgs = append(msgs, "Invoice not of valid status for creating a payment")
 	}
-	acct, ok := h.findAccount(tenant, in.Account, in.Code)
-	if !ok {
-		msgs = append(msgs, "Account could not be found: name a bank account by its Code or AccountID.")
-	} else if acct.Type != "BANK" && !acct.EnablePaymentsToAccount {
-		msgs = append(msgs, fmt.Sprintf("Account %s is not a bank account and is not enabled for payments.", acct.Code))
-	}
-	if in.Date == nil {
-		msgs = append(msgs, "Payment date must be specified.")
-	}
-	switch {
-	case in.Amount <= 0:
-		msgs = append(msgs, "Payment amount must be greater than zero.")
-	case found && inv.Status == "AUTHORISED" && in.Amount > inv.AmountDue+0.005:
+	acct, fieldMsgs := h.checkPaymentFields(tenant, in)
+	msgs = append(msgs, fieldMsgs...)
+	if in.Amount > 0 && found && inv.Status == "AUTHORISED" && in.Amount > inv.AmountDue+0.005 {
 		msgs = append(msgs, "Payment amount exceeds the amount outstanding on this invoice.")
 	}
 	if len(msgs) > 0 {
@@ -132,6 +142,25 @@ func (h *Handler) buildPayment(tenant string, in paymentIn, working map[string]s
 	})
 	inv.UpdatedDateUTC, inv.UpdatedDateUTCString = now, p.UpdatedDateUTCString
 	return p, inv, nil
+}
+
+// checkPaymentFields checks what every payment needs, whatever it is for: a
+// bank account that can take payments, a date and an amount above zero.
+func (h *Handler) checkPaymentFields(tenant string, in paymentIn) (store.Account, []string) {
+	var msgs []string
+	acct, ok := h.findAccount(tenant, in.Account, in.Code)
+	if !ok {
+		msgs = append(msgs, "Account could not be found: name a bank account by its Code or AccountID.")
+	} else if acct.Type != "BANK" && !acct.EnablePaymentsToAccount {
+		msgs = append(msgs, fmt.Sprintf("Account %s is not a bank account and is not enabled for payments.", acct.Code))
+	}
+	if in.Date == nil {
+		msgs = append(msgs, "Payment date must be specified.")
+	}
+	if in.Amount <= 0 {
+		msgs = append(msgs, "Payment amount must be greater than zero.")
+	}
+	return acct, msgs
 }
 
 // findInvoice finds the invoice a payment names by ID or by number, preferring
