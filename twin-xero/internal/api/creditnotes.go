@@ -80,7 +80,10 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 // four digits.
 func (h *Handler) buildCreditNote(tenant string, in store.CreditNote, existing []store.CreditNote, unitdp int) (store.CreditNote, []string) {
 	now := h.store.Clock.Now().UTC()
-	lines, t, msgs := computeLines(in.LineAmountTypes, in.LineItems, unitdp)
+	msgs := h.validateCreditNote(tenant, in, existing)
+
+	lines, t, lineMsgs := computeLines(in.LineAmountTypes, in.LineItems, unitdp)
+	msgs = append(msgs, lineMsgs...)
 	chart := h.store.Accounts.For(tenant).List()
 	for i := range lines {
 		lines[i].LineItemID, lines[i].AccountID = h.store.NewID(), ""
