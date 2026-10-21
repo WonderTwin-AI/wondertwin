@@ -76,6 +76,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 		}
 		cn.UpdatedDateUTC, cn.UpdatedDateUTCString = now, p.UpdatedDateUTCString
 		h.store.CreditNotes.For(tenant).Set(cn.CreditNoteID, cn)
+		h.emitCreditNoteUpdate(r, tenant, cn)
 		h.writeEnvelope(w, http.StatusOK, "Payments", []payment{h.wireCreditNotePayment(tenant, p, cn)})
 		return
 	}
@@ -91,6 +92,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 			inv.Payments = slices.DeleteFunc(slices.Clone(inv.Payments), func(e map[string]any) bool { return e["PaymentID"] == p.PaymentID })
 			inv.UpdatedDateUTC, inv.UpdatedDateUTCString = now, p.UpdatedDateUTCString
 			invoices.Set(inv.InvoiceID, inv)
+			h.emit(r, tenant, "INVOICE", "UPDATE", inv.InvoiceID, nil)
 		}
 	}
 	h.writeEnvelope(w, http.StatusOK, "Payments", []payment{h.wirePayment(tenant, p, inv)})

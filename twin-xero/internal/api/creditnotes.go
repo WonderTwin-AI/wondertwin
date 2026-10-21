@@ -65,6 +65,7 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]any, len(made))
+	updated := map[string]bool{} // an invoice several credit notes allocate to is reported once
 	for i, cn := range made {
 		if msgs := elements[i].Messages; len(msgs) > 0 {
 			out[i] = erroredInvoice(in.CreditNotes[i], msgs)
@@ -72,6 +73,13 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 		}
 		h.applyAllocations(tenant, &cn)
 		notes.Set(cn.CreditNoteID, cn)
+		h.emit(r, tenant, "CREDITNOTE", "CREATE", cn.CreditNoteID, creditNoteEventData(cn))
+		for _, a := range cn.Allocations {
+			if !updated[a.Invoice.InvoiceID] {
+				updated[a.Invoice.InvoiceID] = true
+				h.emit(r, tenant, "INVOICE", "UPDATE", a.Invoice.InvoiceID, nil)
+			}
+		}
 		out[i] = h.wireCreditNote(tenant, cn)
 	}
 	h.writeEnvelope(w, http.StatusOK, "CreditNotes", out)
@@ -145,4 +153,17 @@ func nextCreditNoteNumber(existing []store.CreditNote) string {
 		}
 	}
 	return fmt.Sprintf("CN-%04d", highest+1)
+}
+
+// creditNoteEventData is the data a CREDITNOTE event carries: the type and the
+// status, which are all Xero's event documents.
+func creditNoteEventData(cn store.CreditNote) map[string]any {
+	return map[string]any{"Type": cn.Type, "Status": cn.Status}
+}
+
+// emitCreditNoteUpdate reports a credit note that a payment or its deletion
+// changed. Xero's documentation lists no cause for a credit note UPDATE, so
+// treating a payment as one is a guess.
+func (h *Handler) emitCreditNoteUpdate(r *http.Request, tenant string, cn store.CreditNote) {
+	h.emit(r, tenant, "CREDITNOTE", "UPDATE", cn.CreditNoteID, creditNoteEventData(cn))
 }
