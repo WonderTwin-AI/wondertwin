@@ -183,6 +183,17 @@
       "quirk_ids": [
         "compat-001"
       ]
+    },
+    {
+      "route": "POST /Contacts (updateOrCreateContacts)",
+      "reason": "A contact that carries the ContactID of a stored contact is updated, with only the fields the body carries changed, and one with no ContactID is created by the rules of PUT /Contacts. Whether Xero also matches a Name that belongs to another contact is not settled by the research (reports disagree), so this emulator never does: such a Name is refused as PUT refuses it. A ContactID that matches nothing answers a 404 whose body is a guess. These rules are a guess until a sandbox observes them.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-009"
+      },
+      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced. xero-local's own upsert by Name is deliberately not reproduced: it is not Xero behaviour (WonderTwin-AI/wondertwin-docs research/twins/xero/feature-gap-register.md GAP-007).",
+      "quirk_ids": [
+        "crud-009"
+      ]
     }
   ]
 }

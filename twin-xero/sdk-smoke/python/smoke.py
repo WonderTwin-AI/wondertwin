@@ -557,6 +557,12 @@ def case_webhook_events_follow_the_writes():
         assert seen[("INVOICE", "CREATE")]["resourceUrl"].endswith(f"/api.xro/2.0/Invoices/{invoice_id}")
         called_back = api.get_invoice(tenant, invoice_id).invoices[0]
         assert called_back.invoice_id == invoice_id, "resourceUrl points at a resource the SDK can read back"
+        api.update_or_create_contacts(tenant, Contacts(contacts=[Contact(contact_id=contact_id, email_address="events@example.test")]))
+        for _ in range(100):
+            if ("CONTACT", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == contact_id}:
+                break
+            time.sleep(0.05)
+        assert ("CONTACT", "UPDATE") in {(e["eventCategory"], e["eventType"]) for e in events if e["resourceId"] == contact_id}
     finally:
         if subscription:  # later cases write too, and must not queue deliveries for a receiver that is gone
             conn.request("DELETE", f"/admin/webhooks/{subscription['id']}")
@@ -582,6 +588,30 @@ def case_legacy_control_paths_alias_the_admin_plane():
     assert not api.get_contacts(tenant, page=1).contacts, "the reset cleared the store"
 
 
+def case_update_or_create_contacts():
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    created = api.update_or_create_contacts(tenant, Contacts(contacts=[Contact(name="Smoke Post", account_number="post_1", email_address="p@example.test")])).contacts
+    assert len(created) == 1 and created[0].contact_id and created[0].contact_status == "ACTIVE"
+    updated = api.update_or_create_contacts(tenant, Contacts(contacts=[Contact(contact_id=created[0].contact_id, name="Smoke Post Ltd")])).contacts
+    assert len(updated) == 1 and updated[0].contact_id == created[0].contact_id and updated[0].name == "Smoke Post Ltd"
+    assert updated[0].account_number == "post_1" and updated[0].email_address == "p@example.test", "an update leaves the other fields"
+    assert len([c for c in api.get_contacts(tenant, page=1).contacts if c.contact_id == created[0].contact_id]) == 1
+
+
+def case_update_or_create_contacts_never_upserts_by_name():
+    """crud-009: a Name that belongs to another contact and no ContactID is refused as PUT refuses it."""
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    api.create_contacts(tenant, Contacts(contacts=[Contact(name="Smoke Post Dup")]))
+    try:
+        api.update_or_create_contacts(tenant, Contacts(contacts=[Contact(name="smoke post dup")]))
+    except Exception as e:  # the SDK raises on a 400
+        assert "contact name" in str(e).lower(), str(e)[:300]
+        return
+    raise AssertionError("POST /Contacts upserted by Name")
+
+
 CASES = [
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
@@ -605,6 +635,8 @@ CASES = [
     ("get_contacts with where AccountNumber, as finance-ops calls it", case_get_contacts_as_finance_ops_calls_it),
     ("a duplicate contact name is refused with the words finance-ops looks for", case_duplicate_contact_name_is_refused),
     ("create_contacts sends PUT /Contacts and the SDK parses the contact", case_create_contacts),
+    ("update_or_create_contacts creates, then updates by ContactID and keeps the other fields", case_update_or_create_contacts),
+    ("update_or_create_contacts never upserts by Name", case_update_or_create_contacts_never_upserts_by_name),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
