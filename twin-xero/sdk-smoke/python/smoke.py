@@ -21,8 +21,8 @@ import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import (Account, AccountingApi, Address, Contact, Contacts, CreditNote, CreditNotes, CurrencyCode, Invoice,
-                                    Invoices, LineItem, Payment)
+from xero_python.accounting import (Account, AccountingApi, Address, Allocation, Contact, Contacts, CreditNote, CreditNotes,
+                                    CurrencyCode, Invoice, Invoices, LineItem, Payment)
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -97,6 +97,22 @@ def set_strict_auth(on):
     conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
     conn.request("PUT", "/admin/config", json.dumps({"strict_auth": on}), {"Content-Type": "application/json"})
     assert conn.getresponse().status == 200, "PUT /admin/config failed"
+
+
+def stored_invoice(invoice_id):
+    """The invoice as the emulator holds it, from GET /admin/state (there is no GET /Invoices yet)."""
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request("GET", "/admin/state")
+    state = conn.getresponse().read().decode()
+
+    def walk(node):
+        if isinstance(node, dict) and node.get("InvoiceID") == invoice_id and "AmountCredited" in node:
+            return node
+        for v in (node.values() if isinstance(node, dict) else node if isinstance(node, list) else ()):
+            if (hit := walk(v)) is not None:
+                return hit
+
+    return walk(json.loads(state))
 
 
 def made_up_client():
@@ -390,6 +406,26 @@ def case_create_credit_notes():
     assert created.line_items[0].line_item_id, "an empty LineItemID is replaced"
 
 
+def case_create_credit_notes_with_allocation():
+    """The finance-ops refund: the Allocation inline, against an invoice that is already PAID."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    invoice = api.create_invoices(tenant, Invoices(invoices=[Invoice(
+        type="ACCREC", status="AUTHORISED", contact=Contact(contact_id=contact), date=datetime.date(2026, 9, 1),
+        due_date=datetime.date(2026, 9, 30), line_items=[LineItem(quantity=1, unit_amount=100, account_code="200")])])).invoices[0]
+    when = datetime.date(2026, 9, 11)
+    first = finance_ops_credit_note(contact, amount=100)
+    first.allocations = [Allocation(invoice=Invoice(invoice_id=invoice.invoice_id), amount=100, date=when)]
+    api.create_credit_notes(tenant, CreditNotes(credit_notes=[first]))  # pays the invoice in full
+    refund = finance_ops_credit_note(contact, amount=30)
+    refund.allocations = [Allocation(invoice=invoice, amount=30, date=when)]  # the whole invoice object, as finance-ops sends it
+    created = api.create_credit_notes(tenant, CreditNotes(credit_notes=[refund])).credit_notes[0]
+    assert created.status == "PAID" and created.remaining_credit == 0 and created.applied_amount == 30
+    assert created.allocations[0].allocation_id and created.allocations[0].date == when
+    after = stored_invoice(invoice.invoice_id)
+    assert after["AmountCredited"] == 130 and after["AmountDue"] == 0 and after["Status"] == "PAID", after
+
+
 def case_create_credit_notes_refusals():
     api, tenant = accounting_api()
     contact = new_contact(api, tenant)
@@ -431,6 +467,7 @@ CASES = [
 
 
     ("create_payment pays the invoice, as finance-ops calls it", case_create_payment_pays_the_invoice),
+    ("create_credit_notes with an inline Allocation against an invoice", case_create_credit_notes_with_allocation),
     ("create_credit_notes refuses an unknown account and answers in place with summarize_errors=False", case_create_credit_notes_refusals),
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
