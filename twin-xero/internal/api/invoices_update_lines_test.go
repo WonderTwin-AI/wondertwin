@@ -80,13 +80,13 @@ func TestInvoiceUpdateLineRefusalsAndAmountDueOfAPartlyPaidInvoice(t *testing.T)
 			t.Errorf("%s: %d %v, want a refusal mentioning %q", sent, code, body, want)
 		}
 	}
-	// A payment of 30 against the 100 invoice: editing the lines to 120 leaves 90 due.
+	// A payment of 30 against the 100 invoice: a rename keeps the total, so 70 stays due.
 	invoices := h.store.Invoices.For(store.DefaultTenantID)
 	stored, _, _ := findInvoice(invoices.List(), id)
 	stored.AmountPaid, stored.AmountDue = 30, 70
 	invoices.Set(id, stored)
-	_, body := postInvoice(t, h, id, "", `{"LineItems":[{"Quantity":1,"UnitAmount":120,"AccountCode":"200"}]}`)
-	if got := firstInvoice(t, body); got["AmountDue"] != 90.0 || got["AmountPaid"] != 30.0 {
+	_, body := postInvoice(t, h, id, "", `{"LineItems":[{"Description":"renamed","Quantity":2,"UnitAmount":50,"AccountCode":"200"}]}`)
+	if got := firstInvoice(t, body); got["AmountDue"] != 70.0 || got["AmountPaid"] != 30.0 || got["Total"] != 100.0 {
 		t.Errorf("AmountDue is Total less what is paid: %v", got)
 	}
 }
