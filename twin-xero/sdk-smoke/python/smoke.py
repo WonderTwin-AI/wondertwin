@@ -390,6 +390,22 @@ def case_create_credit_notes():
     assert created.line_items[0].line_item_id, "an empty LineItemID is replaced"
 
 
+def case_create_credit_notes_refusals():
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    bad = finance_ops_credit_note(contact)
+    bad.line_items[0].account_code = "999"
+    try:
+        api.create_credit_notes(tenant, CreditNotes(credit_notes=[bad]))
+        raise AssertionError("an unknown account code was accepted")
+    except AssertionError:
+        raise
+    except Exception as e:  # the SDK raises on a 400 with the body in the message
+        assert "not a valid code" in str(e), str(e)
+    mixed = api.create_credit_notes(tenant, CreditNotes(credit_notes=[finance_ops_credit_note(contact), bad]), summarize_errors=False).credit_notes
+    assert mixed[0].credit_note_id and not mixed[0].has_errors and mixed[1].has_errors and not mixed[1].credit_note_id
+
+
 def case_connect_tenant():
     """The xero-connect-tenant flow: exchange a code, list the connected tenants
     (GET /Connections, zoneless ISO dates), then read the organisation with the
@@ -415,6 +431,7 @@ CASES = [
 
 
     ("create_payment pays the invoice, as finance-ops calls it", case_create_payment_pays_the_invoice),
+    ("create_credit_notes refuses an unknown account and answers in place with summarize_errors=False", case_create_credit_notes_refusals),
     ("create_credit_notes parses a finance-ops refund credit note", case_create_credit_notes),
     ("create_invoices computes the totals", case_create_invoices_computes_the_totals),
     ("create_invoices refuses an unknown account and a duplicate number", case_create_invoices_refusals),
