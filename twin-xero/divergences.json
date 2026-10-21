@@ -216,6 +216,40 @@
       "quirk_ids": [
         "crud-011"
       ]
+    },
+    {
+      "route": "every list endpoint (order, If-Modified-Since)",
+      "reason": "The order query parameter and the If-Modified-Since header are accepted and ignored: the default order applies and every record is returned, where Xero orders as asked and limits the list to records changed since the date. That is silent wrong data, not an error. Accounts also ignores where.",
+      "references": {
+        "docs": "research/twins/xero/feature-gap-register.md GAP-002; research/twins/xero/quirk-hypotheses.json query-001, page-003"
+      },
+      "operator_note": "Deferred to xero-bp2: localstack/finance-ops passes neither order nor If-Modified-Since.",
+      "quirk_ids": [
+        "query-001",
+        "page-003"
+      ]
+    },
+    {
+      "route": "every PUT and POST (Idempotency-Key)",
+      "reason": "The Idempotency-Key header is ignored, so a retried write creates a duplicate where Xero replays the cached response for a repeated key and answers 400 for the same key with a different request.",
+      "references": {
+        "docs": "research/twins/xero/feature-gap-register.md GAP-003; research/twins/xero/quirk-hypotheses.json crud-007"
+      },
+      "operator_note": "No slice of xero-bp1 owns it; recorded for xero-bp2. finance-ops checks for a duplicate by lookup, not by header.",
+      "quirk_ids": [
+        "crud-007"
+      ]
+    },
+    {
+      "route": "PUT /Contacts and POST /Contacts (summarizeErrors=false)",
+      "reason": "summarizeErrors is not read on the contact routes: a contact array with an invalid item is refused as a whole, where Xero answers 200 with a per-item StatusAttributeString and ValidationErrors when summarizeErrors=false. Invoices and credit notes do read it.",
+      "references": {
+        "docs": "research/twins/xero/feature-gap-register.md GAP-004; research/twins/xero/quirk-hypotheses.json crud-006"
+      },
+      "operator_note": "No slice of xero-bp1 owns it for contacts; finance-ops creates one contact per call.",
+      "quirk_ids": [
+        "crud-006"
+      ]
     }
   ]
 }

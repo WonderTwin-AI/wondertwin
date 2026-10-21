@@ -1,0 +1,121 @@
+arazzo: 1.0.1
+info:
+  title: Xero - mirror a billing system into Xero (the finance-ops job)
+  version: 1.0.0
+  summary: Look a contact up by AccountNumber with where, create it, create an invoice with a known number, record a payment, find the invoice by number.
+  description: |
+    Use case xero-stripe-to-xero-migration (scope-recommendation.json).
+    Scenario evidence 01a0f1e2-0c02-7c00-8a00-000000000003 (localstack/finance-ops xero_client.py at 8ff5f6b).
+    The calls are the ones that client makes through xero-python: get_contacts(where=AccountNumber="..", page=1),
+    create_contacts (PUT), create_invoices (PUT), create_payment (POST), get_invoices(invoice_numbers=[..], page=1).
+    The first lookup must come back empty for a fresh AccountNumber: an app emulator that ignores where fails here.
+sourceDescriptions:
+  - name: xeroAccounting
+    url: manifest:openapi-accounting-19.0.0
+    type: openapi
+workflows:
+  - workflowId: stripe-to-xero-migration
+    summary: GET /Contacts?where, PUT /Contacts, PUT /Invoices, POST /Payments, GET /Invoices?InvoiceNumbers
+    inputs:
+      type: object
+      required: [accessToken, tenantId, externalCustomerId, invoiceNumber]
+      properties:
+        accessToken: {type: string}
+        tenantId: {type: string}
+        externalCustomerId: {type: string, default: cus_ARAZZO0001}
+        invoiceNumber: {type: string, default: ARZ-0001}
+        salesAccountCode: {type: string, default: "200"}
+        bankAccountCode: {type: string, default: "090"}
+    steps:
+      - stepId: lookup-missing
+        operationId: $sourceDescriptions.xeroAccounting.getContacts
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: where, in: query, value: AccountNumber=="$inputs.externalCustomerId"}
+          - {name: page, in: query, value: 1}
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body
+            condition: $.Contacts.length == 0
+            type: jsonpath
+      - stepId: create-contact
+        operationId: $sourceDescriptions.xeroAccounting.createContacts
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Contacts:
+              - Name: Migrated Customer ($inputs.externalCustomerId)
+                AccountNumber: $inputs.externalCustomerId
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Contacts/0/AccountNumber == $inputs.externalCustomerId
+        outputs:
+          contactId: $response.body#/Contacts/0/ContactID
+      - stepId: create-invoice
+        operationId: $sourceDescriptions.xeroAccounting.createInvoices
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Invoices:
+              - Type: ACCREC
+                InvoiceNumber: $inputs.invoiceNumber
+                Contact:
+                  ContactID: $steps.create-contact.outputs.contactId
+                Date: "2026-09-01"
+                DueDate: "2026-09-01"
+                LineAmountTypes: NoTax
+                Status: AUTHORISED
+                LineItems:
+                  - Description: Monthly subscription
+                    Quantity: 1
+                    UnitAmount: 50
+                    AccountCode: $inputs.salesAccountCode
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Invoices/0/InvoiceNumber == $inputs.invoiceNumber
+        outputs:
+          invoiceId: $response.body#/Invoices/0/InvoiceID
+      - stepId: record-payment
+        operationId: $sourceDescriptions.xeroAccounting.createPayment
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Invoice:
+              InvoiceID: $steps.create-invoice.outputs.invoiceId
+            Account:
+              Code: $inputs.bankAccountCode
+            Date: "2026-09-02"
+            Amount: 50
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: outcome-find-by-number
+        description: Outcome oracle. Exactly one invoice has the number, and it is PAID.
+        operationId: $sourceDescriptions.xeroAccounting.getInvoices
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: InvoiceNumbers, in: query, value: $inputs.invoiceNumber}
+          - {name: page, in: query, value: 1}
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body
+            condition: $.Invoices.length == 1
+            type: jsonpath
+          - condition: $response.body#/Invoices/0/Status == "PAID"
+    outputs:
+      invoiceId: $steps.create-invoice.outputs.invoiceId

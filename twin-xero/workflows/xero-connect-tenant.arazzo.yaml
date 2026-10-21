@@ -1,0 +1,60 @@
+arazzo: 1.0.1
+info:
+  title: Xero - list connected tenants with both connections casings and read the organisation
+  version: 1.0.0
+  summary: GET /Connections, GET /connections, GET /Organisation for the first organisation tenant.
+  description: |
+    Use case xero-connect-tenant (scope-recommendation.json).
+    Scenario evidence 01a0f1e2-0c00-7c00-8a00-000000000001 (developer.xero.com OAuth 2.0 auth flow).
+    Precondition: an access token from POST /connect/token (identity.xero.com). The token endpoint is in no
+    Xero spec, so it is an input here, not a step. The lower-case alias is the docs' and xero-node's path;
+    Arazzo cannot call a path its source does not declare, so the outcome step asserts the spec path and the
+    lower-case check lives in the app emulator's tests (known limit, README).
+sourceDescriptions:
+  - name: xeroIdentity
+    url: manifest:openapi-identity-19.0.0
+    type: openapi
+  - name: xeroAccounting
+    url: manifest:openapi-accounting-19.0.0
+    type: openapi
+workflows:
+  - workflowId: connect-tenant
+    summary: GET /Connections, GET /api.xro/2.0/Organisation
+    inputs:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+    steps:
+      - stepId: list-connections
+        operationId: $sourceDescriptions.xeroIdentity.getConnections
+        parameters:
+          - name: Authorization
+            in: header
+            value: Bearer $inputs.accessToken
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/0/tenantType == "ORGANISATION"
+        outputs:
+          tenantId: $response.body#/0/tenantId
+          connectionId: $response.body#/0/id
+      - stepId: outcome-organisation
+        description: Outcome oracle. The tenant from the connections call answers the Accounting API.
+        operationId: $sourceDescriptions.xeroAccounting.getOrganisations
+        parameters:
+          - name: Authorization
+            in: header
+            value: Bearer $inputs.accessToken
+          - name: xero-tenant-id
+            in: header
+            value: $steps.list-connections.outputs.tenantId
+          - name: Accept
+            in: header
+            value: application/json
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Status == "OK"
+          - condition: $response.body#/Organisations/0/OrganisationID != null
+    outputs:
+      tenantId: $steps.list-connections.outputs.tenantId

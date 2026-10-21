@@ -1,0 +1,110 @@
+arazzo: 1.0.1
+info:
+  title: Xero - allocate a credit note to an open invoice
+  version: 1.0.0
+  summary: Create an AUTHORISED invoice and credit note for the same contact, allocate 20, read both back.
+  description: |
+    Use case xero-credit-note-allocation (scope-recommendation.json).
+    Scenario evidence 01a0f1e2-0c03-7c00-8a00-000000000004 (developer.xero.com Credit Notes).
+sourceDescriptions:
+  - name: xeroAccounting
+    url: manifest:openapi-accounting-19.0.0
+    type: openapi
+workflows:
+  - workflowId: credit-note-allocation
+    summary: PUT /Invoices, PUT /CreditNotes, PUT /CreditNotes/{CreditNoteID}/Allocations, GET /Invoices/{InvoiceID}, GET /CreditNotes/{CreditNoteID}
+    inputs:
+      type: object
+      required: [accessToken, tenantId, contactId]
+      properties:
+        accessToken: {type: string}
+        tenantId: {type: string}
+        contactId: {type: string}
+        salesAccountCode: {type: string, default: "200"}
+    steps:
+      - stepId: create-invoice
+        operationId: $sourceDescriptions.xeroAccounting.createInvoices
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            Invoices:
+              - Type: ACCREC
+                Contact: {ContactID: $inputs.contactId}
+                Date: "2026-09-01"
+                DueDate: "2026-09-30"
+                LineAmountTypes: NoTax
+                Status: AUTHORISED
+                LineItems:
+                  - {Description: Goods, Quantity: 1, UnitAmount: 100, AccountCode: $inputs.salesAccountCode}
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          invoiceId: $response.body#/Invoices/0/InvoiceID
+      - stepId: create-credit-note
+        operationId: $sourceDescriptions.xeroAccounting.createCreditNotes
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+        requestBody:
+          contentType: application/json
+          payload:
+            CreditNotes:
+              - Type: ACCRECCREDIT
+                Contact: {ContactID: $inputs.contactId}
+                Date: "2026-09-10"
+                LineAmountTypes: NoTax
+                Status: AUTHORISED
+                LineItems:
+                  - {Description: Return, Quantity: 1, UnitAmount: 20, AccountCode: $inputs.salesAccountCode}
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/CreditNotes/0/RemainingCredit == 20
+        outputs:
+          creditNoteId: $response.body#/CreditNotes/0/CreditNoteID
+      - stepId: allocate
+        operationId: $sourceDescriptions.xeroAccounting.createCreditNoteAllocation
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: CreditNoteID, in: path, value: $steps.create-credit-note.outputs.creditNoteId}
+        requestBody:
+          contentType: application/json
+          payload:
+            Allocations:
+              - Invoice: {InvoiceID: $steps.create-invoice.outputs.invoiceId}
+                Amount: 20
+                Date: "2026-09-10"
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: outcome-invoice
+        description: Outcome oracle. The invoice shows 20 credited and 80 due.
+        operationId: $sourceDescriptions.xeroAccounting.getInvoice
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: InvoiceID, in: path, value: $steps.create-invoice.outputs.invoiceId}
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/Invoices/0/AmountCredited == 20
+          - condition: $response.body#/Invoices/0/AmountDue == 80
+      - stepId: outcome-credit-note
+        description: Outcome oracle. The credit note is fully allocated and PAID (INFERENCE from the status table; needs a sandbox capture).
+        operationId: $sourceDescriptions.xeroAccounting.getCreditNote
+        parameters:
+          - {name: Authorization, in: header, value: Bearer $inputs.accessToken}
+          - {name: xero-tenant-id, in: header, value: $inputs.tenantId}
+          - {name: Accept, in: header, value: application/json}
+          - {name: CreditNoteID, in: path, value: $steps.create-credit-note.outputs.creditNoteId}
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/CreditNotes/0/RemainingCredit == 0
+          - condition: $response.body#/CreditNotes/0/Status == "PAID"
+    outputs:
+      creditNoteId: $steps.create-credit-note.outputs.creditNoteId

@@ -657,7 +657,57 @@ def case_update_or_create_credit_notes():
     assert after["AmountCredited"] == 30 and after["AmountDue"] == 70, after
 
 
+def case_finance_ops_flow_end_to_end():
+    """One run of the localstack/finance-ops Stripe-to-Xero sequence (xero_client.py at 8ff5f6b), in its order:
+    look the customer up, create it, bill it, pay the bill, book the processor fee as a paid payable against the
+    fixed Stripe contact, refund through a credit note with a full inline allocation then pay that credit note,
+    check the refund is booked, and delete a payment."""
+    api, tenant = accounting_api()
+    ref = f"cus_{uuid.uuid4().hex[:8]}"
+    assert api.get_contacts(tenant, where=f'AccountNumber="{ref}"', page=1).contacts == [], "a fresh customer is not found"
+    contact = api.create_contacts(tenant, Contacts(contacts=[Contact(name=f"Customer {ref}", account_number=ref)])).contacts[0]
+    again = api.get_contacts(tenant, where=f'AccountNumber="{ref}"', page=1).contacts
+    assert [c.contact_id for c in again] == [contact.contact_id], "the lookup now finds it"
+
+    number = f"INV-{uuid.uuid4().hex[:6]}"
+    invoice = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact.contact_id, invoice_number=number)])).invoices[0]
+    by_contact = api.get_invoices(tenant, contact_i_ds=[contact.contact_id], page=1).invoices
+    assert [i.invoice_number for i in by_contact] == [number], "the invoice is found by contact with page=1"
+    paid = api.create_payment(tenant, Payment(amount=invoice.total, account=Account(code="090"), date=invoice.date,
+                                              payment_type="ACCRECPAYMENT", invoice=invoice)).payments[0]
+    assert paid.invoice.status == "PAID"
+    assert api.get_invoices(tenant, invoice_numbers=[number], page=1).invoices[0].status == "PAID"
+
+    # The fee bill: a payable on the fees account (404) that is created already paid, against the Stripe contact
+    # finance-ops configures by id (XERO_STRIPE_CONTACT_ID; here a contact created first, as Xero needs it to exist),
+    # then paid with the ACCREC payment type, as xero_client.create_payment sends it for any invoice.
+    stripe_contact = new_contact(api, tenant)
+    fee_total = 1.25
+    fee = Invoice(type="ACCPAY", contact=Contact(contact_id=stripe_contact), status="AUTHORISED",
+                  currency_code=CurrencyCode("USD"), date=invoice.date, due_date=invoice.date, invoice_number=f"FEE-{number}",
+                  reference=f"fee_{number}", total=fee_total, amount_paid=fee_total, fully_paid_on_date=invoice.date,
+                  line_items=[LineItem(line_item_id="", quantity=1, unit_amount=fee_total, line_amount=fee_total, account_code="404", tax_type="NONE")])
+    fee_bill = api.create_invoices(tenant, Invoices(invoices=[fee])).invoices[0]
+    assert fee_bill.invoice_id and not fee_bill.has_errors, fee_bill.validation_errors
+    fee_paid = api.create_payment(tenant, Payment(amount=fee_bill.total, account=Account(code="090"), date=fee_bill.date,
+                                                  payment_type="ACCRECPAYMENT", invoice=fee_bill)).payments[0]
+    assert fee_paid.payment_id
+
+    refund = finance_ops_credit_note(contact.contact_id, amount=invoice.total)
+    refund.allocations = [Allocation(invoice=invoice, amount=invoice.total, date=datetime.date(2026, 9, 11))]
+    credit_note = api.create_credit_notes(tenant, CreditNotes(credit_notes=[refund])).credit_notes[0]
+    refunded = api.create_payment(tenant, Payment(amount=credit_note.total, account=Account(code="090"), date=credit_note.date,
+                                                  credit_note=credit_note, payment_type="ARCREDITPAYMENT")).payments[0]
+    assert refunded.credit_note.status == "PAID" and refunded.credit_note.remaining_credit == 0
+    booked = api.get_credit_notes(tenant, page=1).credit_notes
+    assert [c for c in booked if refund.credit_note_number in str(c.credit_note_number)], "the refund shows as booked"
+
+    gone = api.delete_payment(tenant, payment_id=fee_paid.payment_id, payment_delete=PaymentDelete(status="DELETED")).payments[0]
+    assert gone.status == "DELETED"
+
+
 CASES = [
+    ("the finance-ops Stripe-to-Xero sequence runs end to end through xero-python", case_finance_ops_flow_end_to_end),
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
     ("get_credit_notes page=1 as finance-ops calls it, and where by contact", case_get_credit_notes_as_finance_ops_calls_it),

@@ -1,0 +1,296 @@
+{
+  "name": "Xero finance-ops: bill, pay and refund a customer",
+  "description": "The localstack/finance-ops Stripe-to-Xero sequence over raw HTTP: look a contact up with where, create it, bill it, pay the bill, refund through a credit note with a full inline allocation, pay the credit note. Needs the xero twin on the port named in wondertwin.yaml.",
+  "setup": {
+    "reset": [
+      "xero"
+    ]
+  },
+  "steps": [
+    {
+      "name": "Health through the legacy path finance-ops polls",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.xero.port}}/_xero/health",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.status": "ok"
+        }
+      }
+    },
+    {
+      "name": "Look the customer up: a fresh AccountNumber finds nothing",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Contacts?where=AccountNumber%3D%22cus_scn001%22&page=1",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Contacts": []
+        }
+      }
+    },
+    {
+      "name": "Create the contact",
+      "request": {
+        "method": "PUT",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Contacts",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "Contacts": [
+            {
+              "Name": "Scenario Corp",
+              "AccountNumber": "cus_scn001"
+            }
+          ]
+        }
+      },
+      "capture": {
+        "contact_id": "$.Contacts[0].ContactID"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Contacts[0].AccountNumber": "cus_scn001"
+        }
+      }
+    },
+    {
+      "name": "The lookup now finds it",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Contacts?where=AccountNumber%3D%22cus_scn001%22&page=1",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Contacts[0].ContactID": "{{contact_id}}"
+        }
+      }
+    },
+    {
+      "name": "Create the invoice",
+      "request": {
+        "method": "PUT",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Invoices",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "Invoices": [
+            {
+              "Type": "ACCREC",
+              "InvoiceNumber": "SCN-0001",
+              "Status": "AUTHORISED",
+              "Date": "2026-09-01",
+              "DueDate": "2026-09-30",
+              "Contact": {
+                "ContactID": "{{contact_id}}"
+              },
+              "LineItems": [
+                {
+                  "Description": "Subscription",
+                  "Quantity": 1,
+                  "UnitAmount": 50,
+                  "AccountCode": "200",
+                  "TaxType": "NONE"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "capture": {
+        "invoice_id": "$.Invoices[0].InvoiceID"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Invoices[0].Total": 50,
+          "$.Invoices[0].AmountDue": 50
+        }
+      }
+    },
+    {
+      "name": "Pay the invoice in full",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Payments",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "Invoice": {
+            "InvoiceID": "{{invoice_id}}"
+          },
+          "Account": {
+            "Code": "090"
+          },
+          "Date": "2026-09-02",
+          "Amount": 50
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Payments[0].Invoice.Status": "PAID"
+        }
+      }
+    },
+    {
+      "name": "Find the invoice by number: one, and PAID",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Invoices?InvoiceNumbers=SCN-0001&page=1",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Invoices[0].Status": "PAID",
+          "$.Invoices[0].AmountDue": 0
+        }
+      }
+    },
+    {
+      "name": "Refund: a credit note with the whole invoice allocated inline",
+      "request": {
+        "method": "PUT",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/CreditNotes",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "CreditNotes": [
+            {
+              "Type": "ACCRECCREDIT",
+              "Status": "AUTHORISED",
+              "CreditNoteNumber": "SCN refund 1",
+              "Date": "2026-09-10",
+              "Contact": {
+                "ContactID": "{{contact_id}}"
+              },
+              "LineItems": [
+                {
+                  "Description": "Subscription",
+                  "Quantity": 1,
+                  "UnitAmount": 50,
+                  "AccountCode": "200",
+                  "TaxType": "NONE"
+                }
+              ],
+              "Allocations": [
+                {
+                  "Invoice": {
+                    "InvoiceID": "{{invoice_id}}"
+                  },
+                  "Amount": 50,
+                  "Date": "2026-09-11"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "capture": {
+        "credit_note_id": "$.CreditNotes[0].CreditNoteID"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.CreditNotes[0].Total": 50
+        }
+      }
+    },
+    {
+      "name": "Pay the credit note with ARCREDITPAYMENT",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/Payments",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "CreditNote": {
+            "CreditNoteID": "{{credit_note_id}}"
+          },
+          "Account": {
+            "Code": "090"
+          },
+          "Date": "2026-09-12",
+          "Amount": 50,
+          "PaymentType": "ARCREDITPAYMENT"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.Payments[0].PaymentType": "ARCREDITPAYMENT",
+          "$.Payments[0].CreditNote.Status": "PAID"
+        }
+      }
+    },
+    {
+      "name": "The refund is booked: get_credit_notes with page=1",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.xero.port}}/api.xro/2.0/CreditNotes?page=1",
+        "headers": {
+          "Authorization": "Bearer scenario-token",
+          "xero-tenant-id": "00000000-0000-0000-0000-000000000001",
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.CreditNotes[0].CreditNoteNumber": "SCN refund 1"
+        }
+      }
+    }
+  ]
+}
