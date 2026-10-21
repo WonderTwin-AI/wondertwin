@@ -512,3 +512,50 @@ type lenSigner struct{}
 func (lenSigner) Sign(payload []byte, _ string) map[string]string {
 	return map[string]string{"X-Body-Len": strconv.Itoa(len(payload))}
 }
+
+// secretSigner records the secret it was given, so a test can see whether the
+// Signer ran and with what.
+type secretSigner struct{ got *[]string }
+
+func (s secretSigner) Sign(_ []byte, secret string) map[string]string {
+	*s.got = append(*s.got, secret)
+	return map[string]string{"X-Signed": "yes"}
+}
+
+func TestSignWithoutSecretRunsTheSignerWithAnEmptySecret(t *testing.T) {
+	var header string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header = r.Header.Get("X-Signed")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	var secrets []string
+	d := NewDispatcher(Config{URL: srv.URL, Signer: secretSigner{&secrets}, SignWithoutSecret: true, MaxRetries: 1})
+	d.Enqueue("item.error", nil)
+	if err := d.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if header != "yes" || len(secrets) != 1 || secrets[0] != "" {
+		t.Errorf("signer header %q, secrets seen %q; want it to run once with an empty secret", header, secrets)
+	}
+}
+
+func TestSignerStillNeedsASecretByDefault(t *testing.T) {
+	var header string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header = r.Header.Get("X-Signed")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	var secrets []string
+	d := NewDispatcher(Config{URL: srv.URL, Signer: secretSigner{&secrets}, MaxRetries: 1})
+	d.Enqueue("item.error", nil)
+	if err := d.Flush(); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if header != "" || len(secrets) != 0 {
+		t.Errorf("a Signer ran without a secret and without SignWithoutSecret: header %q, secrets %q", header, secrets)
+	}
+}
