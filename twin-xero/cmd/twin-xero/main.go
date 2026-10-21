@@ -12,6 +12,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/api"
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
@@ -37,6 +39,10 @@ func main() {
 	adminHandler.SetConfigProvider(api.NewConfig(twin, memStore))
 	adminHandler.SetFlusher(apiHandler.Dispatcher())
 	adminHandler.Routes(twin.Router)
+
+	adminPlane := chi.NewRouter()
+	adminHandler.Routes(adminPlane)
+	api.MountControlAliases(twin.Router, adminPlane)
 
 	if cfg.SeedFile != "" {
 		data, err := os.ReadFile(cfg.SeedFile)

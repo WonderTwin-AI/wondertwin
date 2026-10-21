@@ -172,6 +172,17 @@
         "alloc-001",
         "alloc-002"
       ]
+    },
+    {
+      "route": "GET /_xero/health and POST /_xero/reset",
+      "reason": "Xero has no health or reset endpoint. These two paths are control-plane aliases for GET /admin/health and POST /admin/reset, served so a consumer written for the legacy xero-local emulator can use this one unchanged. They are not Xero API, and no other xero-local control path (such as /_xero/state) is aliased.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json compat-001"
+      },
+      "operator_note": "Added for the named target localstack/finance-ops, whose Makefile services-wait polls /_xero/health and whose reset_xero_state fixture posts /_xero/reset before each test (tests/conftest.py at 8ff5f6b).",
+      "quirk_ids": [
+        "compat-001"
+      ]
     }
   ]
 }

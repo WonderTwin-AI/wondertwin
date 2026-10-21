@@ -564,6 +564,24 @@ def case_webhook_events_follow_the_writes():
         server.shutdown()
 
 
+def case_legacy_control_paths_alias_the_admin_plane():
+    def raw(method, path):
+        conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+        conn.request(method, path)
+        res = conn.getresponse()
+        return res.status, json.loads(res.read() or b"null")
+
+    assert raw("GET", "/_xero/health") == (200, {"status": "ok"})
+    client, _, _ = signed_in()
+    api, tenant = accounting_for(client)
+    api.create_contacts(tenant, Contacts(contacts=[Contact(name=f"Alias {uuid.uuid4().hex[:8]}")]), summarize_errors=False)
+    assert api.get_contacts(tenant, page=1).contacts, "the write is visible before the reset"
+    assert raw("POST", "/_xero/reset") == (200, {"status": "reset"})
+    client, _, _ = signed_in()  # a reset drops the tokens too
+    api, tenant = accounting_for(client)
+    assert not api.get_contacts(tenant, page=1).contacts, "the reset cleared the store"
+
+
 CASES = [
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
@@ -595,6 +613,7 @@ CASES = [
     ("a replayed refresh token is refused", case_replayed_refresh_token_is_refused),
     ("an expired token refreshes on demand", case_expired_token_refreshes_on_demand),
     ("client credentials", case_client_credentials),
+    ("the legacy /_xero health and reset paths alias the admin plane (last: it resets the store)", case_legacy_control_paths_alias_the_admin_plane),
 ]
 
 failed = False
