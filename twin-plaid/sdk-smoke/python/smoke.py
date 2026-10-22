@@ -25,6 +25,7 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.link_token_get_request import LinkTokenGetRequest
 from plaid.model.products import Products
+from plaid.model.webhook_verification_key_get_request import WebhookVerificationKeyGetRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
 from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
@@ -125,6 +126,13 @@ def case_reset_login_puts_the_item_in_login_required():
     assert client.item_get(ItemGetRequest(access_token=token)).item.error.error_code == "ITEM_LOGIN_REQUIRED"
     assert api_error(lambda: client.accounts_get(AccountsGetRequest(access_token=token))) == (400, "ITEM_LOGIN_REQUIRED")
     assert link_token(access_token=token).link_token.startswith("link-sandbox-"), "update mode must still work"
+
+
+def case_webhook_verification_key_get_refuses_an_unknown_key_id():
+    # A client learns a real key id only from a delivered webhook's JWT header, so the
+    # positive path is checked once delivery exists; the sign and verify round trip is a Go test.
+    assert api_error(lambda: client.webhook_verification_key_get(
+        WebhookVerificationKeyGetRequest(key_id="not-a-key-id"))) == (400, "INVALID_WEBHOOK_VERIFICATION_KEY_ID")
 
 
 def case_item_get():

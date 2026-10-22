@@ -2,6 +2,8 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
@@ -15,6 +17,10 @@ type Handler struct {
 
 	// clientID and secret are each enforced when non-empty; see SetCredentials.
 	clientID, secret string
+
+	// keyOnce guards the webhook signing key, created on first use.
+	keyOnce sync.Once
+	sk      *signingKey
 }
 
 // NewHandler creates a new Plaid API handler.
@@ -37,6 +43,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/item/get", h.itemGet)
 		r.Post("/accounts/get", h.accountsGet)
 		r.Post("/item/remove", h.itemRemove)
+		r.Post("/webhook_verification_key/get", h.webhookVerificationKeyGet)
 		r.Post("/sandbox/item/reset_login", h.sandboxItemResetLogin)
 		r.Post("/item/access_token/invalidate", h.itemAccessTokenInvalidate)
 		r.Post("/link/token/create", h.linkTokenCreate)
