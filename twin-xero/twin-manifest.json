@@ -121,7 +121,12 @@
       "behaviour: order and If-Modified-Since on list endpoints are accepted and ignored (GAP-002)",
       "behaviour: Idempotency-Key header is ignored (GAP-003)",
       "behaviour: summarizeErrors=false on bulk contact writes (GAP-004)",
-      "behaviour: POST /Contacts upsert by Name, which Xero does not document (GAP-007)"
+      "behaviour: POST /Contacts upsert by Name, which Xero does not document (GAP-007)",
+      "behaviour: OIDC discovery, the authEventId filter on GET /connections and DELETE /connections/{id} are not served (GAP-008)",
+      "behaviour: GET /Contacts/{ContactID or ContactNumber} is not served (GAP-009)",
+      "behaviour: contact fields in an invoice update, sent flag for PAID documents, allowBackorders and the default document date are not built (GAP-010)",
+      "behaviour: rate-limit headers and 429, the payroll 401 and XML responses are not built (GAP-011)",
+      "behaviour: a webhook receiver that sets cookies is not refused (GAP-012)"
     ],
     "estimated_coverage_pct": 22
   },
