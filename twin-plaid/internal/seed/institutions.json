@@ -1,0 +1,390 @@
+{
+  "_source": "Institutions the app emulator knows. 20 are Plaid's published Sandbox institutions list (plaid.com/docs/sandbox/institutions); ins_1 and ins_109513 and the full detail of ins_109512 are published sample rows on plaid.com/docs/api/institutions. Fetched 2026-10-20, not the pinned 2026-09-28 docs capture. Provisional: for Sandbox institutions the docs list by name only, products are a template copied from the ins_109512 sample, routing_numbers are empty, country is US unless the list says Canadian or UK, and names drop the docs' parenthetical notes. Production institutions (the docs say all of them also exist in Sandbox) are not included.",
+  "institutions": {
+    "ins_1": {
+      "institution_id": "ins_1",
+      "name": "Bank of America",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "products": [
+        "assets",
+        "auth",
+        "balance",
+        "transactions",
+        "identity",
+        "liabilities"
+      ],
+      "routing_numbers": [
+        "011000138",
+        "011200365",
+        "011400495"
+      ],
+      "dtc_numbers": [
+        "2236",
+        "0955",
+        "1367"
+      ],
+      "source": "published sample row on plaid.com/docs/api/institutions (all fields)"
+    },
+    "ins_109508": {
+      "institution_id": "ins_109508",
+      "name": "First Platypus Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_109509": {
+      "institution_id": "ins_109509",
+      "name": "First Gingham Credit Union",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_109510": {
+      "institution_id": "ins_109510",
+      "name": "Tattersall Federal Credit Union",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_109511": {
+      "institution_id": "ins_109511",
+      "name": "Tartan Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_109512": {
+      "institution_id": "ins_109512",
+      "name": "Houndstooth Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published list plus the published get_by_id sample (all fields)",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": [
+        "011000138",
+        "011200365",
+        "011400495"
+      ],
+      "dtc_numbers": [
+        "2236",
+        "0955",
+        "1367"
+      ]
+    },
+    "ins_109513": {
+      "institution_id": "ins_109513",
+      "name": "Theoretical Bank",
+      "oauth": true,
+      "country_codes": [
+        "US"
+      ],
+      "products": [
+        "assets",
+        "auth",
+        "balance",
+        "cra_lend_score",
+        "cra_plaid_credit_score",
+        "identity",
+        "identity_match",
+        "income",
+        "pay_by_bank",
+        "processor_payments",
+        "recurring_transactions",
+        "transactions",
+        "transfer"
+      ],
+      "routing_numbers": [
+        "031101270",
+        "103100194",
+        "103112357"
+      ],
+      "source": "published sample row on plaid.com/docs/api/institutions (all fields)"
+    },
+    "ins_116834": {
+      "institution_id": "ins_116834",
+      "name": "Flexible Platypus Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_117181": {
+      "institution_id": "ins_117181",
+      "name": "Flexible Platypus Open Banking",
+      "oauth": true,
+      "country_codes": [
+        "GB"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_117650": {
+      "institution_id": "ins_117650",
+      "name": "Royal Bank of Plaid",
+      "oauth": false,
+      "country_codes": [
+        "GB"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_127287": {
+      "institution_id": "ins_127287",
+      "name": "Platypus OAuth Bank",
+      "oauth": true,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_129644": {
+      "institution_id": "ins_129644",
+      "name": "First Platypus Bank - OAuth",
+      "oauth": true,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_130016": {
+      "institution_id": "ins_130016",
+      "name": "First Platypus Balance Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_132241": {
+      "institution_id": "ins_132241",
+      "name": "First Platypus Bank - OAuth App2App",
+      "oauth": true,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_132361": {
+      "institution_id": "ins_132361",
+      "name": "Unhealthy Platypus Bank - Down",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_132363": {
+      "institution_id": "ins_132363",
+      "name": "Unhealthy Platypus Bank - Degraded",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_133402": {
+      "institution_id": "ins_133402",
+      "name": "Unsupported Platypus Bank - Institution Not Supported",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_133502": {
+      "institution_id": "ins_133502",
+      "name": "Platypus Bank RUX Auth",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_133503": {
+      "institution_id": "ins_133503",
+      "name": "Platypus Bank RUX Match",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_135858": {
+      "institution_id": "ins_135858",
+      "name": "Windowpane Bank",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_138395": {
+      "institution_id": "ins_138395",
+      "name": "First Platypus Limited Purpose",
+      "oauth": false,
+      "country_codes": [
+        "US"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    },
+    "ins_43": {
+      "institution_id": "ins_43",
+      "name": "Tartan-Dominion Bank of Canada",
+      "oauth": false,
+      "country_codes": [
+        "CA"
+      ],
+      "source": "published Sandbox institutions list (id, name, oauth, country where stated); products are a template copied from the ins_109512 sample, routing numbers not published",
+      "products": [
+        "auth",
+        "balance",
+        "identity",
+        "transactions"
+      ],
+      "routing_numbers": []
+    }
+  }
+}

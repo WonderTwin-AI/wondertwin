@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
@@ -25,6 +26,7 @@ type Handler struct {
 
 // NewHandler creates a new Plaid API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
+	s.SetDefaults(seed.LoadInstitutions)
 	return &Handler{store: s, mw: mw}
 }
 
@@ -44,6 +46,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/accounts/get", h.accountsGet)
 		r.Post("/item/remove", h.itemRemove)
 		r.Post("/webhook_verification_key/get", h.webhookVerificationKeyGet)
+		r.Post("/institutions/get", h.institutionsGet)
+		r.Post("/institutions/search", h.institutionsSearch)
+		r.Post("/institutions/get_by_id", h.institutionsGetByID)
 		r.Post("/sandbox/item/reset_login", h.sandboxItemResetLogin)
 		r.Post("/item/access_token/invalidate", h.itemAccessTokenInvalidate)
 		r.Post("/link/token/create", h.linkTokenCreate)

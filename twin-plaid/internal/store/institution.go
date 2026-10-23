@@ -11,6 +11,7 @@ type Institution struct {
 	Products       []string `json:"products"`
 	CountryCodes   []string `json:"country_codes"`
 	RoutingNumbers []string `json:"routing_numbers"`
+	DTCNumbers     []string `json:"dtc_numbers,omitempty"`
 	OAuth          bool     `json:"oauth"`
 	URL            string   `json:"url,omitempty"`
 	PrimaryColor   string   `json:"primary_color,omitempty"`
