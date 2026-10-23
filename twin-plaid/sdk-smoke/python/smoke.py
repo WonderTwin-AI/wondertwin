@@ -9,9 +9,14 @@ Prints one JSON line per case ({"sdk","case","pass","detail"}) and exits
 non-zero if any case fails.
 """
 
+import base64
+import hashlib
+import http.server
 import json
 import os
+import queue
 import sys
+import threading
 
 import plaid
 from plaid.api import plaid_api
@@ -23,6 +28,7 @@ from plaid.model.institutions_search_request import InstitutionsSearchRequest
 from plaid.model.item_access_token_invalidate_request import ItemAccessTokenInvalidateRequest
 from plaid.model.item_get_request import ItemGetRequest
 from plaid.model.item_remove_request import ItemRemoveRequest
+from plaid.model.item_webhook_update_request import ItemWebhookUpdateRequest
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
@@ -156,6 +162,40 @@ def case_institutions_get_by_id():
     assert inst.name == "Houndstooth Bank" and inst.oauth is False and len(inst.routing_numbers) == 3
     assert api_error(lambda: client.institutions_get_by_id(
         InstitutionsGetByIdRequest(institution_id="ins_nope", country_codes=US))) == (400, "INVALID_INSTITUTION")
+
+
+def start_receiver():
+    """A webhook URL on localhost; every POST it gets lands on the returned queue."""
+    got = queue.Queue()
+
+    class Hook(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            got.put((self.rfile.read(int(self.headers.get("Content-Length", 0))), dict(self.headers)))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Hook)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_port}/hook", got
+
+
+def case_item_webhook_update_delivers_a_signed_flat_body():
+    url, got = start_receiver()
+    token = linked_access_token()
+    assert client.item_webhook_update(ItemWebhookUpdateRequest(access_token=token, webhook=url)).item.webhook == url
+    body, headers = got.get(timeout=5)
+    payload = json.loads(body)
+    assert (payload["webhook_type"], payload["webhook_code"], payload["new_webhook_url"]) == ("ITEM", "WEBHOOK_UPDATE_ACKNOWLEDGED", url)
+    assert "data" not in payload and payload["error"] is None, "the body must be flat, not wrapped in an envelope"
+    head, claims, _ = headers["Plaid-Verification"].split(".")
+    unb64 = lambda part: json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+    assert unb64(claims)["request_body_sha256"] == hashlib.sha256(body).hexdigest()
+    # A delivered webhook is how a client learns a key id; the SDK can then fetch that key.
+    key = client.webhook_verification_key_get(WebhookVerificationKeyGetRequest(key_id=unb64(head)["kid"])).key
+    assert key.alg == "ES256" and key.crv == "P-256" and key.expired_at is None
 
 
 def case_item_get():
