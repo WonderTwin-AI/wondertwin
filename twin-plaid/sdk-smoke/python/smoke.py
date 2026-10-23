@@ -17,6 +17,9 @@ import plaid
 from plaid.api import plaid_api
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.country_code import CountryCode
+from plaid.model.institutions_get_by_id_request import InstitutionsGetByIdRequest
+from plaid.model.institutions_get_request import InstitutionsGetRequest
+from plaid.model.institutions_search_request import InstitutionsSearchRequest
 from plaid.model.item_access_token_invalidate_request import ItemAccessTokenInvalidateRequest
 from plaid.model.item_get_request import ItemGetRequest
 from plaid.model.item_remove_request import ItemRemoveRequest
@@ -133,6 +136,26 @@ def case_webhook_verification_key_get_refuses_an_unknown_key_id():
     # positive path is checked once delivery exists; the sign and verify round trip is a Go test.
     assert api_error(lambda: client.webhook_verification_key_get(
         WebhookVerificationKeyGetRequest(key_id="not-a-key-id"))) == (400, "INVALID_WEBHOOK_VERIFICATION_KEY_ID")
+US = [CountryCode("US")]
+
+
+def case_institutions_get_pages_by_offset():
+    first = client.institutions_get(InstitutionsGetRequest(count=5, offset=0, country_codes=US))
+    second = client.institutions_get(InstitutionsGetRequest(count=5, offset=5, country_codes=US))
+    assert len(first.institutions) == 5 and first.total == second.total and first.total > 10
+    assert not {i.institution_id for i in first.institutions} & {i.institution_id for i in second.institutions}
+
+
+def case_institutions_search():
+    res = client.institutions_search(InstitutionsSearchRequest(query="houndstooth", country_codes=US, products=[Products("auth")]))
+    assert [i.name for i in res.institutions] == ["Houndstooth Bank"]
+
+
+def case_institutions_get_by_id():
+    inst = client.institutions_get_by_id(InstitutionsGetByIdRequest(institution_id="ins_109512", country_codes=US)).institution
+    assert inst.name == "Houndstooth Bank" and inst.oauth is False and len(inst.routing_numbers) == 3
+    assert api_error(lambda: client.institutions_get_by_id(
+        InstitutionsGetByIdRequest(institution_id="ins_nope", country_codes=US))) == (400, "INVALID_INSTITUTION")
 
 
 def case_item_get():

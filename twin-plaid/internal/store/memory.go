@@ -23,6 +23,9 @@ type MemoryStore struct {
 	Rand *sim.Rand
 
 	tokenMu sync.Mutex
+
+	// defaults restores the fixtures a fresh store starts with; see SetDefaults.
+	defaults func(*MemoryStore)
 }
 
 // New creates an empty MemoryStore.
@@ -89,7 +92,16 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	return nil
 }
 
-// Reset clears every store and the simulated clock.
+// SetDefaults registers the function that loads the fixtures a fresh store
+// starts with, and runs it now. Reset runs it again, so a reset returns to the
+// starting state, not to an empty one. The fixtures live in a package that
+// imports this one, so they are handed in here.
+func (s *MemoryStore) SetDefaults(fn func(*MemoryStore)) {
+	s.defaults = fn
+	fn(s)
+}
+
+// Reset clears every store and the simulated clock, then reloads the defaults.
 func (s *MemoryStore) Reset() {
 	s.Clock.Reset()
 	s.Items.Reset()
@@ -98,4 +110,7 @@ func (s *MemoryStore) Reset() {
 	s.PublicTokens.Reset()
 	s.AccessTokens.Reset()
 	s.LinkTokens.Reset()
+	if s.defaults != nil {
+		s.defaults(s)
+	}
 }
