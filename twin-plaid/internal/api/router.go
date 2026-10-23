@@ -9,6 +9,7 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // Handler holds the Plaid API state.
@@ -22,6 +23,10 @@ type Handler struct {
 	// keyOnce guards the webhook signing key, created on first use.
 	keyOnce sync.Once
 	sk      *signingKey
+
+	// hooksOnce guards the webhook dispatcher, built on first use.
+	hooksOnce sync.Once
+	hooks     *webhook.Dispatcher
 }
 
 // NewHandler creates a new Plaid API handler.
@@ -45,6 +50,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/item/get", h.itemGet)
 		r.Post("/accounts/get", h.accountsGet)
 		r.Post("/item/remove", h.itemRemove)
+		r.Post("/item/webhook/update", h.itemWebhookUpdate)
 		r.Post("/webhook_verification_key/get", h.webhookVerificationKeyGet)
 		r.Post("/institutions/get", h.institutionsGet)
 		r.Post("/institutions/search", h.institutionsSearch)
