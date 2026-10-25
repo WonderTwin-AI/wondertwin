@@ -50,6 +50,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/item/get", h.itemGet)
 		r.Post("/accounts/get", h.accountsGet)
 		r.Post("/item/remove", h.itemRemove)
+		r.Post("/sandbox/item/fire_webhook", h.sandboxItemFireWebhook)
 		r.Post("/item/webhook/update", h.itemWebhookUpdate)
 		r.Post("/webhook_verification_key/get", h.webhookVerificationKeyGet)
 		r.Post("/institutions/get", h.institutionsGet)

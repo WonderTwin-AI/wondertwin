@@ -35,6 +35,7 @@ from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUse
 from plaid.model.link_token_get_request import LinkTokenGetRequest
 from plaid.model.products import Products
 from plaid.model.webhook_verification_key_get_request import WebhookVerificationKeyGetRequest
+from plaid.model.sandbox_item_fire_webhook_request import SandboxItemFireWebhookRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
 from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
@@ -46,8 +47,9 @@ client = plaid_api.PlaidApi(plaid.ApiClient(plaid.Configuration(
     host=BASE, api_key={"clientId": "sdk-smoke", "secret": "secret"})))
 
 
-def public_token(**kwargs):
-    req = SandboxPublicTokenCreateRequest(institution_id="ins_109508", initial_products=[Products("auth")], **kwargs)
+def public_token(products=("auth",), **kwargs):
+    req = SandboxPublicTokenCreateRequest(
+        institution_id="ins_109508", initial_products=[Products(p) for p in products], **kwargs)
     return client.sandbox_public_token_create(req)
 
 
@@ -97,9 +99,9 @@ def case_accounts_get():
     assert str(checking.type) == "depository" and checking.balances.available == 100 and checking.balances.limit is None
 
 
-def linked_access_token():
+def linked_access_token(products=("auth",), **kwargs):
     return client.item_public_token_exchange(
-        ItemPublicTokenExchangeRequest(public_token=public_token().public_token)).access_token
+        ItemPublicTokenExchangeRequest(public_token=public_token(products, **kwargs).public_token)).access_token
 
 
 def api_error(call):
@@ -191,11 +193,75 @@ def case_item_webhook_update_delivers_a_signed_flat_body():
     assert (payload["webhook_type"], payload["webhook_code"], payload["new_webhook_url"]) == ("ITEM", "WEBHOOK_UPDATE_ACKNOWLEDGED", url)
     assert "data" not in payload and payload["error"] is None, "the body must be flat, not wrapped in an envelope"
     head, claims, _ = headers["Plaid-Verification"].split(".")
-    unb64 = lambda part: json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
-    assert unb64(claims)["request_body_sha256"] == hashlib.sha256(body).hexdigest()
+    assert json.loads(unb64(claims))["request_body_sha256"] == hashlib.sha256(body).hexdigest()
     # A delivered webhook is how a client learns a key id; the SDK can then fetch that key.
-    key = client.webhook_verification_key_get(WebhookVerificationKeyGetRequest(key_id=unb64(head)["kid"])).key
+    key = client.webhook_verification_key_get(WebhookVerificationKeyGetRequest(key_id=json.loads(unb64(head))["kid"])).key
     assert key.alg == "ES256" and key.crv == "P-256" and key.expired_at is None
+
+
+# ES256 verification with the standard library, so the harness needs no crypto dependency.
+P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+G = (0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
+     0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5)
+
+
+def _add(a, b):
+    if a is None or b is None:
+        return a or b
+    if a[0] == b[0] and (a[1] + b[1]) % P == 0:
+        return None
+    m = ((3 * a[0] * a[0] - 3) * pow(2 * a[1], -1, P) if a == b else (b[1] - a[1]) * pow(b[0] - a[0], -1, P)) % P
+    x = (m * m - a[0] - b[0]) % P
+    return x, (m * (a[0] - x) - a[1]) % P
+
+
+def _mul(k, pt):
+    out = None
+    while k:
+        if k & 1:
+            out = _add(out, pt)
+        pt, k = _add(pt, pt), k >> 1
+    return out
+
+
+def es256_verify(key, signing_input, sig):
+    unb = lambda v: int.from_bytes(base64.urlsafe_b64decode(v + "=" * (-len(v) % 4)), "big")
+    r, s_ = int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:], "big")
+    e, w = int.from_bytes(hashlib.sha256(signing_input).digest(), "big"), pow(s_, -1, N)
+    pt = _add(_mul(e * w % N, G), _mul(r * w % N, (unb(key.x), unb(key.y))))
+    return pt is not None and pt[0] % N == r
+
+
+def unb64(part):
+    return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))
+
+
+def case_fire_webhook_delivers_a_body_the_served_key_verifies():
+    url, got = start_receiver()
+    token = linked_access_token(("auth", "transactions"), options=SandboxPublicTokenCreateRequestOptions(webhook=url))
+    assert client.sandbox_item_fire_webhook(SandboxItemFireWebhookRequest(
+        access_token=token, webhook_code="SYNC_UPDATES_AVAILABLE")).webhook_fired is True
+    body, headers = got.get(timeout=5)
+    payload = json.loads(body)
+    assert (payload["webhook_type"], payload["webhook_code"]) == ("TRANSACTIONS", "SYNC_UPDATES_AVAILABLE") and "data" not in payload
+    head, claims, sig = headers["Plaid-Verification"].split(".")
+    assert json.loads(unb64(claims))["request_body_sha256"] == hashlib.sha256(body).hexdigest()
+    key = client.webhook_verification_key_get(WebhookVerificationKeyGetRequest(key_id=json.loads(unb64(head))["kid"])).key
+    assert es256_verify(key, f"{head}.{claims}".encode(), unb64(sig)), "the served key does not verify the signature"
+    assert not es256_verify(key, f"{head}.{claims}x".encode(), unb64(sig)), "the signature verified over other content"
+
+
+def case_login_repair_flow_fires_a_webhook_and_update_mode_still_works():
+    url, got = start_receiver()
+    token = linked_access_token(options=SandboxPublicTokenCreateRequestOptions(webhook=url))
+    assert client.sandbox_item_reset_login(SandboxItemResetLoginRequest(access_token=token)).reset_login is True
+    payload = json.loads(got.get(timeout=5)[0])
+    assert (payload["webhook_type"], payload["webhook_code"], payload["error"]["error_code"]) == ("ITEM", "ERROR", "ITEM_LOGIN_REQUIRED")
+    assert api_error(lambda: client.accounts_get(AccountsGetRequest(access_token=token))) == (400, "ITEM_LOGIN_REQUIRED")
+    assert link_token(access_token=token).link_token.startswith("link-sandbox-")
+    client.sandbox_item_fire_webhook(SandboxItemFireWebhookRequest(access_token=token, webhook_code="LOGIN_REPAIRED"))
+    assert json.loads(got.get(timeout=5)[0])["webhook_code"] == "LOGIN_REPAIRED"
 
 
 def case_item_get():

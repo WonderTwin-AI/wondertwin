@@ -146,6 +146,20 @@ func (h *Handler) itemAccessTokenInvalidate(w http.ResponseWriter, r *http.Reque
 func (h *Handler) sandboxItemResetLogin(w http.ResponseWriter, r *http.Request) {
 	if it, ok := h.itemFor(w, r); ok {
 		h.store.SetItemError(it.ID, "ITEM_LOGIN_REQUIRED")
+		// Plaid documents an ITEM_LOGIN_REQUIRED webhook after this call, if the Item has a URL.
+		h.fireWebhook(it, "ITEM", "ERROR", map[string]any{"error": webhookError("ITEM_LOGIN_REQUIRED")})
 		h.writeJSON(w, http.StatusOK, map[string]any{"reset_login": true})
 	}
+}
+
+// webhookError is the error object inside an ITEM ERROR webhook: the documented
+// error with its status, and no request_id (Plaid omits it where an error is not
+// an answer to a request).
+func webhookError(code string) any {
+	e, ok := seed.LookupItemError(code)
+	if !ok {
+		return nil
+	}
+	return map[string]any{"error_type": e.Type, "error_code": e.Code, "error_message": e.Message,
+		"display_message": e.DisplayMessage, "status": e.HTTP}
 }

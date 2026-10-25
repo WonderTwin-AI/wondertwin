@@ -1,0 +1,91 @@
+{
+  "_source": "Sample webhook bodies from Plaid's public docs (plaid.com/docs/api/items, /api/products/transactions, /api/products/auth), fetched 2026-10-20 to 2026-10-25, not the pinned 2026-09-28 capture. Verbatim, keyed TYPE.CODE. Documented as fireable by /sandbox/item/fire_webhook but with no published sample here, so not supported: AUTHORIZATION_GRANTED, PRODUCT_READY and ERROR (the last two are Assets webhooks), SMS_MICRODEPOSITS_VERIFICATION, and DEFAULT_UPDATE for IDENTITY, INVESTMENTS_TRANSACTIONS, LIABILITIES and HOLDINGS.",
+  "samples": {
+    "ITEM.NEW_ACCOUNTS_AVAILABLE": {
+      "webhook_type": "ITEM",
+      "webhook_code": "NEW_ACCOUNTS_AVAILABLE",
+      "item_id": "gAXlMgVEw5uEGoQnnXZ6tn9E7Mn3LBc4PJVKZ",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "error": null,
+      "environment": "production"
+    },
+    "ITEM.LOGIN_REPAIRED": {
+      "webhook_type": "ITEM",
+      "webhook_code": "LOGIN_REPAIRED",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "environment": "production"
+    },
+    "ITEM.PENDING_DISCONNECT": {
+      "webhook_type": "ITEM",
+      "webhook_code": "PENDING_DISCONNECT",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "reason": "INSTITUTION_MIGRATION",
+      "disconnect_time": "2020-01-15T13:25:17.766Z",
+      "environment": "production"
+    },
+    "ITEM.USER_PERMISSION_REVOKED": {
+      "webhook_type": "ITEM",
+      "webhook_code": "USER_PERMISSION_REVOKED",
+      "error": {
+        "error_code": "USER_PERMISSION_REVOKED",
+        "error_message": "the holder of this account has revoked their permission for your application to access it",
+        "display_message": null,
+        "error_type": "ITEM_ERROR",
+        "status": 400
+      },
+      "item_id": "gAXlMgVEw5uEGoQnnXZ6tn9E7Mn3LBc4PJVKZ",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "environment": "production"
+    },
+    "ITEM.USER_ACCOUNT_REVOKED": {
+      "webhook_type": "ITEM",
+      "webhook_code": "USER_ACCOUNT_REVOKED",
+      "item_id": "gAXlMgVEw5uEGoQnnXZ6tn9E7Mn3LBc4PJVKZ",
+      "account_id": "BxBXxLj1m4HMXBm9WZJyUg9XLd4rKEhw8Pb1J",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "environment": "production"
+    },
+    "TRANSACTIONS.DEFAULT_UPDATE": {
+      "webhook_type": "TRANSACTIONS",
+      "webhook_code": "DEFAULT_UPDATE",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "error": null,
+      "new_transactions": 3,
+      "environment": "production"
+    },
+    "TRANSACTIONS.SYNC_UPDATES_AVAILABLE": {
+      "webhook_type": "TRANSACTIONS",
+      "webhook_code": "SYNC_UPDATES_AVAILABLE",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "user_id": "usr_9nSp2KuZ2x4JDw",
+      "initial_update_complete": true,
+      "historical_update_complete": false,
+      "environment": "production"
+    },
+    "TRANSACTIONS.RECURRING_TRANSACTIONS_UPDATE": {
+      "webhook_type": "TRANSACTIONS",
+      "webhook_code": "RECURRING_TRANSACTIONS_UPDATE",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "account_ids": [
+        "lPNjeW1nR6CDn5okmGQ6hEpMo4lLNoSrzqDje",
+        "lPNjeW1nR6CDn5okmGQ6hEpMo4lLNoSrzqDff"
+      ],
+      "environment": "production"
+    },
+    "AUTH.DEFAULT_UPDATE": {
+      "webhook_type": "AUTH",
+      "webhook_code": "DEFAULT_UPDATE",
+      "item_id": "wz666MBjYWTp2PDzzggYhM6oWWmBb",
+      "account_ids_with_new_auth": [],
+      "account_ids_with_updated_auth": {
+        "BxBXxLj1m4HMXBm9WZZmCWVbPjX16EHwv99vp": [
+          "account_number"
+        ]
+      },
+      "error": null,
+      "environment": "production"
+    }
+  }
+}
