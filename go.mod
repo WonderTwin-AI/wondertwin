@@ -3,7 +3,7 @@ module github.com/wondertwin-ai/wondertwin
 go 1.26.10
 
 require (
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/google/go-github/v92 v92.0.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/wondertwin-ai/wondertwin/twinkit v0.0.0-20260420175506-73cb526cc94c
