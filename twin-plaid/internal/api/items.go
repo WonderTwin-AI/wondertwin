@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
@@ -101,6 +102,25 @@ func (h *Handler) liveItemFor(w http.ResponseWriter, r *http.Request) (store.Ite
 		}
 	}
 	return it, ok
+}
+
+// productNotEnabledMessage is the documented error for a data request on an Item that
+// was not linked with the product (the sample body on plaid.com/docs/errors/item).
+// Which of Plaid's product errors each route returns is not documented, so this
+// one answers every gated route.
+const productNotEnabledMessage = "A requested product was not enabled for the current access token. Please ensure it is included when when initializing Link and create the Item again."
+
+// liveItemWith is liveItemFor for a route that needs the Item to carry a product.
+func (h *Handler) liveItemWith(w http.ResponseWriter, r *http.Request, product string) (store.Item, bool) {
+	it, ok := h.liveItemFor(w, r)
+	if !ok {
+		return it, false
+	}
+	if !slices.Contains(it.Products, product) {
+		h.writeError(w, http.StatusBadRequest, "ITEM_ERROR", "PRODUCT_NOT_ENABLED", productNotEnabledMessage)
+		return it, false
+	}
+	return it, true
 }
 
 func orEmpty(s []string) []string {

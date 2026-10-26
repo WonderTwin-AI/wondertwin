@@ -9,7 +9,7 @@ import (
 // linkedItem makes an Item through the sandbox shortcut and returns its access token.
 func linkedItem(tc *testutil.TwinClient) string {
 	pub := tc.Post("/sandbox/public_token/create", creds(map[string]any{
-		"institution_id": "ins_109508", "initial_products": []string{"auth"},
+		"institution_id": "ins_109508", "initial_products": []string{"auth", "identity", "transactions"},
 	})).JSONMap()["public_token"]
 	return tc.Post("/item/public_token/exchange", creds(map[string]any{"public_token": pub})).
 		JSONMap()["access_token"].(string)

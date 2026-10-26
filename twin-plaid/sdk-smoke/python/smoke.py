@@ -309,7 +309,7 @@ def case_auth_get_returns_the_checking_accounts_numbers():
 
 
 def case_identity_get_and_match():
-    token = linked_access_token()
+    token = linked_access_token(("identity",))
     holder = client.identity_get(IdentityGetRequest(access_token=token)).accounts[0].owners[0]
     assert holder.names == ["Alberta Bobbeth Charleson"] and len(holder.addresses) == 2 and holder.addresses[0].primary
     good = client.identity_match(IdentityMatchRequest(access_token=token, user=IdentityMatchUser(
@@ -448,6 +448,21 @@ def case_item_get():
     item = client.item_get(ItemGetRequest(access_token=exchanged.access_token)).item
     assert item.item_id == exchanged.item_id and item.institution_id == "ins_109508"
     assert item.webhook is None and item.error is None and item.update_type == "background"
+
+
+def case_data_routes_refuse_an_item_linked_without_their_product():
+    token = linked_access_token(("auth",))
+    for call in (lambda: client.transactions_sync(TransactionsSyncRequest(access_token=token)),
+                 lambda: client.identity_get(IdentityGetRequest(access_token=token))):
+        assert api_error(call) == (400, "PRODUCT_NOT_ENABLED")
+    assert client.auth_get(AuthGetRequest(access_token=token)).numbers.ach
+    try:
+        client.sandbox_public_token_create(SandboxPublicTokenCreateRequest(
+            institution_id="ins_nope", initial_products=[Products("auth")]))
+    except plaid.ApiException as e:
+        assert e.status == 400 and json.loads(e.body)["error_code"] == "INVALID_INSTITUTION"
+    else:
+        raise AssertionError("an unknown institution created a public token")
 
 
 def case_public_token_is_single_use():

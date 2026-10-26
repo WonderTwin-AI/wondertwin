@@ -61,6 +61,10 @@ func (h *Handler) sandboxPublicTokenCreate(w http.ResponseWriter, r *http.Reques
 		h.writeMissing(w, missing)
 		return
 	}
+	if _, found := h.store.GetInstitution(inst); !found {
+		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_INSTITUTION", "invalid institution_id provided")
+		return
+	}
 	// The error_{CODE} password, with user_good, fails the create with that
 	// documented error (quirk LIFECYCLE-005).
 	if code, isErr := strings.CutPrefix(password, "error_"); isErr && (user == "" || user == "user_good") {

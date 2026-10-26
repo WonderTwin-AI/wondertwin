@@ -17,19 +17,19 @@ type identityAccountJSON struct {
 // accountsForRequest resolves the Item and the accounts the request names with
 // options.account_ids, in Position order. It writes the error and returns ok
 // false when it cannot: a bad Item, bad options, or an account id the Item lacks.
-func (h *Handler) accountsForRequest(w http.ResponseWriter, r *http.Request) (store.Item, []store.Account, bool) {
+func (h *Handler) accountsForRequest(w http.ResponseWriter, r *http.Request, product string) (store.Item, []store.Account, bool) {
 	call, _ := CallFrom(r)
 	ids, ok := accountIDs(call.Body)
 	if !ok {
 		h.invalidBody(w)
 		return store.Item{}, nil, false
 	}
-	return h.accountsForRequestIDs(w, r, ids)
+	return h.accountsForRequestIDs(w, r, ids, product)
 }
 
 // accountsForRequestIDs is accountsForRequest for ids the caller already read.
-func (h *Handler) accountsForRequestIDs(w http.ResponseWriter, r *http.Request, ids []string) (store.Item, []store.Account, bool) {
-	it, ok := h.liveItemFor(w, r)
+func (h *Handler) accountsForRequestIDs(w http.ResponseWriter, r *http.Request, ids []string, product string) (store.Item, []store.Account, bool) {
+	it, ok := h.liveItemWith(w, r, product)
 	if !ok {
 		return it, nil, false
 	}
@@ -49,7 +49,7 @@ func (h *Handler) accountsForRequestIDs(w http.ResponseWriter, r *http.Request, 
 
 // identityGet is POST /identity/get: each account with its holders.
 func (h *Handler) identityGet(w http.ResponseWriter, r *http.Request) {
-	it, accounts, ok := h.accountsForRequest(w, r)
+	it, accounts, ok := h.accountsForRequest(w, r, "identity")
 	if !ok {
 		return
 	}
@@ -93,7 +93,7 @@ func (h *Handler) identityMatch(w http.ResponseWriter, r *http.Request) {
 		h.writeMissing(w, []string{"user"})
 		return
 	}
-	it, accounts, ok := h.accountsForRequest(w, r)
+	it, accounts, ok := h.accountsForRequest(w, r, "identity")
 	if !ok {
 		return
 	}

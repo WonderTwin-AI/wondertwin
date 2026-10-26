@@ -145,7 +145,7 @@ func (h *Handler) transactionsRecurringGet(w http.ResponseWriter, r *http.Reques
 		h.invalidBody(w)
 		return
 	}
-	it, accounts, ok := h.accountsForRequestIDs(w, r, ids)
+	it, accounts, ok := h.accountsForRequestIDs(w, r, ids, "transactions")
 	if !ok {
 		return
 	}
