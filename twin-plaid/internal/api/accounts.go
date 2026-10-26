@@ -8,11 +8,19 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
-// seedAccounts gives a new Item the default accounts, in their sample order.
+// seedAccounts gives a new Item the default accounts, in their sample order, and
+// the default transactions on the first of them.
 func (h *Handler) seedAccounts(itemID string) {
+	var first string
 	for i, a := range seed.DefaultAccounts() {
 		a.ID, a.ItemID, a.Position = h.store.NewID(), itemID, i
 		h.store.PutAccount(a)
+		if i == 0 {
+			first = a.ID
+		}
+	}
+	for _, t := range seed.DefaultTransactions(itemID, first, h.store.NewID, h.store.Clock.Now()) {
+		h.store.AddTransaction(t)
 	}
 }
 
