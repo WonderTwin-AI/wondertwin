@@ -11,15 +11,7 @@
       "version": "15.2.0",
       "repo_url": "https://github.com/XeroAPI/xero-python",
       "docs_url": "https://developer.xero.com/documentation/api/accounting/overview"
-    },
-    "additional": [
-      {
-        "package": "xero-node",
-        "language": "typescript",
-        "version": "20.0.0",
-        "repo_url": "https://github.com/XeroAPI/xero-node"
-      }
-    ]
+    }
   },
   "service_surface": {
     "openapi_spec": {

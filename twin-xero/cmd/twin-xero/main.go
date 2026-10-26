@@ -1,6 +1,6 @@
 // twin-xero is a WonderTwin app emulator for the Xero Accounting API.
 //
-// SDK compatibility target: xero-python 15.2.0 (primary), xero-node 20.0.0
+// SDK compatibility target: xero-python 15.2.0
 // Integration method: override the API and identity hosts
 //
 // LocalStack starts it as `twin-xero --port=N` and treats it as ready when
