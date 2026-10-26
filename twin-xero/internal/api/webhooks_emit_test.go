@@ -57,12 +57,65 @@ func next(t *testing.T, ch chan received) received {
 	}
 }
 
-func none(t *testing.T, ch chan received) {
+// barrier returns once everything emitted before it has been delivered, retries
+// included. One worker delivers events in the order they were emitted, so a
+// sentinel event to a subscription of its own (OVERPAYMENT, which no other test
+// subscribes to) comes out after them all. It replaces sleeping and hoping.
+func barrier(t *testing.T, h *Handler) {
 	t.Helper()
+	srv, got := receiver(t)
+	id := "barrier-" + h.store.NewID()
+	subscribe(h, id, srv.URL, "barrier", store.WebhookOK, "OVERPAYMENT")
+	h.emit(emitRequest(), store.DefaultTenantID, "OVERPAYMENT", "CREATE", id, nil)
+	next(t, got)
+	// The receiver has the sentinel, but the dispatcher logs it a moment later;
+	// everything emitted before it is already logged, and now so is the sentinel.
+	waitFor(t, "the sentinel delivery to be logged", func() bool { return deliveriesTo(h, srv.URL) > 0 })
+	h.store.Webhooks.Delete(id)
+}
+
+// none asserts the receiver was sent nothing, after a barrier has made sure
+// that anything which was going to arrive has.
+func none(t *testing.T, h *Handler, ch chan received) {
+	t.Helper()
+	barrier(t, h)
 	select {
 	case r := <-ch:
 		t.Fatalf("unexpected delivery: %s", r.body)
-	case <-time.After(300 * time.Millisecond):
+	default:
+	}
+}
+
+// waitFor polls a condition until it holds, and fails the test if it does not
+// within a generous limit. It waits on the condition and never on elapsed time.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); !cond(); time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+	}
+}
+
+// deliveriesTo counts the deliveries the log holds for one URL.
+func deliveriesTo(h *Handler, url string) int {
+	n := 0
+	for _, d := range h.dispatcher.Deliveries() {
+		if d.URL == url {
+			n++
+		}
+	}
+	return n
+}
+
+// signedBy fails the test unless the delivery's signature is the HMAC-SHA256 of
+// its body under the key, as a receiver would recompute it.
+func signedBy(t *testing.T, d received, key string) {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write(d.body)
+	if want := base64.StdEncoding.EncodeToString(mac.Sum(nil)); d.sig != want {
+		t.Fatalf("x-xero-signature = %q, want %q", d.sig, want)
 	}
 }
 
@@ -123,10 +176,10 @@ func TestWebhookEmitOnlyReachesSubscribedCategoriesAndPassingSubscriptions(t *te
 	subscribe(h, "w2", failed.URL, "k", store.WebhookFailed, "INVOICE", "CONTACT")
 
 	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "UPDATE", "c-1", nil)
-	none(t, invGot)
+	none(t, h, invGot)
 	h.emit(emitRequest(), store.DefaultTenantID, "INVOICE", "CREATE", "i-1", nil)
 	next(t, invGot)
-	none(t, failedGot)
+	none(t, h, failedGot)
 }
 
 func TestWebhookEmitKeepsEventsInOrder(t *testing.T) {
@@ -154,8 +207,8 @@ func TestWebhookEmitRetriesAFailedDeliveryThenStops(t *testing.T) {
 	if string(first.body) != string(second.body) || first.sig != second.sig {
 		t.Fatal("a retry must resend the same signed body")
 	}
-	time.Sleep(100 * time.Millisecond)
-	if n := len(h.dispatcher.Deliveries()); n != 2 {
+	barrier(t, h) // a third attempt would have been made before the sentinel
+	if n := deliveriesTo(h, srv.URL); n != 2 {
 		t.Fatalf("the kit retried %d times, want 1 failure and 1 success", n)
 	}
 }
@@ -166,7 +219,7 @@ func TestWebhookEmitStateIsClearedByReset(t *testing.T) {
 	subscribe(h, "w1", srv.URL, "k", store.WebhookOK, "CONTACT")
 	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "CREATE", "c", nil)
 	next(t, got)
-	time.Sleep(100 * time.Millisecond)
+	barrier(t, h) // the first delivery has been logged, so reset has something to clear
 
 	h.store.Reset()
 	if len(h.dispatcher.Deliveries()) != 0 || h.store.WebhookSeq.Load() != 0 || h.store.Webhooks.Count() != 0 {

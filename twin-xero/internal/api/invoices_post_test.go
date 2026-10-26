@@ -77,7 +77,7 @@ func TestPostWithAnUnknownInvoiceIDIsA404AndWritesNothing(t *testing.T) {
 	if _, list := getInvoices(t, h, "Invoices"); code != 404 || len(list["Invoices"].([]any)) != 0 {
 		t.Fatalf("status %d, store %v", code, list)
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestPostWithSummarizeErrorsFalseWritesTheValidOnesAndAnswersTheRestInPlace(t *testing.T) {
@@ -95,5 +95,5 @@ func TestPostWithSummarizeErrorsFalseWritesTheValidOnesAndAnswersTheRestInPlace(
 		t.Fatalf("%d %v", code, body)
 	}
 	wantEvent(t, eventsOf(t, got, 1)[0], "INVOICE", "UPDATE", id)
-	none(t, got)
+	none(t, h, got)
 }
