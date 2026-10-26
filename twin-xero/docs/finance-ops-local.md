@@ -11,7 +11,7 @@ go build -o twin-xero ./twin-xero/cmd/twin-xero
 ./twin-xero --port=5001
 ```
 
-`5001` is the port `xero-local` used, so `finance-ops` needs no URL change. The default is `4115`. Leave `--strict-auth` off: `finance-ops` seeds made-up tokens, and strict mode refuses them as Xero does (divergences `auth-001`, `auth-003`, `auth-007`).
+`5001` is the port `xero-local` used, so `finance-ops` needs no URL change. The default is `4115`. Leave `--strict-auth` off: `finance-ops` seeds made-up tokens and client credentials, and strict mode refuses them as Xero does (divergences `auth-001`, `auth-003`, `auth-006`, `auth-007`).
 
 Nothing needs seeding. The default tenant answers to `00000000-0000-0000-0000-000000000001` (an unknown tenant id is accepted by default) and carries the chart accounts `090`, `200`, `201` and `404`. A made-up bearer token and a made-up refresh token are accepted; `POST /connect/token` answers a Xero-shaped token.
 
