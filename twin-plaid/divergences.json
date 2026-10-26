@@ -160,7 +160,7 @@
     },
     {
       "route": "POST /auth/get",
-      "reason": "Only accounts that carry bank numbers are returned (the checking account), with wire_routing null because it is not published. Plaid returns a different error for an Item without the auth product and for an account type it does not serve; the emulator has no product gate and uses NO_AUTH_ACCOUNTS. Micro-deposit fields are not modelled.",
+      "reason": "Only accounts that carry bank numbers are returned (the checking account), with wire_routing null because it is not published. An Item without the auth product gets 400 ITEM_ERROR PRODUCT_NOT_ENABLED; Plaid does not document which product error this route returns. Plaid returns a different error for an account type it does not serve; the emulator uses NO_AUTH_ACCOUNTS. Micro-deposit fields are not modelled.",
       "references": {
         "docs": "plaid.com/docs/api/products/auth",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
