@@ -150,9 +150,9 @@ func (h *Handler) buildPayment(tenant string, in paymentIn, working map[string]s
 	if inv.AmountDue <= 0 {
 		inv.Status, inv.FullyPaidOnDate = "PAID", &p.Date
 	}
-	inv.Payments = append(append([]map[string]any(nil), inv.Payments...), map[string]any{
-		"PaymentID": p.PaymentID, "Date": jsonString(Msdate(p.Date)), "Amount": p.Amount,
-		"Reference": p.Reference, "HasAccount": true, "HasValidationErrors": false,
+	inv.Payments = append(append([]store.PaymentSummary(nil), inv.Payments...), store.PaymentSummary{
+		PaymentID: p.PaymentID, Date: jsonString(Msdate(p.Date)), Amount: p.Amount,
+		Reference: p.Reference, HasAccount: true,
 	})
 	inv.UpdatedDateUTC, inv.UpdatedDateUTCString = now, p.UpdatedDateUTCString
 	return p, inv, nil

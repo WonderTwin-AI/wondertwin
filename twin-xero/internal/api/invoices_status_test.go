@@ -86,7 +86,7 @@ func TestInvoiceWithPaymentsCannotBeVoidedAndPaidOnesKeepTheirAmounts(t *testing
 	invoices := h.store.Invoices.For(store.DefaultTenantID)
 	stored, _, _ := findInvoice(invoices.List(), id)
 	stored.AmountPaid, stored.AmountDue = 100, 0
-	stored.Payments = []map[string]any{{"PaymentID": "p1"}}
+	stored.Payments = []store.PaymentSummary{{PaymentID: "p1"}}
 	invoices.Set(id, stored) // s12 adds the payments themselves
 
 	if code, body := postInvoice(t, h, id, "", `{"Status":"VOIDED"}`); code != 400 || !bodyMentions(body, "payments applied") {

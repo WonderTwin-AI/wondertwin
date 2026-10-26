@@ -43,10 +43,20 @@ func inInvoice(w invoice) store.Invoice {
 // wireInvoice readies a stored invoice for the wire: the contact is resolved,
 // the lists Xero always returns are [], and the dates are msdates.
 func (h *Handler) wireInvoice(tenant string, in store.Invoice) invoice {
-	for _, l := range []*[]map[string]any{&in.Payments, &in.Prepayments, &in.Overpayments, &in.CreditNotes, &in.Attachments} {
-		if *l == nil {
-			*l = []map[string]any{}
-		}
+	if in.Payments == nil {
+		in.Payments = []store.PaymentSummary{}
+	}
+	if in.Prepayments == nil {
+		in.Prepayments = []store.PrepaymentSummary{}
+	}
+	if in.Overpayments == nil {
+		in.Overpayments = []store.OverpaymentSummary{}
+	}
+	if in.CreditNotes == nil {
+		in.CreditNotes = []store.CreditNoteSummary{}
+	}
+	if in.Attachments == nil {
+		in.Attachments = []store.Attachment{}
 	}
 	if in.LineItems == nil {
 		in.LineItems = []store.LineItem{}

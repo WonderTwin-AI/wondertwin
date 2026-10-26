@@ -69,7 +69,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 
 	if p.CreditNote != nil {
 		cn, _ := h.store.CreditNotes.For(tenant).Get(p.CreditNote.CreditNoteID)
-		cn.Payments = slices.DeleteFunc(slices.Clone(cn.Payments), func(e map[string]any) bool { return e["PaymentID"] == p.PaymentID })
+		cn.Payments = slices.DeleteFunc(slices.Clone(cn.Payments), func(e store.PaymentSummary) bool { return e.PaymentID == p.PaymentID })
 		cn.RemainingCredit = max(round(cn.Total-cn.AppliedAmount-paymentsTotal(cn.Payments), 2), 0)
 		if cn.Status == "PAID" && cn.RemainingCredit > 0 {
 			cn.Status, cn.FullyPaidOnDate = "AUTHORISED", nil
@@ -89,7 +89,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 			if inv.Status == "PAID" {
 				inv.Status, inv.FullyPaidOnDate = "AUTHORISED", nil
 			}
-			inv.Payments = slices.DeleteFunc(slices.Clone(inv.Payments), func(e map[string]any) bool { return e["PaymentID"] == p.PaymentID })
+			inv.Payments = slices.DeleteFunc(slices.Clone(inv.Payments), func(e store.PaymentSummary) bool { return e.PaymentID == p.PaymentID })
 			inv.UpdatedDateUTC, inv.UpdatedDateUTCString = now, p.UpdatedDateUTCString
 			invoices.Set(inv.InvoiceID, inv)
 			h.emit(r, tenant, "INVOICE", "UPDATE", inv.InvoiceID, nil)

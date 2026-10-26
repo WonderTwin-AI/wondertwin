@@ -30,7 +30,7 @@ type CreditNote struct {
 	RemainingCredit       float64           `json:"RemainingCredit"`
 	Allocations           []Allocation      `json:"Allocations"`
 	AppliedAmount         float64           `json:"AppliedAmount"`
-	Payments              []map[string]any  `json:"Payments"`
+	Payments              []PaymentSummary  `json:"Payments"`
 	BrandingThemeID       string            `json:"BrandingThemeID,omitempty"`
 	StatusAttributeString string            `json:"StatusAttributeString,omitempty"`
 	HasAttachments        bool              `json:"HasAttachments"`

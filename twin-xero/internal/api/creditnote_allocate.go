@@ -96,9 +96,9 @@ func (h *Handler) applyAllocations(tenant string, cn *store.CreditNote) {
 		if inv.AmountDue == 0 && !wasPaid {
 			inv.Status, inv.FullyPaidOnDate = "PAID", a.Date
 		}
-		inv.CreditNotes = append(inv.CreditNotes, map[string]any{
-			"CreditNoteID": cn.CreditNoteID, "ID": cn.CreditNoteID, "CreditNoteNumber": cn.CreditNoteNumber,
-			"AppliedAmount": a.Amount, "Date": Msdate(*a.Date), "HasErrors": false,
+		inv.CreditNotes = append(inv.CreditNotes, store.CreditNoteSummary{
+			CreditNoteID: cn.CreditNoteID, ID: cn.CreditNoteID, CreditNoteNumber: cn.CreditNoteNumber,
+			AppliedAmount: a.Amount, Date: jsonString(Msdate(*a.Date)),
 		})
 		inv.UpdatedDateUTC, inv.UpdatedDateUTCString = cn.UpdatedDateUTC, cn.UpdatedDateUTCString
 		invoices.Set(inv.InvoiceID, inv)
