@@ -23,7 +23,9 @@ func eventsOf(t *testing.T, got chan received, n int) []map[string]any {
 	var out []map[string]any
 	for range n {
 		var p struct{ Events []map[string]any }
-		if err := json.Unmarshal(next(t, got).body, &p); err != nil || len(p.Events) != 1 {
+		d := next(t, got)
+		signedBy(t, d, "k") // subscribed() registers every receiver under the key k
+		if err := json.Unmarshal(d.body, &p); err != nil || len(p.Events) != 1 {
 			t.Fatalf("delivery: %v %v", err, p)
 		}
 		out = append(out, p.Events[0])
@@ -124,7 +126,7 @@ func TestCreditNotePaymentsReportTheCreditNoteTheyChange(t *testing.T) {
 	if d, _ := e["data"].(map[string]any); d["Status"] != "AUTHORISED" {
 		t.Errorf("data = %v, deleting the payment puts the credit note back to AUTHORISED", e["data"])
 	}
-	none(t, got) // no invoice is touched by a credit note payment
+	none(t, h, got) // no invoice is touched by a credit note payment
 }
 
 func TestACreditNoteReachedTwiceInOneRequestIsReportedOnceWithItsFinalStatus(t *testing.T) {
@@ -140,7 +142,7 @@ func TestACreditNoteReachedTwiceInOneRequestIsReportedOnceWithItsFinalStatus(t *
 	if d, _ := e["data"].(map[string]any); d["Status"] != "PAID" {
 		t.Errorf("data = %v, want the status after the last payment", e["data"])
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestAnInvoiceReachedTwiceInOneRequestIsReportedOnce(t *testing.T) {
@@ -152,7 +154,7 @@ func TestAnInvoiceReachedTwiceInOneRequestIsReportedOnce(t *testing.T) {
 		t.Fatalf("payments: %d %v", code, body)
 	}
 	wantEvent(t, eventsOf(t, got, 1)[0], "INVOICE", "UPDATE", id)
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestARefusedWriteReportsNothing(t *testing.T) {
@@ -165,7 +167,7 @@ func TestARefusedWriteReportsNothing(t *testing.T) {
 	if rec := do(h, "POST", "/api.xro/2.0/Invoices/no-such", `{"Status":"VOIDED"}`, accounting(t, h, store.DefaultTenantID)); rec.Code != 404 {
 		t.Fatalf("unknown invoice answered %d", rec.Code)
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestOnlyTheValidInvoicesOfAPartialBatchAreReported(t *testing.T) {
@@ -178,7 +180,7 @@ func TestOnlyTheValidInvoicesOfAPartialBatchAreReported(t *testing.T) {
 		{"Type":"ACCREC","Contact":{"ContactID":"no-such"},"LineItems":[]}]}`, cid))
 	good := body["Invoices"].([]any)[0].(map[string]any)["InvoiceID"].(string)
 	wantEvent(t, eventsOf(t, got, 1)[0], "INVOICE", "CREATE", good)
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestEventsReachOnlyTheCategoriesSubscribedTo(t *testing.T) {
@@ -190,7 +192,7 @@ func TestEventsReachOnlyTheCategoriesSubscribedTo(t *testing.T) {
 	wantEvent(t, eventsOf(t, got, 1)[0], "CONTACT", "CREATE", cid)
 	putInvoices(t, h, "", fmt.Sprintf(`{"Type":"ACCREC","Status":"AUTHORISED","Contact":{"ContactID":%q},
 		"LineItems":[{"AccountCode":"200","Quantity":1,"UnitAmount":10}]}`, cid))
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestEventSequencesIncreaseInWriteOrder(t *testing.T) {
@@ -244,7 +246,7 @@ func TestAnEventIsNotDeliveredToASubscriptionRegisteredAfterTheWrite(t *testing.
 
 	// Events arrive in write order, so a stale one would come first.
 	wantEvent(t, eventsOf(t, got, 1)[0], "CONTACT", "CREATE", after)
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestAWriteWithNoSubscriberQueuesNothing(t *testing.T) {

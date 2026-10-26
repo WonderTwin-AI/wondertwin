@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -126,7 +125,7 @@ func TestWebhookIntentFailsAReceiverThatDoesNotCheckSignatures(t *testing.T) {
 	srv, got := receiver(t)
 	subscribe(h, "w2", srv.URL, "k", store.WebhookFailed, "CONTACT")
 	h.emit(emitRequest(), store.DefaultTenantID, "CONTACT", "CREATE", "c", nil)
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestWebhookIntentVerifyReenablesASubscriptionOnceTheReceiverIsFixed(t *testing.T) {
@@ -158,10 +157,7 @@ func TestWebhookRegisterDeleteAndTheDeliveryLog(t *testing.T) {
 	t.Cleanup(srv.Close)
 	w := registered(t, call(h, "POST", "/admin/webhooks", `{"url":"`+srv.URL+`","key":"k"}`))
 	h.emit(emitRequest(), store.DefaultTenantID, "INVOICE", "CREATE", "i", nil)
-	deadline := time.Now().Add(3 * time.Second)
-	for len(h.dispatcher.Deliveries()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitFor(t, "the delivery to be logged", func() bool { return len(h.dispatcher.Deliveries()) > 0 })
 	var log []map[string]any
 	_ = json.Unmarshal(call(h, "GET", "/admin/webhooks/deliveries", "").Body.Bytes(), &log)
 	if len(log) != 1 || log[0]["status_code"] != float64(200) {

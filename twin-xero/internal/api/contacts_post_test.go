@@ -84,7 +84,7 @@ func TestPostWithAnUnknownContactIDIsA404AndWritesNothing(t *testing.T) {
 	if code != 404 || contactCount(t, h) != 0 {
 		t.Fatalf("status %d, %d contacts", code, contactCount(t, h))
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestPostWithOneInvalidContactWritesNoneAndSendsNoEvent(t *testing.T) {
@@ -99,7 +99,7 @@ func TestPostWithOneInvalidContactWritesNoneAndSendsNoEvent(t *testing.T) {
 	if _, list := listContacts(t, h, url.Values{}); names(list)[0] != "Acme" || contactCount(t, h) != 1 {
 		t.Fatalf("a refused request changed the store: %v", names(list))
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestPostRefusedForAnInvalidNameLeavesTheStoredAddressesAndPhonesUnchanged(t *testing.T) {

@@ -234,7 +234,7 @@ func TestPostCreditNotesWithSummarizeErrorsFalseAnswersTheInvalidOnesInPlace(t *
 		t.Fatalf("%d %v", code, body)
 	}
 	wantEvent(t, eventsOf(t, got, 1)[0], "CREDITNOTE", "UPDATE", id)
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestPostWithAnUnknownCreditNoteIDIsA404AndWritesNothing(t *testing.T) {
@@ -246,7 +246,7 @@ func TestPostWithAnUnknownCreditNoteIDIsA404AndWritesNothing(t *testing.T) {
 	if n := len(h.store.CreditNotes.For(store.DefaultTenantID).List()); code != 404 || n != 0 {
 		t.Fatalf("status %d, %d credit notes", code, n)
 	}
-	none(t, got)
+	none(t, h, got)
 }
 
 func TestPostAddsAllocationsToAnAuthorisedCreditNoteUpToWhatIsLeft(t *testing.T) {
