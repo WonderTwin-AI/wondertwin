@@ -196,9 +196,14 @@ def start_receiver():
         def log_message(self, *args):
             pass
 
-    server = http.server.HTTPServer(("127.0.0.1", 0), Hook)
+    # SMOKE_RECEIVER_BIND is the address the receiver listens on and
+    # SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+    # from inside a container sets 0.0.0.0 and host.docker.internal.
+    bind = os.environ.get("SMOKE_RECEIVER_BIND", "127.0.0.1")
+    host = os.environ.get("SMOKE_RECEIVER_HOST", "127.0.0.1")
+    server = http.server.HTTPServer((bind, 0), Hook)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    return f"http://127.0.0.1:{server.server_port}/hook", got
+    return f"http://{host}:{server.server_port}/hook", got
 
 
 def case_item_webhook_update_delivers_a_signed_flat_body():
