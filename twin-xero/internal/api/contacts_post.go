@@ -27,7 +27,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 		in.Contacts = []json.RawMessage{raw}
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, err)
 		return
 	}
 
@@ -46,8 +46,8 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 	writes := make([]write, len(in.Contacts))
 	for i, one := range in.Contacts {
 		var sent contact
-		if err := json.Unmarshal(one, &sent); err != nil {
-			h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		if err := decodeBody(one, &sent); err != nil {
+			h.writeBadBody(w, r, err)
 			return
 		}
 		if sent.ContactID == "" {
@@ -82,7 +82,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 		}
 		msgs := validateContact(wr.c.Contact, others)
 		invalid = invalid || len(msgs) > 0
-		elements = append(elements, validationElement{Object: wr.c, Messages: msgs})
+		elements = append(elements, validationElement{Object: in.Contacts[i], Messages: msgs})
 	}
 	if invalid {
 		writeValidationException(w, elements...)

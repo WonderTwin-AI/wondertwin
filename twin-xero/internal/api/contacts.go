@@ -48,27 +48,34 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	var in struct{ Contacts []contact }
 	if err == nil {
-		err = json.Unmarshal(raw, &in)
+		err = decodeBody(raw, &in)
 	}
 	if err == nil && in.Contacts == nil {
 		var one contact
-		if err = json.Unmarshal(raw, &one); err == nil {
+		if err = decodeBody(raw, &one); err == nil {
 			in.Contacts = []contact{one}
 		}
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, err)
 		return
+	}
+
+	// An element echoes what was submitted, not the contact with its zero values.
+	items := []json.RawMessage{raw}
+	var env struct{ Contacts []json.RawMessage }
+	if json.Unmarshal(raw, &env) == nil && env.Contacts != nil {
+		items = env.Contacts
 	}
 
 	contacts := h.store.Contacts.For(tenantID(r))
 	existing := contacts.List()
 	var elements []validationElement
 	invalid := false
-	for _, c := range in.Contacts {
+	for i, c := range in.Contacts {
 		msgs := validateContact(c.Contact, existing)
 		invalid = invalid || len(msgs) > 0
-		elements = append(elements, validationElement{Object: c, Messages: msgs})
+		elements = append(elements, validationElement{Object: items[i], Messages: msgs})
 		existing = append(existing, c.Contact) // a duplicate within the request is a duplicate
 	}
 	if invalid {

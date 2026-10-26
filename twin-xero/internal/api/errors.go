@@ -1,8 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"reflect"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
@@ -71,4 +75,97 @@ func writeValidationException(w http.ResponseWriter, elements ...validationEleme
 		"Message":     "A validation exception occurred",
 		"Elements":    out,
 	})
+}
+
+// badValueError is a date the body carried that Xero cannot read. Field is the
+// key that held it, filled in by decodeBody.
+type badValueError struct{ Field string }
+
+func (e *badValueError) Error() string { return "invalid date in " + e.Field }
+
+// writeBadBody answers a body that did not decode. JSON that is not JSON stays a
+// plain 400 problem. A value of the wrong type or a date that cannot be read is a
+// ValidationException that names the field, as every other refused value is
+// (audit finding F3). The exact words are a guess; Xero's are not observed.
+func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, err error) {
+	var typeErr *json.UnmarshalTypeError
+	var valueErr *badValueError
+	switch {
+	case errors.As(err, &typeErr):
+		writeValidationException(w, validationElement{Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
+	case errors.As(err, &valueErr):
+		field := valueErr.Field
+		if field == "" {
+			field = "Date"
+		}
+		writeValidationException(w, validationElement{Messages: []string{field + " is not a valid date"}})
+	default:
+		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+	}
+}
+
+// decodeBody is json.Unmarshal that, when a date cannot be read, says which key
+// held it. encoding/json drops that, so the body is decoded again one key at a
+// time into a fresh v, in document order, and the first key whose own decode
+// fails is the one named.
+func decodeBody(raw []byte, v any) error {
+	err := json.Unmarshal(raw, v)
+	var bad *badValueError
+	if !errors.As(err, &bad) {
+		return err
+	}
+	typ := reflect.TypeOf(v).Elem()
+	fails := func(b []byte) bool {
+		var be *badValueError
+		return errors.As(json.Unmarshal(b, reflect.New(typ).Interface()), &be)
+	}
+	bad.Field = badKey(raw, func(b []byte) []byte { return b }, fails)
+	return err
+}
+
+// badKey descends val in document order. wrap puts a fragment back at val's
+// place in the body, so each probe is a whole body carrying just that fragment.
+func badKey(val []byte, wrap func([]byte) []byte, fails func([]byte) bool) string {
+	dec := json.NewDecoder(bytes.NewReader(val))
+	open, err := dec.Token()
+	if err != nil {
+		return ""
+	}
+	for dec.More() {
+		key := ""
+		if open == json.Delim('{') {
+			t, err := dec.Token()
+			if err != nil {
+				return ""
+			}
+			key, _ = t.(string)
+		}
+		var child json.RawMessage
+		if dec.Decode(&child) != nil {
+			return ""
+		}
+		inner := func(b []byte) []byte { return wrap(append(append([]byte("["), b...), ']')) }
+		if open == json.Delim('{') {
+			quoted, _ := json.Marshal(key)
+			inner = func(b []byte) []byte {
+				return wrap(append(append(append([]byte("{"), quoted...), ':'), append(b, '}')...))
+			}
+		}
+		if !fails(inner(child)) {
+			continue
+		}
+		if deeper := badKey(child, inner, fails); deeper != "" {
+			return deeper
+		}
+		return key
+	}
+	return ""
+}
+
+// lastKey is the last name in a dotted field path.
+func lastKey(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[i+1:]
+	}
+	return path
 }

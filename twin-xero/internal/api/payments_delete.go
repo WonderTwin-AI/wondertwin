@@ -38,7 +38,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 		err = json.Unmarshal(one, &sent)
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, err)
 		return
 	}
 

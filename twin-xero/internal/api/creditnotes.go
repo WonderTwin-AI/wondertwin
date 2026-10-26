@@ -29,11 +29,11 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 	sent := make([]creditNote, len(in.CreditNotes))
 	for i, item := range in.CreditNotes {
 		if err == nil {
-			err = json.Unmarshal(item, &sent[i])
+			err = decodeBody(item, &sent[i])
 		}
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, err)
 		return
 	}
 	unitdp := 2

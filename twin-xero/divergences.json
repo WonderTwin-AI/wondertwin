@@ -250,6 +250,30 @@
       "quirk_ids": [
         "crud-006"
       ]
+    },
+    {
+      "route": "Any path or method the emulator does not serve (another path version, another API family, an unregistered path, or a method a served path does not take)",
+      "reason": "Authentication precedes routing, as on Xero: a call without a token the emulator accepts answers the 401 first. With one, the answer is a 404 (or 405 for a served path with another method) whose body is problem details with Title Not Found or Method Not Allowed. Xero's own body for an unknown path is not observed, so its words are a guess.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json (auth-008, err-001)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Added for audit finding F2 of the first community audit. Approved by the operator by merging the change that added it.",
+      "quirk_ids": [
+        "auth-008"
+      ]
+    },
+    {
+      "route": "Any write whose body carries a value of the wrong type or a date that cannot be read",
+      "reason": "The answer is a 400 ValidationException whose element names the field (\"Name is not valid\", \"Date is not a valid date\"). Xero's own wording for an unreadable value is not observed, so the message text is a guess. A body that is not JSON at all still answers a 400 problem with \"The request body is not valid JSON\".",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json (auth-008, err-001)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Added for audit finding F3 of the first community audit. Approved by the operator by merging the change that added it.",
+      "quirk_ids": [
+        "err-001"
+      ]
     }
   ]
 }

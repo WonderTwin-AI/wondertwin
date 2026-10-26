@@ -44,6 +44,8 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 // passes fault injection. The token endpoint answers without a bearer token,
 // since it is how a client gets one; everything else sits behind bearer.
 func (h *Handler) Routes(r chi.Router) {
+	r.NotFound(h.NotFound)
+	r.MethodNotAllowed(h.MethodNotAllowed)
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 		r.Post("/connect/token", h.Token)
