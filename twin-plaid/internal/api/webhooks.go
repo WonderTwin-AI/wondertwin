@@ -44,7 +44,9 @@ func (h *Handler) dispatcher() *webhook.Dispatcher {
 	return h.hooks
 }
 
-// Webhooks is the dispatcher, for the admin plane and tests to inspect deliveries.
+// Webhooks is the dispatcher, for tests to inspect deliveries. The admin plane's
+// webhook flush is not wired to it: delivery is automatic, so a flush would send
+// every event a second time.
 func (h *Handler) Webhooks() *webhook.Dispatcher { return h.dispatcher() }
 
 // fireWebhook queues a webhook for an Item's URL. The body is flat: type, code,

@@ -31,6 +31,9 @@ type MemoryStore struct {
 
 	// defaults restores the fixtures a fresh store starts with; see SetDefaults.
 	defaults func(*MemoryStore)
+	// onReset runs after every Reset, for state that lives outside the store
+	// (the webhook dispatcher); see OnReset.
+	onReset []func()
 }
 
 // New creates an empty MemoryStore.
@@ -126,6 +129,13 @@ func (s *MemoryStore) SetDefaults(fn func(*MemoryStore)) {
 	fn(s)
 }
 
+// OnReset registers fn to run at the end of every Reset, after the defaults are
+// reloaded. State the store does not own, such as queued webhooks, clears here
+// so /admin/reset returns the whole emulator to a fresh start.
+func (s *MemoryStore) OnReset(fn func()) {
+	s.onReset = append(s.onReset, fn)
+}
+
 // Reset clears every store and the simulated clock, then reloads the defaults.
 func (s *MemoryStore) Reset() {
 	s.Clock.Reset()
@@ -142,6 +152,9 @@ func (s *MemoryStore) Reset() {
 	s.logMu.Unlock()
 	if s.defaults != nil {
 		s.defaults(s)
+	}
+	for _, fn := range s.onReset {
+		fn()
 	}
 }
 
