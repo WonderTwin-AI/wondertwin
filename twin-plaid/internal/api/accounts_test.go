@@ -94,3 +94,17 @@ func TestAccountsGetRefusesAnUnknownAccessToken(t *testing.T) {
 		t.Fatalf("body = %v", m)
 	}
 }
+
+func TestANewItemStartsWithTheTwoPublishedTransactions(t *testing.T) {
+	tc, _, mem := setupPlaid(t)
+	token := linkedItem(tc)
+	item, _ := mem.ItemForAccessToken(token)
+	rows := mem.TransactionsForItem(item.ID)
+	if len(rows) != 2 || rows[0].AccountID != accountsOf(tc, token)[0]["account_id"] {
+		t.Fatalf("rows = %+v, want two on the checking account", rows)
+	}
+	page, err := mem.Sync(item.ID, "", 100)
+	if err != nil || len(page.Added) != 2 {
+		t.Fatalf("a first sync = %+v, %v", page, err)
+	}
+}

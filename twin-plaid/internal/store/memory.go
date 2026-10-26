@@ -19,11 +19,15 @@ type MemoryStore struct {
 	AccessTokens    *pkgstate.Store[AccessToken]
 	LinkTokens      *pkgstate.Store[LinkToken]
 	ProcessorTokens *pkgstate.Store[ProcessorToken]
+	Transactions    *pkgstate.Store[Transaction]
+	// ChangeLogs is each Item's transaction history, by item id; logMu guards it.
+	ChangeLogs map[string][]Change
 	// Rand is the deterministic random source. main.go replaces the default
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
 
 	tokenMu sync.Mutex
+	logMu   sync.Mutex
 
 	// defaults restores the fixtures a fresh store starts with; see SetDefaults.
 	defaults func(*MemoryStore)
@@ -40,6 +44,8 @@ func New() *MemoryStore {
 		AccessTokens:    pkgstate.New[AccessToken]("access"),
 		LinkTokens:      pkgstate.New[LinkToken]("link"),
 		ProcessorTokens: pkgstate.New[ProcessorToken]("processor"),
+		Transactions:    pkgstate.New[Transaction]("txn"),
+		ChangeLogs:      map[string][]Change{},
 		Rand:            sim.DefaultRand(),
 	}
 }
@@ -54,6 +60,8 @@ type snapshot struct {
 	AccessTokens    map[string]AccessToken    `json:"access_tokens,omitempty"`
 	LinkTokens      map[string]LinkToken      `json:"link_tokens,omitempty"`
 	ProcessorTokens map[string]ProcessorToken `json:"processor_tokens,omitempty"`
+	Transactions    map[string]Transaction    `json:"transactions,omitempty"`
+	ChangeLogs      map[string][]Change       `json:"change_logs,omitempty"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -66,6 +74,8 @@ func (s *MemoryStore) Snapshot() any {
 		AccessTokens:    s.AccessTokens.Snapshot(),
 		LinkTokens:      s.LinkTokens.Snapshot(),
 		ProcessorTokens: s.ProcessorTokens.Snapshot(),
+		Transactions:    s.Transactions.Snapshot(),
+		ChangeLogs:      s.changeLogsCopy(),
 	}
 }
 
@@ -93,6 +103,14 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.LinkTokens != nil {
 		s.LinkTokens.LoadSnapshot(snap.LinkTokens)
 	}
+	if snap.Transactions != nil {
+		s.Transactions.LoadSnapshot(snap.Transactions)
+	}
+	if snap.ChangeLogs != nil {
+		s.logMu.Lock()
+		s.ChangeLogs = snap.ChangeLogs
+		s.logMu.Unlock()
+	}
 	if snap.ProcessorTokens != nil {
 		s.ProcessorTokens.LoadSnapshot(snap.ProcessorTokens)
 	}
@@ -118,7 +136,22 @@ func (s *MemoryStore) Reset() {
 	s.AccessTokens.Reset()
 	s.LinkTokens.Reset()
 	s.ProcessorTokens.Reset()
+	s.Transactions.Reset()
+	s.logMu.Lock()
+	s.ChangeLogs = map[string][]Change{}
+	s.logMu.Unlock()
 	if s.defaults != nil {
 		s.defaults(s)
 	}
+}
+
+// changeLogsCopy is a copy of every Item's log, for the snapshot.
+func (s *MemoryStore) changeLogsCopy() map[string][]Change {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	out := make(map[string][]Change, len(s.ChangeLogs))
+	for k, v := range s.ChangeLogs {
+		out[k] = append([]Change(nil), v...)
+	}
+	return out
 }

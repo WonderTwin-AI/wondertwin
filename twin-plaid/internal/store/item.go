@@ -23,7 +23,7 @@ func (s *MemoryStore) PutItem(it Item) { s.Items.Set(it.ID, it) }
 // GetItem returns the item with the given ID.
 func (s *MemoryStore) GetItem(id string) (Item, bool) { return s.Items.Get(id) }
 
-// RemoveItem deletes an item, its accounts and its processor tokens.
+// RemoveItem deletes an item, its accounts, processor tokens and transactions.
 func (s *MemoryStore) RemoveItem(id string) bool {
 	if !s.Items.Delete(id) {
 		return false
@@ -32,6 +32,7 @@ func (s *MemoryStore) RemoveItem(id string) bool {
 		s.Accounts.Delete(a.ID)
 	}
 	s.removeProcessorTokens(id)
+	s.removeTransactions(id)
 	return true
 }
 
