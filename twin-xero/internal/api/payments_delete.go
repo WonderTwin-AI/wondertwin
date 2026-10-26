@@ -38,7 +38,7 @@ func (h *Handler) DeletePayment(w http.ResponseWriter, r *http.Request) {
 		err = json.Unmarshal(one, &sent)
 	}
 	if err != nil {
-		h.writeBadBody(w, r, one, err)
+		h.writeBadBody(w, r, err)
 		return
 	}
 

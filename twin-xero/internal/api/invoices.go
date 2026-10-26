@@ -28,11 +28,11 @@ func (h *Handler) CreateInvoices(w http.ResponseWriter, r *http.Request) {
 	sent := make([]invoice, len(in.Invoices))
 	for i, item := range in.Invoices {
 		if err == nil {
-			err = json.Unmarshal(item, &sent[i])
+			err = decodeBody(item, &sent[i])
 		}
 	}
 	if err != nil {
-		h.writeBadBody(w, r, raw, err)
+		h.writeBadBody(w, r, err)
 		return
 	}
 	unitdp := 2

@@ -48,16 +48,16 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	var in struct{ Contacts []contact }
 	if err == nil {
-		err = json.Unmarshal(raw, &in)
+		err = decodeBody(raw, &in)
 	}
 	if err == nil && in.Contacts == nil {
 		var one contact
-		if err = json.Unmarshal(raw, &one); err == nil {
+		if err = decodeBody(raw, &one); err == nil {
 			in.Contacts = []contact{one}
 		}
 	}
 	if err != nil {
-		h.writeBadBody(w, r, raw, err)
+		h.writeBadBody(w, r, err)
 		return
 	}
 

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"sort"
+	"reflect"
 	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
@@ -77,24 +77,24 @@ func writeValidationException(w http.ResponseWriter, elements ...validationEleme
 	})
 }
 
-// badValueError is a date the body carried that Xero cannot read. It keeps the
-// raw JSON of the value so the answer can name the field that held it.
-type badValueError struct{ Raw []byte }
+// badValueError is a date the body carried that Xero cannot read. Field is the
+// key that held it, filled in by decodeBody.
+type badValueError struct{ Field string }
 
-func (e *badValueError) Error() string { return "invalid date " + string(e.Raw) }
+func (e *badValueError) Error() string { return "invalid date in " + e.Field }
 
 // writeBadBody answers a body that did not decode. JSON that is not JSON stays a
 // plain 400 problem. A value of the wrong type or a date that cannot be read is a
 // ValidationException that names the field, as every other refused value is
 // (audit finding F3). The exact words are a guess; Xero's are not observed.
-func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, raw []byte, err error) {
+func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, err error) {
 	var typeErr *json.UnmarshalTypeError
 	var valueErr *badValueError
 	switch {
 	case errors.As(err, &typeErr):
 		writeValidationException(w, validationElement{Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
 	case errors.As(err, &valueErr):
-		field := fieldHolding(raw, valueErr.Raw)
+		field := valueErr.Field
 		if field == "" {
 			field = "Date"
 		}
@@ -104,49 +104,68 @@ func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, raw []byt
 	}
 }
 
+// decodeBody is json.Unmarshal that, when a date cannot be read, says which key
+// held it. encoding/json drops that, so the body is decoded again one key at a
+// time into a fresh v, in document order, and the first key whose own decode
+// fails is the one named.
+func decodeBody(raw []byte, v any) error {
+	err := json.Unmarshal(raw, v)
+	var bad *badValueError
+	if !errors.As(err, &bad) {
+		return err
+	}
+	typ := reflect.TypeOf(v).Elem()
+	fails := func(b []byte) bool {
+		var be *badValueError
+		return errors.As(json.Unmarshal(b, reflect.New(typ).Interface()), &be)
+	}
+	bad.Field = badKey(raw, func(b []byte) []byte { return b }, fails)
+	return err
+}
+
+// badKey descends val in document order. wrap puts a fragment back at val's
+// place in the body, so each probe is a whole body carrying just that fragment.
+func badKey(val []byte, wrap func([]byte) []byte, fails func([]byte) bool) string {
+	dec := json.NewDecoder(bytes.NewReader(val))
+	open, err := dec.Token()
+	if err != nil {
+		return ""
+	}
+	for dec.More() {
+		key := ""
+		if open == json.Delim('{') {
+			t, err := dec.Token()
+			if err != nil {
+				return ""
+			}
+			key, _ = t.(string)
+		}
+		var child json.RawMessage
+		if dec.Decode(&child) != nil {
+			return ""
+		}
+		inner := func(b []byte) []byte { return wrap(append(append([]byte("["), b...), ']')) }
+		if open == json.Delim('{') {
+			quoted, _ := json.Marshal(key)
+			inner = func(b []byte) []byte {
+				return wrap(append(append(append([]byte("{"), quoted...), ':'), append(b, '}')...))
+			}
+		}
+		if !fails(inner(child)) {
+			continue
+		}
+		if deeper := badKey(child, inner, fails); deeper != "" {
+			return deeper
+		}
+		return key
+	}
+	return ""
+}
+
 // lastKey is the last name in a dotted field path.
 func lastKey(path string) string {
 	if i := strings.LastIndex(path, "."); i >= 0 {
 		return path[i+1:]
 	}
 	return path
-}
-
-// fieldHolding finds the key under which the body carries the value, searching
-// every nesting level and taking the first key in name order, so the answer does
-// not vary from call to call.
-func fieldHolding(body, value []byte) string {
-	var tree any
-	if json.Unmarshal(body, &tree) != nil {
-		return ""
-	}
-	var walk func(v any) string
-	walk = func(v any) string {
-		switch t := v.(type) {
-		case map[string]any:
-			keys := make([]string, 0, len(t))
-			for k := range t {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				if enc, err := json.Marshal(t[k]); err == nil && bytes.Equal(enc, value) {
-					return k
-				}
-			}
-			for _, k := range keys {
-				if f := walk(t[k]); f != "" {
-					return f
-				}
-			}
-		case []any:
-			for _, e := range t {
-				if f := walk(e); f != "" {
-					return f
-				}
-			}
-		}
-		return ""
-	}
-	return walk(tree)
 }

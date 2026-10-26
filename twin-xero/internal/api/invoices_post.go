@@ -35,11 +35,11 @@ func (h *Handler) UpdateOrCreateInvoices(w http.ResponseWriter, r *http.Request)
 			in.Invoices[i], keys[i], err = normalizeInvoice(item)
 		}
 		if err == nil {
-			err = json.Unmarshal(in.Invoices[i], &sent[i])
+			err = decodeBody(in.Invoices[i], &sent[i])
 		}
 	}
 	if err != nil {
-		h.writeBadBody(w, r, raw, err)
+		h.writeBadBody(w, r, err)
 		return
 	}
 	unitdp := 2

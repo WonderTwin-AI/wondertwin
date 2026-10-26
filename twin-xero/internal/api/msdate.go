@@ -41,19 +41,19 @@ func (d *Msdate) UnmarshalJSON(b []byte) error {
 	}
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
-		return &badValueError{Raw: append([]byte(nil), b...)}
+		return &badValueError{}
 	}
 	if m := msdateRE.FindStringSubmatch(s); m != nil {
 		ms, err := strconv.ParseInt(m[1], 10, 64)
 		if err != nil {
-			return &badValueError{Raw: append([]byte(nil), b...)}
+			return &badValueError{}
 		}
 		*d = Msdate(time.UnixMilli(ms).UTC())
 		return nil
 	}
 	t, err := parseISO(s)
 	if err != nil {
-		return &badValueError{Raw: append([]byte(nil), b...)}
+		return &badValueError{}
 	}
 	*d = Msdate(t)
 	return nil
@@ -82,11 +82,11 @@ func (d *ISOTime) UnmarshalJSON(b []byte) error {
 	}
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
-		return &badValueError{Raw: append([]byte(nil), b...)}
+		return &badValueError{}
 	}
 	t, err := parseISO(s)
 	if err != nil {
-		return &badValueError{Raw: append([]byte(nil), b...)}
+		return &badValueError{}
 	}
 	*d = ISOTime(t)
 	return nil

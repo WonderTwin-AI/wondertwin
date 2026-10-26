@@ -27,7 +27,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 		in.Contacts = []json.RawMessage{raw}
 	}
 	if err != nil {
-		h.writeBadBody(w, r, raw, err)
+		h.writeBadBody(w, r, err)
 		return
 	}
 
@@ -46,8 +46,8 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 	writes := make([]write, len(in.Contacts))
 	for i, one := range in.Contacts {
 		var sent contact
-		if err := json.Unmarshal(one, &sent); err != nil {
-			h.writeBadBody(w, r, one, err)
+		if err := decodeBody(one, &sent); err != nil {
+			h.writeBadBody(w, r, err)
 			return
 		}
 		if sent.ContactID == "" {
