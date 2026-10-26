@@ -250,6 +250,18 @@
       "quirk_ids": [
         "crud-006"
       ]
+    },
+    {
+      "route": "Any path or method the emulator does not serve (another path version, another API family, an unregistered path, or a method a served path does not take)",
+      "reason": "Authentication precedes routing, as on Xero: a call without a token the emulator accepts answers the 401 first. With one, the answer is a 404 (or 405 for a served path with another method) whose body is problem details with Title Not Found or Method Not Allowed. Xero's own body for an unknown path is not observed, so its words are a guess.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json (auth-008, err-001)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Added for audit finding F2 of the first community audit. Approved by the operator by merging the change that added it.",
+      "quirk_ids": [
+        "auth-008"
+      ]
     }
   ]
 }
