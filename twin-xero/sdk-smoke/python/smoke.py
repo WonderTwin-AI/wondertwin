@@ -3,6 +3,11 @@ through the official xero-python SDK against a running binary.
 
     XERO_EMULATOR_URL=http://localhost:4195 uv run smoke.py
 
+The webhook case runs a local receiver. SMOKE_RECEIVER_BIND sets its listen
+address and SMOKE_RECEIVER_HOST the host registered through /admin/webhooks;
+both default to 127.0.0.1. Set them (for example 0.0.0.0 and a name the
+emulator can resolve) when the emulator runs in a container.
+
 The SDK hard-codes https://identity.xero.com in TokenApi, so the suite points
 its URL attributes at the emulator. The SDK has no authorization-code helper
 (the sample app does that with a third-party OAuth library), so the first
@@ -531,11 +536,13 @@ def case_webhook_events_follow_the_writes():
         def log_message(self, *args):
             pass
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+    bind = os.environ.get("SMOKE_RECEIVER_BIND", "127.0.0.1")
+    receiver_host = os.environ.get("SMOKE_RECEIVER_HOST", "127.0.0.1")
+    server = http.server.ThreadingHTTPServer((bind, 0), Receiver)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
-        conn.request("POST", "/admin/webhooks", json.dumps({"url": f"http://127.0.0.1:{server.server_port}/", "key": key}),
+        conn.request("POST", "/admin/webhooks", json.dumps({"url": f"http://{receiver_host}:{server.server_port}/", "key": key}),
                      {"Content-Type": "application/json"})
         registered = conn.getresponse()
         subscription = json.loads(registered.read())
