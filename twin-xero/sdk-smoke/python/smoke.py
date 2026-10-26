@@ -531,11 +531,13 @@ def case_webhook_events_follow_the_writes():
         def log_message(self, *args):
             pass
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+    bind = os.environ.get("SMOKE_RECEIVER_BIND", "127.0.0.1")
+    receiver_host = os.environ.get("SMOKE_RECEIVER_HOST", "127.0.0.1")
+    server = http.server.ThreadingHTTPServer((bind, 0), Receiver)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
-        conn.request("POST", "/admin/webhooks", json.dumps({"url": f"http://127.0.0.1:{server.server_port}/", "key": key}),
+        conn.request("POST", "/admin/webhooks", json.dumps({"url": f"http://{receiver_host}:{server.server_port}/", "key": key}),
                      {"Content-Type": "application/json"})
         registered = conn.getresponse()
         subscription = json.loads(registered.read())
