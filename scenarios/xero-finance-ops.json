@@ -1,6 +1,6 @@
 {
-  "name": "Xero finance-ops: bill, pay and refund a customer",
-  "description": "The localstack/finance-ops Stripe-to-Xero sequence over raw HTTP: look a contact up with where, create it, bill it, pay the bill, refund through a credit note with a full inline allocation, pay the credit note. Needs the xero twin on the port named in wondertwin.yaml.",
+  "name": "Xero: bill, pay and refund a customer",
+  "description": "A billing integration's sequence over raw HTTP: look a contact up with where, create it, bill it, pay the bill, refund through a credit note with a full inline allocation, pay the credit note. Needs the xero twin on the port named in wondertwin.yaml.",
   "setup": {
     "reset": [
       "xero"
@@ -8,7 +8,7 @@
   },
   "steps": [
     {
-      "name": "Health through the legacy path finance-ops polls",
+      "name": "Health through the /_xero/health alias",
       "request": {
         "method": "GET",
         "url": "http://localhost:{{twins.xero.port}}/_xero/health",

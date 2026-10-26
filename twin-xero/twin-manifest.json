@@ -3,7 +3,7 @@
   "vendor_domain": "xero.com",
   "tier": "community",
   "category": "accounting",
-  "description": "Xero Accounting API app emulator, built for the consumer localstack/finance-ops: OAuth tokens and connections, organisation, chart of accounts, and contacts, invoices, payments and credit notes with signed webhook events. Deliberate differences from Xero are declared in divergences.json.",
+  "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments and issue refunds: OAuth tokens and connections, organisation, chart of accounts, and contacts, invoices, payments and credit notes with signed webhook events. Deliberate differences from Xero are declared in divergences.json.",
   "sdk_target": {
     "primary": {
       "package": "xero-python",

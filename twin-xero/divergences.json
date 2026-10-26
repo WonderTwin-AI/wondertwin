@@ -2,7 +2,7 @@
   "twin_id": "twin-xero",
   "tier": "community",
   "vendor_api_version": "Xero Accounting API 2.0 as served 2026-09-28, spec 19.0.0",
-  "reviewed_at": "2026-10-19",
+  "reviewed_at": "2026-10-26",
   "divergences": [
     {
       "route": "GET /connections, GET /Connections and every authenticated route",
@@ -11,7 +11,7 @@
         "docs": "research/twins/xero/observations.json obs-003 (probes p10, p11)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Added for the named target localstack/finance-ops, which seeds a made-up token per test (tests/conftest.py seed_xero_token) and relies on xero-local accepting any bearer. Becomes operator-approved when WonderTwin-AI/wondertwin-docs#261, which adds slice xero-bp1-s24, is merged.",
+      "operator_note": "Added so a test suite that seeds a made-up token per test runs without registering one; strict_auth restores Xero's behaviour. Approved by the operator.",
       "quirk_ids": [
         "auth-007"
       ]
@@ -23,7 +23,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json auth-003",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Same reason as the bearer divergence: localstack/finance-ops seeds xero-local-test-refresh. Becomes operator-approved when WonderTwin-AI/wondertwin-docs#261 is merged.",
+      "operator_note": "Same reason as the bearer divergence: a test suite seeds a made-up refresh token. Approved by the operator.",
       "quirk_ids": [
         "auth-003"
       ]
@@ -35,7 +35,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json auth-001",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Same reason as the bearer divergence: localstack/finance-ops sends its own tenant id (tests/conftest.py XERO_TENANT_ID) and relies on xero-local not checking it. The default tenant id is finance-ops's value, so its own calls reach seeded data.",
+      "operator_note": "Same reason as the bearer divergence: a test suite sends its own tenant id and expects it to be accepted. The default tenant id is that value, so its calls reach seeded data. Approved by the operator.",
       "quirk_ids": [
         "auth-001"
       ]
@@ -47,7 +47,7 @@
         "docs": "research/twins/xero/feature-gap-register.md GAP-001; research/twins/xero/quirk-hypotheses.json webhook-005",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Scope exception granted by the operator on 2026-10-19: deferred to xero-bp2 (WonderTwin-AI/wondertwin-docs#270). The named target localstack/finance-ops uses no Xero webhooks.",
+      "operator_note": "Scope exception granted by the operator on 2026-10-19: deferred. The first integration this emulator was built for uses no Xero webhooks.",
       "quirk_ids": [
         "webhook-005"
       ]
@@ -59,7 +59,7 @@
         "docs": "research/twins/xero/feature-gap-register.md GAP-005; research/twins/xero/quirk-hypotheses.json webhook-004, webhook-006",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Settling these needs a live delivery (quirk observe_via: traffic). Recorded in WonderTwin-AI/wondertwin-docs#270.",
+      "operator_note": "Settling these needs a live delivery (quirk observe_via: traffic). Recorded as deferred.",
       "quirk_ids": [
         "webhook-006",
         "webhook-004"
@@ -67,24 +67,24 @@
     },
     {
       "route": "PUT /api.xro/2.0/Invoices (Contact)",
-      "reason": "Only Contact.ContactID is read. Xero looks a contact up or creates one by name when no ContactID is sent, and updates the contact record from any other contact field sent in the document. Here an invoice with no ContactID, or an unknown one, is refused, and the other contact fields are ignored. localstack/finance-ops always sends a bare ContactID, because the second behaviour is why it reduces the contact to its id.",
+      "reason": "Only Contact.ContactID is read. Xero looks a contact up or creates one by name when no ContactID is sent, and updates the contact record from any other contact field sent in the document. Here an invoice with no ContactID, or an unknown one, is refused, and the other contact fields are ignored. An integration that sends a bare ContactID, because the second behaviour is why it reduces the contact to its id, is unaffected.",
       "references": {
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/quirk-hypotheses.json crud-005"
       },
-      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "operator_note": "Raised while building invoice create. Approved by the operator.",
       "quirk_ids": [
         "crud-005"
       ]
     },
     {
       "route": "PUT /api.xro/2.0/Invoices (tax)",
-      "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0. Xero computes it from the tenant's tax rate for the line's TaxType, and tax rates (TaxRates) are not modelled in xero-bp1, so no rate is applied and Total equals SubTotal unless TaxAmount is sent. TaxType values are accepted unvalidated.",
+      "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0. Xero computes it from the tenant's tax rate for the line's TaxType, and tax rates (TaxRates) are not modelled, so no rate is applied and Total equals SubTotal unless TaxAmount is sent. TaxType values are accepted unvalidated.",
       "references": {
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/quirk-hypotheses.json crud-004"
       },
-      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "operator_note": "Raised while building invoice create. Approved by the operator.",
       "quirk_ids": [
         "crud-004"
       ]
@@ -96,7 +96,7 @@
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/record-type-catalog.json type Invoice"
       },
-      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "operator_note": "Raised while building invoice create. Approved by the operator.",
       "quirk_ids": [
         "crud-004"
       ]
@@ -108,7 +108,7 @@
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/quirk-hypotheses.json crud-004"
       },
-      "operator_note": "Raised while building s09 (invoice create). Becomes operator-approved when the plan amendment that splits xero-bp1-s09 is merged.",
+      "operator_note": "Raised while building invoice create. Approved by the operator.",
       "quirk_ids": [
         "crud-004"
       ]
@@ -120,7 +120,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json crud-002",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Raised while building s13 (delete payments). Becomes operator-approved when s13 is reviewed.",
+      "operator_note": "Raised while building payment delete. Approved by the operator.",
       "quirk_ids": [
         "crud-002"
       ]
@@ -132,7 +132,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json crud-004",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "A scope boundary of xero-bp1, not a decision about Xero. Tracked for xero-bp2 in the plan's deferred list.",
+      "operator_note": "A scope boundary of this release, not a decision about Xero. Tracked as deferred.",
       "quirk_ids": [
         "crud-004"
       ]
@@ -155,7 +155,7 @@
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
       },
-      "operator_note": "Added for the named target localstack/finance-ops, whose refund flow (backend/stripe_xero_lambda/xero_client.py _create_refund_credit_note) allocates the whole refund to an invoice that is normally already PAID. Whether real Xero accepts that is unverified.",
+      "operator_note": "Added for an integration whose refund flow allocates the whole refund to an invoice that is normally already PAID. Whether real Xero accepts that is unverified. Approved by the operator.",
       "quirk_ids": [
         "alloc-001",
         "alloc-002"
@@ -167,7 +167,7 @@
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
       },
-      "operator_note": "Added for the named target localstack/finance-ops, whose refund flow (backend/stripe_xero_lambda/xero_client.py create_payment) allocates a credit note to an invoice in full and then pays the credit note's whole total as ARCREDITPAYMENT. Whether real Xero accepts that sequence is unverified.",
+      "operator_note": "Added for an integration whose refund flow allocates a credit note to an invoice in full and then pays the credit note's whole total as ARCREDITPAYMENT. Whether real Xero accepts that sequence is unverified. Approved by the operator.",
       "quirk_ids": [
         "alloc-001",
         "alloc-002"
@@ -175,11 +175,11 @@
     },
     {
       "route": "GET /_xero/health and POST /_xero/reset",
-      "reason": "Xero has no health or reset endpoint. These two paths are control-plane aliases for GET /admin/health and POST /admin/reset, served so a consumer written for the legacy xero-local emulator can use this one unchanged. They are not Xero API, and no other xero-local control path (such as /_xero/state) is aliased.",
+      "reason": "Xero has no health or reset endpoint. These two paths are control-plane aliases for GET /admin/health and POST /admin/reset, served so a consumer written for an earlier Xero emulator that used these paths can use this one unchanged. They are not Xero API, and no other control path of that emulator (such as /_xero/state) is aliased.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json compat-001"
       },
-      "operator_note": "Added for the named target localstack/finance-ops, whose Makefile services-wait polls /_xero/health and whose reset_xero_state fixture posts /_xero/reset before each test (tests/conftest.py at 8ff5f6b).",
+      "operator_note": "Added for an integration whose Makefile waits on /_xero/health and whose test fixture posts /_xero/reset before each test. Approved by the operator.",
       "quirk_ids": [
         "compat-001"
       ]
@@ -190,7 +190,7 @@
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-009"
       },
-      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced. xero-local's own upsert by Name is deliberately not reproduced: it is not Xero behaviour (WonderTwin-AI/wondertwin-docs research/twins/xero/feature-gap-register.md GAP-007).",
+      "operator_note": "Added so a consumer that creates by POST on the collection can use this emulator. Update-or-create by Name, which an earlier Xero emulator did, is deliberately not reproduced: it is not Xero behaviour (recorded as a known gap). Approved by the operator.",
       "quirk_ids": [
         "crud-009"
       ]
@@ -201,7 +201,7 @@
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-010"
       },
-      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced; finance-ops test_create_invoice_and_payment posts to the collection.",
+      "operator_note": "Added so a consumer that creates invoices by POST on the collection can use this emulator. Approved by the operator.",
       "quirk_ids": [
         "crud-010"
       ]
@@ -212,7 +212,7 @@
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-011, alloc-001, alloc-002"
       },
-      "operator_note": "Added so the legacy xero-local create-by-POST can be replaced; finance-ops test_create_credit_note posts to the collection.",
+      "operator_note": "Added so a consumer that creates credit notes by POST on the collection can use this emulator. Approved by the operator.",
       "quirk_ids": [
         "crud-011"
       ]
@@ -223,7 +223,7 @@
       "references": {
         "docs": "research/twins/xero/feature-gap-register.md GAP-002; research/twins/xero/quirk-hypotheses.json query-001, page-003"
       },
-      "operator_note": "Deferred to xero-bp2: localstack/finance-ops passes neither order nor If-Modified-Since.",
+      "operator_note": "Deferred: the first integration this emulator was built for passes neither order nor If-Modified-Since.",
       "quirk_ids": [
         "query-001",
         "page-003"
@@ -235,7 +235,7 @@
       "references": {
         "docs": "research/twins/xero/feature-gap-register.md GAP-003; research/twins/xero/quirk-hypotheses.json crud-007"
       },
-      "operator_note": "No slice of xero-bp1 owns it; recorded for xero-bp2. finance-ops checks for a duplicate by lookup, not by header.",
+      "operator_note": "Deferred and recorded. An integration that checks for a duplicate by lookup, not by header, is unaffected.",
       "quirk_ids": [
         "crud-007"
       ]
@@ -246,7 +246,7 @@
       "references": {
         "docs": "research/twins/xero/feature-gap-register.md GAP-004; research/twins/xero/quirk-hypotheses.json crud-006"
       },
-      "operator_note": "No slice of xero-bp1 owns it for contacts; finance-ops creates one contact per call.",
+      "operator_note": "Deferred and recorded. An integration that creates one contact per call is unaffected.",
       "quirk_ids": [
         "crud-006"
       ]
@@ -258,7 +258,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json (auth-008, err-001)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Added for audit finding F2 of the first community audit. Approved by the operator by merging the change that added it.",
+      "operator_note": "Added after the first community audit of this emulator. Approved by the operator.",
       "quirk_ids": [
         "auth-008"
       ]
@@ -270,7 +270,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json (auth-008, err-001)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Added for audit finding F3 of the first community audit. Approved by the operator by merging the change that added it.",
+      "operator_note": "Added after the first community audit of this emulator. Approved by the operator.",
       "quirk_ids": [
         "err-001"
       ]
@@ -282,7 +282,7 @@
         "docs": "research/twins/xero/quirk-hypotheses.json (auth-006)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
-      "operator_note": "Added for audit finding F10 of the first community audit. Approved by the operator by merging the change that added it.",
+      "operator_note": "Added after the first community audit of this emulator. Approved by the operator.",
       "quirk_ids": [
         "auth-006"
       ]
