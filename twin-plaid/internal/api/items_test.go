@@ -55,3 +55,20 @@ func TestItemGetRefusesBadAccessTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenErrorsUseThePlaidDocumentedText(t *testing.T) {
+	tc, _, _ := setupPlaid(t)
+	gone := linkedItem(tc)
+	tc.Post("/item/remove", creds(map[string]any{"access_token": gone})).AssertStatus(200)
+	for name, c := range map[string]struct{ path, field, value, want string }{
+		"unknown access token": {"/item/get", "access_token", "access-sandbox-nope", "could not find matching access token"},
+		"unknown public token": {"/item/public_token/exchange", "public_token", "public-sandbox-nope", "could not find matching public token"},
+		"unknown link token":   {"/link/token/get", "link_token", "link-sandbox-nope", "invalid link_token provided"},
+		"removed Item": {"/item/get", "access_token", gone, "The Item you requested cannot be found. This Item does not exist, has been previously " +
+			"removed via /item/remove, or has had access removed by the user."},
+	} {
+		if m := tc.Post(c.path, creds(map[string]any{c.field: c.value})).AssertStatus(400).JSONMap(); m["error_message"] != c.want {
+			t.Fatalf("%s: message = %q, want %q", name, m["error_message"], c.want)
+		}
+	}
+}

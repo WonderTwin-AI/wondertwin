@@ -35,11 +35,11 @@ func (h *Handler) itemFor(w http.ResponseWriter, r *http.Request) (it store.Item
 func (h *Handler) writeAccessTokenError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrItemRemoved) {
 		h.writeError(w, http.StatusBadRequest, "ITEM_ERROR", "ITEM_NOT_FOUND",
-			"the Item you requested cannot be found. This Item does not exist, has been previously removed via /item/remove, or has had access removed by the user")
+			"The Item you requested cannot be found. This Item does not exist, has been previously removed via /item/remove, or has had access removed by the user.")
 		return
 	}
 	h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCESS_TOKEN",
-		"provided access token is invalid. Access tokens are in the format: access-<environment>-<identifier>")
+		"could not find matching access token")
 }
 
 // itemJSON is the Item object. The tags carry the presence rules (quirk
