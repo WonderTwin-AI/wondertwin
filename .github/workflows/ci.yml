@@ -101,7 +101,7 @@ jobs:
 
       - name: Build all twins
         run: |
-          for twin in stripe twilio resend posthog logodev slack github shopify linear hubspot; do
+          for twin in stripe twilio resend posthog logodev slack github shopify linear hubspot plaid; do
             echo "Building twin-$twin..."
             go build -o bin/twin-$twin ./twin-$twin/cmd/twin-$twin/
           done
