@@ -3,6 +3,11 @@ through the official xero-python SDK against a running binary.
 
     XERO_EMULATOR_URL=http://localhost:4195 uv run smoke.py
 
+The webhook case runs a local receiver. SMOKE_RECEIVER_BIND sets its listen
+address and SMOKE_RECEIVER_HOST the host registered through /admin/webhooks;
+both default to 127.0.0.1. Set them (for example 0.0.0.0 and a name the
+emulator can resolve) when the emulator runs in a container.
+
 The SDK hard-codes https://identity.xero.com in TokenApi, so the suite points
 its URL attributes at the emulator. The SDK has no authorization-code helper
 (the sample app does that with a third-party OAuth library), so the first
