@@ -82,7 +82,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 		}
 		msgs := validateContact(wr.c.Contact, others)
 		invalid = invalid || len(msgs) > 0
-		elements = append(elements, validationElement{Object: wr.c, Messages: msgs})
+		elements = append(elements, validationElement{Object: in.Contacts[i], Messages: msgs})
 	}
 	if invalid {
 		writeValidationException(w, elements...)

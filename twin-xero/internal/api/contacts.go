@@ -61,14 +61,21 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An element echoes what was submitted, not the contact with its zero values.
+	items := []json.RawMessage{raw}
+	var env struct{ Contacts []json.RawMessage }
+	if json.Unmarshal(raw, &env) == nil && env.Contacts != nil {
+		items = env.Contacts
+	}
+
 	contacts := h.store.Contacts.For(tenantID(r))
 	existing := contacts.List()
 	var elements []validationElement
 	invalid := false
-	for _, c := range in.Contacts {
+	for i, c := range in.Contacts {
 		msgs := validateContact(c.Contact, existing)
 		invalid = invalid || len(msgs) > 0
-		elements = append(elements, validationElement{Object: c, Messages: msgs})
+		elements = append(elements, validationElement{Object: items[i], Messages: msgs})
 		existing = append(existing, c.Contact) // a duplicate within the request is a duplicate
 	}
 	if invalid {
