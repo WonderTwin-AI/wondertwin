@@ -40,6 +40,8 @@ from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchan
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.link_token_get_request import LinkTokenGetRequest
+from plaid.model.processor_stripe_bank_account_token_create_request import ProcessorStripeBankAccountTokenCreateRequest
+from plaid.model.processor_token_create_request import ProcessorTokenCreateRequest
 from plaid.model.products import Products
 from plaid.model.webhook_verification_key_get_request import WebhookVerificationKeyGetRequest
 from plaid.model.sandbox_item_fire_webhook_request import SandboxItemFireWebhookRequest
@@ -304,6 +306,19 @@ def case_identity_get_and_match():
     assert good.address.is_postal_code_match is True and good.balances.current is None
     bad = client.identity_match(IdentityMatchRequest(access_token=token, user=IdentityMatchUser(legal_name="Jane Smith"))).accounts[0]
     assert bad.legal_name.score == 0 and bad.phone_number.score is None
+
+
+def case_processor_tokens_after_auth_get():
+    token = linked_access_token()
+    checking = client.auth_get(AuthGetRequest(access_token=token)).accounts[0].account_id
+    generic = client.processor_token_create(ProcessorTokenCreateRequest(access_token=token, account_id=checking, processor="dwolla"))
+    assert generic.processor_token.startswith("processor-sandbox-") and generic.request_id
+    stripe = client.processor_stripe_bank_account_token_create(
+        ProcessorStripeBankAccountTokenCreateRequest(access_token=token, account_id=checking))
+    assert stripe.stripe_bank_account_token.startswith("btok_") and len(stripe.stripe_bank_account_token) == 29
+    retirement = client.accounts_get(AccountsGetRequest(access_token=token)).accounts[1].account_id
+    assert api_error(lambda: client.processor_token_create(ProcessorTokenCreateRequest(
+        access_token=token, account_id=retirement, processor="dwolla"))) == (400, "NO_AUTH_ACCOUNTS")
 
 
 def case_item_get():
