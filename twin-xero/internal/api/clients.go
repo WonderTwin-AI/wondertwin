@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"slices"
@@ -86,4 +87,20 @@ func (h *Handler) IssueAuthorizationCode(w http.ResponseWriter, r *http.Request)
 	code := h.entropy() + h.entropy()
 	h.store.AuthCodes.Set(code, store.AuthCode{ClientID: in.ClientID, RedirectURI: in.RedirectURI, Scope: in.Scope, AuthEventID: h.store.NewID()})
 	twincore.JSON(w, http.StatusCreated, map[string]string{"code": code})
+}
+
+// clientSecret returns the secret the token call carries, from HTTP Basic or the
+// form body.
+func clientSecret(r *http.Request) string {
+	if _, pass, ok := r.BasicAuth(); ok {
+		return pass
+	}
+	return r.PostFormValue("client_secret")
+}
+
+// knownClient reports whether the caller is a registered client with the right
+// secret. It is only asked under strict_auth.
+func (h *Handler) knownClient(r *http.Request, id string) bool {
+	c, ok := h.store.Clients.Get(id)
+	return ok && subtle.ConstantTimeCompare([]byte(c.Secret), []byte(clientSecret(r))) == 1
 }

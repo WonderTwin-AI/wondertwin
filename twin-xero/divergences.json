@@ -274,6 +274,18 @@
       "quirk_ids": [
         "err-001"
       ]
+    },
+    {
+      "route": "POST /connect/token",
+      "reason": "By default any client id, any client secret, any authorization code and any redirect URI is accepted, so a test needs no registered app. Xero checks the client and its secret, and redeems a code once for the client and redirect URI it was issued for. strict_auth restores those checks against clients registered with POST /admin/clients, and codes issued with POST /admin/authorization-codes, because the emulator has no developer portal and no consent screen. A refresh token is also bound to the client it was issued to under strict_auth.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json (auth-006)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Added for audit finding F10 of the first community audit. Approved by the operator by merging the change that added it.",
+      "quirk_ids": [
+        "auth-006"
+      ]
     }
   ]
 }

@@ -49,12 +49,29 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, "invalid_client")
 		return
 	}
+	strict := h.store.StrictAuth.Load()
+	if strict && !h.knownClient(r, client) {
+		oauthError(w, "invalid_client")
+		return
+	}
 	scope, authEvent, user := r.PostFormValue("scope"), h.store.NewID(), true
 	switch r.PostFormValue("grant_type") {
 	case "authorization_code":
-		if r.PostFormValue("code") == "" {
+		code := r.PostFormValue("code")
+		if code == "" {
 			oauthError(w, "invalid_request")
 			return
+		}
+		if strict {
+			granted, ok := h.redeemCode(code, client, r.PostFormValue("redirect_uri"))
+			if !ok {
+				oauthError(w, "invalid_grant")
+				return
+			}
+			authEvent = granted.AuthEventID
+			if scope == "" {
+				scope = granted.Scope
+			}
 		}
 		if scope == "" {
 			scope = consentScope
@@ -65,7 +82,7 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		old, found := h.store.RefreshTokens.Get(token)
 		// A redeemed token is always refused. One this emulator never issued is
 		// refused only under StrictAuth; otherwise it is taken as a fresh sign-in.
-		if (found && old.Used) || (!found && (token == "" || h.store.StrictAuth.Load())) {
+		if (found && old.Used) || (!found && (token == "" || strict)) || (found && strict && old.ClientID != client) {
 			h.redeem.Unlock()
 			oauthError(w, "invalid_grant")
 			return
@@ -91,6 +108,20 @@ func (h *Handler) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.issue(w, client, scope, authEvent, user)
+}
+
+// redeemCode uses up an authorization code, which must have been issued to this
+// client for this redirect URI and not used before (quirk auth-006).
+func (h *Handler) redeemCode(code, client, redirect string) (store.AuthCode, bool) {
+	h.redeem.Lock()
+	defer h.redeem.Unlock()
+	granted, ok := h.store.AuthCodes.Get(code)
+	if !ok || granted.Used || granted.ClientID != client || granted.RedirectURI != redirect {
+		return store.AuthCode{}, false
+	}
+	granted.Used = true
+	h.store.AuthCodes.Set(code, granted)
+	return granted, true
 }
 
 // issue mints the tokens, records them, and answers. A user grant gets a refresh
