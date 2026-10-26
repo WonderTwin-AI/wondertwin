@@ -45,6 +45,7 @@ from plaid.model.processor_token_create_request import ProcessorTokenCreateReque
 from plaid.model.products import Products
 from plaid.model.webhook_verification_key_get_request import WebhookVerificationKeyGetRequest
 from plaid.model.sandbox_item_fire_webhook_request import SandboxItemFireWebhookRequest
+from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
 from plaid.model.sandbox_public_token_create_request_options import SandboxPublicTokenCreateRequestOptions
@@ -319,6 +320,30 @@ def case_processor_tokens_after_auth_get():
     retirement = client.accounts_get(AccountsGetRequest(access_token=token)).accounts[1].account_id
     assert api_error(lambda: client.processor_token_create(ProcessorTokenCreateRequest(
         access_token=token, account_id=retirement, processor="dwolla"))) == (400, "NO_AUTH_ACCOUNTS")
+
+
+def case_transactions_sync_pages_and_reports_only_what_changed():
+    token = linked_access_token(("transactions",))
+    # A small count cuts the history into pages: each is parsed strictly by the SDK.
+    seen, cursor, pages = [], None, 0
+    while True:
+        kwargs = {"cursor": cursor} if cursor else {}
+        res = client.transactions_sync(TransactionsSyncRequest(access_token=token, count=1, **kwargs))
+        seen += [t.transaction_id for t in res.added]
+        cursor, pages = res.next_cursor, pages + 1
+        assert str(res.transactions_update_status) == "HISTORICAL_UPDATE_COMPLETE" and len(res.accounts) == 3
+        if not res.has_more:
+            break
+    assert pages == 2 and len(seen) == 2 and len(set(seen)) == 2
+    first = client.transactions_sync(TransactionsSyncRequest(access_token=token))
+    assert [t.transaction_id for t in first.added] == seen or sorted(t.transaction_id for t in first.added) == sorted(seen)
+    assert not first.modified and not first.removed
+    quiet = client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=first.next_cursor))
+    assert not quiet.added and not quiet.modified and not quiet.removed and not quiet.has_more
+    assert api_error(lambda: client.transactions_sync(TransactionsSyncRequest(
+        access_token=token, cursor="not-a-cursor"))) == (400, "INVALID_FIELD")
+    row = first.added[0]
+    assert row.name and row.pending in (True, False) and row.payment_channel and row.personal_finance_category.primary
 
 
 def case_item_get():

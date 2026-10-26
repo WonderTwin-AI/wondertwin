@@ -53,6 +53,11 @@ type SyncPage struct {
 	HasMore         bool
 }
 
+// SyncNow is the cursor value that skips an Item's history: the page is empty
+// and its next_cursor is the end of the log, as Plaid documents for migrating
+// an Item from /transactions/get.
+const SyncNow = "now"
+
 // ErrBadCursor is a cursor this store did not issue for this Item, or one that
 // points past the end of the Item's log.
 var ErrBadCursor = errors.New("bad transactions cursor")
@@ -154,6 +159,9 @@ func (s *MemoryStore) Sync(itemID, cursorText string, count int) (SyncPage, erro
 	s.logMu.Unlock()
 
 	c := cursor{0, len(log), 0}
+	if cursorText == SyncNow {
+		return SyncPage{NextCursor: cursor{len(log), len(log), 0}.String()}, nil
+	}
 	if cursorText != "" {
 		var err error
 		if c, err = parseCursor(cursorText, len(log)); err != nil {
