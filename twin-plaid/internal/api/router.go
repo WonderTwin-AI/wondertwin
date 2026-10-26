@@ -49,6 +49,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/item/public_token/exchange", h.itemPublicTokenExchange)
 		r.Post("/item/get", h.itemGet)
 		r.Post("/accounts/get", h.accountsGet)
+		r.Post("/accounts/balance/get", h.accountsBalanceGet)
 		r.Post("/item/remove", h.itemRemove)
 		r.Post("/sandbox/item/fire_webhook", h.sandboxItemFireWebhook)
 		r.Post("/item/webhook/update", h.itemWebhookUpdate)

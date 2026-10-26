@@ -20,6 +20,8 @@ import threading
 
 import plaid
 from plaid.api import plaid_api
+from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
+from plaid.model.accounts_balance_get_request_options import AccountsBalanceGetRequestOptions
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.country_code import CountryCode
 from plaid.model.institutions_get_by_id_request import InstitutionsGetByIdRequest
@@ -262,6 +264,19 @@ def case_login_repair_flow_fires_a_webhook_and_update_mode_still_works():
     assert link_token(access_token=token).link_token.startswith("link-sandbox-")
     client.sandbox_item_fire_webhook(SandboxItemFireWebhookRequest(access_token=token, webhook_code="LOGIN_REPAIRED"))
     assert json.loads(got.get(timeout=5)[0])["webhook_code"] == "LOGIN_REPAIRED"
+
+
+def case_accounts_balance_get_and_its_account_ids_filter():
+    token = linked_access_token()
+    res = client.accounts_balance_get(AccountsBalanceGetRequest(access_token=token))
+    assert [a.name for a in res.accounts] == ["Plaid Checking", "Plaid 401k", "Plaid Student Loan"]
+    assert res.accounts[0].balances.available == 100 and res.accounts[0].balances.current == 110
+    savings = res.accounts[2].account_id
+    only = client.accounts_balance_get(AccountsBalanceGetRequest(
+        access_token=token, options=AccountsBalanceGetRequestOptions(account_ids=[savings]))).accounts
+    assert [a.account_id for a in only] == [savings]
+    assert api_error(lambda: client.accounts_balance_get(AccountsBalanceGetRequest(
+        access_token=token, options=AccountsBalanceGetRequestOptions(account_ids=["nope"])))) == (400, "INVALID_ACCOUNT_ID")
 
 
 def case_item_get():
