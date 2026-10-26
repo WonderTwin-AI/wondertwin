@@ -664,6 +664,30 @@ def case_update_or_create_credit_notes():
     assert after["AmountCredited"] == 30 and after["AmountDue"] == 70, after
 
 
+def case_the_lists_on_an_invoice_and_a_credit_note_parse_as_typed_models():
+    """Audit finding F1: the payments, credit notes, prepayments, overpayments and attachments an invoice lists, and the
+    payments a credit note lists, are typed records the SDK reads into its own models."""
+    api, tenant = accounting_api()
+    contact = new_contact(api, tenant)
+    invoice = api.create_invoices(tenant, Invoices(invoices=[finance_ops_invoice(contact)])).invoices[0]
+    api.create_payment(tenant, Payment(amount=10, account=Account(code="090"), date=invoice.date, payment_type="ACCRECPAYMENT", invoice=invoice))
+    refund = finance_ops_credit_note(contact, amount=5)
+    refund.allocations = [Allocation(invoice=invoice, amount=5, date=datetime.date(2026, 9, 11))]
+    credit_note = api.create_credit_notes(tenant, CreditNotes(credit_notes=[refund])).credit_notes[0]
+    api.create_payment(tenant, Payment(amount=1, account=Account(code="090"), date=credit_note.date, credit_note=credit_note,
+                                       payment_type="ARCREDITPAYMENT"))
+
+    read = api.get_invoice(tenant, invoice.invoice_id).invoices[0]
+    assert len(read.payments) == 1 and isinstance(read.payments[0], Payment), read.payments
+    assert read.payments[0].amount == 10 and read.payments[0].payment_id and isinstance(read.payments[0].date, datetime.date)
+    assert len(read.credit_notes) == 1 and isinstance(read.credit_notes[0], CreditNote), read.credit_notes
+    assert read.credit_notes[0].applied_amount == 5 and read.credit_notes[0].credit_note_number == refund.credit_note_number
+    assert read.prepayments == [] and read.overpayments == [] and read.attachments == [], "the lists nothing writes are empty, not null"
+
+    listed = [c for c in api.get_credit_notes(tenant, page=1).credit_notes if c.credit_note_id == credit_note.credit_note_id][0]
+    assert len(listed.payments) == 1 and isinstance(listed.payments[0], Payment) and listed.payments[0].amount == 1, listed.payments
+
+
 def case_finance_ops_flow_end_to_end():
     """One run of the localstack/finance-ops Stripe-to-Xero sequence (xero_client.py at 8ff5f6b), in its order:
     look the customer up, create it, bill it, pay the bill, book the processor fee as a paid payable against the
@@ -714,6 +738,7 @@ def case_finance_ops_flow_end_to_end():
 
 
 CASES = [
+    ("the payment, credit note and attachment lists on an invoice and a credit note parse as typed models", case_the_lists_on_an_invoice_and_a_credit_note_parse_as_typed_models),
     ("the finance-ops Stripe-to-Xero sequence runs end to end through xero-python", case_finance_ops_flow_end_to_end),
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),
     ("a refund credit note is allocated, then paid in full with ARCREDITPAYMENT, as finance-ops does", case_refund_credit_note_payment_as_finance_ops_does),
