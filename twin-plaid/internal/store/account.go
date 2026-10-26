@@ -19,19 +19,21 @@ type Owner struct {
 	Addresses    []OwnerAddress `json:"addresses"`
 }
 
-// OwnerPhone, OwnerEmail and OwnerAddress are one contact entry of an Owner.
+// OwnerPhone is one phone number entry of an Owner.
 type OwnerPhone struct {
 	Data    string `json:"data"`
 	Primary bool   `json:"primary"`
 	Type    string `json:"type"`
 }
 
+// OwnerEmail is one email address entry of an Owner.
 type OwnerEmail struct {
 	Data    string `json:"data"`
 	Primary bool   `json:"primary"`
 	Type    string `json:"type"`
 }
 
+// OwnerAddress is one postal address entry of an Owner.
 type OwnerAddress struct {
 	Data    AddressData `json:"data"`
 	Primary bool        `json:"primary"`
