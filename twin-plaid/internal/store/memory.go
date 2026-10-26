@@ -85,6 +85,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if err := json.Unmarshal(data, &snap); err != nil {
 		return err
 	}
+	if err := snap.validateTransactions(); err != nil {
+		return err
+	}
 	if snap.Items != nil {
 		s.Items.LoadSnapshot(snap.Items)
 	}
@@ -154,4 +157,25 @@ func (s *MemoryStore) changeLogsCopy() map[string][]Change {
 		out[k] = append([]Change(nil), v...)
 	}
 	return out
+}
+
+// validateTransactions rejects a snapshot whose transaction bodies would break
+// the SDK, before any of it is loaded.
+func (snap snapshot) validateTransactions() error {
+	for _, t := range snap.Transactions {
+		if err := t.Body.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, log := range snap.ChangeLogs {
+		for _, c := range log {
+			if c.Body == nil {
+				continue
+			}
+			if err := c.Body.Validate(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

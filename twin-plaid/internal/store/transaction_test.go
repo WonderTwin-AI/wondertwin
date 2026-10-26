@@ -10,13 +10,13 @@ import (
 
 func row(id, date string) Transaction {
 	return Transaction{ID: id, ItemID: "item1", AccountID: "acct1", Date: date, Amount: 10,
-		Body: map[string]any{"transaction_id": id, "date": date, "name": "row " + id}}
+		Body: TransactionBody{AccountID: "acct1", TransactionID: id, Date: date, PaymentChannel: "other", Name: "row " + id}}
 }
 
-func ids(rows []map[string]any) []string {
+func ids(rows []TransactionBody) []string {
 	var out []string
 	for _, r := range rows {
-		out = append(out, r["transaction_id"].(string))
+		out = append(out, r.TransactionID)
 	}
 	sort.Strings(out)
 	return out
@@ -63,14 +63,14 @@ func TestChangeLogSyncFromAnEmptyCursorReportsEveryRowAsAddedThenOnlyWhatChanged
 	}
 
 	changed := row("a", "2026-10-01")
-	changed.Body["name"] = "row a, changed"
+	changed.Body.Name = "row a, changed"
 	s.ModifyTransaction(changed)
 	s.RemoveTransaction("b")
 	s.AddTransaction(row("c", "2026-10-03"))
 
 	next, err := s.Sync("item1", quiet.NextCursor, 100)
 	if err != nil || !reflect.DeepEqual(ids(next.Added), []string{"c"}) || !reflect.DeepEqual(ids(next.Modified), []string{"a"}) ||
-		len(next.Removed) != 1 || next.Removed[0] != (RemovedTransaction{"acct1", "b"}) || next.Modified[0]["name"] != "row a, changed" {
+		len(next.Removed) != 1 || next.Removed[0] != (RemovedTransaction{"acct1", "b"}) || next.Modified[0].Name != "row a, changed" {
 		t.Fatalf("what changed = %+v, %v", next, err)
 	}
 }
@@ -80,12 +80,12 @@ func TestChangeLogCollapsesARowChangedInsideOneWindow(t *testing.T) {
 	s.AddTransaction(row("a", "2026-10-01"))
 	s.AddTransaction(row("b", "2026-10-02"))
 	edited := row("a", "2026-10-01")
-	edited.Body["name"] = "latest"
+	edited.Body.Name = "latest"
 	s.ModifyTransaction(edited)
 	s.RemoveTransaction("b")
 
 	p, _ := s.Sync("item1", "", 100)
-	if !reflect.DeepEqual(ids(p.Added), []string{"a"}) || p.Added[0]["name"] != "latest" || len(p.Modified) != 0 || len(p.Removed) != 0 {
+	if !reflect.DeepEqual(ids(p.Added), []string{"a"}) || p.Added[0].Name != "latest" || len(p.Modified) != 0 || len(p.Removed) != 0 {
 		t.Fatalf("added then changed is one added row with its latest body, added then removed is nothing: %+v", p)
 	}
 }

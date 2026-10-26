@@ -47,7 +47,7 @@ func TestTransactionsSyncReturnsTheItemsRowsThenOnlyWhatChanged(t *testing.T) {
 
 	rows := mem.TransactionsForItem(item.ID)
 	edited := rows[0]
-	edited.Body["name"] = "edited"
+	edited.Body.Name = "edited"
 	mem.ModifyTransaction(edited)
 	mem.RemoveTransaction(rows[1].ID)
 	next := doSync(tc, token, quiet["next_cursor"].(string), 0)

@@ -54,9 +54,9 @@ func (h *Handler) transactionsSync(w http.ResponseWriter, r *http.Request) {
 }
 
 // rowsOrEmpty keeps an empty list as [], never null.
-func rowsOrEmpty(rows []map[string]any) []map[string]any {
+func rowsOrEmpty(rows []store.TransactionBody) []store.TransactionBody {
 	if rows == nil {
-		return []map[string]any{}
+		return []store.TransactionBody{}
 	}
 	return rows
 }
@@ -262,7 +262,7 @@ func (h *Handler) transactionsGet(w http.ResponseWriter, r *http.Request) {
 			matching = append(matching, t)
 		}
 	}
-	page := []map[string]any{}
+	page := []store.TransactionBody{}
 	for i := offset; i < min(offset+count, len(matching)); i++ {
 		page = append(page, matching[i].Body)
 	}
