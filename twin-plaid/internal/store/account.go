@@ -10,6 +10,13 @@ type Balances struct {
 	ISOCurrencyCode string   `json:"iso_currency_code,omitempty"`
 }
 
+// AccountNumbers are the US bank numbers Auth returns for an account.
+type AccountNumbers struct {
+	Account     string `json:"account"`
+	Routing     string `json:"routing"`
+	WireRouting string `json:"wire_routing,omitempty"`
+}
+
 // Account is one account on an Item. PersistentID is left empty for most
 // institutions, and an empty value is omitted from responses, never sent as
 // null (quirk IDENTITY-003).
@@ -24,6 +31,8 @@ type Account struct {
 	Subtype      string   `json:"subtype,omitempty"`
 	PersistentID string   `json:"persistent_account_id,omitempty"`
 	Balances     Balances `json:"balances"`
+	// Numbers are set only on accounts Auth serves: checking, savings and cash management.
+	Numbers *AccountNumbers `json:"numbers,omitempty"`
 }
 
 // PutAccount stores an account under its ID.

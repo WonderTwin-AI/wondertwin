@@ -104,3 +104,62 @@ func (h *Handler) accountsGet(w http.ResponseWriter, r *http.Request) { h.writeA
 // account, so the two agree, which is the consistency Plaid's Sandbox lacks
 // between products (quirk LIFECYCLE-006, a declared improvement).
 func (h *Handler) accountsBalanceGet(w http.ResponseWriter, r *http.Request) { h.writeAccounts(w, r) }
+
+// authNumbers is the numbers object. All four arrays are always present; a US
+// Item only has ACH numbers, so the others are empty.
+type authNumbers struct {
+	ACH           []achNumbers `json:"ach"`
+	EFT           []any        `json:"eft"`
+	International []any        `json:"international"`
+	BACS          []any        `json:"bacs"`
+}
+
+// achNumbers is one account's ACH entry. wire_routing is required and
+// nullable; can_transfer_in and can_transfer_out are optional and omitted.
+type achNumbers struct {
+	AccountID                string  `json:"account_id"`
+	Account                  string  `json:"account"`
+	Routing                  string  `json:"routing"`
+	WireRouting              *string `json:"wire_routing"`
+	IsTokenizedAccountNumber bool    `json:"is_tokenized_account_number"`
+}
+
+// authGet is POST /auth/get: the account and routing numbers of an Item's
+// checking, savings and cash management accounts, with those accounts. An Item
+// with none answers the documented NO_AUTH_ACCOUNTS.
+func (h *Handler) authGet(w http.ResponseWriter, r *http.Request) {
+	call, _ := CallFrom(r)
+	ids, ok := accountIDs(call.Body)
+	if !ok {
+		h.invalidBody(w)
+		return
+	}
+	it, ok := h.liveItemFor(w, r)
+	if !ok {
+		return
+	}
+	accounts, nums := []accountJSON{}, authNumbers{ACH: []achNumbers{}, EFT: []any{}, International: []any{}, BACS: []any{}}
+	found := map[string]bool{}
+	for _, a := range h.store.AccountsForItem(it.ID) {
+		found[a.ID] = true
+		if a.Numbers == nil || (len(ids) > 0 && !slices.Contains(ids, a.ID)) {
+			continue
+		}
+		accounts = append(accounts, newAccountJSON(a))
+		nums.ACH = append(nums.ACH, achNumbers{AccountID: a.ID, Account: a.Numbers.Account, Routing: a.Numbers.Routing,
+			WireRouting: strPtr(a.Numbers.WireRouting)})
+	}
+	for _, id := range ids {
+		if !found[id] {
+			h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCOUNT_ID",
+				"failed to find requested account ID for requested item")
+			return
+		}
+	}
+	if len(accounts) == 0 {
+		e, _ := seed.LookupItemError("NO_AUTH_ACCOUNTS")
+		h.writeItemError(w, e)
+		return
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"accounts": accounts, "numbers": nums, "item": newItemJSON(it)})
+}

@@ -23,6 +23,7 @@ from plaid.api import plaid_api
 from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
 from plaid.model.accounts_balance_get_request_options import AccountsBalanceGetRequestOptions
 from plaid.model.accounts_get_request import AccountsGetRequest
+from plaid.model.auth_get_request import AuthGetRequest
 from plaid.model.country_code import CountryCode
 from plaid.model.institutions_get_by_id_request import InstitutionsGetByIdRequest
 from plaid.model.institutions_get_request import InstitutionsGetRequest
@@ -277,6 +278,15 @@ def case_accounts_balance_get_and_its_account_ids_filter():
     assert [a.account_id for a in only] == [savings]
     assert api_error(lambda: client.accounts_balance_get(AccountsBalanceGetRequest(
         access_token=token, options=AccountsBalanceGetRequestOptions(account_ids=["nope"])))) == (400, "INVALID_ACCOUNT_ID")
+
+
+def case_auth_get_returns_the_checking_accounts_numbers():
+    res = client.auth_get(AuthGetRequest(access_token=linked_access_token()))
+    assert [a.name for a in res.accounts] == ["Plaid Checking"]
+    ach = res.numbers.ach[0]
+    assert (ach.account, ach.routing, ach.account_id) == ("1111222233330000", "021000021", res.accounts[0].account_id)
+    assert ach.wire_routing is None and ach.is_tokenized_account_number is False
+    assert not res.numbers.eft and not res.numbers.international and not res.numbers.bacs
 
 
 def case_item_get():
