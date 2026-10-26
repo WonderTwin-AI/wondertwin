@@ -9,6 +9,7 @@
 #   twin-plaid/sdk-smoke/run.sh             # build and run against a fresh binary
 #   BINARY=/path/to/twin-plaid run.sh       # run against an existing binary
 #   PORT=4196 run.sh                       # choose the port (default 4196)
+#   SMOKE_RECEIVER_BIND / SMOKE_RECEIVER_HOST   # webhook receiver address, see python/smoke.py
 #
 # Needs go and uv. Prints a markdown pass/fail table and exits non-zero if any
 # case fails.
