@@ -24,6 +24,11 @@ func (h *Handler) accountsForRequest(w http.ResponseWriter, r *http.Request) (st
 		h.invalidBody(w)
 		return store.Item{}, nil, false
 	}
+	return h.accountsForRequestIDs(w, r, ids)
+}
+
+// accountsForRequestIDs is accountsForRequest for ids the caller already read.
+func (h *Handler) accountsForRequestIDs(w http.ResponseWriter, r *http.Request, ids []string) (store.Item, []store.Account, bool) {
 	it, ok := h.liveItemFor(w, r)
 	if !ok {
 		return it, nil, false
