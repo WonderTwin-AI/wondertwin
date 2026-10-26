@@ -43,7 +43,7 @@ func inCreditNote(w creditNote) store.CreditNote {
 // resolved, the lists Xero always returns are [], and the dates are msdates.
 func (h *Handler) wireCreditNote(tenant string, in store.CreditNote) creditNote {
 	if in.Payments == nil {
-		in.Payments = []map[string]any{}
+		in.Payments = []store.PaymentSummary{}
 	}
 	if in.LineItems == nil {
 		in.LineItems = []store.LineItem{}

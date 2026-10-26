@@ -66,9 +66,9 @@ func (h *Handler) buildCreditNotePayment(tenant string, in paymentIn, working ma
 	p.PaymentType, p.BankAmount, p.StatusAttributeString = creditPaymentType[cn.Type], in.Amount, "OK"
 	p.ValidationErrors, p.Warnings = nil, nil
 
-	cn.Payments = append(append([]map[string]any(nil), cn.Payments...), map[string]any{
-		"PaymentID": p.PaymentID, "Date": jsonString(Msdate(p.Date)), "Amount": p.Amount,
-		"Reference": p.Reference, "HasAccount": true, "HasValidationErrors": false,
+	cn.Payments = append(append([]store.PaymentSummary(nil), cn.Payments...), store.PaymentSummary{
+		PaymentID: p.PaymentID, Date: jsonString(Msdate(p.Date)), Amount: p.Amount,
+		Reference: p.Reference, HasAccount: true,
 	})
 	cn.RemainingCredit = max(round(cn.Total-cn.AppliedAmount-paid-p.Amount, 2), 0)
 	if cn.RemainingCredit == 0 && cn.Status != "PAID" {
@@ -79,10 +79,10 @@ func (h *Handler) buildCreditNotePayment(tenant string, in paymentIn, working ma
 }
 
 // paymentsTotal is what the payments listed on a credit note add up to.
-func paymentsTotal(list []map[string]any) float64 {
+func paymentsTotal(list []store.PaymentSummary) float64 {
 	var sum float64
-	for _, m := range list {
-		sum += m["Amount"].(float64)
+	for _, p := range list {
+		sum += p.Amount
 	}
 	return sum
 }

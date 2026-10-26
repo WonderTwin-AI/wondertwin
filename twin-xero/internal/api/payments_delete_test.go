@@ -32,7 +32,7 @@ func TestDeletingAPaymentRestoresTheInvoice(t *testing.T) {
 		t.Fatalf("status %d, body %v", code, body)
 	}
 	inv := storedInvoice(h, id)
-	if inv.Status != "AUTHORISED" || inv.AmountPaid != 40 || inv.AmountDue != 60 || inv.FullyPaidOnDate != nil || len(inv.Payments) != 1 || inv.Payments[0]["PaymentID"] != paymentIDOf(first) {
+	if inv.Status != "AUTHORISED" || inv.AmountPaid != 40 || inv.AmountDue != 60 || inv.FullyPaidOnDate != nil || len(inv.Payments) != 1 || inv.Payments[0].PaymentID != paymentIDOf(first) {
 		t.Errorf("deleting the payment that cleared the invoice must put it back as the first payment left it: %+v", inv)
 	}
 	if e, _ := got["Invoice"].(map[string]any); e["AmountDue"] != 60.0 || e["Status"] != "AUTHORISED" {
