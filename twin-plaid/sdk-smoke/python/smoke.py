@@ -10,6 +10,7 @@ non-zero if any case fails.
 """
 
 import base64
+import datetime
 import hashlib
 import http.server
 import json
@@ -45,6 +46,9 @@ from plaid.model.processor_token_create_request import ProcessorTokenCreateReque
 from plaid.model.products import Products
 from plaid.model.webhook_verification_key_get_request import WebhookVerificationKeyGetRequest
 from plaid.model.sandbox_item_fire_webhook_request import SandboxItemFireWebhookRequest
+from plaid.model.custom_sandbox_transaction import CustomSandboxTransaction
+from plaid.model.sandbox_transactions_create_request import SandboxTransactionsCreateRequest
+from plaid.model.transactions_refresh_request import TransactionsRefreshRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
 from plaid.model.sandbox_public_token_create_request import SandboxPublicTokenCreateRequest
@@ -344,6 +348,35 @@ def case_transactions_sync_pages_and_reports_only_what_changed():
         access_token=token, cursor="not-a-cursor"))) == (400, "INVALID_FIELD")
     row = first.added[0]
     assert row.name and row.pending in (True, False) and row.payment_channel and row.personal_finance_category.primary
+
+
+def case_sandbox_transactions_create_refresh_then_sync_returns_the_new_rows():
+    token = linked_access_token(("transactions",))
+    start = client.transactions_sync(TransactionsSyncRequest(access_token=token))
+    today = datetime.date.today()
+    assert client.sandbox_transactions_create(SandboxTransactionsCreateRequest(access_token=token, transactions=[
+        CustomSandboxTransaction(date_transacted=today, date_posted=today, amount=100.5, description="Tim Hortons"),
+        CustomSandboxTransaction(date_transacted=today, date_posted=today, amount=-25.75, description="BestBuy",
+                                 iso_currency_code="CAD")])).request_id
+    assert client.transactions_refresh(TransactionsRefreshRequest(access_token=token)).request_id
+    new = client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=start.next_cursor)).added
+    assert sorted((t.name, t.amount, t.iso_currency_code) for t in new) == [("BestBuy", -25.75, "CAD"), ("Tim Hortons", 100.5, "USD")]
+
+
+def case_a_transaction_created_while_paging_waits_for_the_next_run():
+    token = linked_access_token(("transactions",))
+    today = datetime.date.today()
+    make = lambda d: SandboxTransactionsCreateRequest(access_token=token, transactions=[
+        CustomSandboxTransaction(date_transacted=today, date_posted=today, amount=1.0, description=d)])
+    client.sandbox_transactions_create(make("early"))
+    page = client.transactions_sync(TransactionsSyncRequest(access_token=token, count=1))
+    client.sandbox_transactions_create(make("late"))  # lands while the run is paging
+    seen, cursor, more = len(page.added), page.next_cursor, page.has_more
+    while more:
+        page = client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=cursor, count=1))
+        seen, cursor, more = seen + len(page.added), page.next_cursor, page.has_more
+    assert seen == 3, "the run covers the 3 rows that existed when it began"
+    assert [t.name for t in client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=cursor)).added] == ["late"]
 
 
 def case_item_get():

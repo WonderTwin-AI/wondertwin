@@ -52,6 +52,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/accounts/balance/get", h.accountsBalanceGet)
 		r.Post("/auth/get", h.authGet)
 		r.Post("/transactions/sync", h.transactionsSync)
+		r.Post("/sandbox/transactions/create", h.sandboxTransactionsCreate)
+		r.Post("/transactions/refresh", h.transactionsRefresh)
 		r.Post("/processor/token/create", h.processorTokenCreate)
 		r.Post("/processor/stripe/bank_account_token/create", h.processorStripeBankAccountTokenCreate)
 		r.Post("/identity/get", h.identityGet)

@@ -68,3 +68,37 @@ func shift(v any, layout string, days int) any {
 	}
 	return t.AddDate(0, 0, days).Format(layout)
 }
+
+// CustomTransaction is what a client gives /sandbox/transactions/create.
+type CustomTransaction struct {
+	Amount         float64
+	Description    string
+	DatePosted     string
+	DateTransacted string
+	Currency       string
+}
+
+// NewCustomTransaction builds the row for a transaction a client created. It
+// starts from the added transaction in Plaid's /transactions/sync example so
+// every documented field is present with its presence rule, then sets what the
+// client gave and clears what Plaid would have to look up: no merchant, no
+// counterparties, no location, no category (the category fields are left out). The posted date is the date and the
+// transacted date is the authorized date; both date-times are null.
+func NewCustomTransaction(itemID, accountID, id string, in CustomTransaction) store.Transaction {
+	body := loadTransactionSamples().Template
+	for _, k := range []string{"merchant_name", "merchant_entity_id", "merchant_category_code", "logo_url", "website",
+		"pending_transaction_id", "running_balance", "datetime", "authorized_datetime", "unofficial_currency_code"} {
+		body[k] = nil
+	}
+	// Optional and not nullable in the model: absent, never null (quirk ENVELOPE-004).
+	delete(body, "personal_finance_category")
+	delete(body, "personal_finance_category_icon_url")
+	body["location"] = map[string]any{"address": nil, "city": nil, "region": nil, "postal_code": nil, "country": nil,
+		"lat": nil, "lon": nil, "store_number": nil}
+	body["counterparties"] = []any{}
+	body["account_id"], body["transaction_id"] = accountID, id
+	body["amount"], body["iso_currency_code"] = in.Amount, in.Currency
+	body["date"], body["authorized_date"] = in.DatePosted, in.DateTransacted
+	body["name"], body["payment_channel"], body["pending"], body["transaction_type"] = in.Description, "other", false, "unresolved"
+	return store.Transaction{ID: id, ItemID: itemID, AccountID: accountID, Date: in.DatePosted, Amount: in.Amount, Body: body}
+}
