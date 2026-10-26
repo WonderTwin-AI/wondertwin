@@ -171,12 +171,30 @@ func (h *Handler) sandboxTransactionsCreate(w http.ResponseWriter, r *http.Reque
 }
 
 // transactionsRefresh is POST /transactions/refresh: Plaid starts an extraction
-// and, if it finds changes, fires SYNC_UPDATES_AVAILABLE. Rows are available
-// here at once, so there is nothing to extract and the call only acknowledges.
+// and, if it finds changes, tells the Item's webhook (quirk DELIVERY-006). Rows
+// are available here at once, so the extraction has nothing to fetch; the call
+// reports to the webhook what changed since the last report. A receiver gets the
+// legacy DEFAULT_UPDATE (new_transactions), which Plaid keeps sending for
+// compatibility, and SYNC_UPDATES_AVAILABLE only once /transactions/sync has run
+// on the Item. Creating a transaction alone fires nothing. TRANSACTIONS_REMOVED
+// is not sent: no route removes a transaction.
 func (h *Handler) transactionsRefresh(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.liveItemFor(w, r); ok {
-		h.writeJSON(w, http.StatusOK, map[string]any{})
+	it, ok := h.liveItemFor(w, r)
+	if !ok {
+		return
 	}
+	if added, total := h.store.ChangesSince(it.ID, it.NotifiedChanges); total > it.NotifiedChanges {
+		it.NotifiedChanges = total
+		h.store.PutItem(it)
+		if added > 0 {
+			h.fireWebhook(it, "TRANSACTIONS", "DEFAULT_UPDATE", map[string]any{"new_transactions": added, "error": nil})
+		}
+		if it.SyncCalled {
+			h.fireWebhook(it, "TRANSACTIONS", "SYNC_UPDATES_AVAILABLE",
+				map[string]any{"initial_update_complete": true, "historical_update_complete": true})
+		}
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{})
 }
 
 // getOptions reads options.count (1 to 500, default 100) and options.offset (0 or
