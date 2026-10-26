@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
 
 // postToken calls the token endpoint with a form, and HTTP Basic credentials
@@ -107,6 +109,7 @@ func TestTokenErrorsUseTheIdentityShape(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newTestHandler(t)
 			h.store.StrictAuth.Store(true)
+			h.store.Clients.Set("a", store.Client{Secret: "b"}) // the cases that name a grant reach its check
 			req := httptest.NewRequest(http.MethodPost, "/connect/token", strings.NewReader(tc.form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			if tc.basic != "" {

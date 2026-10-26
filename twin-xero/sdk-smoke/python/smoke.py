@@ -109,6 +109,13 @@ def set_strict_auth(on):
     assert conn.getresponse().status == 200, "PUT /admin/config failed"
 
 
+def admin(method, path, body=None):
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request(method, path, json.dumps(body) if body is not None else None, {"Content-Type": "application/json"})
+    res = conn.getresponse()
+    return res.status, json.loads(res.read() or b"null")
+
+
 def stored_invoice(invoice_id):
     """The invoice as the emulator holds it, from GET /admin/state (there is no GET /Invoices yet)."""
     conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
@@ -144,6 +151,7 @@ def case_made_up_tokens_are_accepted_by_default():
 
 def case_strict_auth_refuses_made_up_tokens():
     set_strict_auth(True)
+    admin("POST", "/admin/clients", {"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET})
     try:
         client, token = made_up_client()
         try:
@@ -161,6 +169,37 @@ def case_strict_auth_refuses_made_up_tokens():
         except Exception as e:
             assert "invalid_grant" in str(e), str(e)
     finally:
+        admin("DELETE", f"/admin/clients/{CLIENT_ID}")
+        set_strict_auth(False)
+
+
+def token_call(**form):
+    body = urllib.parse.urlencode(form).encode()
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request("POST", "/connect/token", body, {"Content-Type": "application/x-www-form-urlencoded"})
+    res = conn.getresponse()
+    return res.status, json.load(res)
+
+
+def case_strict_auth_checks_the_client_and_redeems_a_code_once():
+    """Audit finding F10: under strict auth the token endpoint knows only registered clients, and a code issued
+    through the admin plane is good once, for its own client and redirect URI."""
+    redirect = "https://app.test/callback"
+    set_strict_auth(True)
+    try:
+        assert admin("POST", "/admin/clients", {"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, "redirect_uris": [redirect]})[0] == 201
+        who = {"client_id": CLIENT_ID, "client_secret": CLIENT_SECRET}
+        status, body = token_call(grant_type="client_credentials", client_id=CLIENT_ID, client_secret="wrong")
+        assert (status, body["error"]) == (400, "invalid_client"), (status, body)
+        code = admin("POST", "/admin/authorization-codes", {"client_id": CLIENT_ID, "redirect_uri": redirect})[1]["code"]
+        status, body = token_call(grant_type="authorization_code", code=code, redirect_uri="https://elsewhere.test", **who)
+        assert (status, body["error"]) == (400, "invalid_grant"), (status, body)
+        status, body = token_call(grant_type="authorization_code", code=code, redirect_uri=redirect, **who)
+        assert status == 200 and body["refresh_token"] and body["access_token"].count(".") == 2, (status, body)
+        status, body = token_call(grant_type="authorization_code", code=code, redirect_uri=redirect, **who)
+        assert (status, body["error"]) == (400, "invalid_grant"), "a code is single use"
+    finally:
+        admin("DELETE", f"/admin/clients/{CLIENT_ID}")
         set_strict_auth(False)
 
 
@@ -738,6 +777,7 @@ def case_finance_ops_flow_end_to_end():
 
 
 CASES = [
+    ("strict auth checks the client and redeems an authorization code once", case_strict_auth_checks_the_client_and_redeems_a_code_once),
     ("the payment, credit note and attachment lists on an invoice and a credit note parse as typed models", case_the_lists_on_an_invoice_and_a_credit_note_parse_as_typed_models),
     ("the finance-ops Stripe-to-Xero sequence runs end to end through xero-python", case_finance_ops_flow_end_to_end),
     ("webhook events follow the writes: signed CONTACT, INVOICE and CREDITNOTE events", case_webhook_events_follow_the_writes),

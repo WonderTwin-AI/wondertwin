@@ -30,6 +30,7 @@ func get(h *Handler, path string, headers map[string]string) *httptest.ResponseR
 // tokenFor issues a real access token through the token endpoint.
 func tokenFor(t *testing.T, h *Handler) string {
 	t.Helper()
+	h.store.Clients.Set("app", store.Client{Secret: "secret"}) // strict mode only knows registered clients
 	body := decode(t, postToken(h, url.Values{"grant_type": {"client_credentials"}}, "app:secret"))
 	return body["access_token"].(string)
 }

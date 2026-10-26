@@ -15,7 +15,10 @@ type MemoryStore struct {
 	Clock         *pkgstate.Clock
 	AccessTokens  *pkgstate.Store[AccessToken]
 	RefreshTokens *pkgstate.Store[RefreshToken]
-	Connections   *pkgstate.Store[Connection]
+	// Clients and AuthCodes are what strict_auth checks the token endpoint against.
+	Clients     *pkgstate.Store[Client]
+	AuthCodes   *pkgstate.Store[AuthCode]
+	Connections *pkgstate.Store[Connection]
 	// Organisations is keyed by tenant id; Accounts holds one chart per tenant.
 	Organisations *pkgstate.Store[Organisation]
 	Accounts      *Tenanted[Account]
@@ -43,6 +46,8 @@ func New() *MemoryStore {
 		Clock:         pkgstate.NewClock(),
 		AccessTokens:  pkgstate.New[AccessToken]("at"),
 		RefreshTokens: pkgstate.New[RefreshToken]("rt"),
+		Clients:       pkgstate.New[Client]("client"),
+		AuthCodes:     pkgstate.New[AuthCode]("code"),
 		Connections:   pkgstate.New[Connection]("conn"),
 		Organisations: pkgstate.New[Organisation]("org"),
 		Accounts:      NewTenanted[Account](),
@@ -63,6 +68,8 @@ func New() *MemoryStore {
 type snapshot struct {
 	AccessTokens  map[string]AccessToken           `json:"access_tokens"`
 	RefreshTokens map[string]RefreshToken          `json:"refresh_tokens"`
+	Clients       map[string]Client                `json:"clients"`
+	AuthCodes     map[string]AuthCode              `json:"authorization_codes"`
 	Connections   map[string]Connection            `json:"connections"`
 	Organisations map[string]Organisation          `json:"organisations"`
 	Accounts      map[string]map[string]Account    `json:"accounts"`
@@ -78,6 +85,8 @@ func (s *MemoryStore) Snapshot() any {
 	return snapshot{
 		AccessTokens:  s.AccessTokens.Snapshot(),
 		RefreshTokens: s.RefreshTokens.Snapshot(),
+		Clients:       s.Clients.Snapshot(),
+		AuthCodes:     s.AuthCodes.Snapshot(),
 		Connections:   s.Connections.Snapshot(),
 		Organisations: s.Organisations.Snapshot(),
 		Accounts:      s.Accounts.Snapshot(),
@@ -100,6 +109,12 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	}
 	if snap.RefreshTokens != nil {
 		s.RefreshTokens.LoadSnapshot(snap.RefreshTokens)
+	}
+	if snap.Clients != nil {
+		s.Clients.LoadSnapshot(snap.Clients)
+	}
+	if snap.AuthCodes != nil {
+		s.AuthCodes.LoadSnapshot(snap.AuthCodes)
 	}
 	if snap.Connections != nil {
 		s.Connections.LoadSnapshot(snap.Connections)
@@ -134,6 +149,8 @@ func (s *MemoryStore) Reset() {
 	s.Clock.Reset()
 	s.AccessTokens.Reset()
 	s.RefreshTokens.Reset()
+	s.Clients.Reset()
+	s.AuthCodes.Reset()
 	s.Connections.Reset()
 	s.Organisations.Reset()
 	s.Accounts.Reset()
