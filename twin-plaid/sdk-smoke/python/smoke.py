@@ -421,6 +421,23 @@ def case_transactions_recurring_get_inflow_and_outflow_streams():
     assert (inflow.description, str(inflow.frequency), inflow.last_amount.amount) == ("ACME PAYROLL", "MONTHLY", -2500.0)
 
 
+def case_refresh_after_a_change_sends_default_update_and_sync_updates_available():
+    url, got = start_receiver()
+    token = linked_access_token(("transactions",), options=SandboxPublicTokenCreateRequestOptions(webhook=url))
+    client.transactions_sync(TransactionsSyncRequest(access_token=token))  # sync must have run for the sync webhook
+    today = datetime.date.today()
+    client.sandbox_transactions_create(SandboxTransactionsCreateRequest(access_token=token, transactions=[
+        CustomSandboxTransaction(date_transacted=today, date_posted=today, amount=9.99, description="Coffee")]))
+    assert not got.qsize(), "creating a transaction alone sends no webhook"
+    client.transactions_refresh(TransactionsRefreshRequest(access_token=token))
+    bodies = {}
+    for _ in range(2):
+        payload = json.loads(got.get(timeout=5)[0])  # order is not guaranteed
+        bodies[payload["webhook_code"]] = payload
+    assert bodies["DEFAULT_UPDATE"]["new_transactions"] == 1 and bodies["SYNC_UPDATES_AVAILABLE"]["initial_update_complete"] is True
+    assert all(b["webhook_type"] == "TRANSACTIONS" and "data" not in b for b in bodies.values())
+
+
 def case_item_get():
     exchanged = client.item_public_token_exchange(ItemPublicTokenExchangeRequest(public_token=public_token().public_token))
     item = client.item_get(ItemGetRequest(access_token=exchanged.access_token)).item

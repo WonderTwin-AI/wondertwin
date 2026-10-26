@@ -223,3 +223,24 @@ func (s *MemoryStore) Sync(itemID, cursorText string, count int) (SyncPage, erro
 	}
 	return out, nil
 }
+
+// ChangeLogLen is how many changes an Item's log holds.
+func (s *MemoryStore) ChangeLogLen(itemID string) int {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	return len(s.ChangeLogs[itemID])
+}
+
+// ChangesSince counts the entries of an Item's log from a position to the end
+// that added a row, and returns the log's length.
+func (s *MemoryStore) ChangesSince(itemID string, from int) (added, total int) {
+	s.logMu.Lock()
+	defer s.logMu.Unlock()
+	log := s.ChangeLogs[itemID]
+	for _, c := range log[min(from, len(log)):] {
+		if c.Kind == Added {
+			added++
+		}
+	}
+	return added, len(log)
+}

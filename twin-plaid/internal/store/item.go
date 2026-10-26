@@ -16,8 +16,11 @@ type Item struct {
 	ErrorCode         string   `json:"error_code,omitempty"`
 	// SyncCalled is set once /transactions/sync has run on the Item: Plaid sends
 	// SYNC_UPDATES_AVAILABLE only after that (quirk DELIVERY-006).
-	SyncCalled bool      `json:"sync_called,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	SyncCalled bool `json:"sync_called,omitempty"`
+	// NotifiedChanges is how many entries of the Item's change log the last
+	// refresh webhook covered; a refresh tells the receiver only about newer ones.
+	NotifiedChanges int       `json:"notified_changes,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // PutItem stores an item under its ID.
