@@ -178,3 +178,76 @@ func (h *Handler) transactionsRefresh(w http.ResponseWriter, r *http.Request) {
 		h.writeJSON(w, http.StatusOK, map[string]any{})
 	}
 }
+
+// getOptions reads options.count (1 to 500, default 100) and options.offset (0 or
+// more, default 0). ok is false for a wrong type.
+func getOptions(body map[string]any) (count, offset int, ok bool) {
+	opts, isObj := body["options"].(map[string]any)
+	if body["options"] != nil && !isObj {
+		return 0, 0, false
+	}
+	count, hasCount, ok1 := asInt(opts["count"])
+	offset, _, ok2 := asInt(opts["offset"])
+	if !hasCount {
+		count = 100
+	}
+	return count, offset, ok1 && ok2
+}
+
+// transactionsGet is POST /transactions/get: the Item's transactions dated from
+// start_date to end_date, newest first, paged by options.count and a 0-based
+// options.offset (quirk PAGINATION-002). total_transactions is how many match,
+// whatever the page. Plaid steers new integrations to /transactions/sync.
+func (h *Handler) transactionsGet(w http.ResponseWriter, r *http.Request) {
+	call, _ := CallFrom(r)
+	start, ok1 := asString(call.Body["start_date"])
+	end, ok2 := asString(call.Body["end_date"])
+	count, offset, ok3 := getOptions(call.Body)
+	if !ok1 || !ok2 || !ok3 {
+		h.invalidBody(w)
+		return
+	}
+	var missing []string
+	if start == "" {
+		missing = append(missing, "start_date")
+	}
+	if end == "" {
+		missing = append(missing, "end_date")
+	}
+	if len(missing) > 0 {
+		h.writeMissing(w, missing)
+		return
+	}
+	from, errFrom := time.Parse("2006-01-02", start)
+	to, errTo := time.Parse("2006-01-02", end)
+	if errFrom != nil || errTo != nil || to.Before(from) {
+		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "start_date and end_date must be YYYY-MM-DD dates, start_date first")
+		return
+	}
+	if count < 1 || count > 500 || offset < 0 {
+		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "count must be between 1 and 500 and offset 0 or more")
+		return
+	}
+	it, accounts, ok := h.accountsForRequest(w, r)
+	if !ok {
+		return
+	}
+	wanted := map[string]bool{}
+	accountRows := []accountJSON{}
+	for _, a := range accounts {
+		wanted[a.ID] = true
+		accountRows = append(accountRows, newAccountJSON(a))
+	}
+	var matching []store.Transaction
+	for _, t := range h.store.TransactionsForItem(it.ID) {
+		if wanted[t.AccountID] && t.Date >= start && t.Date <= end {
+			matching = append(matching, t)
+		}
+	}
+	page := []map[string]any{}
+	for i := offset; i < min(offset+count, len(matching)); i++ {
+		page = append(page, matching[i].Body)
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{"accounts": accountRows, "transactions": page,
+		"total_transactions": len(matching), "item": newItemJSON(it)})
+}

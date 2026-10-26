@@ -48,6 +48,8 @@ from plaid.model.webhook_verification_key_get_request import WebhookVerification
 from plaid.model.sandbox_item_fire_webhook_request import SandboxItemFireWebhookRequest
 from plaid.model.custom_sandbox_transaction import CustomSandboxTransaction
 from plaid.model.sandbox_transactions_create_request import SandboxTransactionsCreateRequest
+from plaid.model.transactions_get_request import TransactionsGetRequest
+from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
 from plaid.model.transactions_refresh_request import TransactionsRefreshRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
@@ -377,6 +379,28 @@ def case_a_transaction_created_while_paging_waits_for_the_next_run():
         seen, cursor, more = seen + len(page.added), page.next_cursor, page.has_more
     assert seen == 3, "the run covers the 3 rows that existed when it began"
     assert [t.name for t in client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=cursor)).added] == ["late"]
+
+
+def case_transactions_get_pages_with_count_and_offset():
+    token = linked_access_token(("transactions",))
+    today = datetime.date.today()
+    client.sandbox_transactions_create(SandboxTransactionsCreateRequest(access_token=token, transactions=[
+        CustomSandboxTransaction(date_transacted=today - datetime.timedelta(days=i), date_posted=today - datetime.timedelta(days=i),
+                                 amount=float(i + 1), description=f"row {i}") for i in range(6)]))
+    seen, offset = [], 0
+    while True:
+        res = client.transactions_get(TransactionsGetRequest(
+            access_token=token, start_date=today - datetime.timedelta(days=30), end_date=today,
+            options=TransactionsGetRequestOptions(count=3, offset=offset)))
+        assert res.total_transactions == 8 and len(res.accounts) == 3
+        seen += [t.transaction_id for t in res.transactions]
+        offset += 3
+        if offset >= res.total_transactions:
+            break
+    assert len(seen) == 8 and len(set(seen)) == 8, "pages of 3 cover all 8 rows, each once"
+    dates = [t.date for t in client.transactions_get(TransactionsGetRequest(
+        access_token=token, start_date=today - datetime.timedelta(days=30), end_date=today)).transactions]
+    assert dates == sorted(dates, reverse=True), "newest first"
 
 
 def case_item_get():
