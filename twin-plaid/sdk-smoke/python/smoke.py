@@ -25,6 +25,10 @@ from plaid.model.accounts_balance_get_request_options import AccountsBalanceGetR
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.auth_get_request import AuthGetRequest
 from plaid.model.country_code import CountryCode
+from plaid.model.address_data_nullable_no_required_fields import AddressDataNullableNoRequiredFields
+from plaid.model.identity_get_request import IdentityGetRequest
+from plaid.model.identity_match_request import IdentityMatchRequest
+from plaid.model.identity_match_user import IdentityMatchUser
 from plaid.model.institutions_get_by_id_request import InstitutionsGetByIdRequest
 from plaid.model.institutions_get_request import InstitutionsGetRequest
 from plaid.model.institutions_search_request import InstitutionsSearchRequest
@@ -287,6 +291,19 @@ def case_auth_get_returns_the_checking_accounts_numbers():
     assert (ach.account, ach.routing, ach.account_id) == ("1111222233330000", "021000021", res.accounts[0].account_id)
     assert ach.wire_routing is None and ach.is_tokenized_account_number is False
     assert not res.numbers.eft and not res.numbers.international and not res.numbers.bacs
+
+
+def case_identity_get_and_match():
+    token = linked_access_token()
+    holder = client.identity_get(IdentityGetRequest(access_token=token)).accounts[0].owners[0]
+    assert holder.names == ["Alberta Bobbeth Charleson"] and len(holder.addresses) == 2 and holder.addresses[0].primary
+    good = client.identity_match(IdentityMatchRequest(access_token=token, user=IdentityMatchUser(
+        legal_name="Alberta Bobbeth Charleson", phone_number="+12025550123", email_address="accountholder0@example.com",
+        address=AddressDataNullableNoRequiredFields(street="2992 Cameron Road", city="Malakoff", region="NY", postal_code="14236", country="US")))).accounts[0]
+    assert (good.legal_name.score, good.phone_number.score, good.email_address.score, good.address.score) == (100, 100, 100, 100)
+    assert good.address.is_postal_code_match is True and good.balances.current is None
+    bad = client.identity_match(IdentityMatchRequest(access_token=token, user=IdentityMatchUser(legal_name="Jane Smith"))).accounts[0]
+    assert bad.legal_name.score == 0 and bad.phone_number.score is None
 
 
 def case_item_get():

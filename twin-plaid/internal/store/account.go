@@ -10,6 +10,44 @@ type Balances struct {
 	ISOCurrencyCode string   `json:"iso_currency_code,omitempty"`
 }
 
+// Owner is an account holder, in the shape Identity returns it. The JSON tags are
+// Plaid's, so the store's snapshot and the API's response agree.
+type Owner struct {
+	Names        []string       `json:"names"`
+	PhoneNumbers []OwnerPhone   `json:"phone_numbers"`
+	Emails       []OwnerEmail   `json:"emails"`
+	Addresses    []OwnerAddress `json:"addresses"`
+}
+
+// OwnerPhone is one phone number entry of an Owner.
+type OwnerPhone struct {
+	Data    string `json:"data"`
+	Primary bool   `json:"primary"`
+	Type    string `json:"type"`
+}
+
+// OwnerEmail is one email address entry of an Owner.
+type OwnerEmail struct {
+	Data    string `json:"data"`
+	Primary bool   `json:"primary"`
+	Type    string `json:"type"`
+}
+
+// OwnerAddress is one postal address entry of an Owner.
+type OwnerAddress struct {
+	Data    AddressData `json:"data"`
+	Primary bool        `json:"primary"`
+}
+
+// AddressData is a postal address.
+type AddressData struct {
+	City       string `json:"city"`
+	Country    string `json:"country"`
+	PostalCode string `json:"postal_code"`
+	Region     string `json:"region"`
+	Street     string `json:"street"`
+}
+
 // AccountNumbers are the US bank numbers Auth returns for an account.
 type AccountNumbers struct {
 	Account     string `json:"account"`
@@ -33,6 +71,8 @@ type Account struct {
 	Balances     Balances `json:"balances"`
 	// Numbers are set only on accounts Auth serves: checking, savings and cash management.
 	Numbers *AccountNumbers `json:"numbers,omitempty"`
+	// Owners are the account holders Identity returns.
+	Owners []Owner `json:"owners,omitempty"`
 }
 
 // PutAccount stores an account under its ID.
