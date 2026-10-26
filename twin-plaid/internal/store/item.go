@@ -6,15 +6,18 @@ import "time"
 // An empty string stands for a value Plaid sends as null or leaves out; the
 // API layer decides which, per field (quirk ENVELOPE-004).
 type Item struct {
-	ID                string    `json:"item_id"`
-	InstitutionID     string    `json:"institution_id,omitempty"`
-	Webhook           string    `json:"webhook,omitempty"`
-	Products          []string  `json:"products,omitempty"`
-	BilledProducts    []string  `json:"billed_products,omitempty"`
-	ConsentedProducts []string  `json:"consented_products,omitempty"`
-	UpdateType        string    `json:"update_type,omitempty"`
-	ErrorCode         string    `json:"error_code,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                string   `json:"item_id"`
+	InstitutionID     string   `json:"institution_id,omitempty"`
+	Webhook           string   `json:"webhook,omitempty"`
+	Products          []string `json:"products,omitempty"`
+	BilledProducts    []string `json:"billed_products,omitempty"`
+	ConsentedProducts []string `json:"consented_products,omitempty"`
+	UpdateType        string   `json:"update_type,omitempty"`
+	ErrorCode         string   `json:"error_code,omitempty"`
+	// SyncCalled is set once /transactions/sync has run on the Item: Plaid sends
+	// SYNC_UPDATES_AVAILABLE only after that (quirk DELIVERY-006).
+	SyncCalled bool      `json:"sync_called,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // PutItem stores an item under its ID.
