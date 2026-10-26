@@ -3,7 +3,7 @@
   "vendor_domain": "plaid.com",
   "tier": "community",
   "category": "fintech",
-  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). Sandbox public token creation, public token exchange (Item and access token creation), Item reads (item/get), account reads (accounts/get), Item removal and access token rotation (item/remove, item/access_token/invalidate), Item error simulation (the documented error_{CODE} Sandbox passwords and sandbox/item/reset_login), the webhook verification key (webhook_verification_key/get), webhook URL updates with signed delivery (item/webhook/update), Sandbox test webhooks (sandbox/item/fire_webhook, the documented codes that have a published sample body), institutions (institutions/get, institutions/search, institutions/get_by_id) and Link token creation and reads (link/token/create, link/token/get) are served. A new Item starts with three default accounts taken from the sample response in Plaid's public docs, a provisional fixture to be replaced once the Sandbox default set is captured. The 22 institutions are Plaid's published Sandbox list plus published sample rows, also provisional: products are a template and routing numbers are mostly not published; the remaining Plaid API routes arrive in later slices of build plan plaid-bp1.",
+  "description": "Scaffold of the Plaid app emulator: it launches as --port=N, answers GET /admin/health with {\"status\":\"ok\"}, and serves the shared admin plane (reset, state, config, quirks). Sandbox public token creation, public token exchange (Item and access token creation), Item reads (item/get), account and balance reads (accounts/get, accounts/balance/get), Item removal and access token rotation (item/remove, item/access_token/invalidate), Item error simulation (the documented error_{CODE} Sandbox passwords and sandbox/item/reset_login), the webhook verification key (webhook_verification_key/get), webhook URL updates with signed delivery (item/webhook/update), Sandbox test webhooks (sandbox/item/fire_webhook, the documented codes that have a published sample body), institutions (institutions/get, institutions/search, institutions/get_by_id) and Link token creation and reads (link/token/create, link/token/get) are served. A new Item starts with three default accounts taken from the sample response in Plaid's public docs, a provisional fixture to be replaced once the Sandbox default set is captured. The 22 institutions are Plaid's published Sandbox list plus published sample rows, also provisional: products are a template and routing numbers are mostly not published; the remaining Plaid API routes arrive in later slices of build plan plaid-bp1.",
   "sdk_target": {
     "primary": {
       "package": "plaid-python",
@@ -35,7 +35,7 @@
     },
     "auth_pattern": "custom",
     "has_webhooks": true,
-    "resource_count": 15
+    "resource_count": 16
   },
   "coverage": {
     "resources_implemented": [
@@ -53,7 +53,8 @@
       "institutions/search",
       "institutions/get_by_id",
       "item/webhook/update",
-      "sandbox/item/fire_webhook"
+      "sandbox/item/fire_webhook",
+      "accounts/balance/get"
     ],
     "resources_not_implemented": [
       "auth/get",
@@ -62,7 +63,6 @@
       "sandbox/transactions/create",
       "transactions/recurring/get",
       "transactions/sync",
-      "accounts/balance/get",
       "identity/get",
       "identity/match",
       "processor/token/create",
