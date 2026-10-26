@@ -12,13 +12,14 @@ non-zero if any case fails.
 import base64
 import datetime
 import hashlib
+import http.client
 import http.server
 import json
 import os
 import queue
 import sys
 import threading
-import urllib.request
+from urllib.parse import urlsplit
 
 import plaid
 from plaid.api import plaid_api
@@ -361,10 +362,17 @@ def case_transactions_sync_pages_and_reports_only_what_changed():
 
 def admin_call(method, path, body=None):
     """The emulator's admin route for changing or removing a row: Plaid has no such call."""
-    req = urllib.request.Request(BASE + path, method=method, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req) as res:
-        return json.loads(res.read())
+    host = urlsplit(BASE)
+    conn = http.client.HTTPConnection(host.hostname, host.port)
+    try:
+        conn.request(method, path, body=json.dumps(body) if body is not None else None,
+                     headers={"Content-Type": "application/json"})
+        res = conn.getresponse()
+        data = res.read()
+        assert res.status == 200, (res.status, data)
+        return json.loads(data)
+    finally:
+        conn.close()
 
 
 def case_transactions_sync_reports_modified_and_removed_rows():
