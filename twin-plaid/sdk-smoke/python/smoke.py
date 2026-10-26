@@ -50,6 +50,7 @@ from plaid.model.custom_sandbox_transaction import CustomSandboxTransaction
 from plaid.model.sandbox_transactions_create_request import SandboxTransactionsCreateRequest
 from plaid.model.transactions_get_request import TransactionsGetRequest
 from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
+from plaid.model.transactions_recurring_get_request import TransactionsRecurringGetRequest
 from plaid.model.transactions_refresh_request import TransactionsRefreshRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
@@ -401,6 +402,23 @@ def case_transactions_get_pages_with_count_and_offset():
     dates = [t.date for t in client.transactions_get(TransactionsGetRequest(
         access_token=token, start_date=today - datetime.timedelta(days=30), end_date=today)).transactions]
     assert dates == sorted(dates, reverse=True), "newest first"
+
+
+def case_transactions_recurring_get_inflow_and_outflow_streams():
+    token = linked_access_token(("transactions",))
+    today = datetime.date.today()
+    row = lambda desc, amount, ago: CustomSandboxTransaction(
+        date_transacted=today - datetime.timedelta(days=ago), date_posted=today - datetime.timedelta(days=ago),
+        amount=amount, description=desc)
+    client.sandbox_transactions_create(SandboxTransactionsCreateRequest(access_token=token, transactions=[
+        row("Netflix", 15.99, 21), row("Netflix", 15.99, 14), row("Netflix", 15.99, 7), row("Netflix", 15.99, 0),
+        row("ACME PAYROLL", -2500.0, 60), row("ACME PAYROLL", -2500.0, 30), row("ACME PAYROLL", -2500.0, 0)]))
+    res = client.transactions_recurring_get(TransactionsRecurringGetRequest(access_token=token))
+    assert str(res.personal_finance_category_version) == "v2" and res.updated_datetime
+    [out], [inflow] = res.outflow_streams, res.inflow_streams
+    assert (out.description, str(out.frequency), str(out.status), out.is_active, len(out.transaction_ids)) == ("Netflix", "WEEKLY", "MATURE", True, 4)
+    assert out.average_amount.amount == 15.99 and out.predicted_next_date == today + datetime.timedelta(days=7)
+    assert (inflow.description, str(inflow.frequency), inflow.last_amount.amount) == ("ACME PAYROLL", "MONTHLY", -2500.0)
 
 
 def case_item_get():
