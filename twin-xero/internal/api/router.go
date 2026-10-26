@@ -58,6 +58,12 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Delete("/admin/webhooks/{id}", h.DeleteWebhook)
 		r.Post("/admin/webhooks/{id}/verify", h.VerifyWebhook)
 
+		// Strict mode checks the token endpoint's caller against these.
+		r.Post("/admin/clients", h.RegisterClient)
+		r.Get("/admin/clients", h.ListClients)
+		r.Delete("/admin/clients/{id}", h.DeleteClient)
+		r.Post("/admin/authorization-codes", h.IssueAuthorizationCode)
+
 		r.Group(func(r chi.Router) {
 			r.Use(h.bearer)
 			r.Get("/connections", h.Connections)
