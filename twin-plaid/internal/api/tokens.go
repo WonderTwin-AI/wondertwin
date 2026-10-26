@@ -90,7 +90,7 @@ func (h *Handler) itemPublicTokenExchange(w http.ResponseWriter, r *http.Request
 	switch {
 	case errors.Is(err, store.ErrUnknownToken):
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_PUBLIC_TOKEN",
-			"provided public token is invalid or has already been exchanged")
+			"could not find matching public token")
 	case errors.Is(err, store.ErrExpiredToken):
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_PUBLIC_TOKEN",
 			"provided public token has expired; public tokens expire 30 minutes after creation")

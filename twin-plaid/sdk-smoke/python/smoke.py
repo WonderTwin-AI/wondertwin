@@ -466,8 +466,45 @@ def case_item_get_refuses_an_unknown_access_token():
         raise AssertionError("an unknown access token was accepted")
 
 
+# The supported use cases of scope-recommendation.json (WonderTwin-AI/wondertwin-docs,
+# research/twins/plaid/) and the cases above that exercise each one. A use case
+# passes when all of its cases pass.
+USE_CASES = {
+    "plaid-sandbox-link-item": ["sandbox_public_token_create", "item_public_token_exchange", "item_get", "accounts_get"],
+    "plaid-link-token-exchange": ["link_token_create", "link_token_get", "link_token_then_exchange"],
+    "plaid-transactions-sync": [
+        "transactions_sync_pages_and_reports_only_what_changed",
+        "sandbox_transactions_create_refresh_then_sync_returns_the_new_rows",
+        "refresh_after_a_change_sends_default_update_and_sync_updates_available",
+    ],
+    "plaid-transactions-get-legacy": ["transactions_get_pages_with_count_and_offset"],
+    "plaid-balance-check": ["accounts_balance_get_and_its_account_ids_filter"],
+    "plaid-auth-numbers": ["auth_get_returns_the_checking_accounts_numbers"],
+    "plaid-identity": ["identity_get_and_match"],
+    "plaid-item-login-repair": [
+        "reset_login_puts_the_item_in_login_required",
+        "login_repair_flow_fires_a_webhook_and_update_mode_still_works",
+    ],
+    "plaid-webhook-verify": [
+        "fire_webhook_delivers_a_body_the_served_key_verifies",
+        "webhook_verification_key_get_refuses_an_unknown_key_id",
+    ],
+    "plaid-webhook-update": ["item_webhook_update_delivers_a_signed_flat_body"],
+    "plaid-processor-stripe": ["processor_tokens_after_auth_get"],
+    "plaid-processor-token": ["processor_tokens_after_auth_get"],
+    "plaid-institutions": ["institutions_get_pages_by_offset", "institutions_search", "institutions_get_by_id"],
+    "plaid-recurring-transactions": ["transactions_recurring_get_inflow_and_outflow_streams"],
+    "plaid-item-offboard": [
+        "item_remove_then_item_get_is_item_not_found",
+        "item_access_token_invalidate_issues_a_new_token",
+    ],
+    "plaid-error-simulation": ["error_password_fails_the_create"],
+}
+
+
 def main():
     failed = False
+    passed = {}
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("case_") and callable(f)):
         try:
             fn()
@@ -475,7 +512,15 @@ def main():
         except Exception as e:  # report every case, not just the first failure
             failed = True
             row = {"sdk": SDK, "case": name[5:], "pass": False, "detail": f"{type(e).__name__}: {e}"}
+        passed[name[5:]] = row["pass"]
         print(json.dumps(row))
+    for use_case, cases in USE_CASES.items():
+        missing = [c for c in cases if c not in passed]
+        failing = [c for c in cases if passed.get(c) is False]
+        ok = not missing and not failing
+        failed = failed or not ok
+        detail = "" if ok else "missing cases: %s; failing cases: %s" % (missing, failing)
+        print(json.dumps({"sdk": SDK, "case": "use_case_" + use_case, "pass": ok, "detail": detail}))
     sys.exit(1 if failed else 0)
 
 

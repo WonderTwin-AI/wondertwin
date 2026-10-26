@@ -72,7 +72,7 @@ func (h *Handler) linkTokenGet(w http.ResponseWriter, r *http.Request) {
 	lt, err := h.store.GetLinkToken(token)
 	if err != nil {
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_LINK_TOKEN",
-			"provided link token is invalid or has expired")
+			"invalid link_token provided")
 		return
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{
