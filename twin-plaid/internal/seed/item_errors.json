@@ -1,5 +1,5 @@
 {
-  "_source": "Sample error bodies from Plaid's public error pages (plaid.com/docs/errors/{item,institution,payment,api}/), fetched 2026-10-20, not the pinned 2026-09-28 docs capture. Verbatim: http status, error_type, error_message, display_message. Codes listed as Sandbox error passwords on plaid.com/docs/sandbox/test-credentials but absent here have no published sample: COUNTRY_NOT_SUPPORTED, USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS. ITEM_LOGIN_REQUIRED is here for /sandbox/item/reset_login; it is not a listed error password.",
+  "_source": "Sample error bodies from Plaid's public error pages (plaid.com/docs/errors/{item,institution,payment,api}/), fetched 2026-10-20, not the pinned 2026-09-28 docs capture. Verbatim: http status, error_type, error_message, display_message. Codes listed as Sandbox error passwords on plaid.com/docs/sandbox/test-credentials but absent here have no published sample: COUNTRY_NOT_SUPPORTED, USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS. ITEM_LOGIN_REQUIRED is here for /sandbox/item/reset_login, and NO_AUTH_ACCOUNTS for /auth/get; neither is a listed error password.",
   "errors": {
     "ACCESS_NOT_GRANTED": {
       "http": 400,
@@ -84,6 +84,12 @@
       "error_type": "ITEM_ERROR",
       "error_message": "no valid accounts were found for this item",
       "display_message": "No valid accounts were found at the financial institution. Please visit your financial institution's website to confirm accounts are available."
+    },
+    "NO_AUTH_ACCOUNTS": {
+      "http": 400,
+      "error_type": "ITEM_ERROR",
+      "error_message": "There are no valid checking or savings account(s) associated with this Item. See https://plaid.com/docs/api/#item-errors for more.",
+      "display_message": null
     },
     "PAYMENT_INSUFFICIENT_FUNDS": {
       "http": 400,
