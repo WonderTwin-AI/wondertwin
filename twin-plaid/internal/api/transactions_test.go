@@ -129,3 +129,28 @@ func TestTransactionsSyncRefusesBadRequests(t *testing.T) {
 		t.Fatalf("another Item's cursor = %v", m)
 	}
 }
+
+func TestAdminRoutesMakeSyncReportModifiedAndRemovedRows(t *testing.T) {
+	tc, _, _ := setupPlaid(t)
+	token := linkedWithHook(tc, []string{"transactions"}, "")
+	first := doSync(tc, token, "", 0)
+	added := list(first, "added")
+	if len(added) != 2 {
+		t.Fatalf("a new Item should start with two rows, got %v", first)
+	}
+	keep, drop := added[0].(map[string]any)["transaction_id"].(string), added[1].(map[string]any)["transaction_id"].(string)
+
+	tc.Post("/admin/transactions/"+keep+"/modify", map[string]any{"name": "renamed", "amount": 9.5, "pending": false}).AssertStatus(200)
+	tc.Delete("/admin/transactions/" + drop).AssertStatus(200)
+
+	next := doSync(tc, token, first["next_cursor"].(string), 0)
+	modified, removed := list(next, "modified"), list(next, "removed")
+	if len(modified) != 1 || modified[0].(map[string]any)["name"] != "renamed" || modified[0].(map[string]any)["amount"] != 9.5 ||
+		len(removed) != 1 || removed[0].(map[string]any)["transaction_id"] != drop {
+		t.Fatalf("what changed = %v", next)
+	}
+
+	tc.Post("/admin/transactions/nope/modify", map[string]any{"name": "x"}).AssertStatus(404)
+	tc.Delete("/admin/transactions/nope").AssertStatus(404)
+	tc.Post("/admin/transactions/"+keep+"/modify", map[string]any{"date": "yesterday"}).AssertStatus(400)
+}

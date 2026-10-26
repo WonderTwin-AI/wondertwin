@@ -18,6 +18,7 @@ import os
 import queue
 import sys
 import threading
+import urllib.request
 
 import plaid
 from plaid.api import plaid_api
@@ -358,6 +359,25 @@ def case_transactions_sync_pages_and_reports_only_what_changed():
     assert row.name and row.pending in (True, False) and row.payment_channel and row.personal_finance_category.primary
 
 
+def admin_call(method, path, body=None):
+    """The emulator's admin route for changing or removing a row: Plaid has no such call."""
+    req = urllib.request.Request(BASE + path, method=method, data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req) as res:
+        return json.loads(res.read())
+
+
+def case_transactions_sync_reports_modified_and_removed_rows():
+    token = linked_access_token(("transactions",))
+    first = client.transactions_sync(TransactionsSyncRequest(access_token=token))
+    keep, drop = first.added[0].transaction_id, first.added[1].transaction_id
+    assert admin_call("POST", "/admin/transactions/%s/modify" % keep, {"name": "Renamed", "amount": 9.5})["status"] == "modified"
+    assert admin_call("DELETE", "/admin/transactions/%s" % drop)["status"] == "removed"
+    res = client.transactions_sync(TransactionsSyncRequest(access_token=token, cursor=first.next_cursor))
+    assert not res.added and [(t.transaction_id, t.name, t.amount) for t in res.modified] == [(keep, "Renamed", 9.5)]
+    assert [r.transaction_id for r in res.removed] == [drop]
+
+
 def case_sandbox_transactions_create_refresh_then_sync_returns_the_new_rows():
     token = linked_access_token(("transactions",))
     start = client.transactions_sync(TransactionsSyncRequest(access_token=token))
@@ -479,6 +499,7 @@ USE_CASES = {
     "plaid-link-token-exchange": ["link_token_create", "link_token_get", "link_token_then_exchange"],
     "plaid-transactions-sync": [
         "transactions_sync_pages_and_reports_only_what_changed",
+        "transactions_sync_reports_modified_and_removed_rows",
         "sandbox_transactions_create_refresh_then_sync_returns_the_new_rows",
         "refresh_after_a_change_sends_default_update_and_sync_updates_available",
     ],
