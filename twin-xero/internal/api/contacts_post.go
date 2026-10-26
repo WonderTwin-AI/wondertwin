@@ -27,7 +27,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 		in.Contacts = []json.RawMessage{raw}
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, raw, err)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *Handler) UpdateOrCreateContacts(w http.ResponseWriter, r *http.Request)
 	for i, one := range in.Contacts {
 		var sent contact
 		if err := json.Unmarshal(one, &sent); err != nil {
-			h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+			h.writeBadBody(w, r, one, err)
 			return
 		}
 		if sent.ContactID == "" {

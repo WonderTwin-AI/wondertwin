@@ -1,8 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
@@ -71,4 +75,78 @@ func writeValidationException(w http.ResponseWriter, elements ...validationEleme
 		"Message":     "A validation exception occurred",
 		"Elements":    out,
 	})
+}
+
+// badValueError is a date the body carried that Xero cannot read. It keeps the
+// raw JSON of the value so the answer can name the field that held it.
+type badValueError struct{ Raw []byte }
+
+func (e *badValueError) Error() string { return "invalid date " + string(e.Raw) }
+
+// writeBadBody answers a body that did not decode. JSON that is not JSON stays a
+// plain 400 problem. A value of the wrong type or a date that cannot be read is a
+// ValidationException that names the field, as every other refused value is
+// (audit finding F3). The exact words are a guess; Xero's are not observed.
+func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, raw []byte, err error) {
+	var typeErr *json.UnmarshalTypeError
+	var valueErr *badValueError
+	switch {
+	case errors.As(err, &typeErr):
+		writeValidationException(w, validationElement{Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
+	case errors.As(err, &valueErr):
+		field := fieldHolding(raw, valueErr.Raw)
+		if field == "" {
+			field = "Date"
+		}
+		writeValidationException(w, validationElement{Messages: []string{field + " is not a valid date"}})
+	default:
+		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+	}
+}
+
+// lastKey is the last name in a dotted field path.
+func lastKey(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[i+1:]
+	}
+	return path
+}
+
+// fieldHolding finds the key under which the body carries the value, searching
+// every nesting level and taking the first key in name order, so the answer does
+// not vary from call to call.
+func fieldHolding(body, value []byte) string {
+	var tree any
+	if json.Unmarshal(body, &tree) != nil {
+		return ""
+	}
+	var walk func(v any) string
+	walk = func(v any) string {
+		switch t := v.(type) {
+		case map[string]any:
+			keys := make([]string, 0, len(t))
+			for k := range t {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				if enc, err := json.Marshal(t[k]); err == nil && bytes.Equal(enc, value) {
+					return k
+				}
+			}
+			for _, k := range keys {
+				if f := walk(t[k]); f != "" {
+					return f
+				}
+			}
+		case []any:
+			for _, e := range t {
+				if f := walk(e); f != "" {
+					return f
+				}
+			}
+		}
+		return ""
+	}
+	return walk(tree)
 }

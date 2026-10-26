@@ -57,7 +57,7 @@ func (h *Handler) CreateContacts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
-		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
+		h.writeBadBody(w, r, raw, err)
 		return
 	}
 
