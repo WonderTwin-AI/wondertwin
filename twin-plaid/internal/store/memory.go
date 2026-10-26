@@ -11,13 +11,14 @@ import (
 
 // MemoryStore holds all Plaid emulator state in memory.
 type MemoryStore struct {
-	Clock        *pkgstate.Clock
-	Items        *pkgstate.Store[Item]
-	Accounts     *pkgstate.Store[Account]
-	Institutions *pkgstate.Store[Institution]
-	PublicTokens *pkgstate.Store[PublicToken]
-	AccessTokens *pkgstate.Store[AccessToken]
-	LinkTokens   *pkgstate.Store[LinkToken]
+	Clock           *pkgstate.Clock
+	Items           *pkgstate.Store[Item]
+	Accounts        *pkgstate.Store[Account]
+	Institutions    *pkgstate.Store[Institution]
+	PublicTokens    *pkgstate.Store[PublicToken]
+	AccessTokens    *pkgstate.Store[AccessToken]
+	LinkTokens      *pkgstate.Store[LinkToken]
+	ProcessorTokens *pkgstate.Store[ProcessorToken]
 	// Rand is the deterministic random source. main.go replaces the default
 	// with twin.Rand, the source the rest of the emulator draws from.
 	Rand *sim.Rand
@@ -31,37 +32,40 @@ type MemoryStore struct {
 // New creates an empty MemoryStore.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Clock:        pkgstate.NewClock(),
-		Items:        pkgstate.New[Item]("item"),
-		Accounts:     pkgstate.New[Account]("acct"),
-		Institutions: pkgstate.New[Institution]("ins"),
-		PublicTokens: pkgstate.New[PublicToken]("public"),
-		AccessTokens: pkgstate.New[AccessToken]("access"),
-		LinkTokens:   pkgstate.New[LinkToken]("link"),
-		Rand:         sim.DefaultRand(),
+		Clock:           pkgstate.NewClock(),
+		Items:           pkgstate.New[Item]("item"),
+		Accounts:        pkgstate.New[Account]("acct"),
+		Institutions:    pkgstate.New[Institution]("ins"),
+		PublicTokens:    pkgstate.New[PublicToken]("public"),
+		AccessTokens:    pkgstate.New[AccessToken]("access"),
+		LinkTokens:      pkgstate.New[LinkToken]("link"),
+		ProcessorTokens: pkgstate.New[ProcessorToken]("processor"),
+		Rand:            sim.DefaultRand(),
 	}
 }
 
 // snapshot is the JSON form of the store. A field a state file leaves out
 // leaves that store as it is.
 type snapshot struct {
-	Items        map[string]Item        `json:"items,omitempty"`
-	Accounts     map[string]Account     `json:"accounts,omitempty"`
-	Institutions map[string]Institution `json:"institutions,omitempty"`
-	PublicTokens map[string]PublicToken `json:"public_tokens,omitempty"`
-	AccessTokens map[string]AccessToken `json:"access_tokens,omitempty"`
-	LinkTokens   map[string]LinkToken   `json:"link_tokens,omitempty"`
+	Items           map[string]Item           `json:"items,omitempty"`
+	Accounts        map[string]Account        `json:"accounts,omitempty"`
+	Institutions    map[string]Institution    `json:"institutions,omitempty"`
+	PublicTokens    map[string]PublicToken    `json:"public_tokens,omitempty"`
+	AccessTokens    map[string]AccessToken    `json:"access_tokens,omitempty"`
+	LinkTokens      map[string]LinkToken      `json:"link_tokens,omitempty"`
+	ProcessorTokens map[string]ProcessorToken `json:"processor_tokens,omitempty"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
 func (s *MemoryStore) Snapshot() any {
 	return snapshot{
-		Items:        s.Items.Snapshot(),
-		Accounts:     s.Accounts.Snapshot(),
-		Institutions: s.Institutions.Snapshot(),
-		PublicTokens: s.PublicTokens.Snapshot(),
-		AccessTokens: s.AccessTokens.Snapshot(),
-		LinkTokens:   s.LinkTokens.Snapshot(),
+		Items:           s.Items.Snapshot(),
+		Accounts:        s.Accounts.Snapshot(),
+		Institutions:    s.Institutions.Snapshot(),
+		PublicTokens:    s.PublicTokens.Snapshot(),
+		AccessTokens:    s.AccessTokens.Snapshot(),
+		LinkTokens:      s.LinkTokens.Snapshot(),
+		ProcessorTokens: s.ProcessorTokens.Snapshot(),
 	}
 }
 
@@ -89,6 +93,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.LinkTokens != nil {
 		s.LinkTokens.LoadSnapshot(snap.LinkTokens)
 	}
+	if snap.ProcessorTokens != nil {
+		s.ProcessorTokens.LoadSnapshot(snap.ProcessorTokens)
+	}
 	return nil
 }
 
@@ -110,6 +117,7 @@ func (s *MemoryStore) Reset() {
 	s.PublicTokens.Reset()
 	s.AccessTokens.Reset()
 	s.LinkTokens.Reset()
+	s.ProcessorTokens.Reset()
 	if s.defaults != nil {
 		s.defaults(s)
 	}
