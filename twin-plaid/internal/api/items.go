@@ -117,8 +117,8 @@ func (h *Handler) itemGet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// itemRemove is POST /item/remove. The Item and its accounts go; the access
-// token stays on record so later calls answer ITEM_NOT_FOUND (quirk LIFECYCLE-002).
+// itemRemove is POST /item/remove. The Item, its accounts and its processor
+// tokens go; the access token stays on record so later calls answer ITEM_NOT_FOUND (quirk LIFECYCLE-002).
 func (h *Handler) itemRemove(w http.ResponseWriter, r *http.Request) {
 	if it, ok := h.itemFor(w, r); ok {
 		h.store.RemoveItem(it.ID)
