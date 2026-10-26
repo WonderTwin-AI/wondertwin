@@ -1,9 +1,12 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
+	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/seed"
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
@@ -56,4 +59,122 @@ func rowsOrEmpty(rows []map[string]any) []map[string]any {
 		return []map[string]any{}
 	}
 	return rows
+}
+
+// customTransaction reads one entry of /sandbox/transactions/create. ok is false
+// for a wrong type. date_transacted, date_posted, amount and description are
+// required; iso_currency_code defaults to USD; account_id is optional.
+func customTransaction(v any) (in seed.CustomTransaction, accountID string, missing []string, ok bool) {
+	m, isObj := v.(map[string]any)
+	if !isObj {
+		return in, "", nil, false
+	}
+	var ok1, ok2, ok3, ok4, ok5 bool
+	in.DateTransacted, ok1 = asString(m["date_transacted"])
+	in.DatePosted, ok2 = asString(m["date_posted"])
+	in.Description, ok3 = asString(m["description"])
+	in.Currency, ok4 = asString(m["iso_currency_code"])
+	accountID, ok5 = asString(m["account_id"])
+	num, isNum := m["amount"].(json.Number)
+	f, err := num.Float64()
+	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || (m["amount"] != nil && (!isNum || err != nil)) {
+		return in, "", nil, false
+	}
+	in.Amount = f
+	if in.Currency == "" {
+		in.Currency = "USD"
+	}
+	for _, f := range []struct {
+		field  string
+		absent bool
+	}{{"date_transacted", in.DateTransacted == ""}, {"date_posted", in.DatePosted == ""}, {"amount", m["amount"] == nil}, {"description", in.Description == ""}} {
+		if f.absent {
+			missing = append(missing, f.field)
+		}
+	}
+	return in, accountID, missing, true
+}
+
+// sandboxTransactionsCreate is POST /sandbox/transactions/create: up to ten
+// transactions added to an account, which sync then reports as added. Any
+// Sandbox Item takes them. Dates run from 730 days ago to today.
+func (h *Handler) sandboxTransactionsCreate(w http.ResponseWriter, r *http.Request) {
+	call, _ := CallFrom(r)
+	list, isList := call.Body["transactions"].([]any)
+	if call.Body["transactions"] != nil && !isList {
+		h.invalidBody(w)
+		return
+	}
+	var inputs []seed.CustomTransaction
+	var accountIDs []string
+	for _, v := range list {
+		in, accountID, missing, ok := customTransaction(v)
+		if !ok {
+			h.invalidBody(w)
+			return
+		}
+		if len(missing) > 0 {
+			h.writeMissing(w, missing)
+			return
+		}
+		inputs, accountIDs = append(inputs, in), append(accountIDs, accountID)
+	}
+	if len(inputs) == 0 {
+		h.writeMissing(w, []string{"transactions"})
+		return
+	}
+	if len(inputs) > 10 {
+		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "transactions must hold between 1 and 10 entries")
+		return
+	}
+	today := h.store.Clock.Now().UTC().Truncate(24 * time.Hour)
+	for _, in := range inputs {
+		for _, d := range []string{in.DatePosted, in.DateTransacted} {
+			t, err := time.Parse("2006-01-02", d)
+			if err != nil || t.After(today) || t.Before(today.AddDate(0, 0, -730)) {
+				h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD",
+					"dates must be YYYY-MM-DD, today or up to 730 days in the past")
+				return
+			}
+		}
+	}
+	it, ok := h.liveItemFor(w, r)
+	if !ok {
+		return
+	}
+	accounts := h.store.AccountsForItem(it.ID)
+	byID := map[string]store.Account{}
+	fallback := store.Account{}
+	for i, a := range accounts {
+		byID[a.ID] = a
+		if i == 0 || a.Subtype == "checking" && fallback.Subtype != "checking" {
+			fallback = a
+		}
+	}
+	rows := make([]store.Transaction, 0, len(inputs))
+	for i, in := range inputs {
+		a, found := fallback, true
+		if accountIDs[i] != "" {
+			a, found = byID[accountIDs[i]]
+		}
+		if !found || a.Subtype == "student" { // student loans take no custom transactions (documented)
+			h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_ACCOUNT_ID",
+				"failed to find requested account ID for requested item")
+			return
+		}
+		rows = append(rows, seed.NewCustomTransaction(it.ID, a.ID, h.store.NewID(), in))
+	}
+	for _, row := range rows {
+		h.store.AddTransaction(row)
+	}
+	h.writeJSON(w, http.StatusOK, map[string]any{})
+}
+
+// transactionsRefresh is POST /transactions/refresh: Plaid starts an extraction
+// and, if it finds changes, fires SYNC_UPDATES_AVAILABLE. Rows are available
+// here at once, so there is nothing to extract and the call only acknowledges.
+func (h *Handler) transactionsRefresh(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.liveItemFor(w, r); ok {
+		h.writeJSON(w, http.StatusOK, map[string]any{})
+	}
 }

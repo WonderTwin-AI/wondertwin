@@ -1,0 +1,183 @@
+arazzo: 1.0.1
+info:
+  title: Plaid - page /transactions/sync until has_more is false
+  version: 1.0.0
+  summary: dynamic Sandbox user, sync pages with next_cursor, then an incremental page after sandbox/transactions/create and refresh
+  description: |
+    Use case plaid-transactions-sync (scope-recommendation.json).
+    Scenario evidence 01999336-8f00-7000-8a00-000000000002 (plaid.com/docs/transactions/add-to-app)
+    and 01999336-8f00-7000-8a00-000000000007 (plaid/quickstart get_transactions loop).
+    An empty next_cursor means transactions are not ready yet: the step retries (quickstart sleeps 2 s).
+    While has_more is true the step loops on itself with the new cursor.
+sourceDescriptions:
+  - name: plaid
+    url: manifest:openapi-2020-09-14_1.740.1
+    type: openapi
+workflows:
+  - workflowId: transactions-sync-paged
+    summary: dynamic Sandbox user, sync pages with next_cursor, then an incremental page after sandbox/transactions/create and refresh
+    inputs:
+      type: object
+      required: [clientId, secret]
+      properties:
+        clientId:
+          type: string
+        secret:
+          type: string
+    steps:
+      - stepId: create-public-token
+        operationId: $sourceDescriptions.plaid.sandboxPublicTokenCreate
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            institution_id: ins_109508
+            initial_products: [transactions]
+            options:
+              override_username: user_transactions_dynamic
+              override_password: pass_good
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body#/public_token
+            condition: ^public-sandbox-[0-9a-f-]{36}$
+            type: regex
+        outputs:
+          publicToken: $response.body#/public_token
+      - stepId: exchange
+        operationId: $sourceDescriptions.plaid.itemPublicTokenExchange
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            public_token: $steps.create-public-token.outputs.publicToken
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body#/access_token
+            condition: ^access-sandbox-[0-9a-f-]{36}$
+            type: regex
+        outputs:
+          accessToken: $response.body#/access_token
+          itemId: $response.body#/item_id
+      - stepId: sync-page
+        description: "First call sends no cursor in practice (the runner resolves the unset output to empty); repeats while has_more."
+        operationId: $sourceDescriptions.plaid.transactionsSync
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+            cursor: $steps.sync-page.outputs.nextCursor
+            count: 100
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/next_cursor != ""
+        onSuccess:
+          - name: next-page
+            type: goto
+            stepId: sync-page
+            criteria:
+              - condition: $response.body#/has_more == true
+        onFailure:
+          - name: not-ready
+            type: retry
+            retryAfter: 2
+            retryLimit: 15
+            criteria:
+              - condition: $statusCode == 200
+        outputs:
+          nextCursor: $response.body#/next_cursor
+          hasMore: $response.body#/has_more
+      - stepId: add-transaction
+        operationId: $sourceDescriptions.plaid.sandboxTransactionsCreate
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+            transactions:
+              - date_transacted: "2026-09-27"
+                date_posted: "2026-09-28"
+                amount: 12.34
+                description: App emulator test coffee
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: refresh
+        operationId: $sourceDescriptions.plaid.transactionsRefresh
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: outcome-incremental
+        description: "Outcome oracle. After the full sync, a new transaction arrives as a delta on the persisted cursor (INFERENCE: refresh timing in Sandbox not observed; may need a retry)."
+        operationId: $sourceDescriptions.plaid.transactionsSync
+        parameters:
+          - name: PLAID-CLIENT-ID
+            in: header
+            value: $inputs.clientId
+          - name: PLAID-SECRET
+            in: header
+            value: $inputs.secret
+          - name: Plaid-Version
+            in: header
+            value: "2020-09-14"
+        requestBody:
+          contentType: application/json
+          payload:
+            access_token: $steps.exchange.outputs.accessToken
+            cursor: $steps.sync-page.outputs.nextCursor
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.body#/has_more == false
+          - condition: $response.body#/next_cursor != $steps.sync-page.outputs.nextCursor
+        outputs:
+          cursor: $response.body#/next_cursor
+    outputs:
+      cursor: $steps.outcome-incremental.outputs.cursor
