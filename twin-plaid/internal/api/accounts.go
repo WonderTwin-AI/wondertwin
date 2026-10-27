@@ -23,10 +23,8 @@ func (h *Handler) seedAccounts(itemID string) {
 		h.store.AddTransaction(t)
 	}
 	// The starting rows are not news to a receiver: a refresh reports only what changes after them.
-	if it, ok := h.store.GetItem(itemID); ok {
-		it.NotifiedChanges = h.store.ChangeLogLen(itemID)
-		h.store.PutItem(it)
-	}
+	n := h.store.ChangeLogLen(itemID)
+	h.store.UpdateItem(itemID, func(it *store.Item) { it.NotifiedChanges = n })
 }
 
 // balancesJSON carries all five balance fields: Plaid writes each one, as null
