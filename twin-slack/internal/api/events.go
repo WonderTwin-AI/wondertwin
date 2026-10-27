@@ -434,6 +434,31 @@ func (h *Handler) emitMessageDeleted(channel, deletedTS string) {
 	})
 }
 
+// emitMessageChanged reports an edited message, in the hidden message_changed
+// shape the message event docs show: type, subtype, hidden, channel, ts and a
+// message that is the message as it now stands, with its edited stamp. The
+// page's example carries only type, user, text, ts and edited in message and no
+// event_ts or channel_type; the message here is the stored one, so it also
+// keeps its blocks, attachments, team and bot fields, and the event adds
+// channel_type and event_ts as message_deleted does. No previous_message is
+// sent. All of this is unverified (events-002).
+func (h *Handler) emitMessageChanged(msg store.Message) {
+	ch, _ := h.store.Channels.Get(msg.Channel)
+	msg.Reactions = nil
+	msg.Channel = ""
+	ts := h.store.NextTS()
+	h.events.publish(h, map[string]any{
+		"type":         "message",
+		"subtype":      "message_changed",
+		"hidden":       true,
+		"channel":      ch.ID,
+		"ts":           ts,
+		"message":      msg,
+		"event_ts":     ts,
+		"channel_type": channelType(ch),
+	})
+}
+
 // emitReactionAdded reports a reaction, in the shape the Events API docs show.
 func (h *Handler) emitReactionAdded(user, reaction string, msg store.Message) {
 	h.emitReaction("reaction_added", user, reaction, msg)
