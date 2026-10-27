@@ -52,6 +52,10 @@ func (h *Handler) IncomingWebhookPost(w http.ResponseWriter, r *http.Request) {
 		webhookError(w, http.StatusBadRequest, "invalid_payload")
 		return
 	}
+	if len(attachments) > maxAttachments {
+		webhookError(w, http.StatusBadRequest, "too_many_attachments")
+		return
+	}
 	if _, code := messageText(req.Text, req.Blocks, req.Attachments, ""); code != "" {
 		webhookError(w, http.StatusBadRequest, code)
 		return

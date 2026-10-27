@@ -141,6 +141,10 @@ func TestWebhookPost(t *testing.T) {
 	if s, _, b := post(t, url, `not json`); s != 400 || b != "invalid_payload" {
 		t.Errorf("not JSON: %d %q", s, b)
 	}
+	over := strings.TrimSuffix(strings.Repeat(`{"text":"a"},`, 101), ",")
+	if s, _, b := post(t, url, `{"attachments":[`+over+`]}`); s != 400 || b != "too_many_attachments" {
+		t.Errorf("101 attachments: %d %q", s, b)
+	}
 	// A payload with nothing to post is refused, and so is a post to an archived channel.
 	if s, _, b := post(t, url, `{"username":"x"}`); s != 400 || b != "no_text" {
 		t.Errorf("no content: %d %q", s, b)
