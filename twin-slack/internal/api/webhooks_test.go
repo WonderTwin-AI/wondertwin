@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -200,5 +201,59 @@ func TestWebhookErrors(t *testing.T) {
 	ok := mem.MintIncomingWebhook(seedChannel(tc, "fine"), store.DefaultAppID, store.DefaultBotID)
 	if s, ctype, b := post(t, api.WebhookURL(srv.URL, ok), `{"text":"x"}`); s != 200 || b != "ok" || !strings.HasPrefix(ctype, "text/plain") {
 		t.Errorf("success: %d %q %q", s, ctype, b)
+	}
+}
+
+func TestOAuthIncomingWebhook(t *testing.T) {
+	_, srv, tc := setupSlackStore(t)
+	ch := seedChannel(tc, "installs")
+	creds := func(code string, extra ...string) url.Values {
+		v := url.Values{"client_id": {"123.456"}, "client_secret": {"s3cret"}, "code": {code}}
+		for i := 0; i+1 < len(extra); i += 2 {
+			v.Set(extra[i], extra[i+1])
+		}
+		return v
+	}
+
+	// An exchange that names a channel returns the webhook beside the token.
+	m := exchange(t, srv, creds("code-hook", "incoming_webhook_channel", ch), false)
+	if m["ok"] != true {
+		t.Fatalf("exchange: %v", m)
+	}
+	hook, _ := m["incoming_webhook"].(map[string]any)
+	if hook["channel"] != "#installs" || hook["channel_id"] != ch || hook["url"] == "" || hook["configuration_url"] == "" {
+		t.Fatalf("incoming_webhook: %v", hook)
+	}
+	if !strings.Contains(m["scope"].(string), "incoming-webhook") {
+		t.Errorf("scope %q lacks incoming-webhook", m["scope"])
+	}
+
+	// The URL it returns posts to the channel it names.
+	if s, _, b := post(t, hook["url"].(string), `{"text":"installed"}`); s != 200 || b != "ok" {
+		t.Fatalf("post to the minted URL: %d %q", s, b)
+	}
+	_, hist := call(t, srv, "GET", "/api/conversations.history?channel="+ch, "", "", true)
+	if msgs, _ := hist["messages"].([]any); len(msgs) != 1 || msgs[0].(map[string]any)["text"] != "installed" {
+		t.Errorf("history: %v", hist)
+	}
+
+	// The webhook is state: it is in the export.
+	if st := tc.Get("/admin/state").AssertStatus(200).Body; !strings.Contains(string(st), hook["url"].(string)[strings.LastIndex(hook["url"].(string), "/")+1:]) {
+		t.Errorf("state export lacks the minted webhook's secret")
+	}
+
+	// An exchange that names none returns no webhook and no such scope.
+	plain := exchange(t, srv, creds("code-plain"), false)
+	if _, has := plain["incoming_webhook"]; has || strings.Contains(plain["scope"].(string), "incoming-webhook") {
+		t.Errorf("plain exchange: %v", plain)
+	}
+
+	// A channel that does not exist fails the exchange and spends no code.
+	bad := exchange(t, srv, creds("code-bad", "incoming_webhook_channel", "C_NOPE"), false)
+	if bad["ok"] != false || bad["error"] != "channel_not_found" {
+		t.Errorf("unknown channel: %v", bad)
+	}
+	if again := exchange(t, srv, creds("code-bad"), false); again["ok"] != true {
+		t.Errorf("the code was spent by a failed exchange: %v", again)
 	}
 }
