@@ -9,3 +9,6 @@ func SetMaxUploadBytes(t *testing.T, n int64) {
 	maxUploadBytes = n
 	t.Cleanup(func() { maxUploadBytes = old })
 }
+
+// WebhookURL exposes webhookURL to the tests.
+var WebhookURL = webhookURL

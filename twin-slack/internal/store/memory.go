@@ -26,6 +26,7 @@ type MemoryStore struct {
 	Views             *pkgstate.Store[ViewRecord]
 	Presences         *pkgstate.Store[Presence]
 	Bots              *pkgstate.Store[Bot]
+	IncomingWebhooks  *pkgstate.Store[IncomingWebhook]
 	// Emoji are the workspace's custom emoji: a name maps to an image URL, or
 	// to "alias:" and the name of another emoji.
 	Emoji *pkgstate.Store[string]
@@ -54,6 +55,7 @@ func New() *MemoryStore {
 		Views:             pkgstate.New[ViewRecord]("V"),
 		Presences:         pkgstate.New[Presence]("P"),
 		Bots:              pkgstate.New[Bot]("B"),
+		IncomingWebhooks:  pkgstate.New[IncomingWebhook]("WH"),
 		Emoji:             pkgstate.New[string]("E"),
 		ReadStates:        pkgstate.New[ReadState]("R"),
 		Clock:             pkgstate.NewClock(),
@@ -205,6 +207,7 @@ type stateSnapshot struct {
 	Views             map[string]ViewRecord       `json:"views"`
 	Presences         map[string]Presence         `json:"presences"`
 	Bots              map[string]Bot              `json:"bots"`
+	IncomingWebhooks  map[string]IncomingWebhook  `json:"incoming_webhooks"`
 	Emoji             map[string]string           `json:"emoji"`
 	ReadStates        map[string]ReadState        `json:"read_states"`
 	Team              *Team                       `json:"team,omitempty"`
@@ -233,6 +236,7 @@ func (s *MemoryStore) Snapshot() any {
 		Views:             s.Views.Snapshot(),
 		Presences:         s.Presences.Snapshot(),
 		Bots:              s.Bots.Snapshot(),
+		IncomingWebhooks:  s.IncomingWebhooks.Snapshot(),
 		Emoji:             s.Emoji.Snapshot(),
 		ReadStates:        s.ReadStates.Snapshot(),
 		Team:              &s.Team,
@@ -282,6 +286,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	load(s.Views, snap.Views)
 	load(s.Presences, snap.Presences)
 	load(s.Bots, snap.Bots)
+	load(s.IncomingWebhooks, snap.IncomingWebhooks)
 	load(s.Emoji, snap.Emoji)
 	load(s.ReadStates, snap.ReadStates)
 	if snap.Team != nil {
@@ -312,6 +317,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	advancePast(s.Usergroups)
 	advancePast(s.Views)
 	advancePast(s.Bots)
+	advancePast(s.IncomingWebhooks)
 	s.ensureDefaultPrincipals()
 	return nil
 }
@@ -379,6 +385,7 @@ func (s *MemoryStore) Reset() {
 	s.Views.Reset()
 	s.Presences.Reset()
 	s.Bots.Reset()
+	s.IncomingWebhooks.Reset()
 	s.Emoji.Reset()
 	s.ReadStates.Reset()
 	s.Clock.Reset()
