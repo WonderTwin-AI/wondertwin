@@ -381,6 +381,23 @@
       },
       "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it.",
       "no_quirk_reason": "Error choices the captured docs leave open; no quirk records them."
+    },
+    {
+      "route": "POST /services/{team}/{service}/{secret}",
+      "reason": "An incoming webhook posts a message to the one channel it is bound to, and answers 200 with the plain text ok. The URL is on the emulator's own host, not hooks.slack.com, in Slack's documented path form /services/{team}/{service}/{secret}. A webhook is minted by seeding it through POST /admin/state, until the OAuth install returns one. Only text, blocks, attachments and thread_ts are read. The channel, username and icon in a payload, and every other chat.postMessage field, are ignored, since Slack's pages say only that an app's webhook cannot override the channel, username or icon, and do not say whether it ignores or rejects them. thread_ts is kept as given, not checked against a thread. The stored message and its event carry subtype bot_message, the webhook's bot_id, app_id, bot_profile and user, and the bot's name as username, which Slack's pages do not state for a webhook post. The answer is text/plain; the content type of Slack's success answer is not captured. A URL that names no webhook answers 404 no_service, a body that is not JSON 400 invalid_payload, and a channel that does not exist 404 channel_not_found. A payload with no text, blocks or attachments answers 400 no_text, and a webhook bound to an archived channel 410 channel_is_archived, as the 2016 changelog gives for the second. The status of no_text, and whether a blocks-only payload is no_text, are not documented (events-022). A payload with more than 100 attachments answers 400 too_many_attachments; Slack does not document the status of too_many_attachments for a webhook, and 400 is chosen. The statuses of the other errors are not yet served.",
+      "references": {
+        "docs": "docs-2026-09-26-methods (tree_sha256 555358fcdf7ac75d4b2528de6e49e8fdb9badf875eac1b91a49baea10e1a5797)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/slack/references/manifest.json"
+      },
+      "quirk_ids": [
+        "events-018",
+        "events-019",
+        "events-020",
+        "events-022",
+        "events-026",
+        "events-029"
+      ],
+      "operator_note": "Operator rule, 2026-10-06: where the captured references do not settle a behaviour, declare it rather than invent it."
     }
   ]
 }
