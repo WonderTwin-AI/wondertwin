@@ -436,9 +436,19 @@ func (h *Handler) emitMessageDeleted(channel, deletedTS string) {
 
 // emitReactionAdded reports a reaction, in the shape the Events API docs show.
 func (h *Handler) emitReactionAdded(user, reaction string, msg store.Message) {
+	h.emitReaction("reaction_added", user, reaction, msg)
+}
+
+// emitReactionRemoved reports a removed reaction. The reaction_removed page
+// shows the same payload as reaction_added, with user the one who removed it.
+func (h *Handler) emitReactionRemoved(user, reaction string, msg store.Message) {
+	h.emitReaction("reaction_removed", user, reaction, msg)
+}
+
+func (h *Handler) emitReaction(eventType, user, reaction string, msg store.Message) {
 	ch, _ := h.store.Channels.Get(msg.Channel)
 	h.events.publish(h, map[string]any{
-		"type":     "reaction_added",
+		"type":     eventType,
 		"user":     user,
 		"reaction": reaction,
 		"item": map[string]any{
