@@ -544,3 +544,34 @@ func TestEventNamesTheActorAndTheInstallation(t *testing.T) {
 		}
 	}
 }
+
+func TestReactionRemovedEvent(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	ch := seedChannel(tc, "unreact")
+	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
+	ts := posted["ts"].(string)
+	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {ts}, "name": {"tada"}}.Encode(), true)
+	call(t, srv, "POST", "/api/reactions.remove", formType, url.Values{"channel": {ch}, "timestamp": {ts}, "name": {"tada"}}.Encode(), true)
+	// A removal that fails sends nothing.
+	call(t, srv, "POST", "/api/reactions.remove", formType, url.Values{"channel": {ch}, "timestamp": {ts}, "name": {"tada"}}.Encode(), true)
+
+	got := rc.wait(t, 3)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 3)); n != 3 {
+		t.Fatalf("deliveries: %d, want message, reaction_added and reaction_removed only", n)
+	}
+	ev := envelope(t, got[2])["event"].(map[string]any)
+	item, _ := ev["item"].(map[string]any)
+	if ev["type"] != "reaction_removed" || ev["reaction"] != "tada" || ev["user"] != "U_BOT" || ev["item_user"] != "U_BOT" || ev["event_ts"] == "" {
+		t.Errorf("reaction_removed: %v", ev)
+	}
+	if item["type"] != "message" || item["ts"] != ts || item["channel"] != ch || item["channel_type"] != "channel" {
+		t.Errorf("reaction_removed item: %v", item)
+	}
+	d := deliveryLog(t, srv, 3)
+	if last, _ := d[len(d)-1].(map[string]any); last == nil || last["status_code"] != float64(200) {
+		t.Errorf("deliveries log: %v", d)
+	}
+}

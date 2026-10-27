@@ -116,6 +116,7 @@ func (h *Handler) ReactionsRemove(w http.ResponseWriter, r *http.Request) {
 
 	msg.Reactions = reactions
 	h.store.Messages.Set(id, *msg)
+	h.emitReactionRemoved(remover, req.Name, *msg)
 	slackOK(w, nil)
 }
 
