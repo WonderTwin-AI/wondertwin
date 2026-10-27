@@ -33,13 +33,15 @@ func (h *Handler) PinsAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := h.store.Pins.NextID()
-	h.store.Pins.Set(id, store.Pin{
+	pin := store.Pin{
 		Type:    "message",
 		Channel: req.Channel,
 		Message: *msg,
 		Created: h.store.Clock.Now().Unix(),
 		Creator: callerUserID(r),
-	})
+	}
+	h.store.Pins.Set(id, pin)
+	h.emitPin("pin_added", pin.Creator, pin)
 	slackOK(w, nil)
 }
 
@@ -59,7 +61,7 @@ func (h *Handler) PinsRemove(w http.ResponseWriter, r *http.Request) {
 	})
 	if len(ids) > 0 {
 		h.store.Pins.Delete(ids[0])
-		_ = pins
+		h.emitPin("pin_removed", callerUserID(r), pins[0])
 		slackOK(w, nil)
 		return
 	}
