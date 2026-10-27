@@ -257,3 +257,51 @@ func TestOAuthIncomingWebhook(t *testing.T) {
 		t.Errorf("the code was spent by a failed exchange: %v", again)
 	}
 }
+
+func TestWebhookRevocation(t *testing.T) {
+	mem, srv, tc := setupSlackStore(t)
+	ch := seedChannel(tc, "revoke")
+	install := func(code string) (token, hookURL string) {
+		m := exchange(t, srv, url.Values{"client_id": {"1.2"}, "client_secret": {"s"}, "code": {code}, "incoming_webhook_channel": {ch}}, false)
+		hook, _ := m["incoming_webhook"].(map[string]any)
+		if m["ok"] != true || hook == nil {
+			t.Fatalf("install %s: %v", code, m)
+		}
+		return m["access_token"].(string), hook["url"].(string)
+	}
+	tokA, urlA := install("code-a")
+	_, urlB := install("code-b")
+	seeded := mem.MintIncomingWebhook(ch, store.DefaultAppID, store.DefaultBotID)
+	urlSeeded := api.WebhookURL(srv.URL, seeded)
+	for _, u := range []string{urlA, urlB, urlSeeded} {
+		if s, _, b := post(t, u, `{"text":"before"}`); s != 200 || b != "ok" {
+			t.Fatalf("before revocation: %d %q", s, b)
+		}
+	}
+
+	// A test call revokes nothing.
+	callAs(t, srv, "POST", "/api/auth.revoke", formType, "test=true", "Bearer "+tokA)
+	if n := mem.IncomingWebhooks.Count(); n != 3 {
+		t.Fatalf("%d webhooks after auth.revoke with test set", n)
+	}
+
+	// Revoking the token an install issued removes that install's webhook,
+	// which then answers as a webhook that does not exist.
+	_, _, rev := callAs(t, srv, "POST", "/api/auth.revoke", "", "", "Bearer "+tokA)
+	if rev["ok"] != true || rev["revoked"] != true {
+		t.Fatalf("auth.revoke: %v", rev)
+	}
+	if s, ctype, b := post(t, urlA, `{"text":"after"}`); s != 404 || b != "no_service" || ctype != "text/html" {
+		t.Errorf("revoked webhook: %d %q %q", s, ctype, b)
+	}
+	if n := mem.IncomingWebhooks.Count(); n != 2 {
+		t.Errorf("%d webhooks left, want the other install's and the seeded one", n)
+	}
+
+	// Another install's webhook, and a seeded one with no token, are untouched.
+	for _, u := range []string{urlB, urlSeeded} {
+		if s, _, b := post(t, u, `{"text":"still"}`); s != 200 || b != "ok" {
+			t.Errorf("webhook that was not revoked: %d %q", s, b)
+		}
+	}
+}

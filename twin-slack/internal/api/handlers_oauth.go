@@ -95,20 +95,23 @@ func (h *Handler) OAuthV2Access(w http.ResponseWriter, r *http.Request) {
 		"is_enterprise_install": false,
 	}
 	if webhookChannel.ID != "" {
-		resp["incoming_webhook"] = h.installWebhook(r, webhookChannel)
+		resp["incoming_webhook"] = h.installWebhook(r, webhookChannel, token)
 	}
 	slackOK(w, resp)
 }
 
-// installWebhook mints the incoming webhook an install bound to ch and renders
+// installWebhook mints the incoming webhook an install bound to ch, tied to the
+// bot token the install issued, and renders
 // it as the incoming_webhook object of the OAuth response: the channel's name
 // as picked, its ID, the webhook URL, and the app settings page for it. The
 // name's # prefix, the configuration_url's form, and whether a current
 // oauth.v2.access answer carries the object at the top level are unverified
 // (events-018). The configuration_url points at this emulator, which serves no
 // page there.
-func (h *Handler) installWebhook(r *http.Request, ch store.Channel) map[string]any {
+func (h *Handler) installWebhook(r *http.Request, ch store.Channel, token string) map[string]any {
 	wh := h.store.MintIncomingWebhook(ch.ID, appID, store.DefaultBotID)
+	wh.Token = token
+	h.store.IncomingWebhooks.Set(wh.ID, wh)
 	base := origin(r)
 	return map[string]any{
 		"channel":           "#" + ch.Name,

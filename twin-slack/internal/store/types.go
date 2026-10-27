@@ -326,8 +326,12 @@ type IncomingWebhook struct {
 	Channel string `json:"channel"`
 	// AppID and BotID are the app the webhook belongs to, which authors what
 	// it posts.
-	AppID   string `json:"app_id,omitempty"`
-	BotID   string `json:"bot_id,omitempty"`
+	AppID string `json:"app_id,omitempty"`
+	BotID string `json:"bot_id,omitempty"`
+	// Token is the bot token the install that created the webhook issued.
+	// Revoking it removes the webhook. A webhook with no Token, as a seeded
+	// one, is not removed by any revocation.
+	Token   string `json:"token,omitempty"`
 	Created int64  `json:"created"`
 }
 

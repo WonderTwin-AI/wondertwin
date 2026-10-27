@@ -72,7 +72,20 @@ func (s *MemoryStore) RevokeToken(token string) bool {
 	}
 	t.Revoked = true
 	s.Tokens.Set(token, t)
+	if t.Type == TokenBot {
+		s.removeWebhooksOf(token)
+	}
 	return true
+}
+
+// removeWebhooksOf removes the incoming webhooks a bot token's install
+// created, as Slack does when the token is revoked (the OAuth guide, "Revoking
+// tokens").
+func (s *MemoryStore) removeWebhooksOf(token string) {
+	ids, _ := s.IncomingWebhooks.FilterWithIDs(func(_ string, wh IncomingWebhook) bool { return wh.Token == token })
+	for _, id := range ids {
+		s.IncomingWebhooks.Delete(id)
+	}
 }
 
 // UserName returns the display name of a user for auth.test: the stored user's
