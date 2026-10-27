@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -415,6 +416,32 @@ func (h *Handler) emitMessage(msg store.Message) {
 	event["event_ts"] = msg.TS
 	event["channel_type"] = channelType(ch)
 	h.events.publish(h, event)
+	h.emitAppMention(msg, ch)
+}
+
+// emitAppMention reports a message that mentions the app's bot user, as an
+// app_mention event: type, user, text, ts, channel and event_ts, as the page
+// shows. The page says the bot must be in the conversation, and that direct
+// messages send none, so a channel the bot is not a member of, a direct message
+// and a group message send nothing. A mention is the bot user's ID in text as
+// <@U_BOT> or <@U_BOT|name>; one in blocks, or as a user group, is not
+// matched, and Slack's example timestamps disagree with its overview, so
+// seconds are used as everywhere else (events-011).
+func (h *Handler) emitAppMention(msg store.Message, ch store.Channel) {
+	if ch.IsIM || ch.IsMPIM || !slices.Contains(ch.Members, store.DefaultBotUserID) {
+		return
+	}
+	if !strings.Contains(msg.Text, "<@"+store.DefaultBotUserID+">") && !strings.Contains(msg.Text, "<@"+store.DefaultBotUserID+"|") {
+		return
+	}
+	h.events.publish(h, map[string]any{
+		"type":     "app_mention",
+		"user":     msg.User,
+		"text":     msg.Text,
+		"ts":       msg.TS,
+		"channel":  msg.Channel,
+		"event_ts": msg.TS,
+	})
 }
 
 // emitMessageDeleted reports a deleted message, in the hidden message_deleted
