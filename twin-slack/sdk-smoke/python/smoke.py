@@ -196,10 +196,12 @@ def case_events_http_receive():
         conn.close()
         assert resp.status == 200
 
+    # The channel is created before the Request URL is set, since creating one
+    # is delivered as channel_created.
+    channel = new_channel()
     try:
         configure({"request_url": f"http://127.0.0.1:{receiver.server_port}/slack/events",
                    "signing_secret": secret, "retry_delays_ms": [0, 0, 0]})
-        channel = new_channel()
         posted = client.chat_postMessage(channel=channel, text="deploy started")
         for _ in range(200):
             if len(got) >= 2:
