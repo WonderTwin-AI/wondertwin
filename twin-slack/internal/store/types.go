@@ -312,6 +312,25 @@ type ViewRecord struct {
 	View   View   `json:"view"`
 }
 
+// IncomingWebhook is an incoming webhook an app installed: a URL that posts
+// to one channel. Its URL is Service and Secret under the team (see
+// api.webhookURL), and the secret is the credential, as Slack documents.
+// Service and Secret lengths and alphabets are unverified (quirk events-018).
+type IncomingWebhook struct {
+	ID      string `json:"id"`
+	Team    string `json:"team"`
+	Service string `json:"service"`
+	Secret  string `json:"secret"`
+	// Channel is the ID of the one channel the webhook posts to, chosen at
+	// install.
+	Channel string `json:"channel"`
+	// AppID and BotID are the app the webhook belongs to, which authors what
+	// it posts.
+	AppID   string `json:"app_id,omitempty"`
+	BotID   string `json:"bot_id,omitempty"`
+	Created int64  `json:"created"`
+}
+
 // Token types, from the prefix Slack gives each credential.
 const (
 	TokenBot  = "bot"  // xoxb-
