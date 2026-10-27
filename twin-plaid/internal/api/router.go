@@ -44,6 +44,8 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	r.NotFound(h.notFound)
 	r.MethodNotAllowed(h.notFound)
+	r.Post("/admin/transactions/{transaction_id}/modify", h.adminTransactionModify)
+	r.Delete("/admin/transactions/{transaction_id}", h.adminTransactionRemove)
 	r.Group(func(r chi.Router) {
 		r.Use(h.mw.FaultInjection)
 		r.Use(h.checkRequest)

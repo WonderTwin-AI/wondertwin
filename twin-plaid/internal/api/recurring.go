@@ -81,8 +81,7 @@ func fit(dates []time.Time) (frequency, bool) {
 func streamsOf(rows []store.Transaction, now time.Time) (inflow, outflow []streamJSON) {
 	groups := map[string][]store.Transaction{}
 	for _, t := range rows {
-		name, _ := t.Body["name"].(string)
-		cur, _ := t.Body["iso_currency_code"].(string)
+		name, cur := t.Body.Name, deref(t.Body.IsoCurrencyCode)
 		key := strings.Join([]string{t.AccountID, strings.Join(words(name), " "), cur, map[bool]string{true: "out", false: "in"}[t.Amount >= 0]}, "|")
 		groups[key] = append(groups[key], t)
 	}
@@ -108,8 +107,7 @@ func streamsOf(rows []store.Transaction, now time.Time) (inflow, outflow []strea
 			sum, ids[i] = sum+t.Amount, t.ID
 		}
 		last := g[len(g)-1]
-		cur, _ := last.Body["iso_currency_code"].(string)
-		name, _ := last.Body["name"].(string)
+		cur, name := deref(last.Body.IsoCurrencyCode), last.Body.Name
 		amount := func(v float64) streamAmount { return streamAmount{math.Round(v*100) / 100, strPtr(cur), nil} }
 		sum256 := sha256.Sum256([]byte(key))
 		next := f.next(dates[len(dates)-1]).Format("2006-01-02")
@@ -117,14 +115,14 @@ func streamsOf(rows []store.Transaction, now time.Time) (inflow, outflow []strea
 			LastDate: last.Date, Frequency: f.name, TransactionIDs: ids, AverageAmount: amount(sum / float64(len(g))),
 			LastAmount: amount(last.Amount), Status: "MATURE", PredictedNextDate: &next,
 			IsActive: now.Sub(dates[len(dates)-1]).Hours()/24 <= 1.5*float64(f.max)}
-		if m, _ := last.Body["merchant_name"].(string); m != "" {
-			s.MerchantName = &m
+		if last.Body.MerchantName.V != nil && *last.Body.MerchantName.V != "" {
+			s.MerchantName = last.Body.MerchantName.V
 		}
 		if len(g) == 2 {
 			s.Status = "EARLY_DETECTION"
 		}
-		if pfc, ok := last.Body["personal_finance_category"]; ok && pfc != nil {
-			s.PersonalFinanceCategory = pfc
+		if last.Body.PersonalFinanceCategory.Set {
+			s.PersonalFinanceCategory = last.Body.PersonalFinanceCategory.V
 		}
 		if last.Amount >= 0 {
 			outflow = append(outflow, s)
@@ -165,4 +163,12 @@ func (h *Handler) transactionsRecurringGet(w http.ResponseWriter, r *http.Reques
 	}
 	h.writeJSON(w, http.StatusOK, map[string]any{"inflow_streams": inflow, "outflow_streams": outflow,
 		"updated_datetime": rfc3339(now), "personal_finance_category_version": "v2"})
+}
+
+// deref is the string a pointer holds, or "" for nil.
+func deref(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

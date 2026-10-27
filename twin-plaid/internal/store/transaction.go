@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-// Transaction is one row Plaid returns. The typed fields are what the emulator
-// orders and filters by; Body is the whole documented object, so every field and
-// its presence rule (null or omitted) is exactly what was recorded or built.
+// Transaction is one row Plaid returns. The core fields are what the emulator
+// orders and filters by; Body is the whole documented object, typed so every
+// field keeps the presence rule plaid-python applies (null or omitted).
 type Transaction struct {
-	ID        string         `json:"transaction_id"`
-	ItemID    string         `json:"item_id"`
-	AccountID string         `json:"account_id"`
-	Date      string         `json:"date"`
-	Amount    float64        `json:"amount"`
-	Pending   bool           `json:"pending"`
-	Body      map[string]any `json:"body"`
+	ID        string          `json:"transaction_id"`
+	ItemID    string          `json:"item_id"`
+	AccountID string          `json:"account_id"`
+	Date      string          `json:"date"`
+	Amount    float64         `json:"amount"`
+	Pending   bool            `json:"pending"`
+	Body      TransactionBody `json:"body"`
 }
 
 // Change kinds in an Item's log.
@@ -33,10 +33,10 @@ const (
 // replays. It keeps the row's body as it was then, so a replay does not depend
 // on what the store holds later.
 type Change struct {
-	Kind          string         `json:"kind"`
-	TransactionID string         `json:"transaction_id"`
-	AccountID     string         `json:"account_id"`
-	Body          map[string]any `json:"body,omitempty"`
+	Kind          string           `json:"kind"`
+	TransactionID string           `json:"transaction_id"`
+	AccountID     string           `json:"account_id"`
+	Body          *TransactionBody `json:"body,omitempty"`
 }
 
 // RemovedTransaction is how sync reports a removal.
@@ -47,7 +47,7 @@ type RemovedTransaction struct {
 
 // SyncPage is one page of /transactions/sync.
 type SyncPage struct {
-	Added, Modified []map[string]any
+	Added, Modified []TransactionBody
 	Removed         []RemovedTransaction
 	NextCursor      string
 	HasMore         bool
@@ -65,7 +65,7 @@ var ErrBadCursor = errors.New("bad transactions cursor")
 // AddTransaction stores a new row and logs it as added.
 func (s *MemoryStore) AddTransaction(t Transaction) {
 	s.Transactions.Set(t.ID, t)
-	s.appendChange(t.ItemID, Change{Added, t.ID, t.AccountID, t.Body})
+	s.appendChange(t.ItemID, Change{Added, t.ID, t.AccountID, &t.Body})
 }
 
 // ModifyTransaction replaces a stored row and logs it as modified. It reports
@@ -75,7 +75,7 @@ func (s *MemoryStore) ModifyTransaction(t Transaction) bool {
 		return false
 	}
 	s.Transactions.Set(t.ID, t)
-	s.appendChange(t.ItemID, Change{Modified, t.ID, t.AccountID, t.Body})
+	s.appendChange(t.ItemID, Change{Modified, t.ID, t.AccountID, &t.Body})
 	return true
 }
 
@@ -209,9 +209,9 @@ func (s *MemoryStore) Sync(itemID, cursorText string, count int) (SyncPage, erro
 	for _, ch := range page {
 		switch ch.Kind {
 		case Added:
-			out.Added = append(out.Added, ch.Body)
+			out.Added = append(out.Added, *ch.Body)
 		case Modified:
-			out.Modified = append(out.Modified, ch.Body)
+			out.Modified = append(out.Modified, *ch.Body)
 		case Removed:
 			out.Removed = append(out.Removed, RemovedTransaction{ch.AccountID, ch.TransactionID})
 		}
