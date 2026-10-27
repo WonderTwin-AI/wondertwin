@@ -27,6 +27,7 @@ type MemoryStore struct {
 	Rand *sim.Rand
 
 	tokenMu sync.Mutex
+	itemMu  sync.Mutex
 	logMu   sync.Mutex
 
 	// defaults restores the fixtures a fresh store starts with; see SetDefaults.

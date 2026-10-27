@@ -42,12 +42,24 @@ func (s *MemoryStore) RemoveItem(id string) bool {
 	return true
 }
 
+// UpdateItem applies fn to the stored Item under a lock and returns the result.
+// Handlers use it instead of reading an Item, changing it and calling PutItem,
+// which writes back every field and can undo a change another request made in
+// between.
+func (s *MemoryStore) UpdateItem(id string, fn func(*Item)) (Item, bool) {
+	s.itemMu.Lock()
+	defer s.itemMu.Unlock()
+	it, ok := s.Items.Get(id)
+	if !ok {
+		return Item{}, false
+	}
+	fn(&it)
+	s.Items.Set(id, it)
+	return it, true
+}
+
 // SetItemError puts an Item into an error state, by code; an empty code clears it.
 func (s *MemoryStore) SetItemError(id, code string) bool {
-	it, ok := s.Items.Get(id)
-	if ok {
-		it.ErrorCode = code
-		s.Items.Set(id, it)
-	}
+	_, ok := s.UpdateItem(id, func(it *Item) { it.ErrorCode = code })
 	return ok
 }

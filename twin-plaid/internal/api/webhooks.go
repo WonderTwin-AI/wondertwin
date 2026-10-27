@@ -73,8 +73,7 @@ func (h *Handler) itemWebhookUpdate(w http.ResponseWriter, r *http.Request) {
 		h.invalidBody(w)
 		return
 	}
-	it.Webhook = url
-	h.store.PutItem(it)
+	it, _ = h.store.UpdateItem(it.ID, func(i *store.Item) { i.Webhook = url })
 	if url != "" {
 		h.fireWebhook(it, "ITEM", "WEBHOOK_UPDATE_ACKNOWLEDGED", map[string]any{"new_webhook_url": url, "error": nil})
 	}
