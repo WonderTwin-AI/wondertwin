@@ -32,7 +32,10 @@ type Handler struct {
 // NewHandler creates a new Plaid API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 	s.SetDefaults(seed.LoadInstitutions)
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw}
+	// /admin/reset also drops queued webhooks and the delivery log.
+	s.OnReset(func() { h.dispatcher().Reset() })
+	return h
 }
 
 // Routes mounts the Plaid API routes. Each route arrives with the slice that
