@@ -145,7 +145,7 @@ func (h *Handler) authGet(w http.ResponseWriter, r *http.Request) {
 		h.invalidBody(w)
 		return
 	}
-	it, ok := h.liveItemFor(w, r)
+	it, ok := h.liveItemWith(w, r, "auth")
 	if !ok {
 		return
 	}

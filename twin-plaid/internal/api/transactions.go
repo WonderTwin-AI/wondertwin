@@ -29,7 +29,7 @@ func (h *Handler) transactionsSync(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "count must be between 1 and 500")
 		return
 	}
-	it, ok := h.liveItemFor(w, r)
+	it, ok := h.liveItemWith(w, r, "transactions")
 	if !ok {
 		return
 	}
@@ -178,7 +178,7 @@ func (h *Handler) sandboxTransactionsCreate(w http.ResponseWriter, r *http.Reque
 // on the Item. Creating a transaction alone fires nothing. TRANSACTIONS_REMOVED
 // is not sent: no route removes a transaction.
 func (h *Handler) transactionsRefresh(w http.ResponseWriter, r *http.Request) {
-	it, ok := h.liveItemFor(w, r)
+	it, ok := h.liveItemWith(w, r, "transactions")
 	if !ok {
 		return
 	}
@@ -251,7 +251,7 @@ func (h *Handler) transactionsGet(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "count must be between 1 and 500 and offset 0 or more")
 		return
 	}
-	it, accounts, ok := h.accountsForRequest(w, r)
+	it, accounts, ok := h.accountsForRequest(w, r, "transactions")
 	if !ok {
 		return
 	}
