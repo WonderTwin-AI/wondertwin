@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 
@@ -32,9 +33,9 @@ func webhookURL(base string, wh store.IncomingWebhook) string {
 // app's webhook cannot override the channel, username or icon (events-019,
 // events-020). The stored message's shape is unverified (events-026).
 func (h *Handler) IncomingWebhookPost(w http.ResponseWriter, r *http.Request) {
-	wh, ok := h.findWebhook(chi.URLParam(r, "team"), chi.URLParam(r, "service"), chi.URLParam(r, "secret"))
-	if !ok {
-		webhookError(w, http.StatusNotFound, "no_service")
+	wh, code := h.findWebhook(chi.URLParam(r, "team"), chi.URLParam(r, "service"), chi.URLParam(r, "secret"))
+	if code != "" {
+		webhookError(w, code)
 		return
 	}
 	var req struct {
@@ -44,29 +45,29 @@ func (h *Handler) IncomingWebhookPost(w http.ResponseWriter, r *http.Request) {
 		Attachments any    `json:"attachments"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		webhookError(w, http.StatusBadRequest, "invalid_payload")
+		webhookError(w, "invalid_payload")
 		return
 	}
 	attachments, ok := messageAttachments(req.Attachments)
 	if !ok {
-		webhookError(w, http.StatusBadRequest, "invalid_payload")
+		webhookError(w, "invalid_payload")
 		return
 	}
 	if len(attachments) > maxAttachments {
-		webhookError(w, http.StatusBadRequest, "too_many_attachments")
+		webhookError(w, "too_many_attachments")
 		return
 	}
 	if _, code := messageText(req.Text, req.Blocks, req.Attachments, ""); code != "" {
-		webhookError(w, http.StatusBadRequest, code)
+		webhookError(w, code)
 		return
 	}
 	ch, ok := h.store.Channels.Get(wh.Channel)
 	if !ok {
-		webhookError(w, http.StatusNotFound, "channel_not_found")
+		webhookError(w, "channel_not_found")
 		return
 	}
 	if ch.IsArchived {
-		webhookError(w, http.StatusGone, "channel_is_archived")
+		webhookError(w, "channel_is_archived")
 		return
 	}
 
@@ -95,24 +96,49 @@ func (h *Handler) IncomingWebhookPost(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
-// findWebhook finds the webhook a URL names. The secret is compared whole.
-func (h *Handler) findWebhook(team, service, secret string) (store.IncomingWebhook, bool) {
-	for _, wh := range h.store.IncomingWebhooks.List() {
-		if wh.Team == team && wh.Service == service && wh.Secret == secret {
-			return wh, true
-		}
+// findWebhook finds the webhook a URL names, or the error the URL earns: a
+// team that is not this workspace is no_team, a service that names no webhook
+// is no_service, and a secret that does not match is invalid_token. The order
+// of these checks, and which string Slack answers for each, is unverified
+// (events-028, events-030).
+func (h *Handler) findWebhook(team, service, secret string) (store.IncomingWebhook, string) {
+	if team != h.store.Team.ID {
+		return store.IncomingWebhook{}, "no_team"
 	}
-	return store.IncomingWebhook{}, false
+	for _, wh := range h.store.IncomingWebhooks.List() {
+		if wh.Team != team || wh.Service != service {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(wh.Secret), []byte(secret)) != 1 {
+			return store.IncomingWebhook{}, "invalid_token"
+		}
+		return wh, ""
+	}
+	return store.IncomingWebhook{}, "no_service"
 }
 
-// webhookError answers in plain text with the error string as the body, as
-// Slack's webhook docs describe. Slack's changelog gives 400 for invalid_payload
-// and 404 for channel_not_found, and 410 for channel_is_archived. The statuses
-// for no_service and no_text are not documented; 404 is chosen for the first
-// because Slack answered a made-up team with 404, and 400 for the second as
-// the status of the other payload errors (events-022, events-028).
-func webhookError(w http.ResponseWriter, status int, code string) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(status)
+// webhookStatus is the HTTP status each error string is answered with. Slack's
+// 2016 changelog gives 400 invalid_payload, 403 action_prohibited, 404
+// channel_not_found, 410 channel_is_archived and 500 rollup_error. A made-up
+// team drew 404 no_team from Slack in a probe. The rest are not documented and
+// are chosen here (events-028).
+var webhookStatus = map[string]int{
+	"no_team":              http.StatusNotFound,
+	"no_service":           http.StatusNotFound,
+	"invalid_token":        http.StatusForbidden,
+	"invalid_payload":      http.StatusBadRequest,
+	"no_text":              http.StatusBadRequest,
+	"too_many_attachments": http.StatusBadRequest,
+	"channel_not_found":    http.StatusNotFound,
+	"channel_is_archived":  http.StatusGone,
+}
+
+// webhookError answers with the error string as the body. Slack's one observed
+// error answer, a 404 no_team, was text/html and 7 bytes, so errors carry
+// text/html and no newline; the success answer's content type was not captured
+// (events-029).
+func webhookError(w http.ResponseWriter, code string) {
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(webhookStatus[code])
 	w.Write([]byte(code))
 }
