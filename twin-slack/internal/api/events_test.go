@@ -766,3 +766,64 @@ func TestChannelJoinMessage(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
+
+func TestFileEvents(t *testing.T) {
+	srv, tc := setupSlack(t)
+	one, two := seedChannel(tc, "docs-a"), seedChannel(tc, "docs-b")
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	u, id := uploadTicket(t, srv, "report.txt", 1)
+	postBytes(t, u, "", []byte("x"))
+	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + id + `"}]`}, "channels": {one + "," + two}}))
+	// Completing again shares to nothing new, and sends neither event again.
+	mustOK(t, 200, form(t, srv, "files.completeUploadExternal", url.Values{"files": {`[{"id":"` + id + `"}]`}, "channels": {one}}))
+	mustOK(t, 200, form(t, srv, "files.delete", url.Values{"file": {id}}))
+	if r := form(t, srv, "files.delete", url.Values{"file": {id}}); r["ok"] != false { // file_not_found: sends nothing
+		t.Fatalf("deleting a deleted file: %v", r)
+	}
+
+	// Three file_share messages, one file_created, two file_shared and one
+	// file_deleted.
+	got := rc.wait(t, 7)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 7)); n != 7 {
+		t.Fatalf("deliveries: %d, want 7", n)
+	}
+	var created, shared, deleted []map[string]any
+	for i := range got {
+		e := envelope(t, got[i])["event"].(map[string]any)
+		switch e["type"] {
+		case "file_created":
+			created = append(created, e)
+		case "file_shared":
+			shared = append(shared, e)
+		case "file_deleted":
+			deleted = append(deleted, e)
+		}
+	}
+	if len(created) != 1 || len(shared) != 2 || len(deleted) != 1 {
+		t.Fatalf("created %d, shared %d, deleted %d", len(created), len(shared), len(deleted))
+	}
+	if c := created[0]; c["file_id"] != id || c["file"].(map[string]any)["id"] != id || c["event_ts"] == "" {
+		t.Errorf("file_created: %v", c)
+	}
+	if _, has := created[0]["user_id"]; has {
+		t.Errorf("file_created carries user_id, which the page's example does not: %v", created[0])
+	}
+	for i, ch := range []string{one, two} {
+		if s := shared[i]; s["channel_id"] != ch || s["file_id"] != id || s["user_id"] != "U_BOT" || s["file"].(map[string]any)["id"] != id || s["event_ts"] == "" {
+			t.Errorf("file_shared to %s: %v", ch, s)
+		}
+		if _, has := shared[i]["user"]; has {
+			t.Errorf("file_shared carries user, where the page has user_id: %v", shared[i])
+		}
+	}
+	if d := deleted[0]; d["file_id"] != id || d["event_ts"] == "" {
+		t.Errorf("file_deleted: %v", d)
+	} else if _, has := d["file"]; has {
+		t.Errorf("file_deleted carries file, which the page's example does not: %v", d)
+	}
+	if d := deliveryLog(t, srv, 7); len(d) != 7 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}
