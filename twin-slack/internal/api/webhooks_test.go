@@ -135,9 +135,6 @@ func TestWebhookPost(t *testing.T) {
 	}
 
 	// A URL that names no webhook, and a body that is not JSON, post nothing.
-	if s, _, b := post(t, srv.URL+"/services/T0001/"+wh.Service+"/WRONG", `{"text":"x"}`); s != 404 || b != "no_service" {
-		t.Errorf("wrong secret: %d %q", s, b)
-	}
 	if s, _, b := post(t, url, `not json`); s != 400 || b != "invalid_payload" {
 		t.Errorf("not JSON: %d %q", s, b)
 	}
@@ -156,5 +153,52 @@ func TestWebhookPost(t *testing.T) {
 	_, rep = call(t, srv, "GET", "/api/conversations.replies?channel="+ch+"&ts="+ts, "", "", true)
 	if n := len(rep["messages"].([]any)); n != 2 {
 		t.Errorf("%d messages in the thread, want the root and the one reply", n)
+	}
+}
+
+func TestWebhookErrors(t *testing.T) {
+	mem, srv, tc := setupSlackStore(t)
+	ch := seedChannel(tc, "errs")
+	wh := mem.MintIncomingWebhook(ch, store.DefaultAppID, store.DefaultBotID)
+	at := func(team, service, secret string) string {
+		return srv.URL + "/services/" + team + "/" + service + "/" + secret
+	}
+	many := strings.TrimSuffix(strings.Repeat(`{"text":"a"},`, 101), ",")
+	for _, c := range []struct {
+		name, url, body string
+		status          int
+		code            string
+	}{
+		{"a team that is not this workspace", at("T9999", wh.Service, wh.Secret), `{"text":"x"}`, 404, "no_team"},
+		{"a service that names no webhook", at(wh.Team, "BNOSUCH", wh.Secret), `{"text":"x"}`, 404, "no_service"},
+		{"a secret that does not match", at(wh.Team, wh.Service, "WRONG"), `{"text":"x"}`, 403, "invalid_token"},
+		{"a body that is not JSON", at(wh.Team, wh.Service, wh.Secret), `nope`, 400, "invalid_payload"},
+		{"attachments that are not a list", at(wh.Team, wh.Service, wh.Secret), `{"attachments":"x"}`, 400, "invalid_payload"},
+		{"no content", at(wh.Team, wh.Service, wh.Secret), `{}`, 400, "no_text"},
+		{"too many attachments", at(wh.Team, wh.Service, wh.Secret), `{"attachments":[` + many + `]}`, 400, "too_many_attachments"},
+	} {
+		status, ctype, body := post(t, c.url, c.body)
+		if status != c.status || body != c.code || ctype != "text/html" {
+			t.Errorf("%s: %d %q %q, want %d %q text/html", c.name, status, ctype, body, c.status, c.code)
+		}
+	}
+
+	// A webhook whose channel is gone, and one whose channel is archived.
+	gone := mem.MintIncomingWebhook("C_GONE", store.DefaultAppID, store.DefaultBotID)
+	if s, _, b := post(t, api.WebhookURL(srv.URL, gone), `{"text":"x"}`); s != 404 || b != "channel_not_found" {
+		t.Errorf("a channel that is gone: %d %q", s, b)
+	}
+	call(t, srv, "POST", "/api/conversations.archive", formType, "channel="+ch, true)
+	if s, ctype, b := post(t, api.WebhookURL(srv.URL, wh), `{"text":"x"}`); s != 410 || b != "channel_is_archived" || ctype != "text/html" {
+		t.Errorf("an archived channel: %d %q %q", s, ctype, b)
+	}
+
+	// Nothing was posted by any of them, and the success answer is unchanged.
+	if n := mem.Messages.Count(); n != 0 {
+		t.Errorf("%d messages stored by refused posts", n)
+	}
+	ok := mem.MintIncomingWebhook(seedChannel(tc, "fine"), store.DefaultAppID, store.DefaultBotID)
+	if s, ctype, b := post(t, api.WebhookURL(srv.URL, ok), `{"text":"x"}`); s != 200 || b != "ok" || !strings.HasPrefix(ctype, "text/plain") {
+		t.Errorf("success: %d %q %q", s, ctype, b)
 	}
 }
