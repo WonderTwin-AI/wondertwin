@@ -38,8 +38,7 @@ func (h *Handler) transactionsSync(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD", "cursor is not valid for this Item")
 		return
 	}
-	it.SyncCalled = true
-	h.store.PutItem(it)
+	h.store.UpdateItem(it.ID, func(i *store.Item) { i.SyncCalled = true })
 
 	accounts := []accountJSON{}
 	for _, a := range h.store.AccountsForItem(it.ID) {
@@ -183,14 +182,20 @@ func (h *Handler) transactionsRefresh(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if added, total := h.store.ChangesSince(it.ID, it.NotifiedChanges); total > it.NotifiedChanges {
-		it.NotifiedChanges = total
-		h.store.PutItem(it)
-		if added > 0 {
-			h.fireWebhook(it, "TRANSACTIONS", "DEFAULT_UPDATE", map[string]any{"new_transactions": added, "error": nil})
+	added, total := h.store.ChangesSince(it.ID, it.NotifiedChanges)
+	var advanced bool
+	locked, found := h.store.UpdateItem(it.ID, func(i *store.Item) {
+		if total > i.NotifiedChanges {
+			i.NotifiedChanges = total
+			advanced = true
 		}
-		if it.SyncCalled {
-			h.fireWebhook(it, "TRANSACTIONS", "SYNC_UPDATES_AVAILABLE",
+	})
+	if found && advanced {
+		if added > 0 {
+			h.fireWebhook(locked, "TRANSACTIONS", "DEFAULT_UPDATE", map[string]any{"new_transactions": added, "error": nil})
+		}
+		if locked.SyncCalled {
+			h.fireWebhook(locked, "TRANSACTIONS", "SYNC_UPDATES_AVAILABLE",
 				map[string]any{"initial_update_complete": true, "historical_update_complete": true})
 		}
 	}

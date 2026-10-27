@@ -15,11 +15,30 @@ const base62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 // The kit's Nanoid is not used because its alphabet includes _ and -.
 const idLength = 37
 
-// NewID returns an opaque 37-character base62 id from the seeded Rand.
+// NewID returns an opaque 37-character base62 id from the seeded Rand. The Rand
+// is not part of a snapshot, so a seeded run that loads state replays the draws
+// that made it; an id already held by an Item, Account or Transaction is
+// skipped, never reissued.
 func (s *MemoryStore) NewID() string {
-	b := make([]byte, idLength)
-	for i := range b {
-		b[i] = base62[s.Rand.Intn(len(base62))]
+	for {
+		b := make([]byte, idLength)
+		for i := range b {
+			b[i] = base62[s.Rand.Intn(len(base62))]
+		}
+		id := string(b)
+		if !s.idTaken(id) {
+			return id
+		}
 	}
-	return string(b)
+}
+
+func (s *MemoryStore) idTaken(id string) bool {
+	if _, ok := s.Items.Get(id); ok {
+		return true
+	}
+	if _, ok := s.Accounts.Get(id); ok {
+		return true
+	}
+	_, ok := s.Transactions.Get(id)
+	return ok
 }

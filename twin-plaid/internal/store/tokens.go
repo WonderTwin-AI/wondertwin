@@ -38,8 +38,29 @@ var (
 )
 
 // newToken is {kind}-sandbox-{uuid}, the Sandbox token form (quirk IDENTITY-004).
+// A token already issued is skipped, for the reason NewID gives.
 func (s *MemoryStore) newToken(kind string) string {
-	return kind + "-sandbox-" + sim.NewIDGenerator(s.Rand).UUID()
+	for {
+		t := kind + "-sandbox-" + sim.NewIDGenerator(s.Rand).UUID()
+		if !s.tokenTaken(kind, t) {
+			return t
+		}
+	}
+}
+
+func (s *MemoryStore) tokenTaken(kind, token string) bool {
+	var ok bool
+	switch kind {
+	case "public":
+		_, ok = s.PublicTokens.Get(token)
+	case "access":
+		_, ok = s.AccessTokens.Get(token)
+	case "link":
+		_, ok = s.LinkTokens.Get(token)
+	case "processor":
+		_, ok = s.ProcessorTokens.Get(token)
+	}
+	return ok
 }
 
 // CreatePublicToken issues a public token for an Item to be made at exchange.

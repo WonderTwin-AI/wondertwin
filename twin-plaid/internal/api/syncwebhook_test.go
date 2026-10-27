@@ -1,6 +1,9 @@
 package api_test
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func refresh(t *testing.T, tcPost func(string, map[string]any) map[string]any, token string) {
 	t.Helper()
@@ -91,4 +94,28 @@ func TestSyncWebhookGoesToTheChangedItemsOwnURLSigned(t *testing.T) {
 		t.Fatalf("the body must be flat: %v", body)
 	}
 	nothing(t, gotB)
+}
+
+func TestSyncWebhookConcurrentRefreshesFireDefaultUpdateOnce(t *testing.T) {
+	tc, _, _ := setupPlaid(t)
+	post := func(path string, b map[string]any) map[string]any {
+		return tc.Post(path, b).AssertStatus(200).JSONMap()
+	}
+	url, got := receiver(t)
+	token := linkedWithHook(tc, []string{"transactions"}, url)
+	post("/sandbox/transactions/create", creds(map[string]any{"access_token": token, "transactions": []any{newTx("row", 1, nil)}}))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			refresh(t, post, token)
+		}()
+	}
+	wg.Wait()
+	if first := delivered(t, got); first["webhook_code"] != "DEFAULT_UPDATE" || first["new_transactions"] != 1.0 {
+		t.Fatalf("first delivery = %v, want DEFAULT_UPDATE for 1 row", first)
+	}
+	nothing(t, got)
 }
