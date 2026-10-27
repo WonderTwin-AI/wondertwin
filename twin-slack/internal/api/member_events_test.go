@@ -31,7 +31,13 @@ func TestMembershipChangesAreDeliveredAsEvents(t *testing.T) {
 	mustOK(t, 200, formAs(t, srv, "xoxp-joiner", "conversations.leave", url.Values{"channel": {ch}}))
 	mustOK(t, 200, form(t, srv, "conversations.kick", url.Values{"channel": {ch}, "user": {"U_GUEST"}}))
 
-	ev := innerEvents(t, rc.wait(t, 4), "m3mb3rs")
+	// Joining is also delivered as the channel_join message, after the member
+	// event; an invite is not.
+	ev := innerEvents(t, rc.wait(t, 5), "m3mb3rs")
+	if j := ev[1]; j["type"] != "message" || j["subtype"] != "channel_join" || j["user"] != "U_USER" || j["channel"] != ch {
+		t.Errorf("channel_join message: %v", j)
+	}
+	ev = append(ev[:1], ev[2:]...)
 	want := []struct{ typ, user, inviter string }{
 		{"member_joined_channel", "U_USER", ""},
 		{"member_joined_channel", "U_GUEST", "U_BOT"},
