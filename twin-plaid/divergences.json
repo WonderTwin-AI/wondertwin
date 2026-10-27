@@ -6,7 +6,7 @@
   "divergences": [
     {
       "route": "POST /identity/match (scores)",
-      "reason": "Plaid's matching algorithm is not published; its docs give only the score bands (name 100 perfect, 85 to 99 strong, 70 to 84 partial, under 70 a mismatch; phone and email 100 perfect, 70 to 99 partial; address 100, 90 to 99 strong, 70 to 89 partial). The emulator's scorers are its own simple rules that land inside those bands: names by the words they share, phones by their last ten digits, emails with a +tag as a partial match, addresses by street, city, region and postal code. A given input will not score the same as it does at Plaid. Do not write tests that depend on a particular score value; rely on the 70 threshold Plaid recommends. is_nickname_match is always false and phone extensions are not scored.",
+      "reason": "Plaid's matching algorithm is not published; its docs give only the score bands (name 100 perfect, 85 to 99 strong, 70 to 84 partial, under 70 a mismatch; phone and email 100 perfect, 70 to 99 partial; address 100, 90 to 99 strong, 70 to 89 partial). The emulator's scorers are its own simple rules that land inside those bands: names by the words they share, phones by their last ten digits, emails with a +tag as a partial match, addresses by street, city, region and postal code. A given input will not score the same as it does at Plaid. Do not write tests that depend on a particular score value; rely on the 70 threshold Plaid recommends. is_nickname_match is always false and phone extensions are not scored. A business name that is not an exact match scores 0, and a phone number never scores in the partial band; only 100 or 0 is returned for a phone number.",
       "references": {
         "docs": "plaid.com/docs/api/products/identity (identity/match response, score descriptions)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -60,7 +60,7 @@
     },
     {
       "route": "POST /transactions/sync",
-      "reason": "The update status is always HISTORICAL_UPDATE_COMPLETE; NOT_READY and INITIAL_UPDATE_COMPLETE are never returned because rows are available at once. The options object is accepted and ignored. Personal finance category v1 is not served, only v2. A change that lands while a client is paging waits for the next run, instead of Plaid's TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION error. The messages for a bad cursor and an out-of-range count are the emulator's wording.",
+      "reason": "The update status is always HISTORICAL_UPDATE_COMPLETE; NOT_READY and INITIAL_UPDATE_COMPLETE are never returned because rows are available at once. The options object is accepted and ignored. Personal finance category v1 is not served, only v2. A change that lands while a client is paging waits for the next run, instead of Plaid's TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION error. The messages for a bad cursor and an out-of-range count are the emulator's wording. A personal_finance_category_version request option is ignored: v2 is always served. Plaid returns PRODUCT_NOT_READY for no route in this emulator, and its docs say /transactions/sync never does.",
       "references": {
         "docs": "plaid.com/docs/api/products/transactions",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -125,7 +125,7 @@
     },
     {
       "route": "POST /sandbox/public_token/create (test users and passwords)",
-      "reason": "Of the Sandbox error passwords, the 22 error_{CODE} codes with a published sample are simulated. COUNTRY_NOT_SUPPORTED and USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS are listed by Plaid but have no published sample, so they are accepted and not simulated. The multi-factor test passwords, the recaptcha password, the persona users and user_transactions_dynamic, and custom Sandbox users are not modelled: any username is accepted and every Item gets the same accounts. The error passwords are honoured only for user_good or no username.",
+      "reason": "Of the Sandbox error passwords, the 22 error_{CODE} codes with a published sample are simulated. COUNTRY_NOT_SUPPORTED and USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS are listed by Plaid but have no published sample, so they are accepted and not simulated. The multi-factor test passwords, the recaptcha password, the persona users and user_transactions_dynamic, and custom Sandbox users are not modelled: any username is accepted and every Item gets the same accounts. The error passwords are honoured only for user_good or no username. The error passwords are not refused for OAuth institutions, where Plaid does not support them (quirk LIFECYCLE-005). An institution_id the emulator does not list is refused with INVALID_INSTITUTION; initial_products is not checked against the products the institution supports.",
       "references": {
         "docs": "plaid.com/docs/sandbox/test-credentials, plaid.com/docs/errors",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -142,7 +142,7 @@
         "docs": "plaid.com/docs/api/sandbox (sandbox/item/reset_login), plaid.com/docs/link/update-mode",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
       },
-      "operator_note": "Stated in WonderTwin-AI/wondertwin#419 and merged by the operator. The research quirk LIFECYCLE-003 says Sandbox Items do not auto-expire; the sandbox docs say they do, a research correction not yet made.",
+      "operator_note": "Stated in WonderTwin-AI/wondertwin#419 and merged by the operator. The research quirk LIFECYCLE-003 says Sandbox Items auto-expire after 30 days; its status_2026_09_28 is NOT-FOUND, so the claim is documented but not yet confirmed from the Sandbox. The emulator does not model the expiry.",
       "quirk_ids": [
         "LIFECYCLE-003",
         "AUTH-003"
@@ -187,6 +187,122 @@
       },
       "operator_note": "Messages marked as inferred in the merged slice PRs; the authenticated Sandbox capture (OD-6) would settle them.",
       "quirk_ids": []
+    },
+    {
+      "route": "every route (rate limits)",
+      "reason": "Rate limits are not emulated. No route answers 429 RATE_LIMIT_EXCEEDED, there are no per-endpoint limits, and there is no way to set one. The kit's rate limiter is not mounted on any route, and its 429 body is not Plaid's error shape.",
+      "references": {
+        "docs": "plaid.com/docs/errors",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-26: community app emulators do not emulate rate limits.",
+      "quirk_ids": [
+        "THROTTLE-001",
+        "THROTTLE-002",
+        "THROTTLE-003"
+      ]
+    },
+    {
+      "route": "every route (client_id and secret)",
+      "reason": "By default any non-empty client_id and secret pair is accepted, from the body or from the PLAID-CLIENT-ID and PLAID-SECRET headers, so INVALID_API_KEYS is not returned. Set the PLAID_CLIENT_ID and PLAID_SECRET environment variables to enforce a pair; each is enforced on its own, and an unset one accepts any value. A missing credential is always MISSING_FIELDS.",
+      "references": {
+        "docs": "plaid.com/docs/errors (INVALID_API_KEYS)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-26: keep any-pair credentials as the default and declare it.",
+      "quirk_ids": [
+        "AUTH-001"
+      ]
+    },
+    {
+      "route": "POST /sandbox/transactions/create",
+      "reason": "Accepted on any Item, including one linked without the transactions product. The research (event-model.md) says Plaid allows the route only for Items created with the user_transactions_dynamic test user, which this app emulator does not model. Created rows appear in /transactions/sync and /transactions/get like the starting rows.",
+      "references": {
+        "docs": "plaid.com/docs/api/sandbox (sandbox/transactions/create)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-26: leave transactions/create open to any Item and declare it.",
+      "quirk_ids": []
+    },
+    {
+      "route": "POST /accounts/get, /accounts/balance/get (balances after transactions)",
+      "reason": "Balances do not follow transactions: creating, modifying or removing a transaction leaves every account's balances as they were. Plaid's documentation states no rule that ties Sandbox balances to Sandbox transactions, so none is invented here.",
+      "references": {
+        "docs": "plaid.com/docs/api/products/balance",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Not implemented on purpose. The research quirk LIFECYCLE-006 notes an app emulator could be consistent; no vendor rule exists to copy, and the operator decides if one should be designed.",
+      "quirk_ids": [
+        "LIFECYCLE-006"
+      ]
+    },
+    {
+      "route": "POST /identity/get, /identity/match, /transactions/sync, /transactions/get, /transactions/refresh, /transactions/recurring/get (product gating)",
+      "reason": "These routes answer 400 ITEM_ERROR PRODUCT_NOT_ENABLED, with Plaid's documented message, for an Item linked without the product (identity or transactions). The code is the same for every gated route: Plaid documents PRODUCT_NOT_ENABLED, PRODUCT_NOT_READY and PRODUCTS_NOT_SUPPORTED but not which route returns which, and PRODUCT_NOT_READY is never returned. /accounts/get, /accounts/balance/get, the processor token routes and /sandbox/transactions/create check no product. initial_products is not checked against the products an institution supports.",
+      "references": {
+        "docs": "plaid.com/docs/errors (ITEM_ERROR: PRODUCT_NOT_ENABLED, PRODUCT_NOT_READY, PRODUCTS_NOT_SUPPORTED)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Operator decision, 2026-10-26: enforce product gating. Which gated route returns which product error is not documented by Plaid.",
+      "quirk_ids": []
+    },
+    {
+      "route": "POST /admin/webhooks/flush, POST /admin/reset (webhook deliveries)",
+      "reason": "/admin/webhooks/flush is not wired: it answers that no webhooks are configured, because deliveries are sent as they are queued and a flush would send every queued event a second time. /admin/reset clears queued webhooks and the delivery log, but an attempt already in flight when the reset arrives can still finish. The signing key survives a reset on purpose, so a receiver's cached key stays valid.",
+      "references": {
+        "docs": "plaid.com/docs/api/webhooks/webhook-verification",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Decision made during the build and repeated in WonderTwin-AI/wondertwin#452.",
+      "quirk_ids": [
+        "DELIVERY-003"
+      ]
+    },
+    {
+      "route": "POST /admin/transactions/{transaction_id}/modify, DELETE /admin/transactions/{transaction_id}",
+      "reason": "These routes are the emulator's own and have no Plaid equivalent. Plaid has no public call that changes or removes a transaction, so a test that needs /transactions/sync to report modified and removed rows uses them. They take no Plaid credentials, change a row's name, amount, date or pending flag or remove it, and send no webhook.",
+      "references": {
+        "docs": "plaid.com/docs/api/products/transactions (transactions/sync)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Added in WonderTwin-AI/wondertwin#453 so the modified and removed arrays of /transactions/sync are reachable over HTTP.",
+      "quirk_ids": []
+    },
+    {
+      "route": "every route (fault injection)",
+      "reason": "A fault injected through /admin/fault runs before Plaid's request checks, so a faulted route does not answer a bad Content-Type, an unparsable body or missing credentials first. A fault that carries no body answers the kit's default body, which is not Plaid's error shape; give the fault a Plaid-shaped body.",
+      "references": {
+        "docs": "plaid.com/docs/errors",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Order and default body come from the public kit's middleware, which this app emulator does not change.",
+      "quirk_ids": [
+        "ENVELOPE-008"
+      ]
+    },
+    {
+      "route": "POST /accounts/get, /identity/get (persistent_account_id)",
+      "reason": "persistent_account_id is never populated. Plaid fills it for some institutions; omitting it is valid for the SDKs because the field is optional.",
+      "references": {
+        "docs": "plaid.com/docs/api/accounts (persistent_account_id)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Not implemented. The community audit of 2026-10-26 found it.",
+      "quirk_ids": [
+        "IDENTITY-003"
+      ]
+    },
+    {
+      "route": "response objects (optional fields left out)",
+      "reason": "Optional fields the SDKs allow to be absent are not sent: an Item's institution_name and auth_method, an account's verification_status, verification_name, verification_insights, apy and holder_category, balances.last_updated_datetime, ACH can_transfer_in and can_transfer_out, an institution's status, and a link token's hosted_link_url, link_sessions and user_id. A recurring stream's category is always null even when its transactions carry one.",
+      "references": {
+        "docs": "plaid.com/docs/api (response objects)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Found by the community audit of 2026-10-26. plaid-python 44.0.0 deserialises every response without them, as the SDK smoke run shows.",
+      "quirk_ids": [
+        "ENVELOPE-004"
+      ]
     }
   ]
 }
