@@ -101,9 +101,9 @@ func (h *Handler) OAuthV2Access(w http.ResponseWriter, r *http.Request) {
 }
 
 // installWebhook mints the incoming webhook an install bound to ch, tied to the
-// bot token the install issued, and renders
-// it as the incoming_webhook object of the OAuth response: the channel's name
-// as picked, its ID, the webhook URL, and the app settings page for it. The
+// bot token the install issued, and renders it as the incoming_webhook object
+// of the OAuth response: the channel's name as picked, its ID, the webhook URL,
+// and the app settings page for it. The
 // name's # prefix, the configuration_url's form, and whether a current
 // oauth.v2.access answer carries the object at the top level are unverified
 // (events-018). The configuration_url points at this emulator, which serves no
