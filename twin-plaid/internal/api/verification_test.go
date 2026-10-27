@@ -69,7 +69,9 @@ func TestFireWebhookDeliveryVerifiesAgainstTheServedKey(t *testing.T) {
 
 func TestSyncWebhookDeliveriesVerifyAgainstTheServedKey(t *testing.T) {
 	tc, _, _ := setupPlaid(t)
-	post := func(path string, b map[string]any) map[string]any { return tc.Post(path, b).AssertStatus(200).JSONMap() }
+	post := func(path string, b map[string]any) map[string]any {
+		return tc.Post(path, b).AssertStatus(200).JSONMap()
+	}
 	url, got := receiver(t)
 	token := linkedWithHook(tc, []string{"transactions"}, url)
 
