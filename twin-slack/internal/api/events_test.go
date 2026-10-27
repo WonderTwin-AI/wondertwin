@@ -575,3 +575,49 @@ func TestReactionRemovedEvent(t *testing.T) {
 		t.Errorf("deliveries log: %v", d)
 	}
 }
+
+func TestPinEvents(t *testing.T) {
+	srv, tc := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	ch := seedChannel(tc, "pins")
+	var ts [2]string
+	for i := range ts {
+		_, m := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"m"}}.Encode(), true)
+		ts[i] = m["ts"].(string)
+	}
+	pin := func(method, at string) {
+		call(t, srv, "POST", "/api/pins."+method, formType, url.Values{"channel": {ch}, "timestamp": {at}}.Encode(), true)
+	}
+	pin("add", ts[0])
+	pin("add", ts[1])
+	pin("add", ts[1]) // already_pinned: sends nothing
+	pin("remove", ts[0])
+	pin("remove", ts[1])
+	pin("remove", ts[1]) // no_pin: sends nothing
+
+	got := rc.wait(t, 6)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 6)); n != 6 {
+		t.Fatalf("deliveries: %d, want 2 messages, 2 pin_added and 2 pin_removed", n)
+	}
+	ev := func(i int) map[string]any { return envelope(t, got[i])["event"].(map[string]any) }
+	for i, want := range []string{"pin_added", "pin_added", "pin_removed", "pin_removed"} {
+		e := ev(2 + i)
+		item, _ := e["item"].(map[string]any)
+		msg, _ := item["message"].(map[string]any)
+		if e["type"] != want || e["user"] != "U_BOT" || e["channel_id"] != ch || e["event_ts"] == "" || item["type"] != "message" || msg["ts"] != ts[[]int{0, 1, 0, 1}[i]] {
+			t.Errorf("event %d: %v", 2+i, e)
+		}
+	}
+	if _, has := ev(2)["has_pins"]; has {
+		t.Errorf("pin_added carries has_pins: %v", ev(2))
+	}
+	// has_pins follows the page's sentence: true while other pins remain.
+	if ev(4)["has_pins"] != true || ev(5)["has_pins"] != false {
+		t.Errorf("has_pins: %v then %v", ev(4)["has_pins"], ev(5)["has_pins"])
+	}
+	if d := deliveryLog(t, srv, 6); len(d) != 6 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}

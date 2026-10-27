@@ -462,6 +462,27 @@ func (h *Handler) emitReaction(eventType, user, reaction string, msg store.Messa
 	})
 }
 
+// emitPin reports a pinned or unpinned item, in the shape the pin_added and
+// pin_removed pages show: type, user, channel_id, item and event_ts. The pages
+// elide the item, so it carries the pin as pins.list shows it (type, channel,
+// message, created, created_by); that shape is unverified (events-006).
+func (h *Handler) emitPin(eventType, user string, pin store.Pin) {
+	event := map[string]any{
+		"type":       eventType,
+		"user":       user,
+		"channel_id": pin.Channel,
+		"item":       pin,
+		"event_ts":   h.store.NextTS(),
+	}
+	if eventType == "pin_removed" {
+		// has_pins is read as the page's sentence has it, true when other
+		// pinned items remain in the channel; the page's example shows false
+		// beside that sentence, so the polarity is unverified (events-006).
+		event["has_pins"] = len(h.store.Pins.Filter(func(_ string, p store.Pin) bool { return p.Channel == pin.Channel })) > 0
+	}
+	h.events.publish(h, event)
+}
+
 // memberChannelType names a conversation for member_joined_channel and
 // member_left_channel: C for a public channel, G for a private one. This is
 // unverified, since Slack's reference page for those events is not in the
