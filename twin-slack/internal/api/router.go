@@ -156,6 +156,9 @@ func (h *Handler) Routes(r chi.Router) {
 	// The upload step of the external file upload. It lives outside /api,
 	// as it does on Slack's upload host, and the URL itself is the credential.
 	r.Post(uploadPath+"{fileID}", h.UploadFileBytes)
+	// An incoming webhook, which takes a message for its one channel. It lives
+	// outside /api, as it does on hooks.slack.com, and the URL is the credential.
+	r.Post(webhooksPath+"{team}/{service}/{secret}", h.IncomingWebhookPost)
 	// A file's private URLs, which serve its bytes to a caller with a token.
 	r.Get(filesPath+"{teamFile}/{name}", h.ServeFile(false))
 	r.Get(filesPath+"{teamFile}/download/{name}", h.ServeFile(true))
