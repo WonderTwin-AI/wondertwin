@@ -662,3 +662,35 @@ func TestChannelCreatedRenameEvents(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
+
+func TestChannelArchiveEvents(t *testing.T) {
+	srv, tc := setupSlack(t)
+	pub := seedChannel(tc, "old-news")
+	_, priv := call(t, srv, "POST", "/api/conversations.create", formType, url.Values{"name": {"hush"}, "is_private": {"true"}}.Encode(), true)
+	hush := priv["channel"].(map[string]any)["id"].(string)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	archive := func(method, ch string) {
+		call(t, srv, "POST", "/api/conversations."+method, formType, url.Values{"channel": {ch}}.Encode(), true)
+	}
+	archive("archive", pub)
+	archive("archive", pub) // already_archived: sends nothing
+	archive("unarchive", pub)
+	archive("unarchive", pub) // not_archived: sends nothing
+	archive("archive", hush)  // a private channel sends nothing, as the pages say public channel
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 2)); n != 2 {
+		t.Fatalf("deliveries: %d, want channel_archive and channel_unarchive for the public channel only", n)
+	}
+	for i, want := range []string{"channel_archive", "channel_unarchive"} {
+		e := envelope(t, got[i])["event"].(map[string]any)
+		if e["type"] != want || e["channel"] != pub || e["user"] != "U_BOT" || e["event_ts"] == "" {
+			t.Errorf("%s: %v", want, e)
+		}
+	}
+	if d := deliveryLog(t, srv, 2); len(d) != 2 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}

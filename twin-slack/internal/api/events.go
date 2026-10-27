@@ -512,6 +512,22 @@ func (h *Handler) emitChannelRename(ch store.Channel) {
 	})
 }
 
+// emitChannelArchive reports an archived or unarchived channel, in the shape
+// the pages show: type, channel (the ID) and user. Both pages say "public
+// channel", so a private channel, a direct message and a group message send
+// nothing; that is unverified (events-007).
+func (h *Handler) emitChannelArchive(eventType, user string, ch store.Channel) {
+	if ch.IsPrivate || ch.IsIM || ch.IsMPIM {
+		return
+	}
+	h.events.publish(h, map[string]any{
+		"type":     eventType,
+		"channel":  ch.ID,
+		"user":     user,
+		"event_ts": h.store.NextTS(),
+	})
+}
+
 // memberChannelType names a conversation for member_joined_channel and
 // member_left_channel: C for a public channel, G for a private one. This is
 // unverified, since Slack's reference page for those events is not in the
