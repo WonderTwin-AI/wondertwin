@@ -483,6 +483,35 @@ func (h *Handler) emitPin(eventType, user string, pin store.Pin) {
 	h.events.publish(h, event)
 }
 
+// emitChannelCreated reports a new channel, with the channel object the
+// channel_created page shows: id, name, created and creator.
+func (h *Handler) emitChannelCreated(ch store.Channel) {
+	h.events.publish(h, map[string]any{
+		"type": "channel_created",
+		"channel": map[string]any{
+			"id":      ch.ID,
+			"name":    ch.Name,
+			"created": ch.Created,
+			"creator": ch.Creator,
+		},
+		"event_ts": h.store.NextTS(),
+	})
+}
+
+// emitChannelRename reports a renamed channel: the page shows id, name and
+// created, and no creator.
+func (h *Handler) emitChannelRename(ch store.Channel) {
+	h.events.publish(h, map[string]any{
+		"type": "channel_rename",
+		"channel": map[string]any{
+			"id":      ch.ID,
+			"name":    ch.Name,
+			"created": ch.Created,
+		},
+		"event_ts": h.store.NextTS(),
+	})
+}
+
 // memberChannelType names a conversation for member_joined_channel and
 // member_left_channel: C for a public channel, G for a private one. This is
 // unverified, since Slack's reference page for those events is not in the

@@ -89,9 +89,9 @@ func post(t *testing.T, url, body string) (int, string, string) {
 func TestWebhookPost(t *testing.T) {
 	mem, srv, tc := setupSlackStore(t)
 	rc := newReceiver(t)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	ch := seedChannel(tc, "alerts")
 	other := seedChannel(tc, "elsewhere")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	wh := mem.MintIncomingWebhook(ch, store.DefaultAppID, store.DefaultBotID)
 	url := api.WebhookURL(srv.URL, wh)
 

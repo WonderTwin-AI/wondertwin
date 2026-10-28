@@ -236,6 +236,7 @@ func (h *Handler) ConversationsCreate(w http.ResponseWriter, r *http.Request) {
 		NumMembers: 1,
 	}
 	h.store.Channels.Set(id, ch)
+	h.emitChannelCreated(ch)
 
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
@@ -318,6 +319,7 @@ func (h *Handler) ConversationsRename(w http.ResponseWriter, r *http.Request) {
 
 	ch.Name = req.Name
 	h.store.Channels.Set(req.Channel, ch)
+	h.emitChannelRename(ch)
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }
 

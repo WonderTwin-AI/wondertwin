@@ -198,11 +198,13 @@ const cases = {
     const configure = (cfg) => fetch(`${base}/admin/events/config`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg),
     });
+    // The channel is created before the Request URL is set, since creating one
+    // is delivered as channel_created.
+    const channel = await newChannel();
     try {
       const configured = await configure({request_url: `http://127.0.0.1:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
       assert.equal(configured.status, 200, 'the Request URL passes url_verification');
       assert.equal(verifications.length, 1, 'setting the Request URL makes one url_verification handshake');
-      const channel = await newChannel();
       const posted = await web.chat.postMessage({channel, text: 'deploy started'});
       for (let i = 0; i < 200 && got.length < 2; i++) await new Promise((r) => setTimeout(r, 25));
       assert.equal(got.length, 2, 'the failed delivery is retried once and then succeeds');

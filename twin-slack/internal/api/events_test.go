@@ -152,8 +152,8 @@ func verify(t *testing.T, r received, secret string) {
 func TestPostedMessageIsDeliveredAsASignedEventCallback(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "s3cret"})
 	ch := seedChannel(tc, "events")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "s3cret"})
 
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"hello"}}.Encode(), true)
 	mustOK(t, 200, posted)
@@ -207,8 +207,8 @@ func TestNoRequestURLSendsNothing(t *testing.T) {
 func TestFailedDeliveryIsRetriedWithRetryHeaders(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500, 503, 200)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 5, 5}})
 	ch := seedChannel(tc, "flaky")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 5, 5}})
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
 
 	got := rc.wait(t, 3)
@@ -238,8 +238,8 @@ func TestFailedDeliveryIsRetriedWithRetryHeaders(t *testing.T) {
 func TestDeliveryStopsAfterThreeRetries(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500, 500, 500, 500, 500, 500)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
 	ch := seedChannel(tc, "down")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
 	rc.wait(t, 4)
 	time.Sleep(100 * time.Millisecond)
@@ -255,8 +255,8 @@ func TestSlowReceiverIsRetriedAsATimeout(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
 	rc.firstDelay = 3500 * time.Millisecond
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0}})
 	ch := seedChannel(tc, "slow")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0}})
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
 	got := rc.wait(t, 2)
 	if got[1].header.Get("X-Slack-Retry-Reason") != "http_timeout" {
@@ -267,8 +267,8 @@ func TestSlowReceiverIsRetriedAsATimeout(t *testing.T) {
 func TestDeleteAndReactionAreDeliveredAsEvents(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	ch := seedChannel(tc, "more")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
 	ts := posted["ts"].(string)
 	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {ts}, "name": {"tada"}}.Encode(), true)
@@ -313,8 +313,8 @@ func TestNoRetryHeaderStopsRedelivery(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500)
 	rc.header = http.Header{"X-Slack-No-Retry": {"1"}}
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
 	ch := seedChannel(tc, "no-retry")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{0, 0, 0}})
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"once"}}.Encode(), true)
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"next"}}.Encode(), true)
 
@@ -337,8 +337,8 @@ func TestNoRetryHeaderStopsRedelivery(t *testing.T) {
 func TestResetClearsTheEventBus(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{60000}})
 	ch := seedChannel(tc, "before")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "retry_delays_ms": []int{60000}})
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"stuck"}}.Encode(), true)
 	rc.wait(t, 1)
 
@@ -354,18 +354,24 @@ func TestResetClearsTheEventBus(t *testing.T) {
 		t.Errorf("reset dropped the Request URL: %v", cfg)
 	}
 
+	// The channel created after the reset is the first event of the new
+	// sequence, and the message after it the second.
 	ch = seedChannel(tc, "after")
 	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"fresh"}}.Encode(), true)
-	got := rc.wait(t, 2)
-	env := envelope(t, got[1])
-	if ev := env["event"].(map[string]any); ev["text"] != "fresh" || got[1].header.Get("X-Slack-Retry-Num") != "" {
+	got := rc.wait(t, 3)
+	first := envelope(t, got[1])
+	if ev := first["event"].(map[string]any); ev["type"] != "channel_created" || got[1].header.Get("X-Slack-Retry-Num") != "" {
 		t.Errorf("first delivery after reset: %v", ev)
 	}
-	if env["event_id"] != "Ev00000001" {
-		t.Errorf("event ids restart after reset: %v", env["event_id"])
+	env := envelope(t, got[2])
+	if ev := env["event"].(map[string]any); ev["text"] != "fresh" || got[2].header.Get("X-Slack-Retry-Num") != "" {
+		t.Errorf("second delivery after reset: %v", ev)
 	}
-	d := deliveryLog(t, srv, 1)
-	if len(d) != 1 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
+	if first["event_id"] != "Ev00000001" || env["event_id"] != "Ev00000002" {
+		t.Errorf("event ids restart after reset: %v, %v", first["event_id"], env["event_id"])
+	}
+	d := deliveryLog(t, srv, 2)
+	if len(d) != 2 || d[0].(map[string]any)["event_id"] != "Ev00000001" {
 		t.Errorf("delivery log after reset: %v", d)
 	}
 }
@@ -497,8 +503,8 @@ func TestRequestURLThatFailsVerificationIsRefused(t *testing.T) {
 func TestEveryDeliveryIsSignedWithTheSigningSecret(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "right", "retry_delays_ms": []int{0}})
 	ch := seedChannel(tc, "signed")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "right", "retry_delays_ms": []int{0}})
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"a"}}.Encode(), true)
 	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {posted["ts"].(string)}, "name": {"eyes"}}.Encode(), true)
 	call(t, srv, "POST", "/api/chat.delete", formType, url.Values{"channel": {ch}, "ts": {posted["ts"].(string)}}.Encode(), true)
@@ -548,8 +554,8 @@ func TestEventNamesTheActorAndTheInstallation(t *testing.T) {
 func TestReactionRemovedEvent(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	ch := seedChannel(tc, "unreact")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"x"}}.Encode(), true)
 	ts := posted["ts"].(string)
 	call(t, srv, "POST", "/api/reactions.add", formType, url.Values{"channel": {ch}, "timestamp": {ts}, "name": {"tada"}}.Encode(), true)
@@ -579,8 +585,8 @@ func TestReactionRemovedEvent(t *testing.T) {
 func TestPinEvents(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
-	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	ch := seedChannel(tc, "pins")
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
 	var ts [2]string
 	for i := range ts {
 		_, m := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"m"}}.Encode(), true)
@@ -618,6 +624,41 @@ func TestPinEvents(t *testing.T) {
 		t.Errorf("has_pins: %v then %v", ev(4)["has_pins"], ev(5)["has_pins"])
 	}
 	if d := deliveryLog(t, srv, 6); len(d) != 6 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}
+
+func TestChannelCreatedRenameEvents(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	_, created := call(t, srv, "POST", "/api/conversations.create", formType, url.Values{"name": {"launch"}}.Encode(), true)
+	id := created["channel"].(map[string]any)["id"].(string)
+	call(t, srv, "POST", "/api/conversations.create", formType, url.Values{"name": {"launch"}}.Encode(), true) // name_taken: sends nothing
+	call(t, srv, "POST", "/api/conversations.rename", formType, url.Values{"channel": {id}, "name": {"landing"}}.Encode(), true)
+	call(t, srv, "POST", "/api/conversations.create", formType, url.Values{"name": {"secret"}, "is_private": {"true"}}.Encode(), true)
+
+	got := rc.wait(t, 3)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 3)); n != 3 {
+		t.Fatalf("deliveries: %d, want created, rename and the private channel's created", n)
+	}
+	ev := func(i int) map[string]any { return envelope(t, got[i])["event"].(map[string]any) }
+	c, _ := ev(0)["channel"].(map[string]any)
+	if ev(0)["type"] != "channel_created" || c["id"] != id || c["name"] != "launch" || c["creator"] != "U_BOT" || c["created"] == nil || ev(0)["event_ts"] == "" {
+		t.Errorf("channel_created: %v", ev(0))
+	}
+	r, _ := ev(1)["channel"].(map[string]any)
+	if ev(1)["type"] != "channel_rename" || r["id"] != id || r["name"] != "landing" || r["created"] != c["created"] {
+		t.Errorf("channel_rename: %v", ev(1))
+	}
+	if _, has := r["creator"]; has {
+		t.Errorf("channel_rename carries a creator: %v", r)
+	}
+	if p, _ := ev(2)["channel"].(map[string]any); ev(2)["type"] != "channel_created" || p["name"] != "secret" {
+		t.Errorf("private channel_created: %v", ev(2))
+	}
+	if d := deliveryLog(t, srv, 3); len(d) != 3 {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
