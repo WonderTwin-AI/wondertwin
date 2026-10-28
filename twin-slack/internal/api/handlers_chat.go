@@ -226,6 +226,7 @@ func (h *Handler) ChatUpdate(w http.ResponseWriter, r *http.Request) {
 	editTS := h.store.NextTS()
 	msg.Edited = &store.MessageEdit{User: callerUserID(r), TS: editTS}
 	h.store.Messages.Set(id, *msg)
+	h.emitMessageChanged(*msg)
 
 	slackOK(w, map[string]any{
 		"channel": req.Channel,

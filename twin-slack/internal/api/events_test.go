@@ -694,3 +694,39 @@ func TestChannelArchiveEvents(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
+
+func TestMessageChangedEvent(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "edits")
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"first"}}.Encode(), true)
+	ts := posted["ts"].(string)
+	call(t, srv, "POST", "/api/chat.update", formType, url.Values{"channel": {ch}, "ts": {ts}, "text": {"second"}}.Encode(), true)
+	// An update that fails sends nothing.
+	call(t, srv, "POST", "/api/chat.update", formType, url.Values{"channel": {ch}, "ts": {"1.000001"}, "text": {"x"}}.Encode(), true)
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 2)); n != 2 {
+		t.Fatalf("deliveries: %d, want the post and the edit", n)
+	}
+	e := envelope(t, got[1])["event"].(map[string]any)
+	m, _ := e["message"].(map[string]any)
+	edited, _ := m["edited"].(map[string]any)
+	if e["type"] != "message" || e["subtype"] != "message_changed" || e["hidden"] != true || e["channel"] != ch || e["ts"] == ts || e["ts"] == "" || e["event_ts"] != e["ts"] || e["channel_type"] != "channel" {
+		t.Errorf("message_changed: %v", e)
+	}
+	if m["ts"] != ts || m["text"] != "second" || m["user"] != "U_BOT" || edited["user"] != "U_BOT" || edited["ts"] == "" {
+		t.Errorf("message_changed message: %v", m)
+	}
+	if _, has := e["previous_message"]; has {
+		t.Errorf("message_changed carries previous_message: %v", e)
+	}
+	if _, has := m["channel"]; has {
+		t.Errorf("message carries a channel beside the event's: %v", m)
+	}
+	if d := deliveryLog(t, srv, 2); len(d) != 2 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}
