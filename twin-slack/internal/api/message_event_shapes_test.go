@@ -24,7 +24,20 @@ func TestMessageEventsKeepTheirSubtypeAndContent(t *testing.T) {
 		"channel": {ch}, "text": {"also here"}, "thread_ts": {parent}, "reply_broadcast": {"true"},
 		"attachments": {`[{"text":"att"}]`}}))
 
-	ev := innerEvents(t, rc.wait(t, 3), "sh4pes")
+	// The upload also sends file_created and file_shared, which the test sets
+	// aside to look at the three message events.
+	var ev []map[string]any
+	fileEvents := 0
+	for _, e := range innerEvents(t, rc.wait(t, 5), "sh4pes") {
+		if e["type"] == "message" {
+			ev = append(ev, e)
+		} else {
+			fileEvents++
+		}
+	}
+	if len(ev) != 3 || fileEvents != 2 {
+		t.Fatalf("%d message events and %d file events, want 3 and 2", len(ev), fileEvents)
+	}
 
 	share := ev[0]
 	if share["subtype"] != "file_share" || share["text"] != "look" {

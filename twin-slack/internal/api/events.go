@@ -553,6 +553,44 @@ func (h *Handler) emitChannelArchive(eventType, user string, ch store.Channel) {
 	})
 }
 
+// emitFileCreated reports a file that now exists, in the shape the file_created
+// page shows: type, file_id and a file carrying only the ID. The example has no
+// user_id or event_ts, so none of user_id is sent, while event_ts is, as every
+// inner event carries one (events-009).
+func (h *Handler) emitFileCreated(fileID string) {
+	h.events.publish(h, map[string]any{
+		"type":     "file_created",
+		"file_id":  fileID,
+		"file":     map[string]any{"id": fileID},
+		"event_ts": h.store.NextTS(),
+	})
+}
+
+// emitFileShared reports a file shared to a channel: type, channel_id, file_id,
+// user_id (not user, as the page's example has it), file with only the ID, and
+// event_ts. One is sent for each channel the file is shared to (events-009).
+func (h *Handler) emitFileShared(channel, fileID, user string) {
+	h.events.publish(h, map[string]any{
+		"type":       "file_shared",
+		"channel_id": channel,
+		"file_id":    fileID,
+		"user_id":    user,
+		"file":       map[string]any{"id": fileID},
+		"event_ts":   h.store.NextTS(),
+	})
+}
+
+// emitFileDeleted reports a deleted file: type, file_id and event_ts, as the
+// page's example shows. Its text names a file property that the example leaves
+// out, which is not sent (events-009).
+func (h *Handler) emitFileDeleted(fileID string) {
+	h.events.publish(h, map[string]any{
+		"type":     "file_deleted",
+		"file_id":  fileID,
+		"event_ts": h.store.NextTS(),
+	})
+}
+
 // memberChannelType names a conversation for member_joined_channel and
 // member_left_channel: C for a public channel, G for a private one. This is
 // unverified, since Slack's reference page for those events is not in the

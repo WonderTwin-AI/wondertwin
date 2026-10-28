@@ -106,14 +106,23 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 	}
 
 	completed := []map[string]any{}
+	// newShares are the channels each file is shared to by this call and was
+	// not before, and created lists the files that are completed for the first
+	// time, which are the ones a file_created and a file_shared are sent for.
+	newShares := make([][]string, len(req.Files))
+	var created []string
 	for i, f := range req.Files {
 		file := files[i]
 		if f.Title != "" {
 			file.Title = f.Title
 		}
+		if file.URLPrivate == "" {
+			created = append(created, file.ID)
+		}
 		for _, c := range share {
 			if !slices.Contains(file.Channels, c) {
 				file.Channels = append(file.Channels, c)
+				newShares[i] = append(newShares[i], c)
 			}
 		}
 		file.IsPublic = len(file.Channels) > 0
@@ -144,6 +153,14 @@ func (h *Handler) FilesCompleteUploadExternal(w http.ResponseWriter, r *http.Req
 		}
 		h.store.Messages.Set(h.store.Messages.NextID(), msg)
 		h.emitMessage(msg)
+	}
+	for _, id := range created {
+		h.emitFileCreated(id)
+	}
+	for i := range files {
+		for _, c := range newShares[i] {
+			h.emitFileShared(c, files[i].ID, callerUserID(r))
+		}
 	}
 
 	slackOK(w, map[string]any{"files": completed})
@@ -255,6 +272,7 @@ func (h *Handler) FilesDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.store.Files.Delete(req.File)
+	h.emitFileDeleted(req.File)
 	slackOK(w, nil)
 }
 
