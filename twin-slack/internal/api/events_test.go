@@ -827,3 +827,59 @@ func TestFileEvents(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
+
+func TestAppMentionEvent(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "ask-the-bot")
+	// The bot is not a member of this one.
+	elsewhere := formAs(t, srv, "xoxp-someone", "conversations.create", url.Values{"name": {"elsewhere"}})["channel"].(map[string]any)["id"].(string)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	say := func(channel, text string) {
+		call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {channel}, "text": {text}}.Encode(), true)
+	}
+	say(ch, "hello <@U_BOT> please look")
+	say(ch, "hello <@U_BOT|bot> again")
+	say(ch, "no mention here")
+	say(ch, "someone else <@U_GUEST>")
+	say(elsewhere, "<@U_BOT> in a channel the bot is not in")
+
+	// Each mention is a message event and then an app_mention; nothing else
+	// mentions the bot where it is a member.
+	got := rc.wait(t, 7)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 7)); n != 7 {
+		t.Fatalf("deliveries: %d, want 5 messages and 2 app_mentions", n)
+	}
+	var mentions []map[string]any
+	for i := range got {
+		if e := envelope(t, got[i])["event"].(map[string]any); e["type"] == "app_mention" {
+			mentions = append(mentions, e)
+		}
+	}
+	if len(mentions) != 2 {
+		t.Fatalf("%d app_mention events, want 2", len(mentions))
+	}
+	m := mentions[0]
+	if m["user"] != "U_BOT" || m["channel"] != ch || m["text"] != "hello <@U_BOT> please look" || m["ts"] == "" || m["event_ts"] != m["ts"] {
+		t.Errorf("app_mention: %v", m)
+	}
+	if mentions[1]["text"] != "hello <@U_BOT|bot> again" {
+		t.Errorf("second app_mention: %v", mentions[1])
+	}
+	if d := deliveryLog(t, srv, 7); len(d) != 7 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+
+	// A direct message that mentions the bot sends none.
+	_, dm := call(t, srv, "POST", "/api/conversations.open", formType, url.Values{"users": {"U_USER"}}.Encode(), true)
+	if id, ok := dm["channel"].(map[string]any)["id"].(string); ok {
+		before := len(rc.wait(t, 7))
+		say(id, "psst <@U_BOT>")
+		rc.wait(t, before+1)
+		time.Sleep(100 * time.Millisecond)
+		if n := len(rc.wait(t, before+1)); n != before+1 {
+			t.Errorf("a direct message sent %d events, want the message only", n-before)
+		}
+	}
+}
