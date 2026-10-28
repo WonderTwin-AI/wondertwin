@@ -581,6 +581,30 @@ func (h *Handler) emitMemberJoined(ch store.Channel, user, inviter string) {
 	h.events.publish(h, event)
 }
 
+// emitChannelJoin reports a join as the channel_join message: type, subtype,
+// ts, user and the text the page shows, "<@U|name> has joined the channel". The
+// page's example has no channel, event_ts or channel_type, which this adds as
+// the other message events carry them, and Slack says it is sometimes withheld,
+// which is not modelled; whether the Events API sends it at all is unverified
+// (events-005). It is delivered, not stored in the channel's history.
+func (h *Handler) emitChannelJoin(ch store.Channel, user string) {
+	name := "user"
+	if u, ok := h.store.Users.Get(user); ok && u.Name != "" {
+		name = u.Name
+	}
+	ts := h.store.NextTS()
+	h.events.publish(h, map[string]any{
+		"type":         "message",
+		"subtype":      "channel_join",
+		"ts":           ts,
+		"user":         user,
+		"text":         "<@" + user + "|" + name + "> has joined the channel",
+		"channel":      ch.ID,
+		"event_ts":     ts,
+		"channel_type": channelType(ch),
+	})
+}
+
 // emitMemberLeft reports a member leaving, or being removed from, a channel.
 func (h *Handler) emitMemberLeft(ch store.Channel, user string) {
 	h.events.publish(h, map[string]any{

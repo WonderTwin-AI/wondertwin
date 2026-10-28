@@ -538,6 +538,7 @@ func (h *Handler) ConversationsJoin(w http.ResponseWriter, r *http.Request) {
 	ch.NumMembers++
 	h.store.Channels.Set(req.Channel, ch)
 	h.emitMemberJoined(ch, caller, "")
+	h.emitChannelJoin(ch, caller)
 
 	slackOK(w, map[string]any{"channel": membershipView(r, ch)})
 }

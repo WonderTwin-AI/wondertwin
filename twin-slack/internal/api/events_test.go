@@ -730,3 +730,39 @@ func TestMessageChangedEvent(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 }
+
+func TestChannelJoinMessage(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "welcome")
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	joined := func() {
+		callAs(t, srv, "POST", "/api/conversations.join", formType, "channel="+ch, "Bearer xoxp-newcomer")
+	}
+	joined()
+	joined() // already in the channel: sends nothing
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 2)); n != 2 {
+		t.Fatalf("deliveries: %d, want member_joined_channel and the channel_join message", n)
+	}
+	if first := envelope(t, got[0])["event"].(map[string]any); first["type"] != "member_joined_channel" {
+		t.Errorf("first delivery: %v", first)
+	}
+	e := envelope(t, got[1])["event"].(map[string]any)
+	if e["type"] != "message" || e["subtype"] != "channel_join" || e["user"] != "U_USER" || e["channel"] != ch || e["channel_type"] != "channel" || e["text"] != "<@U_USER|user> has joined the channel" || e["ts"] == "" || e["event_ts"] != e["ts"] {
+		t.Errorf("channel_join: %v", e)
+	}
+	if _, has := e["inviter"]; has {
+		t.Errorf("a join nobody invited carries an inviter: %v", e)
+	}
+	// It is delivered, and not kept in the history.
+	_, hist := call(t, srv, "GET", "/api/conversations.history?channel="+ch, "", "", true)
+	if msgs, _ := hist["messages"].([]any); len(msgs) != 0 {
+		t.Errorf("history: %v", hist)
+	}
+	if d := deliveryLog(t, srv, 2); len(d) != 2 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}
