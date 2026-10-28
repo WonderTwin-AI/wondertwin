@@ -871,16 +871,20 @@ func TestAppMentionEvent(t *testing.T) {
 		t.Errorf("deliveries log: %d entries", len(d))
 	}
 
-	// A direct message that mentions the bot sends none.
+	// A direct message that mentions the bot sends none. The test fails if the
+	// direct message cannot be opened, rather than skipping this check.
 	_, dm := call(t, srv, "POST", "/api/conversations.open", formType, url.Values{"users": {"U_USER"}}.Encode(), true)
-	if id, ok := dm["channel"].(map[string]any)["id"].(string); ok {
-		before := len(rc.wait(t, 7))
-		say(id, "psst <@U_BOT>")
-		rc.wait(t, before+1)
-		time.Sleep(100 * time.Millisecond)
-		if n := len(rc.wait(t, before+1)); n != before+1 {
-			t.Errorf("a direct message sent %d events, want the message only", n-before)
-		}
+	opened, _ := dm["channel"].(map[string]any)
+	id, _ := opened["id"].(string)
+	if id == "" {
+		t.Fatalf("conversations.open returned no channel id: %v", dm)
+	}
+	before := len(rc.wait(t, 7))
+	say(id, "psst <@U_BOT>")
+	rc.wait(t, before+1)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, before+1)); n != before+1 {
+		t.Errorf("a direct message sent %d events, want the message only", n-before)
 	}
 }
 
