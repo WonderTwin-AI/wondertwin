@@ -618,6 +618,21 @@ func (h *Handler) emitFileDeleted(fileID string) {
 	})
 }
 
+// emitUserChange reports a profile change as user_change: type, event_ts,
+// cache_ts and the user. The page's user object has about fifty fields, among
+// them color, avatar_hash, is_primary_owner, is_restricted and locale, which
+// the emulator does not model; the user here is the one users.info shows, with
+// the fields it has, and none is invented. cache_ts is the user's updated time,
+// which is a guess at what Slack puts there (events-013).
+func (h *Handler) emitUserChange(u store.User) {
+	h.events.publish(h, map[string]any{
+		"type":     "user_change",
+		"user":     u,
+		"cache_ts": u.Updated,
+		"event_ts": h.store.NextTS(),
+	})
+}
+
 // memberChannelType names a conversation for member_joined_channel and
 // member_left_channel: C for a public channel, G for a private one. This is
 // unverified, since Slack's reference page for those events is not in the

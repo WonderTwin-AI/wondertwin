@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -195,6 +196,7 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	before := u.Profile
 	// Only an admin changes an email, and never their own: "You cannot update
 	// your own email using this method" (the users.profile.set docs).
 	if code := applyProfile(&u.Profile, fields, target != caller && (me.IsAdmin || me.IsOwner)); code != "" {
@@ -210,7 +212,18 @@ func (h *Handler) UsersProfileSet(w http.ResponseWriter, r *http.Request) {
 	u.RealName = u.Profile.RealName
 	u.Updated = h.store.Clock.Now().Unix()
 	h.store.Users.Set(target, u)
+	// A change to custom profile fields alone sends no user_change, as the
+	// page says.
+	if profileChanged(before, u.Profile) {
+		h.emitUserChange(u)
+	}
 	slackOK(w, map[string]any{"profile": u.Profile})
+}
+
+// profileChanged reports whether a profile differs outside its custom fields.
+func profileChanged(before, after store.UserProfile) bool {
+	before.Fields, after.Fields = nil, nil
+	return !reflect.DeepEqual(before, after)
 }
 
 // maxStatusText is the longest custom status the docs allow (too_long).

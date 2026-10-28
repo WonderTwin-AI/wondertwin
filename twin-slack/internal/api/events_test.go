@@ -883,3 +883,38 @@ func TestAppMentionEvent(t *testing.T) {
 		}
 	}
 }
+
+func TestUserChangeEvent(t *testing.T) {
+	srv, _ := setupSlack(t)
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	set := func(v url.Values) map[string]any { return formAs(t, srv, "xoxp-editor", "users.profile.set", v) }
+
+	mustOK(t, 200, set(url.Values{"profile": {`{"status_text":"lunch","title":"Engineer"}`}}))
+	// A custom field alone, a call that changes nothing and one that fails
+	// send no event.
+	mustOK(t, 200, set(url.Values{"name": {"Xf0123456789"}, "value": {"blue"}}))
+	mustOK(t, 200, set(url.Values{"profile": {`{"status_text":"lunch"}`}}))
+	if m := set(url.Values{"user": {"U-nope"}, "name": {"status_text"}, "value": {"x"}}); m["ok"] != false {
+		t.Fatalf("a profile for no user: %v", m)
+	}
+	mustOK(t, 200, set(url.Values{"profile": {`{"status_text":"back"}`}}))
+
+	got := rc.wait(t, 2)
+	time.Sleep(100 * time.Millisecond)
+	if n := len(rc.wait(t, 2)); n != 2 {
+		t.Fatalf("deliveries: %d, want the two changes to profile fields", n)
+	}
+	e := envelope(t, got[0])["event"].(map[string]any)
+	u, _ := e["user"].(map[string]any)
+	p, _ := u["profile"].(map[string]any)
+	if e["type"] != "user_change" || e["event_ts"] == "" || e["cache_ts"] != u["updated"] || u["id"] != "U_USER" || u["team_id"] != "T0001" || p["status_text"] != "lunch" || p["title"] != "Engineer" {
+		t.Errorf("user_change: %v", e)
+	}
+	if p2, _ := envelope(t, got[1])["event"].(map[string]any)["user"].(map[string]any)["profile"].(map[string]any); p2["status_text"] != "back" {
+		t.Errorf("second user_change: %v", got[1])
+	}
+	if d := deliveryLog(t, srv, 2); len(d) != 2 {
+		t.Errorf("deliveries log: %d entries", len(d))
+	}
+}
