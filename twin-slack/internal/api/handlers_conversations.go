@@ -263,6 +263,7 @@ func (h *Handler) ConversationsArchive(w http.ResponseWriter, r *http.Request) {
 
 	ch.IsArchived = true
 	h.store.Channels.Set(req.Channel, ch)
+	h.emitChannelArchive("channel_archive", callerUserID(r), ch)
 	slackOK(w, nil)
 }
 
@@ -288,6 +289,7 @@ func (h *Handler) ConversationsUnarchive(w http.ResponseWriter, r *http.Request)
 
 	ch.IsArchived = false
 	h.store.Channels.Set(req.Channel, ch)
+	h.emitChannelArchive("channel_unarchive", callerUserID(r), ch)
 	slackOK(w, nil)
 }
 
