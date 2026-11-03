@@ -261,13 +261,18 @@ smoke("webhook-delivery", async () => {
       res.end();
     });
   });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  // SMOKE_RECEIVER_BIND is the address the receiver listens on and
+  // SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+  // from inside a container sets 0.0.0.0 and host.docker.internal.
+  const bind = process.env.SMOKE_RECEIVER_BIND || "127.0.0.1";
+  const host = process.env.SMOKE_RECEIVER_HOST || "127.0.0.1";
+  await new Promise((r) => server.listen(0, bind, r));
   try {
     const gh = octokit(AUTHOR);
     const { owner, sha } = await bootstrap(gh, "hooks");
     await gh.rest.repos.createWebhook({
       owner, repo: "hooks", events: ["issues", "pull_request", "push", "check_run"],
-      config: { url: `http://127.0.0.1:${server.address().port}/`, content_type: "json", secret },
+      config: { url: `http://${host}:${server.address().port}/`, content_type: "json", secret },
     });
     await gh.rest.issues.create({ owner, repo: "hooks", title: "hook me" });
     await gh.rest.git.createRef({ owner, repo: "hooks", ref: "refs/heads/topic", sha });
