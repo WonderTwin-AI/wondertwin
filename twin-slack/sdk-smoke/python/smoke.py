@@ -184,7 +184,12 @@ def case_events_http_receive():
         def log_message(self, *args):
             pass
 
-    receiver = HTTPServer(("127.0.0.1", 0), Receiver)
+    # SMOKE_RECEIVER_BIND is the address the receiver listens on and
+    # SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+    # from inside a container sets 0.0.0.0 and host.docker.internal.
+    bind = os.environ.get("SMOKE_RECEIVER_BIND") or "127.0.0.1"
+    host = os.environ.get("SMOKE_RECEIVER_HOST") or "127.0.0.1"
+    receiver = HTTPServer((bind, 0), Receiver)
     threading.Thread(target=receiver.serve_forever, daemon=True).start()
     secret = f"smoke-python-{int(time.time() * 1000):x}"
 
@@ -200,7 +205,7 @@ def case_events_http_receive():
     # is delivered as channel_created.
     channel = new_channel()
     try:
-        configure({"request_url": f"http://127.0.0.1:{receiver.server_port}/slack/events",
+        configure({"request_url": f"http://{host}:{receiver.server_port}/slack/events",
                    "signing_secret": secret, "retry_delays_ms": [0, 0, 0]})
         posted = client.chat_postMessage(channel=channel, text="deploy started")
         for _ in range(200):
