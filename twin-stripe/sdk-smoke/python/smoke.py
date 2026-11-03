@@ -136,10 +136,15 @@ def case_webhook_endpoint_events():
         def log_message(self, *args):
             pass
 
-    server = HTTPServer(("127.0.0.1", 0), Receiver)
+    # SMOKE_RECEIVER_BIND is the address the receiver listens on and
+    # SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+    # from inside a container sets 0.0.0.0 and host.docker.internal.
+    bind = os.environ.get("SMOKE_RECEIVER_BIND") or "127.0.0.1"
+    host = os.environ.get("SMOKE_RECEIVER_HOST") or "127.0.0.1"
+    server = HTTPServer((bind, 0), Receiver)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        url = f"http://127.0.0.1:{server.server_port}/hook"
+        url = f"http://{host}:{server.server_port}/hook"
         endpoint = v1.webhook_endpoints.create(
             {"url": url, "enabled_events": ["customer.created"], "api_version": "2026-08-26.dahlia"}
         )

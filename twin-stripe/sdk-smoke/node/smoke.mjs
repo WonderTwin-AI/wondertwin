@@ -113,9 +113,14 @@ const cases = {
         res.end('ok');
       });
     });
-    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    // SMOKE_RECEIVER_BIND is the address the receiver listens on and
+    // SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+    // from inside a container sets 0.0.0.0 and host.docker.internal.
+    const bind = process.env.SMOKE_RECEIVER_BIND || '127.0.0.1';
+    const host = process.env.SMOKE_RECEIVER_HOST || '127.0.0.1';
+    await new Promise((r) => server.listen(0, bind, r));
     try {
-      const url = `http://127.0.0.1:${server.address().port}/hook`;
+      const url = `http://${host}:${server.address().port}/hook`;
       const endpoint = await stripe.webhookEndpoints.create({url, enabled_events: ['customer.created'], api_version: '2026-08-26.dahlia'});
       assert.equal(endpoint.api_version, '2026-08-26.dahlia');
       assert.deepEqual(endpoint.enabled_events, ['customer.created']);
