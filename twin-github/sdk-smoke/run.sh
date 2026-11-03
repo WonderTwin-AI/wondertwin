@@ -22,6 +22,9 @@
 #       starts an existing binary instead of building one
 #   GITHUB_EMULATOR_URL=http://github.localhost.localstack.cloud:4566 twin-github/sdk-smoke/run.sh
 #       runs against an emulator that is already up (for example through lstk)
+#   SMOKE_RECEIVER_BIND=0.0.0.0 SMOKE_RECEIVER_HOST=host.docker.internal
+#       the webhook receiver's listen address and the host it registers, for
+#       an emulator in a container (default 127.0.0.1 for both)
 #
 # Needs go, node (20 or later) and npm. Prints a pass/fail table and exits
 # non-zero if any case fails.

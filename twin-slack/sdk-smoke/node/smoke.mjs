@@ -193,7 +193,12 @@ const cases = {
         res.writeHead(got.length === 1 ? 500 : 200).end();
       });
     });
-    await new Promise((resolve) => receiver.listen(0, '127.0.0.1', resolve));
+    // SMOKE_RECEIVER_BIND is the address the receiver listens on and
+    // SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+    // from inside a container sets 0.0.0.0 and host.docker.internal.
+    const bind = process.env.SMOKE_RECEIVER_BIND || '127.0.0.1';
+    const host = process.env.SMOKE_RECEIVER_HOST || '127.0.0.1';
+    await new Promise((resolve) => receiver.listen(0, bind, resolve));
     const secret = `smoke-node-${unique()}`;
     const configure = (cfg) => fetch(`${base}/admin/events/config`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cfg),
@@ -202,7 +207,7 @@ const cases = {
     // is delivered as channel_created.
     const channel = await newChannel();
     try {
-      const configured = await configure({request_url: `http://127.0.0.1:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
+      const configured = await configure({request_url: `http://${host}:${receiver.address().port}/slack/events`, signing_secret: secret, retry_delays_ms: [0, 0, 0]});
       assert.equal(configured.status, 200, 'the Request URL passes url_verification');
       assert.equal(verifications.length, 1, 'setting the Request URL makes one url_verification handshake');
       const posted = await web.chat.postMessage({channel, text: 'deploy started'});

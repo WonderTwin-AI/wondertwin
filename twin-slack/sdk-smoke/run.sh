@@ -10,6 +10,7 @@
 #   twin-slack/sdk-smoke/run.sh             # build and run against a fresh binary
 #   BINARY=/path/to/twin-slack run.sh       # run against an existing binary
 #   PORT=4197 run.sh                        # choose the port (default 4197)
+#   SMOKE_RECEIVER_BIND / SMOKE_RECEIVER_HOST   # webhook receiver address, read by both suites
 #
 # Needs go, node (>=20) with npm, and uv. Prints a markdown pass/fail table
 # and exits non-zero if any case fails.

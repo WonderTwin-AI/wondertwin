@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -366,7 +367,7 @@ func TestSmoke(t *testing.T) {
 		var mu sync.Mutex
 		var events []any
 		var bad []error
-		recv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			payload, err := github.ValidatePayload(r, []byte(secret))
 			if err == nil {
 				var evt any
@@ -381,13 +382,31 @@ func TestSmoke(t *testing.T) {
 				mu.Unlock()
 			}
 		}))
+		// SMOKE_RECEIVER_BIND is the address the receiver listens on and
+		// SMOKE_RECEIVER_HOST the host in the URL given to the app emulator; a run
+		// from inside a container sets 0.0.0.0 and host.docker.internal.
+		bind, host := os.Getenv("SMOKE_RECEIVER_BIND"), os.Getenv("SMOKE_RECEIVER_HOST")
+		if bind == "" {
+			bind = "127.0.0.1"
+		}
+		if host == "" {
+			host = "127.0.0.1"
+		}
+		ln, err := net.Listen("tcp", net.JoinHostPort(bind, "0"))
+		if err != nil {
+			t.Fatalf("receiver listen: %v", err)
+		}
+		recv.Listener.Close()
+		recv.Listener = ln
+		recv.Start()
 		defer recv.Close()
+		recvURL := "http://" + net.JoinHostPort(host, strconv.Itoa(ln.Addr().(*net.TCPAddr).Port))
 
 		gh := client(t, author, apiVersion)
 		owner, sha := bootstrap(t, gh, "hooks")
 		hook := res(gh.Repositories.CreateHook(ctx, owner, "hooks", &github.Hook{
 			Events: []string{"issues", "pull_request", "push", "check_run"},
-			Config: &github.HookConfig{URL: github.Ptr(recv.URL), ContentType: github.Ptr("json"), Secret: github.Ptr(secret)},
+			Config: &github.HookConfig{URL: github.Ptr(recvURL), ContentType: github.Ptr("json"), Secret: github.Ptr(secret)},
 		})).v(t)
 		res(gh.Issues.Create(ctx, owner, "hooks", github.CreateIssueRequest{Title: "hook me"})).v(t)
 		res(gh.Git.CreateRef(ctx, owner, "hooks", github.CreateRef{Ref: "refs/heads/topic", SHA: sha})).v(t)
