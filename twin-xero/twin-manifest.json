@@ -3,7 +3,7 @@
   "vendor_domain": "xero.com",
   "tier": "community",
   "category": "accounting",
-  "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments and issue refunds: OAuth tokens and connections, organisation, chart of accounts, contacts, invoices, payments and credit notes with signed webhook events, and bank transactions. Deliberate differences from Xero are declared in divergences.json.",
+  "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments and issue refunds: OAuth tokens and connections, organisation, chart of accounts, contacts, invoices, payments and credit notes with signed webhook events, bank transactions and manual journals. Deliberate differences from Xero are declared in divergences.json.",
   "sdk_target": {
     "primary": {
       "package": "xero-python",
@@ -49,7 +49,9 @@
       "GET /api.xro/2.0/BankTransactions/{}",
       "POST /api.xro/2.0/BankTransactions/{}",
       "POST /api.xro/2.0/BankTransactions",
-      "PUT /api.xro/2.0/ManualJournals"
+      "PUT /api.xro/2.0/ManualJournals",
+      "GET /api.xro/2.0/ManualJournals",
+      "GET /api.xro/2.0/ManualJournals/{}"
     ],
     "resources_not_implemented": [
       "GET /api.xro/2.0/Accounts/{}",
@@ -74,9 +76,7 @@
       "GET /api.xro/2.0/Items/{}",
       "POST /api.xro/2.0/Items/{}",
       "DELETE /api.xro/2.0/Items/{}",
-      "GET /api.xro/2.0/ManualJournals",
       "POST /api.xro/2.0/ManualJournals",
-      "GET /api.xro/2.0/ManualJournals/{}",
       "POST /api.xro/2.0/ManualJournals/{}",
       "GET /api.xro/2.0/Overpayments",
       "GET /api.xro/2.0/Overpayments/{}",

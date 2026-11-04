@@ -31,9 +31,9 @@ import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import (Account, AccountingApi, Address, Allocation, BankTransaction, BankTransactions, Contact,
-                                    Contacts, CreditNote, CreditNotes, CurrencyCode, Invoice, Invoices, LineAmountTypes, LineItem,
-                                    Payment, PaymentDelete)
+from xero_python.accounting import (Account, AccountingApi, AccountType, Address, Allocation, BankTransaction, BankTransactions,
+                                    Contact, Contacts, CreditNote, CreditNotes, CurrencyCode, Invoice, Invoices, LineAmountTypes,
+                                    LineItem, ManualJournal, ManualJournalLine, ManualJournals, Payment, PaymentDelete)
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -311,6 +311,55 @@ def case_update_or_create_bank_transactions():
                                                    summarize_errors=False).bank_transactions
     assert mixed[0].status_attribute_string == "ERROR" and mixed[0].validation_errors, "the refused item is answered in place"
     assert mixed[1].status_attribute_string == "OK" and mixed[1].total == 10
+
+
+def refused(call, words):
+    try:
+        call()
+    except Exception as e:  # the SDK raises on a 400 with the body in the message
+        assert words in str(e), str(e)[:300]
+        return
+    raise AssertionError(f"accepted a request that should be refused with {words!r}")
+
+
+def case_advance_booked_as_a_loan_liability():
+    """The demo's second part: the lender's advance booked as a loan with a manual journal, against a liability
+    account the demo creates with create_account because the default chart has none. Reset drops the account,
+    and the demo's reset recreates it. Runs late: it resets the store."""
+    api, tenant = accounting_api()
+    code = f"2{uuid.uuid4().int % 1000:03d}"
+    loan = Account(code=code, name=f"Merchant Advance Loan {code}", type=AccountType.TERMLIAB)
+    created = api.create_account(tenant, loan).accounts[0]
+    value = lambda v: getattr(v, "value", v)  # noqa: E731 - the SDK parses some of these into enums
+    assert value(created._class) == "LIABILITY" and value(created.status) == "ACTIVE", created
+
+    journal = ManualJournal(narration="Lender advance booked as a loan", status="POSTED", date=datetime.date(2026, 11, 3),
+                            journal_lines=[ManualJournalLine(line_amount=5000, account_code="090", description="Advance received"),
+                                           ManualJournalLine(line_amount=-5000, account_code=code, description="Loan from lender")])
+    booked = api.create_manual_journals(tenant, ManualJournals(manual_journals=[journal])).manual_journals[0]
+    assert booked.status == "POSTED" and booked.manual_journal_id, booked
+    read = api.get_manual_journal(tenant, booked.manual_journal_id).manual_journals[0]
+    assert [l.line_amount for l in read.journal_lines] == [5000, -5000] and read.journal_lines[1].account_code == code
+    listed = api.get_manual_journals(tenant, where='Status=="POSTED"', page=1).manual_journals
+    assert booked.manual_journal_id in [m.manual_journal_id for m in listed]
+
+    unbalanced = ManualJournal(narration="Unbalanced", status="POSTED", journal_lines=[
+        ManualJournalLine(line_amount=100, account_code="090"), ManualJournalLine(line_amount=-10, account_code=code)])
+    refused(lambda: api.create_manual_journals(tenant, ManualJournals(manual_journals=[unbalanced])),
+            "must equal total credits")
+    unknown = ManualJournal(narration="Unknown account", status="POSTED", journal_lines=[
+        ManualJournalLine(line_amount=1, account_code="090"), ManualJournalLine(line_amount=-1, account_code="476")])
+    refused(lambda: api.create_manual_journals(tenant, ManualJournals(manual_journals=[unknown])),
+            "Account code '476' does not match a recognised account.")
+
+    status, _ = admin("POST", "/admin/reset")
+    assert status == 200, f"reset answered {status}"
+    api, tenant = accounting_api()
+    assert code not in [a.code for a in api.get_accounts(tenant).accounts], "reset drops the added account"
+    assert not api.get_manual_journals(tenant).manual_journals, "reset drops the journals"
+    api.create_account(tenant, loan)  # the demo's reset recreates it
+    again = api.create_manual_journals(tenant, ManualJournals(manual_journals=[journal])).manual_journals[0]
+    assert again.status == "POSTED"
 
 
 def case_chart_of_accounts():
@@ -868,6 +917,7 @@ CASES = [
     ("a replayed refresh token is refused", case_replayed_refresh_token_is_refused),
     ("an expired token refreshes on demand", case_expired_token_refreshes_on_demand),
     ("client credentials", case_client_credentials),
+    ("the advance is booked as a loan with create_manual_journals against an account made by create_account, recreated after reset", case_advance_booked_as_a_loan_liability),
     ("the legacy /_xero health and reset paths alias the admin plane (last: it resets the store)", case_legacy_control_paths_alias_the_admin_plane),
 ]
 
