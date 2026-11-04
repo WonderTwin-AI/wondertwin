@@ -103,6 +103,9 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 		URL:     "/v1/accounts/" + id + "/external_accounts",
 	}
 
+	if ea != nil {
+		dropExternalAccountRequirement(acct.Requirements)
+	}
 	h.store.Accounts.Set(id, acct)
 	h.store.GetOrCreateBalance(id)
 	if ea != nil {
@@ -172,6 +175,7 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 			h.store.ExternalAccts.Delete(old.ID)
 		}
 		h.store.ExternalAccts.Set(ea.ID, ea)
+		dropExternalAccountRequirement(acct.Requirements)
 	}
 
 	// Update fields from form
@@ -264,10 +268,10 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 	acct.Updated = h.store.Now()
 	h.store.Accounts.Set(id, acct)
 
+	acct.ExternalAccounts = h.getExternalAccountsForAccount(id)
 	// Emit account.updated event
 	h.emitEvent("account.updated", accountToMap(acct))
 
-	acct.ExternalAccounts = h.getExternalAccountsForAccount(id)
 	twincore.JSON(w, http.StatusOK, acct)
 }
 

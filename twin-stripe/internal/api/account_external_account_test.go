@@ -18,6 +18,19 @@ func accountBanks(tc *testutil.TwinClient, acct string) []map[string]any {
 	return banks
 }
 
+func requiresExternalAccount(acct map[string]any) bool {
+	req, _ := acct["requirements"].(map[string]any)
+	for _, k := range []string{"currently_due", "eventually_due", "past_due"} {
+		fields, _ := req[k].([]any)
+		for _, f := range fields {
+			if f == "external_account" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func TestAccountExternalAccountOnCreate(t *testing.T) {
 	_, tc := setupStripe(t)
 
@@ -31,6 +44,9 @@ func TestAccountExternalAccountOnCreate(t *testing.T) {
 	banks := accountBanks(tc, acct["id"].(string))
 	if len(banks) != 1 || banks[0]["last4"] != "6789" || banks[0]["bank_name"] != "STRIPE TEST BANK" {
 		t.Errorf("external accounts = %v", banks)
+	}
+	if requiresExternalAccount(acct) || requiresExternalAccount(stripeGet(tc, "/v1/accounts/"+acct["id"].(string)).JSONMap()) {
+		t.Errorf("requirements still list external_account: %v", acct["requirements"])
 	}
 
 	dict := stripePost(tc, "/v1/accounts?type=custom&country=US&external_account[object]=bank_account"+
@@ -67,6 +83,14 @@ func TestAccountExternalAccountOnUpdateReplacesDefault(t *testing.T) {
 	if len(banks) != 1 || banks[0]["bank_name"] != "First Platypus Bank" || banks[0]["last4"] != "1111" {
 		t.Errorf("after update, external accounts = %v, want only the new default", banks)
 	}
+	events, _ := stripeGet(tc, "/v1/events?type=account.updated").JSONMap()["data"].([]any)
+	latest, _ := events[0].(map[string]any)
+	obj, _ := latest["data"].(map[string]any)["object"].(map[string]any)
+	evList, _ := obj["external_accounts"].(map[string]any)
+	evData, _ := evList["data"].([]any)
+	if len(evData) != 1 || evData[0].(map[string]any)["bank_name"] != "First Platypus Bank" {
+		t.Errorf("account.updated event external_accounts = %v, want the new default", evList)
+	}
 
 	reuse := stripePost(tc, "/v1/accounts/"+acct+"?external_account=btok_next&email=changed@example.com", nil)
 	reuse.AssertStatus(400)
@@ -75,5 +99,18 @@ func TestAccountExternalAccountOnUpdateReplacesDefault(t *testing.T) {
 	}
 	if email := stripeGet(tc, "/v1/accounts/"+acct).JSONMap()["email"]; email == "changed@example.com" {
 		t.Errorf("a refused update still changed the email")
+	}
+}
+
+func TestExternalAccountsRouteClearsRequirement(t *testing.T) {
+	_, tc := setupStripe(t)
+	acct := newConnectAccount(t, tc)
+	if !requiresExternalAccount(stripeGet(tc, "/v1/accounts/"+acct).JSONMap()) {
+		t.Fatalf("a new account should require external_account")
+	}
+
+	stripePost(tc, "/v1/accounts/"+acct+"/external_accounts?external_account=btok_us_verified", nil).AssertStatus(200)
+	if got := stripeGet(tc, "/v1/accounts/"+acct).JSONMap(); requiresExternalAccount(got) {
+		t.Errorf("requirements still list external_account: %v", got["requirements"])
 	}
 }

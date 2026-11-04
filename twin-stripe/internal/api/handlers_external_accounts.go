@@ -13,7 +13,8 @@ import (
 func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) {
 	accountID := chi.URLParam(r, "account_id")
 
-	if _, ok := h.store.Accounts.Get(accountID); !ok {
+	acct, ok := h.store.Accounts.Get(accountID)
+	if !ok {
 		stripeError(w, http.StatusNotFound,
 			"invalid_request_error", "resource_missing",
 			"No such account: '"+accountID+"'")
@@ -31,7 +32,29 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 	}
 	ea.Metadata = parseMetadata(r)
 	h.store.ExternalAccts.Set(ea.ID, ea)
+	dropExternalAccountRequirement(acct.Requirements)
+	h.store.Accounts.Set(accountID, acct)
 	twincore.JSON(w, http.StatusOK, ea)
+}
+
+// dropExternalAccountRequirement removes external_account from the
+// account's outstanding requirements once a bank account is attached.
+func dropExternalAccountRequirement(req *store.Requirements) {
+	if req == nil {
+		return
+	}
+	without := func(fields []string) []string {
+		out := []string{}
+		for _, f := range fields {
+			if f != "external_account" {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	req.CurrentlyDue = without(req.CurrentlyDue)
+	req.EventuallyDue = without(req.EventuallyDue)
+	req.PastDue = without(req.PastDue)
 }
 
 // hasExternalAccount reports whether the request carries external_account,
