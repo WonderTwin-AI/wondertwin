@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -49,6 +50,7 @@ func fetchKey(t *testing.T, srv http.Handler, kid string) map[string]any {
 
 func TestWebhookSignerProducesAJWTTheServedKeyVerifies(t *testing.T) {
 	h := newTestHandler(1)
+	h.store.Clock.Pin(time.Unix(1_793_776_411, 0))
 	header, claims, input, sig := signed(t, h, `{"webhook_type":"ITEM","webhook_code":"ERROR"}`)
 	if header["alg"] != "ES256" || header["typ"] != "JWT" || header["kid"] == nil {
 		t.Fatalf("header = %v", header)

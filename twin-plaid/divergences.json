@@ -150,12 +150,12 @@
     },
     {
       "route": "POST /processor/token/create, POST /processor/stripe/bank_account_token/create",
-      "reason": "The emulator issues a processor token or a btok_ Stripe bank account token for a checking account and revokes them with the Item, but nothing redeems them: no processor-partner route honours a processor token, the one-time use of the Stripe token is not enforced, and the Stripe app emulator in this repo does not accept a btok_ token, so the Plaid to Stripe flow does not work end to end. An account without bank numbers answers NO_AUTH_ACCOUNTS, which is the nearest documented error, not a published answer. The processor list is Plaid's documented one.",
+      "reason": "The emulator issues a processor token or a btok_ Stripe bank account token for a checking account and revokes them with the Item, and no processor-partner route here honours a processor token. A btok_ token is redeemed by the Stripe app emulator in this repo only once it is registered there through POST /admin/bank_account_tokens, because the two app emulators share no state; with that one step the Plaid to Stripe flow works end to end, and the Stripe app emulator enforces the token's one-time use. An account without bank numbers answers NO_AUTH_ACCOUNTS, which is the nearest documented error, not a published answer. The processor list is Plaid's documented one.",
       "references": {
         "docs": "plaid.com/docs/api/processors, plaid.com/docs/auth/partnerships/stripe",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
       },
-      "operator_note": "Built in WonderTwin-AI/wondertwin#436 and merged by the operator. The Stripe-side acceptance of btok_ tokens is not planned yet.",
+      "operator_note": "Built in WonderTwin-AI/wondertwin#436 and merged by the operator. Stripe-side acceptance of registered btok_ tokens shipped with build plan stripe-bp1 (WonderTwin-AI/wondertwin#483, #484).",
       "quirk_ids": []
     },
     {
