@@ -7,6 +7,7 @@
 // non-zero if any case fails. run.sh drives both SDK suites.
 
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import Stripe from 'stripe';
 
@@ -227,6 +228,30 @@ const cases = {
     const read = await stripe.customers.retrieve(customer.id);
     assert.equal(read.id, customer.id);
     assert.equal(read.deleted, true);
+  },
+
+  async 'stripe-registered-bank-token-payout'() {
+    // The token Plaid issued, registered as the demo does; the Stripe SDK has no admin calls.
+    const token = `btok_${randomUUID().replaceAll('-', '')}`;
+    const reg = await fetch(new URL('/admin/bank_account_tokens', base), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, bank_name: 'First Platypus Bank', last4: '1111', routing_number: '011401533' }),
+    });
+    assert.equal(reg.status, 200);
+    const account = await stripe.accounts.create({ type: 'custom', country: 'US' });
+    const bank = await stripe.accounts.createExternalAccount(account.id, { external_account: token });
+    assert.equal(bank.bank_name, 'First Platypus Bank');
+    assert.equal(bank.last4, '1111');
+    assert.equal(bank.routing_number, '011401533');
+    await stripe.paymentIntents.create({
+      amount: 5000, currency: 'usd', payment_method: 'pm_card_bypassPending', confirm: true,
+      payment_method_types: ['card'],
+    });
+    const transfer = await stripe.transfers.create({ amount: 1000, currency: 'usd', destination: account.id });
+    assert.equal(transfer.destination, account.id);
+    const err = await expectError(() => stripe.accounts.createExternalAccount(account.id, { external_account: token }));
+    assert.equal(err.code, 'token_already_used');
   },
 
   async 'error-bad-key'() {

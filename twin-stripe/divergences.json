@@ -86,9 +86,15 @@
       "reason": "Unverified until a live test-mode call (quirks error-005, crud-009, crud-010): 400 is Stripe's general invalid_request_error status, and the test tokens' bank details and reuse are inferred, not documented"
     },
     {
+      "route": "POST /admin/bank_account_tokens",
+      "stripe": "Resolves a bank account token a partner such as Plaid issued, to the bank account the partner verified; a Plaid Sandbox token always resolves to routing 110000000, account 000123456789",
+      "app_emulator": "Resolves a btok_ token only once it is registered here, to the bank_name, last4, routing_number, country, currency and account_holder_name given; omitted fields default to STRIPE TEST BANK, last4 6789, routing 110000000, US, usd",
+      "reason": "The app emulator shares no state with the Plaid app emulator, so the demo registers the token Plaid issued; a bank name other than STRIPE TEST BANK is a deliberate difference that makes a demo account recognisable (quirk crud-011)"
+    },
+    {
       "route": "/admin/*",
       "stripe": "No equivalent",
-      "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes)",
+      "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes, register bank account tokens)",
       "reason": "Lets tests drive outcomes that Stripe produces asynchronously or from the Dashboard"
     }
   ]
