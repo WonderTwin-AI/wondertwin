@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
@@ -121,4 +122,40 @@ func titleCase(s string) string {
 		words[i] = strings.ToUpper(w[:1]) + w[1:]
 	}
 	return strings.Join(words, " ")
+}
+
+// CustomTransactions builds the configured rows of a user_custom Item. accounts
+// are the Item's stored accounts, in the order of cfg.OverrideAccounts. Each row
+// is made like a /sandbox/transactions/create row: description is name,
+// date_posted is date, date_transacted is authorized_date, and the amount keeps
+// Plaid's sign (positive is money out). A row's currency defaults to its
+// account's.
+//
+// A row whose date_posted is after today, the UTC date of the app emulator's
+// clock at Item creation, is pending. It does not post when the clock passes
+// that date (quirk LIFECYCLE-010, operator decision 2026-11-03: deferred and
+// declared). options.transactions.days_requested is not read, so every
+// configured row is kept (quirk LIFECYCLE-009).
+func CustomTransactions(itemID string, accounts []store.Account, cfg *store.CustomUser, newID func() string, now time.Time) []store.Transaction {
+	today := now.UTC().Format("2006-01-02")
+	var out []store.Transaction
+	for i, c := range cfg.OverrideAccounts {
+		if i >= len(accounts) {
+			break
+		}
+		a := accounts[i]
+		for _, in := range c.Transactions {
+			currency := in.Currency
+			if currency == "" {
+				currency = a.Balances.ISOCurrencyCode
+			}
+			row := NewCustomTransaction(itemID, a.ID, newID(), CustomTransaction{Amount: *in.Amount,
+				Description: in.Description, DatePosted: in.DatePosted, DateTransacted: in.DateTransacted, Currency: currency})
+			if in.DatePosted > today {
+				row.Pending, row.Body.Pending = true, true
+			}
+			out = append(out, row)
+		}
+	}
+	return out
 }

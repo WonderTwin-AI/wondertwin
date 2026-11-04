@@ -9,7 +9,8 @@ import (
 )
 
 // seedAccounts gives a new Item its accounts and starting transactions. A
-// user_custom configuration builds them from its override_accounts; without
+// user_custom configuration builds them from its override_accounts and their
+// configured transactions, never the fixture rows; without
 // one the Item gets the default accounts, in their sample order, and the
 // default transactions on the first of them.
 func (h *Handler) seedAccounts(itemID string, cfg *store.CustomUser) {
@@ -17,18 +18,18 @@ func (h *Handler) seedAccounts(itemID string, cfg *store.CustomUser) {
 	if cfg != nil {
 		accounts = seed.CustomAccounts(cfg)
 	}
-	var first string
-	for i, a := range accounts {
-		a.ID, a.ItemID, a.Position = h.store.NewID(), itemID, i
-		h.store.PutAccount(a)
-		if i == 0 {
-			first = a.ID
-		}
+	for i := range accounts {
+		accounts[i].ID, accounts[i].ItemID, accounts[i].Position = h.store.NewID(), itemID, i
+		h.store.PutAccount(accounts[i])
 	}
-	if cfg == nil {
-		for _, t := range seed.DefaultTransactions(itemID, first, h.store.NewID, h.store.Clock.Now()) {
-			h.store.AddTransaction(t)
-		}
+	var rows []store.Transaction
+	if cfg != nil {
+		rows = seed.CustomTransactions(itemID, accounts, cfg, h.store.NewID, h.store.Clock.Now())
+	} else {
+		rows = seed.DefaultTransactions(itemID, accounts[0].ID, h.store.NewID, h.store.Clock.Now())
+	}
+	for _, t := range rows {
+		h.store.AddTransaction(t)
 	}
 	// The starting rows are not news to a receiver: a refresh reports only what changes after them.
 	n := h.store.ChangeLogLen(itemID)
