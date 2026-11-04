@@ -270,6 +270,17 @@ def case_error_missing_resource():
     eq(bool(err.error.doc_url), True, "doc_url")
 
 
+def case_error_unknown_bank_token():
+    account = v1.accounts.create({"type": "custom", "country": "US"})
+    err = expect_error(
+        lambda: v1.accounts.external_accounts.create(account.id, {"external_account": "btok_this_does_not_exist"}),
+        stripe.InvalidRequestError,
+    )
+    eq(err.code, "resource_missing", "code")
+    eq(err.param, "external_account", "param")
+    eq(err.error.message, "No such token: 'btok_this_does_not_exist'", "message")
+
+
 def case_error_declined_card():
     err = expect_error(
         lambda: v1.payment_intents.create(
@@ -346,6 +357,7 @@ CASES = {
     "deleted-customer-retrieve": case_deleted_customer_retrieve,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
+    "error-unknown-bank-token": case_error_unknown_bank_token,
     "error-declined-card": case_error_declined_card,
     "error-idempotency-mismatch": case_error_idempotency_mismatch,
     "error-unsupported-version": case_error_unsupported_version,

@@ -244,6 +244,17 @@ const cases = {
     assert.ok(err.doc_url);
   },
 
+  async 'error-unknown-bank-token'() {
+    const account = await stripe.accounts.create({ type: 'custom', country: 'US' });
+    const err = await expectError(() =>
+      stripe.accounts.createExternalAccount(account.id, { external_account: 'btok_this_does_not_exist' }),
+    );
+    assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
+    assert.equal(err.code, 'resource_missing');
+    assert.equal(err.param, 'external_account');
+    assert.equal(err.message, "No such token: 'btok_this_does_not_exist'");
+  },
+
   async 'error-declined-card'() {
     const err = await expectError(() =>
       stripe.paymentIntents.create({amount: 500, currency: 'usd', confirm: true, payment_method: 'pm_card_visa_chargeDeclinedInsufficientFunds'}),
