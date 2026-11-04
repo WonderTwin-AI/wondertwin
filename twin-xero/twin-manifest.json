@@ -21,7 +21,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 18
+    "resource_count": 19
   },
   "coverage": {
     "resources_implemented": [
@@ -30,6 +30,7 @@
       "GET /Connections",
       "GET /api.xro/2.0/Organisation",
       "GET /api.xro/2.0/Accounts",
+      "PUT /api.xro/2.0/Accounts",
       "GET /api.xro/2.0/Contacts",
       "PUT /api.xro/2.0/Contacts",
       "PUT /api.xro/2.0/Invoices",
@@ -45,7 +46,6 @@
       "POST /api.xro/2.0/CreditNotes"
     ],
     "resources_not_implemented": [
-      "PUT /api.xro/2.0/Accounts",
       "GET /api.xro/2.0/Accounts/{}",
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",

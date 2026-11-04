@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
 )
@@ -50,13 +51,6 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = decodeBody(raw, &in)
 	}
-	if err == nil {
-		var env struct{ Accounts []json.RawMessage }
-		if json.Unmarshal(raw, &env) == nil && len(env.Accounts) == 1 {
-			raw, in = env.Accounts[0], account{}
-			err = decodeBody(raw, &in)
-		}
-	}
 	if err != nil {
 		h.writeBadBody(w, r, err)
 		return
@@ -81,13 +75,13 @@ func validateAccount(a store.Account, chart []store.Account) []string {
 	switch {
 	case strings.TrimSpace(a.Code) == "":
 		msgs = append(msgs, "Please enter a Code.")
-	case len(a.Code) > 10:
+	case utf8.RuneCountInString(a.Code) > 10:
 		msgs = append(msgs, "The Code must not be more than 10 characters long.")
 	}
 	switch {
 	case strings.TrimSpace(a.Name) == "":
 		msgs = append(msgs, "Please enter a Name.")
-	case len(a.Name) > 150:
+	case utf8.RuneCountInString(a.Name) > 150:
 		msgs = append(msgs, "The Name must not be more than 150 characters long.")
 	}
 	if _, ok := accountClass[a.Type]; !ok {

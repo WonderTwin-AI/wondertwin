@@ -47,13 +47,11 @@ func TestCreateAccountAddsALiabilityToTheChart(t *testing.T) {
 	}
 }
 
-func TestCreateAccountTakesTheEnvelopeForm(t *testing.T) {
+func TestCreateAccountCountsLengthLimitsInCharacters(t *testing.T) {
 	h := newTestHandler(t)
-	if code, body := putAccount(t, h, `{"Accounts":[{"Code":"2101","Name":"Loan","Type":"CURRLIAB"}]}`); code != 200 {
-		t.Fatalf("status %d: %v", code, body)
-	}
-	if !chartHas(t, h, "2101") {
-		t.Error("an account sent in {\"Accounts\":[..]} must be created")
+	body := `{"Code":"` + strings.Repeat("é", 10) + `","Name":"` + strings.Repeat("é", 150) + `","Type":"TERMLIAB"}`
+	if code, b := putAccount(t, h, body); code != 200 {
+		t.Fatalf("10 and 150 multi-byte characters are within the limits: %d %v", code, b)
 	}
 }
 
