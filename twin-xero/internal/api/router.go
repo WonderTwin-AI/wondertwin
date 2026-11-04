@@ -86,6 +86,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Put("/CreditNotes", h.CreateCreditNotes)
 				r.Post("/CreditNotes", h.UpdateOrCreateCreditNotes)
 				r.Post("/Payments/{PaymentID}", h.DeletePayment)
+				r.Put("/BankTransactions", h.CreateBankTransactions)
 			})
 		})
 	})
