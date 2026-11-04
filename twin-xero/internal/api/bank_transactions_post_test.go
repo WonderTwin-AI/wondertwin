@@ -70,3 +70,17 @@ func TestUpdateOrCreateBankTransactionsAnswersAMixedBatchInPlace(t *testing.T) {
 		t.Errorf("the refused update leaves the stored one as it was: %+v", got)
 	}
 }
+
+func TestUpdateOrCreateBankTransactionsAppliesRepeatedIDsInOrder(t *testing.T) {
+	h := newTestHandler(t)
+	lender := newContactID(t, h, "Lender Capital")
+	id := createBankTransaction(t, h, settlement(lender))
+	body := `{"BankTransactions":[{"BankTransactionID":"` + id + `","Reference":"FIRST"},{"BankTransactionID":"` + id + `","Date":"2026-01-01"}]}`
+	if code, out := postBankTransactions(t, h, "", body); code != 200 {
+		t.Fatalf("status %d: %v", code, out)
+	}
+	got, _ := h.store.BankTransactions.For(store.DefaultTenantID).Get(id)
+	if got.Reference != "FIRST" || got.Date == nil || got.Date.Format("2006-01-02") != "2026-01-01" {
+		t.Errorf("a later item for the same ID builds on the earlier one: %+v", got)
+	}
+}

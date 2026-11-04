@@ -66,7 +66,11 @@ func (h *Handler) UpdateOrCreateBankTransactions(w http.ResponseWriter, r *http.
 	for i, s := range sent {
 		var msgs []string
 		if id := s.BankTransactionID; id != "" {
-			made[i], msgs = h.applyBankTransactionUpdate(tenant, stored[find(id)], inBankTransaction(s), keys[i], unitdp)
+			at := find(id)
+			made[i], msgs = h.applyBankTransactionUpdate(tenant, stored[at], inBankTransaction(s), keys[i], unitdp)
+			if len(msgs) == 0 {
+				stored[at] = made[i]
+			}
 		} else {
 			made[i], msgs = h.buildBankTransaction(tenant, inBankTransaction(s), unitdp)
 		}

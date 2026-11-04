@@ -243,6 +243,17 @@
       ]
     },
     {
+      "route": "POST /BankTransactions (updateOrCreateBankTransactions)",
+      "reason": "A bank transaction that carries the BankTransactionID of a stored one is updated by the rules of POST /BankTransactions/{BankTransactionID}, and one with no BankTransactionID is created by the rules of PUT /BankTransactions. Whether Xero also matches on Reference is not settled by the research, so this emulator does not. A BankTransactionID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022"
+      },
+      "operator_note": "Added so a consumer that creates bank transactions by POST on the collection can use this emulator (xero-bp3-s12). Recorded by operator decision in review.",
+      "quirk_ids": [
+        "crud-022"
+      ]
+    },
+    {
       "route": "every list endpoint (order, If-Modified-Since)",
       "reason": "The order query parameter and the If-Modified-Since header are accepted and ignored: the default order applies and every record is returned, where Xero orders as asked and limits the list to records changed since the date. That is silent wrong data, not an error. Accounts also ignores where.",
       "references": {
