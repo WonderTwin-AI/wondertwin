@@ -28,7 +28,7 @@ func TestAdminBankAccountTokenResolvesToRegisteredDetails(t *testing.T) {
 	ea.AssertStatus(200)
 	got := ea.JSONMap()
 	if got["bank_name"] != "First Platypus Bank" || got["last4"] != "1111" || got["routing_number"] != "011401533" ||
-		got["country"] != "US" || got["currency"] != "usd" {
+		got["country"] != "US" || got["currency"] != "usd" || got["account_holder_name"] != "Acme Merchant" {
 		t.Errorf("external account = %v", got)
 	}
 	attachToken(tc, acct, "btok_plaidA1").AssertStatus(400)
