@@ -97,6 +97,26 @@ def case_link_token_then_exchange():
         ItemPublicTokenExchangeRequest(public_token=public_token().public_token)).access_token
 
 
+def case_roll_dates_forward_ends_history_on_the_emulators_today():
+    # The demo's flow: one fixed configuration dated from an epoch, the clock advanced, then the link.
+    admin_call("POST", "/admin/time/advance", {"duration": "2160h"})
+    try:
+        simulated = admin_call("GET", "/admin/time")["simulated"]
+        today = datetime.datetime.fromisoformat(simulated).astimezone(datetime.timezone.utc).date()
+        epoch = datetime.date(2025, 1, 6)
+        rows = [{"date_transacted": (epoch + datetime.timedelta(days=d)).isoformat(),
+                 "date_posted": (epoch + datetime.timedelta(days=d)).isoformat(),
+                 "amount": -1250.5, "description": "STRIPE PAYOUT"} for d in range(0, 90, 7)]
+        token = custom_access_token({"roll_dates_forward": True, "override_accounts": [
+            {"type": "depository", "subtype": "checking", "starting_balance": 1000, "transactions": rows}]}, ("transactions",))
+        added = client.transactions_sync(TransactionsSyncRequest(access_token=token)).added
+        dates = sorted(t.authorized_date for t in added)
+        assert len(dates) == len(rows) and dates[-1] == today, (dates[-1], today)
+        assert [(b - a).days for a, b in zip(dates, dates[1:])] == [7] * (len(rows) - 1), "spacing is kept"
+    finally:
+        admin_call("POST", "/admin/time/advance", {"duration": "-2160h"})
+
+
 def case_sandbox_public_token_create():
     res = public_token()
     assert res.public_token.startswith("public-sandbox-") and res.request_id

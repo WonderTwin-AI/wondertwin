@@ -159,3 +159,40 @@ func CustomTransactions(itemID string, accounts []store.Account, cfg *store.Cust
 	}
 	return out
 }
+
+// RollDatesForward applies roll_dates_forward: it returns a copy of cfg whose
+// every date_transacted and date_posted has moved by the same whole number of
+// days, so the latest date_transacted is today, the UTC date of the app
+// emulator's clock. date_posted keeps its distance from date_transacted, so a
+// row posted after its transaction date can still be pending. The shift
+// happens once, at Item creation; advancing the clock afterwards moves nothing.
+// A configuration without the flag, or without transactions, is returned as is.
+func RollDatesForward(cfg *store.CustomUser, now time.Time) *store.CustomUser {
+	if !cfg.RollDatesForward {
+		return cfg
+	}
+	var latest time.Time
+	for _, a := range cfg.OverrideAccounts {
+		for _, t := range a.Transactions {
+			if d, err := time.Parse("2006-01-02", t.DateTransacted); err == nil && d.After(latest) {
+				latest = d
+			}
+		}
+	}
+	if latest.IsZero() {
+		return cfg
+	}
+	today, _ := time.Parse("2006-01-02", now.UTC().Format("2006-01-02"))
+	days := int(today.Sub(latest).Hours() / 24)
+	out := *cfg
+	out.OverrideAccounts = make([]store.CustomAccount, len(cfg.OverrideAccounts))
+	for i, a := range cfg.OverrideAccounts {
+		a.Transactions = slices.Clone(a.Transactions)
+		for j := range a.Transactions {
+			a.Transactions[j].DateTransacted = shift(a.Transactions[j].DateTransacted, "2006-01-02", days)
+			a.Transactions[j].DatePosted = shift(a.Transactions[j].DatePosted, "2006-01-02", days)
+		}
+		out.OverrideAccounts[i] = a
+	}
+	return &out
+}
