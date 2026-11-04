@@ -21,7 +21,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 19
+    "resource_count": 24
   },
   "coverage": {
     "resources_implemented": [
@@ -47,13 +47,13 @@
       "PUT /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransactions/{}",
-      "POST /api.xro/2.0/BankTransactions/{}"
+      "POST /api.xro/2.0/BankTransactions/{}",
+      "POST /api.xro/2.0/BankTransactions"
     ],
     "resources_not_implemented": [
       "GET /api.xro/2.0/Accounts/{}",
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",
-      "POST /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransfers",
       "PUT /api.xro/2.0/BankTransfers",
       "POST /api.xro/2.0/BankTransfers",
@@ -120,7 +120,7 @@
       "behaviour: rate-limit headers and 429, the payroll 401 and XML responses are not built (GAP-011)",
       "behaviour: a webhook receiver that sets cookies is not refused (GAP-012)"
     ],
-    "estimated_coverage_pct": 23
+    "estimated_coverage_pct": 29
   },
   "generation": {
     "method": "wondertwin_skill"

@@ -285,6 +285,34 @@ def case_settlement_received_into_the_bank_account():
     assert created.bank_transaction_id in json.dumps(state["bank_transactions"]), "the settlement is in /admin/state"
 
 
+def case_update_or_create_bank_transactions():
+    """update_or_create_bank_transactions creates one without an ID and updates one by its ID, in one batch,
+    and with summarize_errors=False answers a refused item in place."""
+    api, tenant = accounting_api()
+    lender = new_contact(api, tenant)
+
+    def receive(amount, reference):
+        return BankTransaction(type="RECEIVE", contact=Contact(contact_id=lender), bank_account=Account(code="090"),
+                               line_amount_types=LineAmountTypes.NOTAX, reference=reference,
+                               line_items=[LineItem(description="Advance", quantity=1, unit_amount=amount, account_code="200")])
+
+    first = api.update_or_create_bank_transactions(tenant, BankTransactions(bank_transactions=[receive(5000, "ADV-A")])).bank_transactions[0]
+    assert first.bank_transaction_id and first.total == 5000
+    first.reference = "ADV-A-CORRECTED"  # xero-python requires Type, BankAccount and lines, so the record goes back whole
+    batch = BankTransactions(bank_transactions=[first, receive(750, "ADV-B")])
+    both = api.update_or_create_bank_transactions(tenant, batch).bank_transactions
+    assert both[0].bank_transaction_id == first.bank_transaction_id and both[0].reference == "ADV-A-CORRECTED"
+    assert both[0].total == 5000 and len(both[0].line_items) == 1, "the lines sent back keep their IDs"
+    assert both[1].bank_transaction_id != first.bank_transaction_id and both[1].total == 750
+
+    bad = BankTransaction(type="RECEIVE", contact=Contact(contact_id=lender), bank_account=Account(code="200"),
+                          line_items=[LineItem(description="x", unit_amount=1, account_code="201")])
+    mixed = api.update_or_create_bank_transactions(tenant, BankTransactions(bank_transactions=[bad, receive(10, "ADV-C")]),
+                                                   summarize_errors=False).bank_transactions
+    assert mixed[0].status_attribute_string == "ERROR" and mixed[0].validation_errors, "the refused item is answered in place"
+    assert mixed[1].status_attribute_string == "OK" and mixed[1].total == 10
+
+
 def case_chart_of_accounts():
     client, token, _ = signed_in()
     tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
@@ -831,6 +859,7 @@ CASES = [
     ("update_or_create_contacts creates, then updates by ContactID and keeps the other fields", case_update_or_create_contacts),
     ("update_or_create_contacts never upserts by Name", case_update_or_create_contacts_never_upserts_by_name),
     ("the settlement is received into account 090 with create_bank_transactions, then read and listed", case_settlement_received_into_the_bank_account),
+    ("update_or_create_bank_transactions creates, updates by BankTransactionID and answers a mixed batch in place", case_update_or_create_bank_transactions),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
