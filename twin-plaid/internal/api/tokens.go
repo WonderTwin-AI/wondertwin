@@ -73,7 +73,20 @@ func (h *Handler) sandboxPublicTokenCreate(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	pt := h.store.CreatePublicToken(inst, products, webhook)
+	// user_custom reads the password as a configuration for the Item's accounts
+	// and transactions. Plaid's answer to a bad one is not documented, so the
+	// refusal is a labelled guess (quirk LIFECYCLE-008), declared in divergences.json.
+	var cfg *store.CustomUser
+	if user == "user_custom" {
+		parsed, err := store.ParseCustomUser(password)
+		if err != nil {
+			h.writeError(w, http.StatusBadRequest, "INVALID_REQUEST", "INVALID_FIELD",
+				"override_password for user_custom "+err.Error())
+			return
+		}
+		cfg = parsed
+	}
+	pt := h.store.CreateCustomPublicToken(inst, products, webhook, cfg)
 	h.writeJSON(w, http.StatusOK, map[string]any{"public_token": pt.Token})
 }
 
