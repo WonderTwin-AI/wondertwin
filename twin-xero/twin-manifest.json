@@ -44,15 +44,15 @@
       "POST /api.xro/2.0/Contacts",
       "POST /api.xro/2.0/Invoices",
       "POST /api.xro/2.0/CreditNotes",
-      "PUT /api.xro/2.0/BankTransactions"
+      "PUT /api.xro/2.0/BankTransactions",
+      "GET /api.xro/2.0/BankTransactions",
+      "GET /api.xro/2.0/BankTransactions/{}"
     ],
     "resources_not_implemented": [
       "GET /api.xro/2.0/Accounts/{}",
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",
-      "GET /api.xro/2.0/BankTransactions",
       "POST /api.xro/2.0/BankTransactions",
-      "GET /api.xro/2.0/BankTransactions/{}",
       "POST /api.xro/2.0/BankTransactions/{}",
       "GET /api.xro/2.0/BankTransfers",
       "PUT /api.xro/2.0/BankTransfers",

@@ -31,8 +31,9 @@ import uuid
 
 from xero_python.api_client import ApiClient, Configuration
 from xero_python.api_client.oauth2 import OAuth2Token, TokenApi
-from xero_python.accounting import (Account, AccountingApi, Address, Allocation, Contact, Contacts, CreditNote, CreditNotes,
-                                    CurrencyCode, Invoice, Invoices, LineItem, Payment, PaymentDelete)
+from xero_python.accounting import (Account, AccountingApi, Address, Allocation, BankTransaction, BankTransactions, Contact,
+                                    Contacts, CreditNote, CreditNotes, CurrencyCode, Invoice, Invoices, LineAmountTypes, LineItem,
+                                    Payment, PaymentDelete)
 from xero_python.identity import IdentityApi
 
 BASE = os.environ.get("XERO_EMULATOR_URL", "http://localhost:4195").rstrip("/")
@@ -259,6 +260,29 @@ def case_get_contacts_parses_with_and_without_page():
     paged = api.get_contacts(tenant, page=1, page_size=1)
     p = paged.pagination
     assert (p.page, p.page_size, len(paged.contacts)) == (1, 1, 1) and p.item_count >= 2 and p.page_count >= 2, p
+
+
+def case_settlement_received_into_the_bank_account():
+    """The demo's settlement: the lender's advance reaches the merchant as a RECEIVE into account 090."""
+    api, tenant = accounting_api()
+    lender = api.create_contacts(tenant, Contacts(contacts=[Contact(name=f"Lender {uuid.uuid4().hex[:8]}")])).contacts[0]
+    reference = f"ADV-{uuid.uuid4().hex[:6]}"
+    advance = BankTransaction(
+        type="RECEIVE", contact=Contact(contact_id=lender.contact_id), bank_account=Account(code="090"),
+        line_amount_types=LineAmountTypes.NOTAX, reference=reference, date=datetime.date(2026, 11, 3),
+        line_items=[LineItem(description="Merchant cash advance", quantity=1, unit_amount=5000, account_code="200")])
+    created = api.create_bank_transactions(tenant, BankTransactions(bank_transactions=[advance])).bank_transactions[0]
+    assert created.status == "AUTHORISED" and created.total == 5000, f"created {created.status} {created.total}"
+    assert created.bank_account.code == "090" and created.bank_account.name == "Business Bank Account"
+    assert created.contact.name == lender.name and created.date == datetime.date(2026, 11, 3)
+
+    read = api.get_bank_transaction(tenant, created.bank_transaction_id).bank_transactions[0]
+    assert read.line_items[0].line_amount == 5000 and read.line_items[0].account_code == "200"
+    listed = api.get_bank_transactions(tenant, where='Type=="RECEIVE"', page=1).bank_transactions
+    assert created.bank_transaction_id in [b.bank_transaction_id for b in listed], "the settlement lists with where Type"
+
+    _, state = admin("GET", "/admin/state")
+    assert created.bank_transaction_id in json.dumps(state["bank_transactions"]), "the settlement is in /admin/state"
 
 
 def case_chart_of_accounts():
@@ -806,6 +830,7 @@ CASES = [
     ("create_contacts sends PUT /Contacts and the SDK parses the contact", case_create_contacts),
     ("update_or_create_contacts creates, then updates by ContactID and keeps the other fields", case_update_or_create_contacts),
     ("update_or_create_contacts never upserts by Name", case_update_or_create_contacts_never_upserts_by_name),
+    ("the settlement is received into account 090 with create_bank_transactions, then read and listed", case_settlement_received_into_the_bank_account),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
