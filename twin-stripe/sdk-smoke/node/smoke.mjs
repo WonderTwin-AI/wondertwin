@@ -254,6 +254,22 @@ const cases = {
     assert.equal(err.code, 'token_already_used');
   },
 
+  async 'stripe-bank-account-token'() {
+    const tok = await stripe.tokens.create({
+      bank_account: {
+        account_number: '000123456789', country: 'US', currency: 'usd',
+        routing_number: '110000000', account_holder_name: 'Jenny Rosen',
+      },
+    });
+    assert.equal(tok.type, 'bank_account');
+    assert.equal(tok.bank_account.last4, '6789');
+    assert.equal((await stripe.tokens.retrieve(tok.id)).used, false);
+    const account = await stripe.accounts.create({ type: 'custom', country: 'US' });
+    const bank = await stripe.accounts.createExternalAccount(account.id, { external_account: tok.id });
+    assert.equal(bank.fingerprint, tok.bank_account.fingerprint);
+    assert.equal((await stripe.tokens.retrieve(tok.id)).used, true);
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);

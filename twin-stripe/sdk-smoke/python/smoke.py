@@ -283,6 +283,20 @@ def case_registered_bank_token_payout():
     eq(err.code, "token_already_used", "reuse code")
 
 
+def case_bank_account_token():
+    tok = v1.tokens.create(
+        {"bank_account": {"account_number": "000123456789", "country": "US", "currency": "usd",
+                          "routing_number": "110000000", "account_holder_name": "Jenny Rosen"}}
+    )
+    eq(tok.type, "bank_account", "type")
+    eq(tok.bank_account.last4, "6789", "last4")
+    eq(v1.tokens.retrieve(tok.id).used, False, "used before attach")
+    account = v1.accounts.create({"type": "custom", "country": "US"})
+    bank = v1.accounts.external_accounts.create(account.id, {"external_account": tok.id})
+    eq(bank.fingerprint, tok.bank_account.fingerprint, "fingerprint")
+    eq(v1.tokens.retrieve(tok.id).used, True, "used after attach")
+
+
 def case_error_bad_key():
     err = expect_error(lambda: client("sk_live_not_a_test_key").v1.customers.list(), stripe.AuthenticationError)
     eq(err.http_status, 401, "status")
@@ -379,6 +393,7 @@ CASES = {
     "stripe-idempotent-retry": case_idempotent_retry,
     "stripe-connect-transfer": case_connect_transfer,
     "stripe-registered-bank-token-payout": case_registered_bank_token_payout,
+    "stripe-bank-account-token": case_bank_account_token,
     "unset-fields-null": case_unset_fields_null,
     "metadata-merge": case_metadata_merge,
     "deleted-customer-retrieve": case_deleted_customer_retrieve,
