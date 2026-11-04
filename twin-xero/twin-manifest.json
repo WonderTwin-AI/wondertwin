@@ -3,7 +3,7 @@
   "vendor_domain": "xero.com",
   "tier": "community",
   "category": "accounting",
-  "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments and issue refunds: OAuth tokens and connections, organisation, chart of accounts, and contacts, invoices, payments and credit notes with signed webhook events. Deliberate differences from Xero are declared in divergences.json.",
+  "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments and issue refunds: OAuth tokens and connections, organisation, chart of accounts, contacts, invoices, payments and credit notes with signed webhook events, and bank transactions. Deliberate differences from Xero are declared in divergences.json.",
   "sdk_target": {
     "primary": {
       "package": "xero-python",
@@ -21,7 +21,7 @@
     },
     "auth_pattern": "oauth2",
     "has_webhooks": true,
-    "resource_count": 18
+    "resource_count": 19
   },
   "coverage": {
     "resources_implemented": [
@@ -42,7 +42,8 @@
       "PUT /api.xro/2.0/CreditNotes",
       "POST /api.xro/2.0/Contacts",
       "POST /api.xro/2.0/Invoices",
-      "POST /api.xro/2.0/CreditNotes"
+      "POST /api.xro/2.0/CreditNotes",
+      "PUT /api.xro/2.0/BankTransactions"
     ],
     "resources_not_implemented": [
       "PUT /api.xro/2.0/Accounts",
@@ -50,7 +51,6 @@
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",
       "GET /api.xro/2.0/BankTransactions",
-      "PUT /api.xro/2.0/BankTransactions",
       "POST /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransactions/{}",
       "POST /api.xro/2.0/BankTransactions/{}",
@@ -120,7 +120,7 @@
       "behaviour: rate-limit headers and 429, the payroll 401 and XML responses are not built (GAP-011)",
       "behaviour: a webhook receiver that sets cookies is not refused (GAP-012)"
     ],
-    "estimated_coverage_pct": 22
+    "estimated_coverage_pct": 23
   },
   "generation": {
     "method": "wondertwin_skill"
