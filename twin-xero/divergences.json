@@ -254,6 +254,17 @@
       ]
     },
     {
+      "route": "PUT /ManualJournals (journal line with an unknown account code)",
+      "reason": "A journal line whose AccountCode matches no account in the chart is refused with a 400 ValidationException, and nothing is created. The spec's example has Xero remove such a line and answer with a Warning. The refusal's wording is a guess.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020"
+      },
+      "operator_note": "Refused by operator decision 2026-11-03 (xero-bp3-s08). Approved by the operator.",
+      "quirk_ids": [
+        "crud-020"
+      ]
+    },
+    {
       "route": "every list endpoint (order, If-Modified-Since)",
       "reason": "The order query parameter and the If-Modified-Since header are accepted and ignored: the default order applies and every record is returned, where Xero orders as asked and limits the list to records changed since the date. That is silent wrong data, not an error. Accounts also ignores where.",
       "references": {
