@@ -297,6 +297,13 @@ def case_bank_account_token():
     eq(v1.tokens.retrieve(tok.id).used, True, "used after attach")
 
 
+def case_account_with_external_account():
+    account = v1.accounts.create({"type": "custom", "country": "US", "external_account": "btok_us_verified"})
+    banks = v1.accounts.retrieve(account.id).external_accounts.data
+    eq(len(banks), 1, "external accounts")
+    eq(banks[0].last4, "6789", "last4")
+
+
 def case_error_bad_key():
     err = expect_error(lambda: client("sk_live_not_a_test_key").v1.customers.list(), stripe.AuthenticationError)
     eq(err.http_status, 401, "status")
@@ -394,6 +401,7 @@ CASES = {
     "stripe-connect-transfer": case_connect_transfer,
     "stripe-registered-bank-token-payout": case_registered_bank_token_payout,
     "stripe-bank-account-token": case_bank_account_token,
+    "stripe-account-with-external-account": case_account_with_external_account,
     "unset-fields-null": case_unset_fields_null,
     "metadata-merge": case_metadata_merge,
     "deleted-customer-retrieve": case_deleted_customer_retrieve,

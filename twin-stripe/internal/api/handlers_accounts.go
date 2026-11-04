@@ -22,6 +22,17 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	id := h.store.StripeID(h.store.Accounts.NextID())
 	now := h.store.Now()
 
+	// An external account given at creation is resolved first, so a refused
+	// one leaves no account behind.
+	var ea *store.ExternalAccount
+	if hasExternalAccount(r) {
+		built, ok := h.externalAccountFromRequest(w, r, id, false)
+		if !ok {
+			return
+		}
+		ea = &built
+	}
+
 	acctType := r.FormValue("type")
 	if acctType == "" {
 		acctType = "custom"
@@ -94,6 +105,10 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Accounts.Set(id, acct)
 	h.store.GetOrCreateBalance(id)
+	if ea != nil {
+		h.store.ExternalAccts.Set(ea.ID, *ea)
+		acct.ExternalAccounts = h.getExternalAccountsForAccount(id)
+	}
 
 	// Emit account.updated event
 	h.emitEvent("account.updated", accountToMap(acct))
@@ -143,6 +158,21 @@ func (h *Handler) UpdateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	acct.Metadata = meta
+
+	// A new external account becomes the default for its currency and
+	// replaces the old default, as Stripe documents for this parameter.
+	if hasExternalAccount(r) {
+		ea, ok := h.externalAccountFromRequest(w, r, id, false)
+		if !ok {
+			return
+		}
+		for _, old := range h.store.ExternalAccts.Filter(func(_ string, e store.ExternalAccount) bool {
+			return e.AccountID == id && e.Currency == ea.Currency && e.DefaultForCurrency
+		}) {
+			h.store.ExternalAccts.Delete(old.ID)
+		}
+		h.store.ExternalAccts.Set(ea.ID, ea)
+	}
 
 	// Update fields from form
 	if v := r.FormValue("email"); v != "" {

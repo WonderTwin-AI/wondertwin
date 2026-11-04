@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
@@ -24,14 +25,44 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	ea, ok := h.externalAccountFromRequest(w, r, accountID, true)
+	if !ok {
+		return
+	}
+	ea.Metadata = parseMetadata(r)
+	h.store.ExternalAccts.Set(ea.ID, ea)
+	twincore.JSON(w, http.StatusOK, ea)
+}
+
+// hasExternalAccount reports whether the request carries external_account,
+// as a token or as a dictionary.
+func hasExternalAccount(r *http.Request) bool {
+	if r.FormValue("external_account") != "" {
+		return true
+	}
+	for k := range r.Form {
+		if strings.HasPrefix(k, "external_account[") {
+			return true
+		}
+	}
+	return false
+}
+
+// externalAccountFromRequest builds the bank account external_account
+// describes: a token resolved by resolveBankToken, or the dictionary form.
+// flatFallback reads routing_number, account_number, country and currency
+// from the top level as well, which only the external accounts route does;
+// on an account route those names are the account's own. On refusal it has
+// written Stripe's error and returns false.
+func (h *Handler) externalAccountFromRequest(w http.ResponseWriter, r *http.Request, accountID string, flatFallback bool) (store.ExternalAccount, bool) {
 	// A token arrives as the plain string form of external_account; the
 	// dictionary form arrives as external_account[...] fields.
 	if token := r.FormValue("external_account"); token != "" {
 		bank, ok := h.resolveBankToken(w, token)
 		if !ok {
-			return
+			return store.ExternalAccount{}, false
 		}
-		ea := store.ExternalAccount{
+		return store.ExternalAccount{
 			ID:                 h.store.StripeID(h.store.ExternalAccts.NextID()),
 			Object:             "bank_account",
 			AccountID:          accountID,
@@ -44,65 +75,40 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 			Status:             "new",
 			DefaultForCurrency: true,
 			Fingerprint:        bank.Fingerprint,
-			Metadata:           parseMetadata(r),
-		}
-		h.store.ExternalAccts.Set(ea.ID, ea)
-		twincore.JSON(w, http.StatusOK, ea)
-		return
+		}, true
 	}
 
-	id := h.store.StripeID(h.store.ExternalAccts.NextID())
-
-	routingNumber := r.FormValue("external_account[routing_number]")
-	if routingNumber == "" {
-		routingNumber = r.FormValue("routing_number")
-	}
-	accountNumber := r.FormValue("external_account[account_number]")
-	if accountNumber == "" {
-		accountNumber = r.FormValue("account_number")
-	}
-	country := r.FormValue("external_account[country]")
-	if country == "" {
-		country = r.FormValue("country")
-		if country == "" {
-			country = "US"
+	field := func(name, fallback string) string {
+		if v := r.FormValue("external_account[" + name + "]"); v != "" {
+			return v
 		}
-	}
-	currency := r.FormValue("external_account[currency]")
-	if currency == "" {
-		currency = r.FormValue("currency")
-		if currency == "" {
-			currency = "usd"
+		if flatFallback {
+			if v := r.FormValue(name); v != "" {
+				return v
+			}
 		}
+		return fallback
 	}
-
-	// Generate last4 from account number
+	routingNumber := field("routing_number", "")
+	accountNumber := field("account_number", "")
 	last4 := "0000"
 	if len(accountNumber) >= 4 {
 		last4 = accountNumber[len(accountNumber)-4:]
 	}
-
-	// Generate fingerprint
-	fingerprint := bankFingerprint(routingNumber, accountNumber)
-
-	ea := store.ExternalAccount{
-		ID:                 id,
+	return store.ExternalAccount{
+		ID:                 h.store.StripeID(h.store.ExternalAccts.NextID()),
 		Object:             "bank_account",
 		AccountID:          accountID,
-		BankName:           "STRIPE TEST BANK",
-		Country:            country,
-		Currency:           currency,
+		AccountHolderName:  field("account_holder_name", ""),
+		BankName:           testBankName,
+		Country:            field("country", "US"),
+		Currency:           field("currency", "usd"),
 		Last4:              last4,
 		RoutingNumber:      routingNumber,
 		Status:             "new",
 		DefaultForCurrency: true,
-		Fingerprint:        fingerprint,
-		Metadata:           parseMetadata(r),
-	}
-
-	h.store.ExternalAccts.Set(id, ea)
-
-	twincore.JSON(w, http.StatusOK, ea)
+		Fingerprint:        bankFingerprint(routingNumber, accountNumber),
+	}, true
 }
 
 // GetExternalAccount handles GET /v1/accounts/{account_id}/external_accounts/{id}.

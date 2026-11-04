@@ -92,6 +92,12 @@
       "reason": "The app emulator shares no state with the Plaid app emulator, so the demo registers the token Plaid issued; a bank name other than STRIPE TEST BANK is a deliberate difference that makes a demo account recognisable (quirk crud-011)"
     },
     {
+      "route": "POST /v1/accounts, external_account",
+      "stripe": "Takes a token or a dictionary; what happens to the account when the token is refused is not documented",
+      "app_emulator": "Resolves the external account before creating the account, so a refused token refuses the whole request and leaves no account",
+      "reason": "The conservative reading until a live test-mode call shows whether Stripe creates the account and refuses only the token"
+    },
+    {
       "route": "/admin/*",
       "stripe": "No equivalent",
       "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes, register bank account tokens)",
