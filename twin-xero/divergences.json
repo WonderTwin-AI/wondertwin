@@ -78,6 +78,19 @@
       ]
     },
     {
+      "route": "PUT /api.xro/2.0/BankTransactions (Contact)",
+      "reason": "Only Contact.ContactID is read, as for invoices. Xero identifies the contact by Name, ContactID or ContactNumber, looks it up or creates it by name, and updates the contact record from any other contact field sent. Here a bank transaction with no ContactID is refused with Xero's message naming all three elements, even when it sends a Name or ContactNumber, one with an unknown ContactID is refused, and the other contact fields are ignored.",
+      "references": {
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-005, crud-017"
+      },
+      "operator_note": "Raised in review while building bank transaction create (xero-bp3-s03); follows the approved Invoices (Contact) divergence. Contact is required by operator decision 2026-11-03.",
+      "quirk_ids": [
+        "crud-005",
+        "crud-017"
+      ]
+    },
+    {
       "route": "PUT /api.xro/2.0/Invoices (tax)",
       "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0. Xero computes it from the tenant's tax rate for the line's TaxType, and tax rates (TaxRates) are not modelled, so no rate is applied and Total equals SubTotal unless TaxAmount is sent. TaxType values are accepted unvalidated.",
       "references": {
