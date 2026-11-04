@@ -102,7 +102,7 @@ def case_roll_dates_forward_ends_history_on_the_emulators_today():
     admin_call("POST", "/admin/time/advance", {"duration": "2160h"})
     try:
         simulated = admin_call("GET", "/admin/time")["simulated"]
-        today = datetime.datetime.fromisoformat(simulated).astimezone(datetime.timezone.utc).date()
+        today = datetime.datetime.fromisoformat(simulated.replace("Z", "+00:00")).astimezone(datetime.timezone.utc).date()
         epoch = datetime.date(2025, 1, 6)
         rows = [{"date_transacted": (epoch + datetime.timedelta(days=d)).isoformat(),
                  "date_posted": (epoch + datetime.timedelta(days=d)).isoformat(),
