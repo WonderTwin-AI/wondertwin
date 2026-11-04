@@ -265,6 +265,17 @@
       ]
     },
     {
+      "route": "POST /api.xro/2.0/ManualJournals/{ManualJournalID}",
+      "reason": "The update rules are inferred from Xero's status list, not observed: a DRAFT may be edited, posted (if balanced) or deleted, a POSTED journal may only be voided, and a DELETED or VOIDED journal cannot be updated. Fields sent with the values already stored do not count as an edit, so a POSTED journal read and sent back with Status VOIDED is voided. JournalLines sent replace every line. The wording of the 400 refusals is a guess, as is the body of the 404 for an unknown ManualJournalID.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020"
+      },
+      "operator_note": "Raised in review while building manual journal update (xero-bp3-s10). Recorded by operator decision.",
+      "quirk_ids": [
+        "crud-020"
+      ]
+    },
+    {
       "route": "every list endpoint (order, If-Modified-Since)",
       "reason": "The order query parameter and the If-Modified-Since header are accepted and ignored: the default order applies and every record is returned, where Xero orders as asked and limits the list to records changed since the date. That is silent wrong data, not an error. Accounts also ignores where.",
       "references": {
