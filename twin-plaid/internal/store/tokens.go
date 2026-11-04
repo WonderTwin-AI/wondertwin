@@ -18,6 +18,10 @@ type PublicToken struct {
 	Products      []string  `json:"products"`
 	Webhook       string    `json:"webhook,omitempty"`
 	ExpiresAt     time.Time `json:"expires_at"`
+	// CustomUser is the user_custom configuration the Item is built from, or nil
+	// for the fixture Item. It rides here until the exchange, so /admin/state and
+	// /admin/reset cover it with the token.
+	CustomUser *CustomUser `json:"custom_user,omitempty"`
 }
 
 // AccessToken is bound to one Item and never expires (quirk AUTH-003).
@@ -65,9 +69,15 @@ func (s *MemoryStore) tokenTaken(kind, token string) bool {
 
 // CreatePublicToken issues a public token for an Item to be made at exchange.
 func (s *MemoryStore) CreatePublicToken(institutionID string, products []string, webhook string) PublicToken {
+	return s.CreateCustomPublicToken(institutionID, products, webhook, nil)
+}
+
+// CreateCustomPublicToken issues a public token whose Item is built from a
+// user_custom configuration; a nil configuration is the fixture Item.
+func (s *MemoryStore) CreateCustomPublicToken(institutionID string, products []string, webhook string, cfg *CustomUser) PublicToken {
 	t := PublicToken{
 		Token: s.newToken("public"), InstitutionID: institutionID, Products: products,
-		Webhook: webhook, ExpiresAt: s.Clock.Now().Add(publicTokenTTL),
+		Webhook: webhook, ExpiresAt: s.Clock.Now().Add(publicTokenTTL), CustomUser: cfg,
 	}
 	s.PublicTokens.Set(t.Token, t)
 	return t
