@@ -265,7 +265,7 @@
       ]
     },
     {
-      "route": "PUT /ManualJournals (journal line with an unknown account code)",
+      "route": "PUT and POST /ManualJournals (journal line with an unknown account code)",
       "reason": "A journal line whose AccountCode matches no account in the chart is refused with a 400 ValidationException, and nothing is created. The spec's example has Xero remove such a line and answer with a Warning. The refusal's wording is a guess.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-020"
@@ -354,6 +354,46 @@
       "operator_note": "Added after the first community audit of this emulator. Approved by the operator.",
       "quirk_ids": [
         "auth-006"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/BankTransactions (defaults, types and reconciliation)",
+      "reason": "A bank transaction that names no LineAmountTypes is tax inclusive, as the BankTransactions page says; the spec's shared schema says exclusive. One with no Date is dated today. The validation messages are guesses except the Contact one, which Xero publishes. Overpayment and prepayment types are stored as bank transactions only: no Overpayment or Prepayment record is created, the line is not coded to the receivable or payable account, and the single-line rule is not enforced. IsReconciled is a stored flag: there are no bank statement lines to reconcile against.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-018, err-005, time-004",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "The operator chose Inclusive on 2026-11-03. Declared under plan xero-bp3, approved by the operator on 2026-11-03 (WonderTwin-AI/wondertwin-docs#327, #328).",
+      "quirk_ids": [
+        "crud-018",
+        "err-005",
+        "time-004"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Accounts",
+      "reason": "One account is created per call, sent bare as xero-python sends it. Code (at most 10 characters), Name (at most 150) and Type are required and Name and Code are unique; only the duplicate Name message is Xero's, the others are guesses. Class is derived from Type by inference, Status is ACTIVE and TaxType defaults to NONE. A BANK account needs no bank account number here. Reset removes every account a client added and restores the default chart.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-021",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Declared under plan xero-bp3, approved by the operator on 2026-11-03 (WonderTwin-AI/wondertwin-docs#327, #328).",
+      "quirk_ids": [
+        "crud-021"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/ManualJournals (status, balance and lines)",
+      "reason": "Xero's rules here come from the spec and SDK only: there is no ManualJournals page in the research. A POSTED journal must balance, with the spec's message; a DRAFT need not. At least two lines and a Narration are required. A new journal is DRAFT unless sent POSTED, dated today when no Date is sent, and NoTax unless told otherwise. ARCHIVED is not served; the update rules are declared under POST /api.xro/2.0/ManualJournals/{ManualJournalID}. Journal lines carry no ID, so lines sent on an update replace them all. A paged list carries the lines, as the release notes say; the spec's example shows them empty.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020, page-004, time-004",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Declared under plan xero-bp3, approved by the operator on 2026-11-03 (WonderTwin-AI/wondertwin-docs#327, #328).",
+      "quirk_ids": [
+        "crud-020",
+        "page-004",
+        "time-004"
       ]
     }
   ]
