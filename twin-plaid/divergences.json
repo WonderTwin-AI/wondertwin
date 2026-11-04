@@ -2,7 +2,7 @@
   "twin_id": "twin-plaid",
   "tier": "community",
   "vendor_api_version": "Plaid API 2020-09-14, OpenAPI revision 1.740.1, as served 2026-09-28",
-  "reviewed_at": "2026-10-26",
+  "reviewed_at": "2026-11-04",
   "divergences": [
     {
       "route": "POST /identity/match (scores)",
@@ -26,7 +26,7 @@
     },
     {
       "route": "POST /accounts/get, /accounts/balance/get, /auth/get, /identity/get (default accounts)",
-      "reason": "A new Item starts with three accounts taken from the sample response on plaid.com/docs/api/accounts: Plaid Checking, Plaid 401k and Plaid Student Loan. Plaid's Sandbox gives a larger default set that is not published, so a credit card and the other account types are missing. Only the checking account has bank numbers (account 1111222233330000, routing 021000021, from the Sandbox institutions page; wire routing is not published). The same holder, the one in the identity sample, is on every account. Account ids are random per Item. Provisional until an authenticated Sandbox capture replaces it.",
+      "reason": "A new Item not made with user_custom starts with three accounts taken from the sample response on plaid.com/docs/api/accounts: Plaid Checking, Plaid 401k and Plaid Student Loan. Plaid's Sandbox gives a larger default set that is not published, so a credit card and the other account types are missing. Only the checking account has bank numbers (account 1111222233330000, routing 021000021, from the Sandbox institutions page; wire routing is not published). The same holder, the one in the identity sample, is on every account. Account ids are random per Item. Provisional until an authenticated Sandbox capture replaces it.",
       "references": {
         "docs": "plaid.com/docs/api/accounts, plaid.com/docs/sandbox/institutions, plaid.com/docs/api/products/identity; research/twins/plaid/RESEARCH-STATUS.md gap 4",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -48,7 +48,7 @@
     },
     {
       "route": "POST /transactions/sync, POST /transactions/get (starting rows and created rows)",
-      "reason": "A new Item starts with the two transactions in Plaid's /transactions/get example, with new ids and dates moved so the newest is the day before the emulator's today. Plaid's Sandbox generates a long history that is not published, so paging needs rows created with /sandbox/transactions/create, which takes up to ten a call. A created row has no merchant, counterparties, location or logo, and its category fields are omitted. This is the published-rows-only choice, taken by default on 2026-10-26 and reversible; a derived history generator is not built.",
+      "reason": "A new Item not made with user_custom starts with the two transactions in Plaid's /transactions/get example, with new ids and dates moved so the newest is the day before the emulator's today. Plaid's Sandbox generates a long history that is not published, so paging needs rows created with /sandbox/transactions/create, which takes up to ten a call. A created row has no merchant, counterparties, location or logo, and its category fields are omitted. This is the published-rows-only choice, taken by default on 2026-10-26 and reversible; a derived history generator is not built.",
       "references": {
         "docs": "plaid.com/docs/api/products/transactions, plaid.com/docs/api/sandbox",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -125,7 +125,7 @@
     },
     {
       "route": "POST /sandbox/public_token/create (test users and passwords)",
-      "reason": "Of the Sandbox error passwords, the 22 error_{CODE} codes with a published sample are simulated. COUNTRY_NOT_SUPPORTED and USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS are listed by Plaid but have no published sample, so they are accepted and not simulated. The multi-factor test passwords, the recaptcha password, the persona users and user_transactions_dynamic, and custom usernames configured in the Plaid Dashboard are not modelled: any other username is accepted and every Item gets the same accounts. user_custom with a valid override_password configuration is accepted and its configuration is carried to the exchange, where the Item's accounts and transactions are built from it. A bad configuration is refused with 400 INVALID_REQUEST INVALID_FIELD and a message naming the problem. Plaid does not document its answer, so this refusal is a guess (quirk LIFECYCLE-008). The error passwords are honoured only for user_good or no username; for user_custom an error password is just an invalid configuration. The error passwords are not refused for OAuth institutions, where Plaid does not support them (quirk LIFECYCLE-005). An institution_id the emulator does not list is refused with INVALID_INSTITUTION; initial_products is not checked against the products the institution supports.",
+      "reason": "Of the Sandbox error passwords, the 22 error_{CODE} codes with a published sample are simulated. COUNTRY_NOT_SUPPORTED and USER_SHOULD_VERIFY_DEPOSIT_ALLOCATIONS are listed by Plaid but have no published sample, so they are accepted and not simulated. The multi-factor test passwords, the recaptcha password, the persona users and user_transactions_dynamic, and custom usernames configured in the Plaid Dashboard are not modelled: any other username is accepted and gets the default Item. user_custom is modelled: its override_password configuration builds the Item's accounts and transactions (see the user_custom entries). A bad configuration is refused with 400 INVALID_REQUEST INVALID_FIELD and a message naming the problem; Plaid does not document its answer, so this is a guess. Plaid's size limits for a configuration (about 55 kB or 250 transactions) are not enforced; more than ten accounts is refused. The error passwords are honoured only for user_good or no username; for user_custom such a password is an invalid configuration. The error passwords are not refused for OAuth institutions, where Plaid does not support them (quirk LIFECYCLE-005). An institution_id the emulator does not list is refused with INVALID_INSTITUTION; initial_products is not checked against the products the institution supports.",
       "references": {
         "docs": "plaid.com/docs/sandbox/test-credentials, plaid.com/docs/errors",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
@@ -217,12 +217,12 @@
     },
     {
       "route": "POST /sandbox/transactions/create",
-      "reason": "Accepted on any Item, including one linked without the transactions product. The research (event-model.md) says Plaid allows the route only for Items created with the user_transactions_dynamic test user, which this app emulator does not model. Created rows appear in /transactions/sync and /transactions/get like the starting rows.",
+      "reason": "Accepted on any Item, including one linked without the transactions product. The research (event-model.md) says Plaid allows the route only for Items created with the user_transactions_dynamic test user, which this app emulator does not model. Created rows appear in /transactions/sync and /transactions/get like the starting rows. Dates may be up to 730 days in the past; Plaid's docs and spec allow 14, so a backfill older than two weeks works here and fails at Plaid.",
       "references": {
         "docs": "plaid.com/docs/api/sandbox (sandbox/transactions/create)",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
       },
-      "operator_note": "Operator decision, 2026-10-26: leave transactions/create open to any Item and declare it.",
+      "operator_note": "Operator decision, 2026-10-26: leave transactions/create open to any Item and declare it. The 730-day date window was declared on 2026-11-04 by operator decision, not changed.",
       "quirk_ids": []
     },
     {
@@ -303,6 +303,41 @@
       "operator_note": "Found by the community audit of 2026-10-26. plaid-python 44.0.0 deserialises every response without them, as the SDK smoke run shows.",
       "quirk_ids": [
         "ENVELOPE-004"
+      ]
+    },
+    {
+      "route": "POST /sandbox/public_token/create (user_custom configuration fields accepted and ignored)",
+      "reason": "Only what the app emulator models is read from a user_custom configuration: version and seed are ignored. identity, holdings, investment_transactions, liability, inflow_model, income, mfa, recaptcha, force_error, meta.apy and the eft, international and bacs numbers are accepted and ignored, so a configuration that uses them links but those products and values are absent. Where Plaid fills an unspecified value with random data from seed, the app emulator uses the default Item's fixture values instead, the same on every run. A configuration without override_accounts, including {}, gives an Item with no accounts and no transactions; Plaid generates random accounts and history.",
+      "references": {
+        "docs": "plaid.com/docs/sandbox/user-custom (custom user configuration schema); spec 1.740.1 UserCustomPassword, OverrideAccounts",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Accept, ignore and declare. Decided by the operator on 2026-11-03 in WonderTwin-AI/wondertwin-docs#333 and #334 (plan plaid-bp2).",
+      "quirk_ids": []
+    },
+    {
+      "route": "POST /accounts/get, /accounts/balance/get, /auth/get, /identity/get (user_custom accounts)",
+      "reason": "A user_custom Item has one account per override_accounts entry, in order. balances.current is starting_balance, read as the current balance at Item creation; it stays fixed, as balances do not follow transactions (see that entry), so a caller passes the balance its history should end on. available is force_available_balance, null with has_null_available_balance, and otherwise equal to current. Values the entry leaves out come from the default Item's fixture account of the same subtype, else of the same type, else Plaid Checking: a fixture name is renamed 'Plaid <Subtype>' for a subtype the fixture lacks, and the fixture's official name is used only when the entry gives no meta.name. A missing mask is the last four of numbers.account, else the same-subtype fixture's, else the account's position repeated (1111, 2222; a tenth account repeats 1111). Checking, savings and cash management accounts without numbers get routing 021000021 and an account number ending in the mask, so /auth/get serves them; other subtypes have no numbers. Every account has the fixture's account holder for /identity/get.",
+      "references": {
+        "docs": "plaid.com/docs/sandbox/user-custom (starting_balance, force_available_balance, has_null_available_balance, meta, numbers)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "starting_balance as the current balance at creation, and a configured name without official_name giving null, are operator decisions. Decided by the operator on 2026-11-03 in WonderTwin-AI/wondertwin-docs#333 and #334 (plan plaid-bp2).",
+      "quirk_ids": [
+        "LIFECYCLE-007"
+      ]
+    },
+    {
+      "route": "POST /transactions/sync, /transactions/get, /transactions/recurring/get (user_custom transactions)",
+      "reason": "A user_custom Item's rows are its configured transactions and no others. A row whose date_posted is after the app emulator's today at Item creation is pending, and it stays pending when the clock passes that date; Plaid moves it to posted, and how that appears in /transactions/sync is not documented. options.transactions.days_requested is not read, so every configured row is kept whatever its age. A row's currency defaults to its account's. With roll_dates_forward, dates move once at Item creation so the latest date_transacted is the app emulator's today (the UTC date of its clock, which /admin/time/advance moves); without it, dates are kept as given.",
+      "references": {
+        "docs": "plaid.com/docs/sandbox/user-custom (transactions, roll_dates_forward)",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/plaid/references/manifest.json"
+      },
+      "operator_note": "Pending rows that never post are deferred by operator decision. Decided by the operator on 2026-11-03 in WonderTwin-AI/wondertwin-docs#333 and #334 (plan plaid-bp2).",
+      "quirk_ids": [
+        "LIFECYCLE-009",
+        "LIFECYCLE-010"
       ]
     }
   ]
