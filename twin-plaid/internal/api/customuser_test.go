@@ -36,7 +36,7 @@ func TestSandboxPublicTokenCreateCustomUserRefusesABadConfiguration(t *testing.T
 
 	for password, want := range map[string]string{
 		"pass_good": "override_password for user_custom must be a JSON object",
-		`{"override_accounts": [{"type": "depository", "subtype": "checking", "meta": {"mask": "123456"}}]}`: "override_password for user_custom override_accounts[0].meta.mask must be empty or 2 to 4 letters and digits",
+		`{"override_accounts": [{"type": "depository", "subtype": "checking", "meta": {"mask": "123456"}}]}`:      "override_password for user_custom override_accounts[0].meta.mask must be empty or 2 to 4 letters and digits",
 		`{"override_accounts": [{"type": "depository", "subtype": "checking", "transactions": [{"amount": 1}]}]}`: "override_password for user_custom override_accounts[0].transactions[0] is missing date_transacted, date_posted, description",
 	} {
 		m := tc.Post("/sandbox/public_token/create", customCreate(password)).AssertStatus(400).JSONMap()
