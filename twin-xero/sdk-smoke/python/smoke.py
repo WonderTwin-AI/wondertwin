@@ -362,6 +362,29 @@ def case_advance_booked_as_a_loan_liability():
     assert again.status == "POSTED"
 
 
+def case_update_or_create_manual_journals():
+    """update_or_create_manual_journals creates a draft without an ID, then posts it by its ID beside a new journal,
+    and with summarize_errors=False answers an unbalanced one in place."""
+    api, tenant = accounting_api()
+    draft = ManualJournal(narration="Accrued fee", journal_lines=[
+        ManualJournalLine(line_amount=25, account_code="404"), ManualJournalLine(line_amount=-25, account_code="090")])
+    first = api.update_or_create_manual_journals(tenant, ManualJournals(manual_journals=[draft])).manual_journals[0]
+    assert first.status == "DRAFT" and first.manual_journal_id, first
+    first.status = "POSTED"  # xero-python requires Narration, so the journal goes back whole
+    other = ManualJournal(narration="Second fee", status="POSTED", journal_lines=[
+        ManualJournalLine(line_amount=5, account_code="404"), ManualJournalLine(line_amount=-5, account_code="090")])
+    both = api.update_or_create_manual_journals(tenant, ManualJournals(manual_journals=[first, other])).manual_journals
+    assert both[0].manual_journal_id == first.manual_journal_id and both[0].status == "POSTED"
+    assert both[1].manual_journal_id != first.manual_journal_id and both[1].status == "POSTED"
+
+    unbalanced = ManualJournal(narration="Unbalanced", status="POSTED", journal_lines=[
+        ManualJournalLine(line_amount=10, account_code="404"), ManualJournalLine(line_amount=-1, account_code="090")])
+    mixed = api.update_or_create_manual_journals(tenant, ManualJournals(manual_journals=[unbalanced, other]),
+                                                 summarize_errors=False).manual_journals
+    assert mixed[0].status_attribute_string == "ERROR" and mixed[0].validation_errors, "the unbalanced journal is answered in place"
+    assert mixed[1].status_attribute_string == "OK"
+
+
 def case_chart_of_accounts():
     client, token, _ = signed_in()
     tenant = IdentityApi(client, base_url=BASE).get_connections()[0].tenant_id
@@ -909,6 +932,7 @@ CASES = [
     ("update_or_create_contacts never upserts by Name", case_update_or_create_contacts_never_upserts_by_name),
     ("the settlement is received into account 090 with create_bank_transactions, then read and listed", case_settlement_received_into_the_bank_account),
     ("update_or_create_bank_transactions creates, updates by BankTransactionID and answers a mixed batch in place", case_update_or_create_bank_transactions),
+    ("update_or_create_manual_journals creates a draft, posts it by ManualJournalID and answers a mixed batch in place", case_update_or_create_manual_journals),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
