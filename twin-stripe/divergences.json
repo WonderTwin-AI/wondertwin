@@ -80,6 +80,12 @@
       "reason": "Unchanged in this build; recorded so the gap is visible"
     },
     {
+      "route": "POST /v1/accounts/{account}/external_accounts, external_account as a token",
+      "stripe": "Refuses a token it does not know with invalid_request_error resource_missing (\"No such token: '<id>'\") and a reused token with token_already_used; the HTTP status of both, and the param and reuse message, are not documented",
+      "app_emulator": "Answers both with 400, param external_account, and the reuse message \"You cannot use a Stripe token more than once: <id>.\"; resolves the six btok_us_verified test tokens to STRIPE TEST BANK, routing 110000000, last4 6789 and never marks them used",
+      "reason": "Unverified until a live test-mode call (quirks error-005, crud-009, crud-010): 400 is Stripe's general invalid_request_error status, and the test tokens' bank details and reuse are inferred, not documented"
+    },
+    {
       "route": "/admin/*",
       "stripe": "No equivalent",
       "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes)",

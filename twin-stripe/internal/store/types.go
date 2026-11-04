@@ -592,13 +592,29 @@ type PaymentLink struct {
 
 // Token represents a Stripe tokenized payment source.
 type Token struct {
-	ID       string       `json:"id"`
-	Object   string       `json:"object"`
-	Type     string       `json:"type"`
-	Card     *CardDetails `json:"card,omitempty"`
-	Used     bool         `json:"used"`
-	Livemode bool         `json:"livemode"`
-	Created  int64        `json:"created"`
+	ID          string              `json:"id"`
+	Object      string              `json:"object"`
+	Type        string              `json:"type"`
+	Card        *CardDetails        `json:"card,omitempty"`
+	BankAccount *BankAccountDetails `json:"bank_account,omitempty"`
+	Used        bool                `json:"used"`
+	Livemode    bool                `json:"livemode"`
+	Created     int64               `json:"created"`
+}
+
+// BankAccountDetails is the bank_account a bank account token (btok_) carries.
+type BankAccountDetails struct {
+	ID                string `json:"id"`
+	Object            string `json:"object"`
+	AccountHolderName string `json:"account_holder_name,omitempty"`
+	AccountHolderType string `json:"account_holder_type,omitempty"`
+	BankName          string `json:"bank_name,omitempty"`
+	Country           string `json:"country"`
+	Currency          string `json:"currency"`
+	Fingerprint       string `json:"fingerprint,omitempty"`
+	Last4             string `json:"last4"`
+	RoutingNumber     string `json:"routing_number,omitempty"`
+	Status            string `json:"status"`
 }
 
 // Source represents a Stripe source object.

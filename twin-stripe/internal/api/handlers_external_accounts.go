@@ -1,8 +1,6 @@
 package api
 
 import (
-	"crypto/sha256"
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -23,6 +21,32 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 
 	if err := parseFormOrJSON(r); err != nil {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", err.Error())
+		return
+	}
+
+	// A token arrives as the plain string form of external_account; the
+	// dictionary form arrives as external_account[...] fields.
+	if token := r.FormValue("external_account"); token != "" {
+		bank, ok := h.resolveBankToken(w, token)
+		if !ok {
+			return
+		}
+		ea := store.ExternalAccount{
+			ID:                 h.store.StripeID(h.store.ExternalAccts.NextID()),
+			Object:             "bank_account",
+			AccountID:          accountID,
+			BankName:           bank.BankName,
+			Country:            bank.Country,
+			Currency:           bank.Currency,
+			Last4:              bank.Last4,
+			RoutingNumber:      bank.RoutingNumber,
+			Status:             "new",
+			DefaultForCurrency: true,
+			Fingerprint:        bank.Fingerprint,
+			Metadata:           parseMetadata(r),
+		}
+		h.store.ExternalAccts.Set(ea.ID, ea)
+		twincore.JSON(w, http.StatusOK, ea)
 		return
 	}
 
@@ -58,7 +82,7 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Generate fingerprint
-	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(routingNumber+accountNumber)))[:16]
+	fingerprint := bankFingerprint(routingNumber, accountNumber)
 
 	ea := store.ExternalAccount{
 		ID:                 id,
