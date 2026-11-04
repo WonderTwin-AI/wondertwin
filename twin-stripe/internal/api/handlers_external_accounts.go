@@ -35,6 +35,7 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 			ID:                 h.store.StripeID(h.store.ExternalAccts.NextID()),
 			Object:             "bank_account",
 			AccountID:          accountID,
+			AccountHolderName:  bank.AccountHolderName,
 			BankName:           bank.BankName,
 			Country:            bank.Country,
 			Currency:           bank.Currency,

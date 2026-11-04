@@ -7,6 +7,7 @@ Prints one JSON line per case ({"sdk","case","pass","detail"}) and exits
 non-zero if any case fails. run.sh drives both SDK suites.
 """
 
+import http.client
 import json
 import os
 import sys
@@ -14,6 +15,7 @@ import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlsplit
 
 import stripe
 
@@ -257,6 +259,30 @@ def case_connect_transfer():
     eq(balance.object, "balance", "balance")
 
 
+def case_registered_bank_token_payout():
+    # The token Plaid issued, registered as the demo does; the Stripe SDK has no admin calls.
+    token = "btok_" + uuid.uuid4().hex
+    body = json.dumps({"token": token, "bank_name": "First Platypus Bank", "last4": "1111", "routing_number": "011401533"})
+    conn = http.client.HTTPConnection(urlsplit(BASE).netloc)
+    conn.request("POST", "/admin/bank_account_tokens", body, {"Content-Type": "application/json"})
+    eq(conn.getresponse().status, 200, "register status")
+    account = v1.accounts.create({"type": "custom", "country": "US"})
+    bank = v1.accounts.external_accounts.create(account.id, {"external_account": token})
+    eq(bank.bank_name, "First Platypus Bank", "bank_name")
+    eq(bank.last4, "1111", "last4")
+    eq(bank.routing_number, "011401533", "routing_number")
+    v1.payment_intents.create(
+        {"amount": 5000, "currency": "usd", "payment_method": "pm_card_bypassPending", "confirm": True,
+         "payment_method_types": ["card"]}
+    )
+    transfer = v1.transfers.create({"amount": 1000, "currency": "usd", "destination": account.id})
+    eq(transfer.destination, account.id, "transfer destination")
+    err = expect_error(
+        lambda: v1.accounts.external_accounts.create(account.id, {"external_account": token}), stripe.InvalidRequestError
+    )
+    eq(err.code, "token_already_used", "reuse code")
+
+
 def case_error_bad_key():
     err = expect_error(lambda: client("sk_live_not_a_test_key").v1.customers.list(), stripe.AuthenticationError)
     eq(err.http_status, 401, "status")
@@ -352,6 +378,7 @@ CASES = {
     "stripe-expand-and-paginate": case_expand_and_paginate,
     "stripe-idempotent-retry": case_idempotent_retry,
     "stripe-connect-transfer": case_connect_transfer,
+    "stripe-registered-bank-token-payout": case_registered_bank_token_payout,
     "unset-fields-null": case_unset_fields_null,
     "metadata-merge": case_metadata_merge,
     "deleted-customer-retrieve": case_deleted_customer_retrieve,

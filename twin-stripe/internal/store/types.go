@@ -48,6 +48,7 @@ type ExternalAccount struct {
 	ID                 string            `json:"id"`
 	Object             string            `json:"object"`
 	AccountID          string            `json:"account"`
+	AccountHolderName  string            `json:"account_holder_name,omitempty"`
 	BankName           string            `json:"bank_name,omitempty"`
 	Country            string            `json:"country"`
 	Currency           string            `json:"currency"`

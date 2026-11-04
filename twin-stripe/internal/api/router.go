@@ -322,6 +322,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Post("/admin/payment_intents/{id}/authenticate", h.AdminAuthenticatePaymentIntent)
 	r.Post("/admin/disputes", h.AdminCreateDispute)
 	r.Post("/admin/disputes/{id}/resolve", h.AdminResolveDispute)
+	r.Post("/admin/bank_account_tokens", h.AdminRegisterBankToken)
 }
 
 // authMiddleware validates the API key the way Stripe does: Bearer or HTTP
