@@ -139,6 +139,18 @@
       ]
     },
     {
+      "route": "POST /api.xro/2.0/BankTransactions/{BankTransactionID} (VOIDED, reconciled)",
+      "reason": "How a bank transaction reaches VOIDED and whether a reconciled one may change are unsettled. Here Status VOIDED is refused, and any update to a transaction whose IsReconciled is true is refused, deletion included. The wording of these refusals is a guess, as is the body of the 404 for an unknown BankTransactionID.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-019",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Raised in review while building bank transaction update (xero-bp3-s05). Recorded by operator decision.",
+      "quirk_ids": [
+        "crud-019"
+      ]
+    },
+    {
       "route": "POST /api.xro/2.0/Payments (prepayments, overpayments)",
       "reason": "Only a payment against an invoice or a credit note is supported: a payment that names a Prepayment or Overpayment is refused with a ValidationException. Xero records these too; the plan does not cover them.",
       "references": {
