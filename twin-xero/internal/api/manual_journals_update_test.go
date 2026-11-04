@@ -55,6 +55,17 @@ func TestUpdateManualJournalStatusMoves(t *testing.T) {
 	if mj := updatedJournal(t, h, posted, `{"Status":"VOIDED"}`); mj["Status"] != "VOIDED" {
 		t.Errorf("a POSTED journal can be voided: %v", mj)
 	}
+	resent := createManualJournal(t, h, advanceJournal("POSTED", 5000, -5000, "2100"))
+	if mj := updatedJournal(t, h, resent, `{"ManualJournals":[{"Narration":"Lender advance booked as a loan","Status":"VOIDED"}]}`); mj["Status"] != "VOIDED" {
+		t.Errorf("a POSTED journal sent back with its narration unchanged can be voided: %v", mj)
+	}
+	roundTrip := createManualJournal(t, h, advanceJournal("POSTED", 5000, -5000, "2100"))
+	_, read := getManualJournals(t, h, "/"+roundTrip)
+	sent := read["ManualJournals"].([]any)[0].(map[string]any)
+	sent["Status"] = "VOIDED"
+	if mj := updatedJournal(t, h, roundTrip, bankTransactionJSON(map[string]any{"ManualJournals": []any{sent}})); mj["Status"] != "VOIDED" {
+		t.Errorf("a POSTED journal round-tripped whole can be voided: %v", mj)
+	}
 	if code, body := postManualJournal(t, h, posted, `{"Status":"POSTED"}`); code != 400 ||
 		!strings.Contains(bankTransactionJSON(body), "status VOIDED cannot be updated") {
 		t.Errorf("a VOIDED journal has no moves: %d %v", code, body)

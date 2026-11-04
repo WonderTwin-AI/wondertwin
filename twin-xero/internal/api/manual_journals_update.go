@@ -88,14 +88,6 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 		}
 		out.Status = in.Status
 	}
-	edits := false
-	for _, k := range []string{"Narration", "Date", "JournalLines", "LineAmountTypes", "Url", "ShowOnCashBasisReports"} {
-		_, ok := keys[k]
-		edits = edits || ok
-	}
-	if edits && old.Status != "DRAFT" {
-		return old, []string{"Only a DRAFT manual journal can have its details changed."}
-	}
 	set := func(key string, apply func()) {
 		if _, ok := keys[key]; ok {
 			apply()
@@ -107,6 +99,17 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 	set("LineAmountTypes", func() { out.LineAmountTypes = in.LineAmountTypes })
 	set("ShowOnCashBasisReports", func() { out.ShowOnCashBasisReports = in.ShowOnCashBasisReports })
 	set("JournalLines", func() { out.JournalLines = in.JournalLines })
+	if old.Status != "DRAFT" {
+		sent := out
+		sent.JournalLines = slices.Clone(out.JournalLines)
+		h.validateManualJournal(tenant, &sent)
+		if manualJournalDetails(sent) != manualJournalDetails(old) {
+			return old, []string{"Only a DRAFT manual journal can have its details changed."}
+		}
+		status := out.Status
+		out = old
+		out.Status = status
+	}
 	if out.Status == "DRAFT" || out.Status == "POSTED" {
 		if msgs := h.validateManualJournal(tenant, &out); len(msgs) > 0 {
 			return old, msgs
@@ -114,4 +117,19 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 	}
 	out.StatusAttributeString, out.UpdatedDateUTC = "OK", h.store.Clock.Now().UTC()
 	return out, nil
+}
+
+// manualJournalDetails renders the fields only a DRAFT may change, as the wire
+// carries them, so a journal sent back unchanged compares equal to the stored one.
+func manualJournalDetails(m store.ManualJournal) string {
+	w := wireManualJournal(store.ManualJournal{
+		Narration:              m.Narration,
+		Date:                   m.Date,
+		JournalLines:           slices.Clone(m.JournalLines),
+		LineAmountTypes:        m.LineAmountTypes,
+		URL:                    m.URL,
+		ShowOnCashBasisReports: m.ShowOnCashBasisReports,
+	})
+	b, _ := json.Marshal(w)
+	return string(b)
 }
