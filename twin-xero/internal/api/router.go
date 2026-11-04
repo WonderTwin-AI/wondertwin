@@ -92,6 +92,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Put("/BankTransactions", h.CreateBankTransactions)
 				r.Post("/BankTransactions", h.UpdateOrCreateBankTransactions)
 				r.Post("/BankTransactions/{BankTransactionID}", h.UpdateBankTransaction)
+				r.Put("/ManualJournals", h.CreateManualJournals)
 			})
 		})
 	})
