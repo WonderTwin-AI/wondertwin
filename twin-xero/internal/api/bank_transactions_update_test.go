@@ -122,3 +122,15 @@ func TestUpdateBankTransactionTakesTheNewBankAccountsCurrency(t *testing.T) {
 		t.Errorf("the new currency must reach the tenant's state: %+v", got)
 	}
 }
+
+func TestUpdateBankTransactionKeepsTheTaxAmountSentOnALine(t *testing.T) {
+	h := newTestHandler(t)
+	id := createBankTransaction(t, h, settlement(newContactID(t, h, "Lender Capital")))
+	stored, _ := h.store.BankTransactions.For(store.DefaultTenantID).Get(id)
+	lineID := stored.LineItems[0].LineItemID
+	bt := updated(t, h, id, `{"LineAmountTypes":"Exclusive","LineItems":[{"LineItemID":"`+lineID+`","Description":"Advance","UnitAmount":4000,"TaxAmount":1.5,"AccountCode":"200"}]}`)
+	line := bt["LineItems"].([]any)[0].(map[string]any)
+	if line["TaxAmount"] != 1.5 || bt["TotalTax"] != 1.5 || bt["Total"] != 4001.5 {
+		t.Errorf("a TaxAmount sent on a line is kept: %v", bt)
+	}
+}

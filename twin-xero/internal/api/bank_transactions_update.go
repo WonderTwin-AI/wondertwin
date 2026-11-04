@@ -127,12 +127,14 @@ func (h *Handler) applyBankTransactionUpdate(tenant string, old, in store.BankTr
 			out.LineItems = in.LineItems
 		} else {
 			out.LineItems = append([]store.LineItem(nil), old.LineItems...)
+			for i := range out.LineItems {
+				out.LineItems[i].TaxAmount = nil
+			}
 		}
 		for i := range out.LineItems {
 			if !known[out.LineItems[i].LineItemID] {
 				out.LineItems[i].LineItemID = ""
 			}
-			out.LineItems[i].TaxAmount = nil // tax is worked out again under the type in force
 		}
 		msgs = append(msgs, bankTransactionLines(&out, unitdp)...)
 		chart := h.store.Accounts.For(tenant).List()
