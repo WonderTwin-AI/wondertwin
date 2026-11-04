@@ -28,6 +28,7 @@ type MemoryStore struct {
 	Payments      *Tenanted[Payment]
 
 	BankTransactions *Tenanted[BankTransaction]
+	ManualJournals   *Tenanted[ManualJournal]
 	Webhooks         *pkgstate.Store[Webhook]
 	// WebhookSeq numbers the events of every delivery, in order.
 	WebhookSeq atomic.Int64
@@ -60,6 +61,7 @@ func New() *MemoryStore {
 		Payments:      NewTenanted[Payment](),
 
 		BankTransactions: NewTenanted[BankTransaction](),
+		ManualJournals:   NewTenanted[ManualJournal](),
 		Rand:             sim.DefaultRand(),
 	}
 	s.seedConnection()
@@ -84,6 +86,7 @@ type snapshot struct {
 	Payments      map[string]map[string]Payment    `json:"payments"`
 
 	BankTransactions map[string]map[string]BankTransaction `json:"bank_transactions"`
+	ManualJournals   map[string]map[string]ManualJournal   `json:"manual_journals"`
 }
 
 // Snapshot returns the full state for GET /admin/state.
@@ -103,6 +106,7 @@ func (s *MemoryStore) Snapshot() any {
 		Payments:      s.Payments.Snapshot(),
 
 		BankTransactions: s.BankTransactions.Snapshot(),
+		ManualJournals:   s.ManualJournals.Snapshot(),
 	}
 }
 
@@ -151,6 +155,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.BankTransactions != nil {
 		s.BankTransactions.Load(snap.BankTransactions)
 	}
+	if snap.ManualJournals != nil {
+		s.ManualJournals.Load(snap.ManualJournals)
+	}
 	return nil
 }
 
@@ -175,6 +182,7 @@ func (s *MemoryStore) Reset() {
 	s.CreditNotes.Reset()
 	s.Payments.Reset()
 	s.BankTransactions.Reset()
+	s.ManualJournals.Reset()
 	s.seedConnection()
 	s.seedTenant()
 }
