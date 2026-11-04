@@ -18,6 +18,11 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if hasBankAccountParams(r) {
+		h.createBankAccountToken(w, r)
+		return
+	}
+
 	id := h.store.StripeID(h.store.Tokens.NextID())
 
 	number := r.FormValue("card[number]")
@@ -64,6 +69,59 @@ func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Tokens.Set(id, tok)
+	twincore.JSON(w, http.StatusOK, tok)
+}
+
+// hasBankAccountParams reports whether the request describes a bank account.
+func hasBankAccountParams(r *http.Request) bool {
+	for k := range r.Form {
+		if strings.HasPrefix(k, "bank_account[") {
+			return true
+		}
+	}
+	return false
+}
+
+// createBankAccountToken creates a btok_ token from bank_account[...], as
+// POST /v1/tokens does. account_number and country are required; the bank
+// name is Stripe's test bank, as Stripe's reference example shows.
+func (h *Handler) createBankAccountToken(w http.ResponseWriter, r *http.Request) {
+	accountNumber := r.FormValue("bank_account[account_number]")
+	country := strings.ToUpper(r.FormValue("bank_account[country]"))
+	if accountNumber == "" || country == "" {
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+			missingParamMessage(r, "bank_account[account_number]", "bank_account[country]"))
+		return
+	}
+	currency := strings.ToLower(r.FormValue("bank_account[currency]"))
+	if currency == "" {
+		currency = "usd"
+	}
+	last4 := accountNumber
+	if len(accountNumber) >= 4 {
+		last4 = accountNumber[len(accountNumber)-4:]
+	}
+	routingNumber := r.FormValue("bank_account[routing_number]")
+	tok := store.Token{
+		ID:     h.store.StripeID("b" + h.store.Tokens.NextID()),
+		Object: "token",
+		Type:   "bank_account",
+		BankAccount: &store.BankAccountDetails{
+			ID:                h.store.StripeID(h.store.ExternalAccts.NextID()),
+			Object:            "bank_account",
+			AccountHolderName: r.FormValue("bank_account[account_holder_name]"),
+			AccountHolderType: r.FormValue("bank_account[account_holder_type]"),
+			BankName:          testBankName,
+			Country:           country,
+			Currency:          currency,
+			Fingerprint:       bankFingerprint(routingNumber, accountNumber),
+			Last4:             last4,
+			RoutingNumber:     routingNumber,
+			Status:            "new",
+		},
+		Created: h.store.Now(),
+	}
+	h.store.Tokens.Set(tok.ID, tok)
 	twincore.JSON(w, http.StatusOK, tok)
 }
 
