@@ -295,3 +295,39 @@ func TestBankTransactionResetClearsEveryTenant(t *testing.T) {
 		t.Fatal("reset must clear every tenant's bank transactions")
 	}
 }
+
+func TestManualJournalStateSurvivesASnapshot(t *testing.T) {
+	s := store.New()
+	s.ManualJournals.For("t1").Set("m1", store.ManualJournal{ManualJournalID: "m1", Narration: "Advance as a loan", Status: "POSTED",
+		JournalLines: []store.JournalLine{{LineAmount: 5000, AccountCode: "090"}, {LineAmount: -5000, AccountCode: "2100"}}})
+	b, _ := json.Marshal(s.Snapshot())
+	var raw map[string]map[string]map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["manual_journals"]["t1"]["m1"]; !ok {
+		t.Fatalf("/admin/state must list manual journals under manual_journals, got %s", b)
+	}
+
+	s.Reset()
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := s.ManualJournals.For("t1").Get("m1")
+	if !ok || len(got.JournalLines) != 2 || got.JournalLines[1].LineAmount != -5000 || got.JournalLines[1].AccountCode != "2100" {
+		t.Fatalf("the journal and its lines must survive a snapshot: %+v %v", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.ManualJournals.For("t1").Count() != 1 {
+		t.Fatal("a state file that omits manual journals must leave them alone")
+	}
+}
+
+func TestManualJournalResetClearsEveryTenant(t *testing.T) {
+	s := store.New()
+	s.ManualJournals.For("t1").Set("m1", store.ManualJournal{ManualJournalID: "m1"})
+	s.ManualJournals.For(store.DefaultTenantID).Set("m2", store.ManualJournal{ManualJournalID: "m2"})
+	s.Reset()
+	if s.ManualJournals.For("t1").Count() != 0 || s.ManualJournals.For(store.DefaultTenantID).Count() != 0 {
+		t.Fatal("reset must clear every tenant's manual journals")
+	}
+}
