@@ -259,3 +259,39 @@ func TestStorePaymentsSnapshotLoadAndResetPerTenant(t *testing.T) {
 		t.Fatal("a payment leaked into another tenant")
 	}
 }
+
+func TestBankTransactionStateSurvivesASnapshot(t *testing.T) {
+	s := store.New()
+	s.BankTransactions.For("t1").Set("b1", store.BankTransaction{BankTransactionID: "b1", Type: "RECEIVE", Total: 5000,
+		Contact: &store.ContactRef{ContactID: "c1"}, BankAccount: &store.AccountRef{Code: "090"}})
+	b, _ := json.Marshal(s.Snapshot())
+	var raw map[string]map[string]map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["bank_transactions"]["t1"]["b1"]; !ok {
+		t.Fatalf("/admin/state must list bank transactions under bank_transactions, got %s", b)
+	}
+
+	s.Reset()
+	if err := s.LoadState(b); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := s.BankTransactions.For("t1").Get("b1")
+	if !ok || got.Total != 5000 || got.Contact.ContactID != "c1" || got.BankAccount.Code != "090" {
+		t.Fatalf("the bank transaction and its links must survive a snapshot: %+v %v", got, ok)
+	}
+	if err := s.LoadState([]byte(`{}`)); err != nil || s.BankTransactions.For("t1").Count() != 1 {
+		t.Fatal("a state file that omits bank transactions must leave them alone")
+	}
+}
+
+func TestBankTransactionResetClearsEveryTenant(t *testing.T) {
+	s := store.New()
+	s.BankTransactions.For("t1").Set("b1", store.BankTransaction{BankTransactionID: "b1"})
+	s.BankTransactions.For(store.DefaultTenantID).Set("b2", store.BankTransaction{BankTransactionID: "b2"})
+	s.Reset()
+	if s.BankTransactions.For("t1").Count() != 0 || s.BankTransactions.For(store.DefaultTenantID).Count() != 0 {
+		t.Fatal("reset must clear every tenant's bank transactions")
+	}
+}
