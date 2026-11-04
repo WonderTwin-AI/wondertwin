@@ -95,6 +95,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Get("/ManualJournals", h.ManualJournals)
 				r.Get("/ManualJournals/{ManualJournalID}", h.ManualJournal)
 				r.Put("/ManualJournals", h.CreateManualJournals)
+				r.Post("/ManualJournals/{ManualJournalID}", h.UpdateManualJournal)
 			})
 		})
 	})
