@@ -96,3 +96,17 @@ func TestUpdateManualJournalChecksBalanceAndAccounts(t *testing.T) {
 		t.Errorf("an unknown ManualJournalID is a 404, got %d", code)
 	}
 }
+
+func TestRefusedManualJournalUpdateLeavesStoredLinesAlone(t *testing.T) {
+	h := newTestHandler(t)
+	loanAccount(t, h)
+	id := createManualJournal(t, h, `{"Narration":"Taxed draft","Status":"DRAFT","LineAmountTypes":"Exclusive","JournalLines":[`+
+		`{"LineAmount":100,"AccountCode":"090","TaxAmount":1.5},{"LineAmount":-100,"AccountCode":"2100","TaxAmount":-1.5}]}`)
+	if code, body := postManualJournal(t, h, id, `{"LineAmountTypes":"NoTax","Narration":""}`); code != 400 {
+		t.Fatalf("an update with no narration is refused: %d %v", code, body)
+	}
+	got, _ := h.store.ManualJournals.For(store.DefaultTenantID).Get(id)
+	if got.LineAmountTypes != "Exclusive" || got.JournalLines[0].TaxAmount == nil || *got.JournalLines[0].TaxAmount != 1.5 {
+		t.Errorf("a refused update must leave the stored journal unchanged: %+v %v", got, *got.JournalLines[0].TaxAmount)
+	}
+}

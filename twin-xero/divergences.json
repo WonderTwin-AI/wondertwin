@@ -254,6 +254,17 @@
       ]
     },
     {
+      "route": "POST /ManualJournals (updateOrCreateManualJournals)",
+      "reason": "A manual journal that carries the ManualJournalID of a stored one is updated by the rules of POST /ManualJournals/{ManualJournalID}, and one with no ManualJournalID is created by the rules of PUT /ManualJournals. Whether Xero also matches on any other field is not settled by the research, so this emulator matches by ManualJournalID only, and a repeated ManualJournalID is applied in order. A ManualJournalID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022"
+      },
+      "operator_note": "Added so a consumer that creates manual journals by POST on the collection can use this emulator (xero-bp3-s13). Recorded by operator decision in review.",
+      "quirk_ids": [
+        "crud-022"
+      ]
+    },
+    {
       "route": "PUT /ManualJournals (journal line with an unknown account code)",
       "reason": "A journal line whose AccountCode matches no account in the chart is refused with a 400 ValidationException, and nothing is created. The spec's example has Xero remove such a line and answer with a Warning. The refusal's wording is a guess.",
       "references": {

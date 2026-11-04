@@ -82,6 +82,7 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 		return old, []string{fmt.Sprintf("A manual journal with the status %s cannot be updated.", old.Status)}
 	}
 	out := old
+	out.JournalLines = slices.Clone(old.JournalLines)
 	if _, ok := keys["Status"]; ok && in.Status != "" {
 		if !slices.Contains(moves, in.Status) {
 			return old, []string{fmt.Sprintf("A manual journal cannot change from %s to %s.", old.Status, in.Status)}
@@ -108,6 +109,7 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 		}
 		status := out.Status
 		out = old
+		out.JournalLines = slices.Clone(old.JournalLines)
 		out.Status = status
 	}
 	if out.Status == "DRAFT" || out.Status == "POSTED" {
