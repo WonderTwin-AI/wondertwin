@@ -270,6 +270,13 @@ const cases = {
     assert.equal((await stripe.tokens.retrieve(tok.id)).used, true);
   },
 
+  async 'stripe-account-with-external-account'() {
+    const account = await stripe.accounts.create({ type: 'custom', country: 'US', external_account: 'btok_us_verified' });
+    const banks = (await stripe.accounts.retrieve(account.id)).external_accounts;
+    assert.equal(banks.data.length, 1);
+    assert.equal(banks.data[0].last4, '6789');
+  },
+
   async 'error-bad-key'() {
     const err = await expectError(() => client({key: 'sk_live_not_a_test_key'}).customers.list());
     assert.ok(err instanceof Stripe.errors.StripeAuthenticationError, `expected StripeAuthenticationError, got ${err.type}`);
