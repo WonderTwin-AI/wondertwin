@@ -26,6 +26,14 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Stripe requires the account to attach (quirk crud-012); bank_account is
+	// the spec's other name for it.
+	if !hasExternalAccount(r) && !hasBankAccountParams(r) {
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+			"Missing required param: external_account.")
+		return
+	}
+
 	ea, ok := h.externalAccountFromRequest(w, r, accountID, true)
 	if !ok {
 		return
@@ -73,9 +81,9 @@ func hasExternalAccount(r *http.Request) bool {
 
 // externalAccountFromRequest builds the bank account external_account
 // describes: a token resolved by resolveBankToken, or the dictionary form.
-// flatFallback reads routing_number, account_number, country and currency
-// from the top level as well, which only the external accounts route does;
-// on an account route those names are the account's own. On refusal it has
+// flatFallback also reads each field from bank_account[...] and then from
+// the top level, which only the external accounts route does; on an
+// account route those names are the account's own. On refusal it has
 // written Stripe's error and returns false.
 func (h *Handler) externalAccountFromRequest(w http.ResponseWriter, r *http.Request, accountID string, flatFallback bool) (store.ExternalAccount, bool) {
 	// A token arrives as the plain string form of external_account; the
@@ -106,6 +114,9 @@ func (h *Handler) externalAccountFromRequest(w http.ResponseWriter, r *http.Requ
 			return v
 		}
 		if flatFallback {
+			if v := r.FormValue("bank_account[" + name + "]"); v != "" {
+				return v
+			}
 			if v := r.FormValue(name); v != "" {
 				return v
 			}

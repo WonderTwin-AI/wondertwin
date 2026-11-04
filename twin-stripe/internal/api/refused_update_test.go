@@ -46,7 +46,7 @@ func TestRefusedExternalAccountUpdateChangesNothing(t *testing.T) {
 	resp.AssertStatus(200)
 	acctID := resp.JSONMap()["id"].(string)
 
-	resp = stripePost(tc, "/v1/accounts/"+acctID+"/external_accounts", nil)
+	resp = stripePost(tc, "/v1/accounts/"+acctID+"/external_accounts?external_account=btok_us_verified", nil)
 	resp.AssertStatus(200)
 	eaID := resp.JSONMap()["id"].(string)
 
