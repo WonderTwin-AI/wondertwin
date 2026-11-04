@@ -20,11 +20,14 @@ var authSubtypes = []string{"checking", "savings", "cash management"}
 //
 // What the configuration leaves out comes from the fixture, not from Plaid's
 // random generator, and seed is ignored (declared in divergences.json):
-//   - name, official name, mask and balances take the fixture account of the
-//     same subtype, else of the same type, else Plaid Checking; a fixture name
-//     is renamed for a subtype the fixture lacks ("Plaid Savings");
-//   - a missing mask is the last four of numbers.account, else the fixture's,
-//     else its position repeated: 1111 for the first account, 2222 for the second;
+//   - name and balances take the fixture account of the same subtype, else of
+//     the same type, else Plaid Checking; a fixture name is renamed for a
+//     subtype the fixture lacks ("Plaid Savings");
+//   - official name is the same-subtype fixture's only when the entry gives no
+//     meta.name at all: a configured name without official_name gets null;
+//   - a missing mask is the last four of numbers.account, else the
+//     same-subtype fixture's, else its position repeated: 1111 for the first
+//     account, 2222 for the second, and 1111 again for a tenth;
 //   - a checking, savings or cash management account without numbers gets
 //     routing 021000021 and an account number ending in its mask, so /auth/get
 //     serves it (a labelled choice).
