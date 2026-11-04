@@ -47,13 +47,13 @@
       "PUT /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransactions/{}",
-      "POST /api.xro/2.0/BankTransactions/{}"
+      "POST /api.xro/2.0/BankTransactions/{}",
+      "POST /api.xro/2.0/BankTransactions"
     ],
     "resources_not_implemented": [
       "GET /api.xro/2.0/Accounts/{}",
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",
-      "POST /api.xro/2.0/BankTransactions",
       "GET /api.xro/2.0/BankTransfers",
       "PUT /api.xro/2.0/BankTransfers",
       "POST /api.xro/2.0/BankTransfers",
