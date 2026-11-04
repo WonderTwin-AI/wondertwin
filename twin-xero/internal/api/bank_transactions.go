@@ -90,6 +90,7 @@ func (h *Handler) buildBankTransaction(tenant string, in store.BankTransaction, 
 		msgs = append(msgs, fmt.Sprintf("Bank transaction Type '%s' cannot be created. Use RECEIVE, SPEND, or an overpayment or prepayment type.", in.Type))
 	}
 	msgs = append(msgs, bankTransactionLines(&in, unitdp)...)
+	msgs = append(msgs, h.validateBankTransaction(tenant, in)...)
 	chart := h.store.Accounts.For(tenant).List()
 	for i := range in.LineItems {
 		in.LineItems[i].LineItemID, in.LineItems[i].AccountID = h.store.NewID(), ""
