@@ -107,3 +107,18 @@ func TestUpdateBankTransactionRefusesReconciledAndPrepayments(t *testing.T) {
 		t.Errorf("an unknown BankTransactionID is a 404, got %d", code)
 	}
 }
+
+func TestUpdateBankTransactionTakesTheNewBankAccountsCurrency(t *testing.T) {
+	h := newTestHandler(t)
+	if code, body := putAccount(t, h, `{"Code":"091","Name":"Euro Account","Type":"BANK","CurrencyCode":"EUR","BankAccountNumber":"9876543210"}`); code != 200 {
+		t.Fatalf("status %d: %v", code, body)
+	}
+	id := createBankTransaction(t, h, settlement(newContactID(t, h, "Lender Capital")))
+	bt := updated(t, h, id, `{"BankAccount":{"Code":"091"}}`)
+	if bt["CurrencyCode"] != "EUR" || bt["BankAccount"].(map[string]any)["Code"] != "091" {
+		t.Errorf("moving to another bank account takes that account's currency: %v", bt)
+	}
+	if got, _ := h.store.BankTransactions.For(store.DefaultTenantID).Get(id); got.CurrencyCode != "EUR" {
+		t.Errorf("the new currency must reach the tenant's state: %+v", got)
+	}
+}

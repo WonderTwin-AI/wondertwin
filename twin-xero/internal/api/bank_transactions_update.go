@@ -157,6 +157,9 @@ func (h *Handler) applyBankTransactionUpdate(tenant string, old, in store.BankTr
 	if out.BankAccount != nil {
 		if a, ok := h.findAccount(tenant, &store.PaymentAccount{AccountID: out.BankAccount.AccountID, Code: out.BankAccount.Code}, ""); ok {
 			out.BankAccount = &store.AccountRef{AccountID: a.AccountID, Code: a.Code}
+			if a.CurrencyCode != "" {
+				out.CurrencyCode = a.CurrencyCode
+			}
 		}
 	}
 	out.StatusAttributeString, out.UpdatedDateUTC = "OK", h.store.Clock.Now().UTC()
