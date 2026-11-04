@@ -30,6 +30,7 @@
       "GET /Connections",
       "GET /api.xro/2.0/Organisation",
       "GET /api.xro/2.0/Accounts",
+      "PUT /api.xro/2.0/Accounts",
       "GET /api.xro/2.0/Contacts",
       "PUT /api.xro/2.0/Contacts",
       "PUT /api.xro/2.0/Invoices",
@@ -46,7 +47,6 @@
       "PUT /api.xro/2.0/BankTransactions"
     ],
     "resources_not_implemented": [
-      "PUT /api.xro/2.0/Accounts",
       "GET /api.xro/2.0/Accounts/{}",
       "POST /api.xro/2.0/Accounts/{}",
       "DELETE /api.xro/2.0/Accounts/{}",
