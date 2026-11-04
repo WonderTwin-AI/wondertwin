@@ -114,6 +114,9 @@ func (h *Handler) externalAccountFromRequest(w http.ResponseWriter, r *http.Requ
 			return v
 		}
 		if flatFallback {
+			if v := r.FormValue("bank_account[" + name + "]"); v != "" {
+				return v
+			}
 			if v := r.FormValue(name); v != "" {
 				return v
 			}
