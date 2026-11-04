@@ -204,6 +204,34 @@ func TestNoRequestURLSendsNothing(t *testing.T) {
 	}
 }
 
+// An event that happens with no Request URL is never sent, even when a
+// Request URL is set while the bus is still busy delivering earlier events.
+func TestEventWithNoRequestURLIsNotSentToALaterOne(t *testing.T) {
+	srv, tc := setupSlack(t)
+	ch := seedChannel(tc, "busy")
+	slow := newReceiver(t)
+	slow.firstDelay = 300 * time.Millisecond
+	configureEvents(t, srv, map[string]any{"request_url": slow.srv.URL})
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"held"}}.Encode(), true)
+
+	configureEvents(t, srv, map[string]any{"request_url": ""})
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"unsent"}}.Encode(), true)
+
+	rc := newReceiver(t)
+	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL})
+	call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"sent"}}.Encode(), true)
+
+	rc.wait(t, 1)
+	time.Sleep(50 * time.Millisecond)
+	got := rc.wait(t, 1)
+	if len(got) != 1 {
+		t.Fatalf("deliveries to the later Request URL: %d, want 1", len(got))
+	}
+	if ev := envelope(t, got[0])["event"].(map[string]any); ev["text"] != "sent" {
+		t.Errorf("delivered to the later Request URL: %v", ev)
+	}
+}
+
 func TestFailedDeliveryIsRetriedWithRetryHeaders(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t, 500, 503, 200)
