@@ -26,6 +26,14 @@ func (h *Handler) CreateExternalAccount(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Stripe requires the account to attach (quirk crud-012); bank_account is
+	// the spec's other name for it.
+	if !hasExternalAccount(r) && !hasBankAccountParams(r) {
+		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing",
+			"Missing required param: external_account.")
+		return
+	}
+
 	ea, ok := h.externalAccountFromRequest(w, r, accountID, true)
 	if !ok {
 		return

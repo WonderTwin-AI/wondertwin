@@ -125,3 +125,19 @@ func TestExternalAccountTokenCardTokenIsNotABankAccount(t *testing.T) {
 		t.Errorf("code = %v, want resource_missing", e["code"])
 	}
 }
+
+func TestExternalAccountRequired(t *testing.T) {
+	_, tc := setupStripe(t)
+	acct := newConnectAccount(t, tc)
+
+	resp := stripePost(tc, "/v1/accounts/"+acct+"/external_accounts?metadata[k]=v", nil)
+	resp.AssertStatus(400)
+	e, _ := resp.JSONMap()["error"].(map[string]any)
+	if e["code"] != "parameter_missing" || e["param"] != "external_account" ||
+		e["message"] != "Missing required param: external_account." {
+		t.Errorf("error = %v", e)
+	}
+	if n := externalAccountCount(tc, acct); n != 0 {
+		t.Errorf("a refused request created %d external accounts", n)
+	}
+}

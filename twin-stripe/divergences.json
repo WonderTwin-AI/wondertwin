@@ -98,6 +98,12 @@
       "reason": "The conservative reading until a live test-mode call shows whether Stripe creates the account and refuses only the token"
     },
     {
+      "route": "POST /v1/accounts/{account}/external_accounts, no external_account",
+      "stripe": "The API reference and the SDK spec mark external_account required; the dahlia spec lists no required parameter",
+      "app_emulator": "Refuses a request with neither external_account nor bank_account with 400 invalid_request_error parameter_missing, param external_account, \"Missing required param: external_account.\"",
+      "reason": "Follows the reference and the SDK spec; the error shape is inferred from Stripe's general missing-parameter refusal (quirk crud-012)"
+    },
+    {
       "route": "/admin/*",
       "stripe": "No equivalent",
       "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes, register bank account tokens)",
