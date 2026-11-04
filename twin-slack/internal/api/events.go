@@ -174,14 +174,11 @@ func (b *eventBus) configure(cfg EventsConfig) {
 	b.d.SetSecret(cfg.SigningSecret)
 }
 
-// publish queues one event for delivery. An event that happens while no
-// Request URL is configured is dropped, as Slack sends nothing to an app
-// without Event Subscriptions; setting a Request URL later does not deliver it.
+// publish queues one event for delivery. With no Request URL configured,
+// the dispatcher sends nothing, as Slack sends nothing to an app without
+// Event Subscriptions.
 func (b *eventBus) publish(h *Handler, event map[string]any) {
 	cfg := b.config()
-	if cfg.RequestURL == "" {
-		return
-	}
 	b.mu.Lock()
 	b.counter++
 	n, gen := b.counter, b.gen
