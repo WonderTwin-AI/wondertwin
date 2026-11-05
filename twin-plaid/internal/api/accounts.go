@@ -8,19 +8,27 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
-// seedAccounts gives a new Item the default accounts, in their sample order, and
-// the default transactions on the first of them.
-func (h *Handler) seedAccounts(itemID string) {
+// seedAccounts gives a new Item its accounts and starting transactions. A
+// user_custom configuration builds them from its override_accounts; without
+// one the Item gets the default accounts, in their sample order, and the
+// default transactions on the first of them.
+func (h *Handler) seedAccounts(itemID string, cfg *store.CustomUser) {
+	accounts := seed.DefaultAccounts()
+	if cfg != nil {
+		accounts = seed.CustomAccounts(cfg)
+	}
 	var first string
-	for i, a := range seed.DefaultAccounts() {
+	for i, a := range accounts {
 		a.ID, a.ItemID, a.Position = h.store.NewID(), itemID, i
 		h.store.PutAccount(a)
 		if i == 0 {
 			first = a.ID
 		}
 	}
-	for _, t := range seed.DefaultTransactions(itemID, first, h.store.NewID, h.store.Clock.Now()) {
-		h.store.AddTransaction(t)
+	if cfg == nil {
+		for _, t := range seed.DefaultTransactions(itemID, first, h.store.NewID, h.store.Clock.Now()) {
+			h.store.AddTransaction(t)
+		}
 	}
 	// The starting rows are not news to a receiver: a refresh reports only what changes after them.
 	n := h.store.ChangeLogLen(itemID)

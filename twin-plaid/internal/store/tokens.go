@@ -86,15 +86,22 @@ func (s *MemoryStore) CreateCustomPublicToken(institutionID string, products []s
 // ExchangePublicToken spends a public token: it creates the Item and its
 // access token. A public token works once; an expired one is spent too.
 func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, error) {
+	it, at, _, err := s.ExchangeCustomPublicToken(token)
+	return it, at, err
+}
+
+// ExchangeCustomPublicToken is ExchangePublicToken that also returns the
+// user_custom configuration the token carried, nil for a fixture Item.
+func (s *MemoryStore) ExchangeCustomPublicToken(token string) (Item, AccessToken, *CustomUser, error) {
 	s.tokenMu.Lock()
 	defer s.tokenMu.Unlock()
 	pt, ok := s.PublicTokens.Get(token)
 	if !ok {
-		return Item{}, AccessToken{}, ErrUnknownToken
+		return Item{}, AccessToken{}, nil, ErrUnknownToken
 	}
 	s.PublicTokens.Delete(token)
 	if !s.Clock.Now().Before(pt.ExpiresAt) {
-		return Item{}, AccessToken{}, ErrExpiredToken
+		return Item{}, AccessToken{}, nil, ErrExpiredToken
 	}
 	it := Item{
 		ID: s.NewID(), InstitutionID: pt.InstitutionID, Webhook: pt.Webhook,
@@ -104,7 +111,7 @@ func (s *MemoryStore) ExchangePublicToken(token string) (Item, AccessToken, erro
 	s.PutItem(it)
 	at := AccessToken{Token: s.newToken("access"), ItemID: it.ID}
 	s.AccessTokens.Set(at.Token, at)
-	return it, at, nil
+	return it, at, pt.CustomUser, nil
 }
 
 // ItemForAccessToken returns the Item an access token is bound to. A removed

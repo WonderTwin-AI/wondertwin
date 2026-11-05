@@ -103,7 +103,7 @@ func (h *Handler) itemPublicTokenExchange(w http.ResponseWriter, r *http.Request
 		h.writeMissing(w, []string{"public_token"})
 		return
 	}
-	it, at, err := h.store.ExchangePublicToken(token)
+	it, at, cfg, err := h.store.ExchangeCustomPublicToken(token)
 	switch {
 	case errors.Is(err, store.ErrUnknownToken):
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_PUBLIC_TOKEN",
@@ -112,7 +112,7 @@ func (h *Handler) itemPublicTokenExchange(w http.ResponseWriter, r *http.Request
 		h.writeError(w, http.StatusBadRequest, "INVALID_INPUT", "INVALID_PUBLIC_TOKEN",
 			"provided public token has expired; public tokens expire 30 minutes after creation")
 	default:
-		h.seedAccounts(it.ID)
+		h.seedAccounts(it.ID, cfg)
 		h.writeJSON(w, http.StatusOK, map[string]any{"access_token": at.Token, "item_id": it.ID})
 	}
 }
