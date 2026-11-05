@@ -24,7 +24,9 @@ func (h *Handler) seedAccounts(itemID string, cfg *store.CustomUser) {
 	}
 	var rows []store.Transaction
 	if cfg != nil {
-		rows = seed.CustomTransactions(itemID, accounts, cfg, h.store.NewID, h.store.Clock.Now())
+		// roll_dates_forward shifts the dates before pending is decided from them.
+		now := h.store.Clock.Now()
+		rows = seed.CustomTransactions(itemID, accounts, seed.RollDatesForward(cfg, now), h.store.NewID, now)
 	} else {
 		rows = seed.DefaultTransactions(itemID, accounts[0].ID, h.store.NewID, h.store.Clock.Now())
 	}

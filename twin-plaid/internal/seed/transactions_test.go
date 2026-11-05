@@ -61,3 +61,51 @@ func TestCustomTransactionPendingFromDatePosted(t *testing.T) {
 		}
 	}
 }
+
+func TestRollDatesForwardAnchorsTheLatestTransactionDateOnToday(t *testing.T) {
+	amount := func(v float64) *float64 { return &v }
+	in := &store.CustomUser{RollDatesForward: true, OverrideAccounts: []store.CustomAccount{
+		{Type: "depository", Subtype: "checking", Transactions: []store.CustomUserTransaction{
+			{DateTransacted: "2025-01-01", DatePosted: "2025-01-01", Amount: amount(1), Description: "first"},
+			{DateTransacted: "2025-03-31", DatePosted: "2025-04-02", Amount: amount(2), Description: "latest, posts two days on"}}},
+		{Type: "depository", Subtype: "savings", Transactions: []store.CustomUserTransaction{
+			{DateTransacted: "2025-03-01", DatePosted: "2025-03-01", Amount: amount(3), Description: "other account"}}},
+	}}
+	out := RollDatesForward(in, time.Date(2026, 11, 4, 23, 59, 0, 0, time.UTC))
+	got := [][2]string{}
+	for _, a := range out.OverrideAccounts {
+		for _, tx := range a.Transactions {
+			got = append(got, [2]string{tx.DateTransacted, tx.DatePosted})
+		}
+	}
+	// 2025-03-31 to 2026-11-04 is 583 days; every date moves by that, spacing kept.
+	want := [][2]string{{"2026-08-07", "2026-08-07"}, {"2026-11-04", "2026-11-06"}, {"2026-10-05", "2026-10-05"}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("rolled = %v, want %v", got, want)
+	}
+	if in.OverrideAccounts[0].Transactions[1].DateTransacted != "2025-03-31" {
+		t.Fatal("the stored configuration was changed in place")
+	}
+
+	// A rolled row posted after today is pending, decided from the shifted dates.
+	accounts := CustomAccounts(out)
+	rows := CustomTransactions("item", accounts, out, func() string { return "id" }, time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC))
+	for _, r := range rows {
+		if r.Pending != (r.Body.Name == "latest, posts two days on") {
+			t.Errorf("%s: pending = %v", r.Body.Name, r.Pending)
+		}
+	}
+}
+
+func TestRollDatesForwardLeavesAConfigurationWithoutTheFlagOrRowsAlone(t *testing.T) {
+	amount := func(v float64) *float64 { return &v }
+	off := &store.CustomUser{OverrideAccounts: []store.CustomAccount{{Type: "depository", Subtype: "checking",
+		Transactions: []store.CustomUserTransaction{{DateTransacted: "2025-01-01", DatePosted: "2025-01-01", Amount: amount(1), Description: "x"}}}}}
+	if RollDatesForward(off, time.Now()) != off {
+		t.Fatal("without roll_dates_forward the dates must be kept as given")
+	}
+	empty := &store.CustomUser{RollDatesForward: true, OverrideAccounts: []store.CustomAccount{{Type: "depository", Subtype: "checking"}}}
+	if RollDatesForward(empty, time.Now()) != empty {
+		t.Fatal("a configuration without rows has nothing to roll")
+	}
+}
