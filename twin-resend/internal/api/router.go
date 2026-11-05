@@ -23,6 +23,9 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 
 // Routes mounts the Resend API routes and admin extras.
 func (h *Handler) Routes(r chi.Router) {
+	r.NotFound(h.notFound)
+	r.MethodNotAllowed(h.methodNotAllowed)
+
 	// Resend API routes (Bearer token auth required)
 	r.Route("/emails", func(r chi.Router) {
 		r.Use(h.bearerAuthMiddleware)
@@ -90,30 +93,28 @@ func (h *Handler) Routes(r chi.Router) {
 }
 
 // bearerAuthMiddleware validates Resend-style Bearer token auth.
-// Accepts any token starting with "re_" in sim mode.
 func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth == "" {
-			twincore.JSON(w, http.StatusUnauthorized, map[string]any{
-				"statusCode": 401,
-				"message":    "Missing API key in the authorization header. Include the following header 'Authorization: Bearer re_123' in the request.",
-				"name":       "missing_api_key",
-			})
-			return
+		if authenticate(w, r) {
+			next.ServeHTTP(w, r)
 		}
-
-		token := strings.TrimPrefix(auth, "Bearer ")
-		if token == auth || token == "" {
-			twincore.JSON(w, http.StatusUnauthorized, map[string]any{
-				"statusCode": 401,
-				"message":    "Invalid authorization header format. Use 'Authorization: Bearer re_123'.",
-				"name":       "invalid_api_key",
-			})
-			return
-		}
-
-		// In sim mode, accept any non-empty token (preferably starting with "re_")
-		next.ServeHTTP(w, r)
 	})
+}
+
+// authenticate checks the Authorization header and answers the error itself
+// when it fails. Any non-empty Bearer token is accepted: the emulator does
+// not know the account's keys.
+func authenticate(w http.ResponseWriter, r *http.Request) bool {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		writeError(w, http.StatusUnauthorized, "missing_api_key", "Missing API Key")
+		return false
+	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == auth || token == "" {
+		writeError(w, http.StatusUnauthorized, "invalid_api_key",
+			"Invalid authorization header format. Use 'Authorization: Bearer re_123'.")
+		return false
+	}
+	return true
 }

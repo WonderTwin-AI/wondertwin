@@ -55,6 +55,13 @@ await check("send, then get by id", async () => {
   assert.equal(got.subject, "smoke get");
   assert.deepEqual(got.to, ["delivered@resend.dev"]);
 });
+await check("get an unknown id answers not_found", async () => {
+  const { data, error } = await resend.emails.get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c");
+  assert.equal(data, null);
+  assert.equal(error?.name, "not_found", `error is ${JSON.stringify(error)}`);
+  assert.equal(error?.statusCode, 404, `error is ${JSON.stringify(error)}`);
+});
+
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);
