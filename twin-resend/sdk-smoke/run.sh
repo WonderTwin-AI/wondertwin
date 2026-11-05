@@ -9,8 +9,9 @@
 #   python/  resend-python 2.48.0, pinned by uv.lock
 #   node/    resend-node 6.30.0, pinned by package-lock.json
 #
-# Test-only: nothing here is part of the Go build, and the Node client is
-# installed into a scratch copy, never into the tree.
+# Test-only: nothing here is part of the Go build, and both SDK clients are
+# installed into scratch space (Python in a venv, Node in a copy of its
+# directory), never into the tree.
 #
 #   twin-resend/sdk-smoke/run.sh             # build and run against a fresh binary
 #   BINARY=/path/to/twin-resend run.sh       # run against an existing binary
@@ -52,7 +53,7 @@ fi
 
 results="$work/results.jsonl"
 status=0
-(cd "$here/python" && RESEND_EMULATOR_URL="$base" uv run --quiet --frozen smoke.py >>"$results") 2>"$work/python.log" || status=1
+(cd "$here/python" && UV_PROJECT_ENVIRONMENT="$work/venv" RESEND_EMULATOR_URL="$base" uv run --quiet --frozen smoke.py >>"$results") 2>"$work/python.log" || status=1
 
 mkdir -p "$work/node"
 cp "$here/node/package.json" "$here/node/package-lock.json" "$here/node/smoke.mjs" "$work/node/"
