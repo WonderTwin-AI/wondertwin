@@ -1,0 +1,13 @@
+{
+  "name": "twin-resend-sdk-smoke-node",
+  "private": true,
+  "description": "resend-node smoke suite for the Resend app emulator (test-only).",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "resend": "6.30.0"
+  }
+}
