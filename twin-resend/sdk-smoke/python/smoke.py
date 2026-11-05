@@ -12,7 +12,8 @@ put both SDKs in one table.
 import json
 import os
 import sys
-import urllib.request
+
+import requests
 
 BASE = os.environ.get("RESEND_EMULATOR_URL", "http://localhost:4113").rstrip("/")
 # resend-python reads its base URL from RESEND_API_URL at import time.
@@ -28,9 +29,9 @@ results = []
 
 
 def admin(method, path):
-    req = urllib.request.Request(BASE + path, method=method, data=b"" if method == "POST" else None)
-    with urllib.request.urlopen(req) as resp:
-        return resp.read()
+    resp = requests.request(method, BASE + path, timeout=10)
+    resp.raise_for_status()
+    return resp.content
 
 
 def case(name):
