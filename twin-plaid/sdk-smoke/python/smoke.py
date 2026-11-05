@@ -454,6 +454,44 @@ def case_transactions_recurring_get_inflow_and_outflow_streams():
     assert (inflow.description, str(inflow.frequency), inflow.last_amount.amount) == ("ACME PAYROLL", "MONTHLY", -2500.0)
 
 
+def custom_access_token(config, products=("auth", "transactions")):
+    """Links a user_custom Item: Plaid's documented custom Sandbox user, configured by a JSON password."""
+    return linked_access_token(products, options=SandboxPublicTokenCreateRequestOptions(
+        override_username="user_custom", override_password=json.dumps(config)))
+
+
+def case_custom_user_item_feeds_accounts_balance_auth_and_transactions():
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    day = lambda ago: (today - datetime.timedelta(days=ago)).isoformat()
+    payouts = [{"date_transacted": day(ago), "date_posted": day(ago), "amount": -1250.5, "description": "STRIPE PAYOUT"}
+               for ago in (21, 14, 7, 0)]
+    rent = {"date_transacted": day(3), "date_posted": day(3), "amount": 420.0, "description": "Office Rent"}
+    token = custom_access_token({"override_accounts": [
+        {"type": "depository", "subtype": "checking", "starting_balance": 48210.55,
+         "meta": {"name": "ACME Operating"}, "numbers": {"account": "9900001234", "ach_routing": "011401533"},
+         "transactions": payouts + [rent]},
+        {"type": "credit", "subtype": "credit card", "starting_balance": 1820.4, "has_null_available_balance": True,
+         "meta": {"limit": 10000}}]})
+
+    accounts = client.accounts_get(AccountsGetRequest(access_token=token)).accounts
+    assert [(a.name, str(a.subtype)) for a in accounts] == [("ACME Operating", "checking"), ("Plaid Credit Card", "credit card")]
+    operating, card = accounts
+    balances = {a.account_id: a.balances for a in client.accounts_balance_get(AccountsBalanceGetRequest(access_token=token)).accounts}
+    assert balances[operating.account_id].current == 48210.55 and balances[operating.account_id].available == 48210.55
+    assert balances[card.account_id].available is None and balances[card.account_id].limit == 10000
+    auth = client.auth_get(AuthGetRequest(access_token=token))
+    assert [(n.account_id, n.account, n.routing) for n in auth.numbers.ach] == [(operating.account_id, "9900001234", "011401533")]
+
+    synced = client.transactions_sync(TransactionsSyncRequest(access_token=token)).added
+    assert sorted((t.name, t.amount) for t in synced) == sorted([("STRIPE PAYOUT", -1250.5)] * 4 + [("Office Rent", 420.0)])
+    assert all(t.account_id == operating.account_id and not t.pending for t in synced)
+    got = client.transactions_get(TransactionsGetRequest(
+        access_token=token, start_date=today - datetime.timedelta(days=90), end_date=today))
+    assert got.total_transactions == 5 and {t.transaction_id for t in got.transactions} == {t.transaction_id for t in synced}
+    [inflow] = client.transactions_recurring_get(TransactionsRecurringGetRequest(access_token=token)).inflow_streams
+    assert (inflow.description, str(inflow.frequency), len(inflow.transaction_ids)) == ("STRIPE PAYOUT", "WEEKLY", 4)
+
+
 def case_refresh_after_a_change_sends_default_update_and_sync_updates_available():
     url, got = start_receiver()
     token = linked_access_token(("transactions",), options=SandboxPublicTokenCreateRequestOptions(webhook=url))

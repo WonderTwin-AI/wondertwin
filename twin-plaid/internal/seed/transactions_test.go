@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/wondertwin-ai/wondertwin/twin-plaid/internal/store"
 )
 
 func TestDefaultTransactionsAreThePublishedRowsReDatedWithNewIDs(t *testing.T) {
@@ -33,5 +35,29 @@ func TestDefaultTransactionsAreThePublishedRowsReDatedWithNewIDs(t *testing.T) {
 	again := DefaultTransactions("item2", "acct2", newID, now)
 	if again[0].ID == rows[0].ID || rows[0].Body.Name != again[0].Body.Name {
 		t.Fatal("two Items must get distinct ids and independent copies of the same content")
+	}
+}
+
+func TestCustomTransactionPendingFromDatePosted(t *testing.T) {
+	now := time.Date(2026, 11, 4, 23, 30, 0, 0, time.UTC)
+	amount := func(v float64) *float64 { return &v }
+	cfg := &store.CustomUser{OverrideAccounts: []store.CustomAccount{{Type: "depository", Subtype: "checking",
+		Transactions: []store.CustomUserTransaction{
+			{DateTransacted: "2026-11-03", DatePosted: "2026-11-03", Amount: amount(10), Description: "past"},
+			{DateTransacted: "2026-11-04", DatePosted: "2026-11-04", Amount: amount(11), Description: "today"},
+			{DateTransacted: "2026-11-04", DatePosted: "2026-11-05", Amount: amount(12), Description: "posts tomorrow"},
+		}}}}
+	accounts := CustomAccounts(cfg)
+	accounts[0].ID = "acc"
+	n := 0
+	rows := CustomTransactions("item", accounts, cfg, func() string { n++; return fmt.Sprint("tx", n) }, now)
+	want := map[string]bool{"past": false, "today": false, "posts tomorrow": true}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %v", rows)
+	}
+	for _, r := range rows {
+		if r.Pending != want[r.Body.Name] || r.Body.Pending != r.Pending || r.AccountID != "acc" || *r.Body.IsoCurrencyCode != "USD" {
+			t.Errorf("%s: pending %v (body %v), account %s", r.Body.Name, r.Pending, r.Body.Pending, r.AccountID)
+		}
 	}
 }
