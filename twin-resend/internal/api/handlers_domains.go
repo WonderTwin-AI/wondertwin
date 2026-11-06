@@ -105,7 +105,7 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// In sim mode, verification always succeeds
-	domain.Status = "verified"
+	domain.Status = store.DomainStatusVerified
 	for i := range domain.Records {
 		domain.Records[i].Status = "verified"
 	}

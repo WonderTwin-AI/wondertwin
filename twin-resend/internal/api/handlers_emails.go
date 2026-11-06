@@ -64,6 +64,10 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
 		return
 	}
+	if msg := h.senderCheck(req); msg != "" {
+		writeError(w, http.StatusForbidden, "validation_error", msg)
+		return
+	}
 
 	email := h.createEmail(req)
 	twincore.JSON(w, http.StatusOK, map[string]any{
@@ -158,16 +162,19 @@ func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 	var errs []map[string]any
 	valid := make([]sendEmailRequest, 0, len(reqs))
 	for i, req := range reqs {
-		msg := validateSend(req)
+		status, msg := http.StatusUnprocessableEntity, validateSend(req)
 		if msg == "" && len(req.Attachments) > 0 {
 			msg = "Attachments are not supported in batch emails."
+		}
+		if msg == "" {
+			status, msg = http.StatusForbidden, h.senderCheck(req)
 		}
 		if msg == "" {
 			valid = append(valid, req)
 			continue
 		}
 		if !permissive {
-			writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
+			writeError(w, status, "validation_error", msg)
 			return
 		}
 		errs = append(errs, map[string]any{"index": i, "message": msg})

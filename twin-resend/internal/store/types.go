@@ -67,6 +67,9 @@ type Domain struct {
 	CreatedAt string         `json:"created_at"`
 }
 
+// DomainStatusVerified is the status of a domain that passed verification.
+const DomainStatusVerified = "verified"
+
 // DomainRecord is a DNS record needed for domain verification.
 type DomainRecord struct {
 	Record   string `json:"record"` // CNAME, TXT, MX
