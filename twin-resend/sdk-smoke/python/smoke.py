@@ -78,6 +78,26 @@ def _():
     raise AssertionError("get of an unknown id did not raise")
 
 
+
+@case("send with a string recipient")
+def _():
+    sent = resend.Emails.send({
+        "from": SENDER, "to": "delivered@resend.dev", "subject": "smoke string", "html": "<p>string</p>",
+    })
+    got = resend.Emails.get(sent["id"])
+    assert got.get("to") == ["delivered@resend.dev"], f"to is {got.get('to')!r}"
+
+
+@case("send with tags, then get them back")
+def _():
+    sent = resend.Emails.send({
+        "from": SENDER, "to": ["delivered@resend.dev"], "subject": "smoke tags", "html": "<p>tags</p>",
+        "tags": [{"name": "category", "value": "smoke"}],
+    })
+    got = resend.Emails.get(sent["id"])
+    assert got.get("tags") == [{"name": "category", "value": "smoke"}], f"tags is {got.get('tags')!r}"
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)
