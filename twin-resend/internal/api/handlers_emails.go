@@ -136,24 +136,52 @@ func nilIfBlank(s string) any {
 	return s
 }
 
-// SendBatch handles POST /emails/batch
+// maxBatch is Resend's cap on messages in one batch.
+const maxBatch = 100
+
+// SendBatch handles POST /emails/batch (quirk lifecycle-005). In strict mode,
+// the default, one invalid item fails the whole batch with that item's error.
+// With x-batch-validation: permissive, valid items are sent and the answer is
+// 202 with the invalid items' errors by index.
 func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 	var reqs []sendEmailRequest
 	if !decodeBody(w, r, &reqs) {
 		return
 	}
+	if len(reqs) > maxBatch {
+		writeError(w, http.StatusUnprocessableEntity, "validation_error",
+			"Your batch request contains more than 100 messages.")
+		return
+	}
+	permissive := strings.EqualFold(r.Header.Get("x-batch-validation"), "permissive")
 
-	var results []map[string]any
-	for _, req := range reqs {
-		email := h.createEmail(req)
-		results = append(results, map[string]any{
-			"id": email.ID,
-		})
+	var errs []map[string]any
+	valid := make([]sendEmailRequest, 0, len(reqs))
+	for i, req := range reqs {
+		msg := validateSend(req)
+		if msg == "" && len(req.Attachments) > 0 {
+			msg = "Attachments are not supported in batch emails."
+		}
+		if msg == "" {
+			valid = append(valid, req)
+			continue
+		}
+		if !permissive {
+			writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
+			return
+		}
+		errs = append(errs, map[string]any{"index": i, "message": msg})
 	}
 
-	twincore.JSON(w, http.StatusOK, map[string]any{
-		"data": results,
-	})
+	data := make([]map[string]any, 0, len(valid))
+	for _, req := range valid {
+		data = append(data, map[string]any{"id": h.createEmail(req).ID})
+	}
+	if permissive && len(errs) > 0 {
+		twincore.JSON(w, http.StatusAccepted, map[string]any{"data": data, "errors": errs})
+		return
+	}
+	twincore.JSON(w, http.StatusOK, map[string]any{"data": data})
 }
 
 // createEmail is a shared helper that creates and stores an email from a request.
