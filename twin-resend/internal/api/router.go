@@ -4,6 +4,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
@@ -14,6 +15,10 @@ import (
 type Handler struct {
 	store *store.MemoryStore
 	mw    *twincore.Middleware
+
+	// idemMu makes the idempotency check and reservation one step, so two
+	// concurrent requests with one key cannot both send.
+	idemMu sync.Mutex
 }
 
 // NewHandler creates a new API handler.
@@ -31,9 +36,9 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Use(h.bearerAuthMiddleware)
 		r.Use(h.mw.FaultInjection)
 
-		r.Post("/", h.SendEmail)
+		r.With(h.idempotency).Post("/", h.SendEmail)
 		r.Get("/{id}", h.GetEmail)
-		r.Post("/batch", h.SendBatch)
+		r.With(h.idempotency).Post("/batch", h.SendBatch)
 	})
 
 	// Domains

@@ -1,6 +1,11 @@
 // Package store defines the Resend twin's state types and in-memory store.
 package store
 
+import (
+	"encoding/json"
+	"time"
+)
+
 // Email represents a Resend email.
 type Email struct {
 	ID        string   `json:"id"`
@@ -114,4 +119,15 @@ type Broadcast struct {
 	Status     string   `json:"status"` // draft, queued, sending, sent
 	CreatedAt  string   `json:"created_at"`
 	SentAt     string   `json:"sent_at,omitempty"`
+}
+
+// IdempotencyRecord is what the emulator remembers about one Idempotency-Key:
+// the fingerprint of the first request's body and, once it succeeded, its
+// answer to replay. InFlight marks a request still being served.
+type IdempotencyRecord struct {
+	RequestHash string          `json:"request_hash"`
+	CreatedAt   time.Time       `json:"created_at"`
+	InFlight    bool            `json:"in_flight,omitempty"`
+	Status      int             `json:"status,omitempty"`
+	Body        json.RawMessage `json:"body,omitempty"`
 }

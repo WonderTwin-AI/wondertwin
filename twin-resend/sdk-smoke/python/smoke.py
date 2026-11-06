@@ -12,6 +12,7 @@ put both SDKs in one table.
 import json
 import os
 import sys
+import uuid
 
 import requests
 
@@ -135,6 +136,21 @@ def _():
     got = resend.Batch.send(_batch_items(), {"batch_validation": "permissive"})
     assert len(got["data"]) == 1, f"data is {got.get('data')!r}"
     assert got["errors"] == [{"index": 1, "message": "Missing `from` field."}], f"errors is {got.get('errors')!r}"
+
+
+@case("idempotent retry returns the first send")
+def _():
+    key = f"smoke-{uuid.uuid4()}"
+    params = {"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke idem", "html": "<p>i</p>"}
+    first = resend.Emails.send(params, {"idempotency_key": key})
+    again = resend.Emails.send(params, {"idempotency_key": key})
+    assert first["id"] == again["id"], f"ids differ: {first['id']} vs {again['id']}"
+    try:
+        resend.Emails.send({**params, "subject": "changed"}, {"idempotency_key": key})
+    except resend.exceptions.ResendError as e:
+        assert str(e.code) == "409", f"code is {e.code!r}"
+        return
+    raise AssertionError("same key with another body did not raise")
 
 
 for r in results:

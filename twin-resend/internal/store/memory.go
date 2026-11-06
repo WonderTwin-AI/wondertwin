@@ -15,7 +15,11 @@ type MemoryStore struct {
 	Audiences  *pkgstate.Store[Audience]
 	Contacts   *pkgstate.Store[Contact]
 	Broadcasts *pkgstate.Store[Broadcast]
-	Clock      *pkgstate.Clock
+
+	// Idempotency holds Idempotency-Key records, keyed by method, path and key.
+	Idempotency *pkgstate.Store[IdempotencyRecord]
+
+	Clock *pkgstate.Clock
 
 	// Rand is the deterministic per-twin random source. Wired by
 	// main.go (and test setups) to twin.Rand so handler-level
@@ -26,35 +30,38 @@ type MemoryStore struct {
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Emails:     pkgstate.New[Email]("email"),
-		Domains:    pkgstate.New[Domain]("domain"),
-		APIKeys:    pkgstate.New[APIKey]("apikey"),
-		Audiences:  pkgstate.New[Audience]("audience"),
-		Contacts:   pkgstate.New[Contact]("contact"),
-		Broadcasts: pkgstate.New[Broadcast]("broadcast"),
-		Clock:      pkgstate.NewClock(),
+		Emails:      pkgstate.New[Email]("email"),
+		Domains:     pkgstate.New[Domain]("domain"),
+		APIKeys:     pkgstate.New[APIKey]("apikey"),
+		Audiences:   pkgstate.New[Audience]("audience"),
+		Contacts:    pkgstate.New[Contact]("contact"),
+		Broadcasts:  pkgstate.New[Broadcast]("broadcast"),
+		Idempotency: pkgstate.New[IdempotencyRecord]("idem"),
+		Clock:       pkgstate.NewClock(),
 	}
 }
 
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
-	Emails     map[string]Email     `json:"emails"`
-	Domains    map[string]Domain    `json:"domains,omitempty"`
-	APIKeys    map[string]APIKey    `json:"api_keys,omitempty"`
-	Audiences  map[string]Audience  `json:"audiences,omitempty"`
-	Contacts   map[string]Contact   `json:"contacts,omitempty"`
-	Broadcasts map[string]Broadcast `json:"broadcasts,omitempty"`
+	Emails      map[string]Email             `json:"emails"`
+	Domains     map[string]Domain            `json:"domains,omitempty"`
+	APIKeys     map[string]APIKey            `json:"api_keys,omitempty"`
+	Audiences   map[string]Audience          `json:"audiences,omitempty"`
+	Contacts    map[string]Contact           `json:"contacts,omitempty"`
+	Broadcasts  map[string]Broadcast         `json:"broadcasts,omitempty"`
+	Idempotency map[string]IdempotencyRecord `json:"idempotency,omitempty"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
 func (s *MemoryStore) Snapshot() any {
 	return stateSnapshot{
-		Emails:     s.Emails.Snapshot(),
-		Domains:    s.Domains.Snapshot(),
-		APIKeys:    s.APIKeys.Snapshot(),
-		Audiences:  s.Audiences.Snapshot(),
-		Contacts:   s.Contacts.Snapshot(),
-		Broadcasts: s.Broadcasts.Snapshot(),
+		Emails:      s.Emails.Snapshot(),
+		Domains:     s.Domains.Snapshot(),
+		APIKeys:     s.APIKeys.Snapshot(),
+		Audiences:   s.Audiences.Snapshot(),
+		Contacts:    s.Contacts.Snapshot(),
+		Broadcasts:  s.Broadcasts.Snapshot(),
+		Idempotency: s.Idempotency.Snapshot(),
 	}
 }
 
@@ -80,6 +87,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Broadcasts != nil {
 		s.Broadcasts.LoadSnapshot(snap.Broadcasts)
 	}
+	if snap.Idempotency != nil {
+		s.Idempotency.LoadSnapshot(snap.Idempotency)
+	}
 	return nil
 }
 
@@ -91,5 +101,6 @@ func (s *MemoryStore) Reset() {
 	s.Audiences.Reset()
 	s.Contacts.Reset()
 	s.Broadcasts.Reset()
+	s.Idempotency.Reset()
 	s.Clock.Reset()
 }
