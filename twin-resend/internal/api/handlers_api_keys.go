@@ -17,7 +17,7 @@ func (h *Handler) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	for i, k := range keys {
 		stripped[i] = map[string]any{"id": k.ID, "name": k.Name, "created_at": k.CreatedAt}
 	}
-	twincore.JSON(w, http.StatusOK, map[string]any{"data": stripped})
+	twincore.JSON(w, http.StatusOK, listBody(stripped))
 }
 
 // CreateAPIKey handles POST /api-keys

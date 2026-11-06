@@ -13,7 +13,7 @@ import (
 // ListDomains handles GET /domains
 func (h *Handler) ListDomains(w http.ResponseWriter, r *http.Request) {
 	domains := h.store.Domains.Filter(func(_ string, _ store.Domain) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"data": domains})
+	twincore.JSON(w, http.StatusOK, listBody(domains))
 }
 
 // GetDomain handles GET /domains/{id}

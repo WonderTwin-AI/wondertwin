@@ -12,7 +12,7 @@ import (
 // ListBroadcasts handles GET /broadcasts
 func (h *Handler) ListBroadcasts(w http.ResponseWriter, r *http.Request) {
 	broadcasts := h.store.Broadcasts.Filter(func(_ string, _ store.Broadcast) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": broadcasts})
+	twincore.JSON(w, http.StatusOK, listBody(broadcasts))
 }
 
 // GetBroadcast handles GET /broadcasts/{id}

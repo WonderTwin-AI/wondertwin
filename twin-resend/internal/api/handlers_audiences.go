@@ -14,7 +14,7 @@ import (
 // ListAudiences handles GET /audiences
 func (h *Handler) ListAudiences(w http.ResponseWriter, r *http.Request) {
 	audiences := h.store.Audiences.Filter(func(_ string, _ store.Audience) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": audiences})
+	twincore.JSON(w, http.StatusOK, listBody(audiences))
 }
 
 // GetAudience handles GET /audiences/{id}
@@ -89,7 +89,7 @@ func (h *Handler) ListContacts(w http.ResponseWriter, r *http.Request) {
 	contacts := h.store.Contacts.Filter(func(_ string, c store.Contact) bool {
 		return c.AudienceID == audienceID
 	})
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": contacts})
+	twincore.JSON(w, http.StatusOK, listBody(contacts))
 }
 
 // GetContact handles GET /audiences/{audience_id}/contacts/{id}
