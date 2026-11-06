@@ -132,7 +132,7 @@ Works with any test framework. Go, Python, Node, Rust, Java — if it speaks HTT
 |------|----------|-------------|
 | **Stripe** | Payments, Refunds, Subscriptions, Invoices, Checkout Sessions, Connect, Events, Webhook delivery (see `twin-stripe/twin-manifest.json`) | 4111 |
 | **Twilio** | Messages, Verify (OTP send/check) | 4112 |
-| **Resend** | Email send, delivery status | 4113 |
+| **Resend** | Email send (single and batch), read-back, test-address outcomes, Domains, API keys (see `twin-resend/twin-manifest.json`) | 4113 |
 | **PostHog** | Event capture, batch ingestion, feature flag evaluation | 4114 |
 | **Logo.dev** | Logo image retrieval | 4116 |
 

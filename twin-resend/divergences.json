@@ -1,0 +1,46 @@
+{
+  "app_emulator": "twin-resend",
+  "references": {
+    "docs": "resend.com/docs as served 2026-09-28",
+    "sdks": ["resend-go v4.7.0", "resend-node 6.30.0", "resend-python 2.48.0"]
+  },
+  "status": "Declared under the operator's decisions on API keys and sender domains.",
+  "divergences": [
+    {
+      "route": "any API route, API key",
+      "resend": "Verifies the key; an invalid or deleted key answers validation_error 'API key is invalid', 401 on POST /emails and 400 on reads",
+      "app_emulator": "Accepts any non-empty Bearer token; a missing key answers 401 missing_api_key",
+      "reason": "The app emulator issues no keys, so it has none to check a token against"
+    },
+    {
+      "route": "POST /emails, POST /emails/batch, from",
+      "resend": "Refuses any sender domain that is not verified on the team with 403 validation_error",
+      "app_emulator": "By default refuses only a domain created through POST /domains and not yet verified; a domain it has never seen is accepted. strict_sender_domains in /admin/config refuses every domain that is not created and verified",
+      "reason": "Tests run with no domain setup by default; strict mode is there for clients that need Resend's refusal"
+    },
+    {
+      "route": "POST /emails, POST /emails/batch, from onboarding@resend.dev (strict mode)",
+      "resend": "The shared sender may send to the account owner's address and to resend.dev test addresses",
+      "app_emulator": "In strict mode the shared sender may send to resend.dev test addresses only, with Resend's 403 'You can only send testing emails to your own email address' for any other recipient",
+      "reason": "The app emulator has no account owner"
+    },
+    {
+      "route": "any authenticated route, rate limits",
+      "resend": "Enforces the team's rate limit and answers 429 rate_limit_exceeded",
+      "app_emulator": "Sends Resend's headers with fixed values (ratelimit-limit 10, ratelimit-policy 10;w=1, ratelimit-remaining 9, ratelimit-reset 1) and never answers 429",
+      "reason": "A test should not fail on throttling it did not ask for"
+    },
+    {
+      "route": "POST /emails, POST /emails/batch, quotas",
+      "resend": "Counts sends against daily and monthly quotas, reports them in x-resend-daily-quota and x-resend-monthly-quota, and answers 429 when one is exceeded",
+      "app_emulator": "Keeps no quota and sends neither header",
+      "reason": "Quotas belong to a Resend plan, which the app emulator does not have"
+    },
+    {
+      "route": "POST /emails, scheduled_at",
+      "resend": "Accepts an ISO 8601 date or natural language such as 'in 1 hour'",
+      "app_emulator": "Accepts ISO 8601 (RFC 3339) only; natural language answers 422 validation_error",
+      "reason": "Natural-language scheduling is planned with the coverage extension"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "name": "Resend app emulator health, send and read",
+  "description": "Checks the app emulator is healthy, sends an email to a Resend test address, and reads it back in Resend's read shape.",
+  "setup": {
+    "reset": ["resend"]
+  },
+  "steps": [
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.resend.port}}/admin/health"
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.status": "ok"
+        }
+      }
+    },
+    {
+      "name": "Send an email",
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:{{twins.resend.port}}/emails",
+        "headers": {
+          "Authorization": "Bearer re_test_123"
+        },
+        "body": {
+          "from": "onboarding@resend.dev",
+          "to": "delivered@resend.dev",
+          "subject": "Scenario",
+          "html": "<p>Scenario</p>"
+        }
+      },
+      "capture": {
+        "email_id": "$.id"
+      },
+      "assert": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Read the email back",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:{{twins.resend.port}}/emails/{{email_id}}",
+        "headers": {
+          "Authorization": "Bearer re_test_123"
+        }
+      },
+      "assert": {
+        "status": 200,
+        "body": {
+          "$.id": "{{email_id}}",
+          "$.object": "email",
+          "$.subject": "Scenario",
+          "$.last_event": "delivered",
+          "$.text": "Scenario"
+        }
+      }
+    }
+  ]
+}

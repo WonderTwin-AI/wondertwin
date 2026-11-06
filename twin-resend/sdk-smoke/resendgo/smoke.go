@@ -1,0 +1,224 @@
+//go:build sdksmoke
+
+// Command smoke runs the Resend app emulator's email flows through the
+// official resend-go SDK (v4.7.0, pinned by resend-go.mod) against a running
+// binary. It is test-only and sits outside the repository's Go module: run.sh
+// copies it next to resend-go.mod and resend-go.sum and runs it.
+//
+//	RESEND_EMULATOR_URL=http://localhost:4113 go run -tags sdksmoke .
+//
+// Prints one JSON line per case ({"sdk","case","pass","detail"}) with the same
+// case names as python/smoke.py and node/smoke.mjs. resend-go types to as a
+// list and reads no tags back, so those two cases report pass: null (not
+// applicable). Errors from resend-go carry the message only, not the status.
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/resend/resend-go/v4"
+)
+
+const (
+	sdk    = "resend-go v4.7.0"
+	sender = "onboarding@resend.dev"
+)
+
+var (
+	base    = strings.TrimRight(os.Getenv("RESEND_EMULATOR_URL"), "/")
+	ctx     = context.Background()
+	client  = newClient()
+	results []map[string]any
+)
+
+func newClient() *resend.Client {
+	c := resend.NewClient("re_smoke_key")
+	u, err := url.Parse(base + "/")
+	if err != nil {
+		panic(err)
+	}
+	c.BaseURL = u
+	return c
+}
+
+func check(name string, fn func() error) {
+	err := fn()
+	r := map[string]any{"sdk": sdk, "case": name, "pass": err == nil, "detail": ""}
+	if err != nil {
+		r["detail"] = err.Error()
+	}
+	results = append(results, r)
+}
+
+func notApplicable(name, why string) {
+	results = append(results, map[string]any{"sdk": sdk, "case": name, "pass": nil, "detail": why})
+}
+
+func email(subject string, to ...string) *resend.SendEmailRequest {
+	return &resend.SendEmailRequest{From: sender, To: to, Subject: subject, Html: "<p>" + subject + "</p>"}
+}
+
+func wantErr(err error, substr string) error {
+	if err == nil {
+		return errors.New("no error")
+	}
+	if !strings.Contains(err.Error(), substr) {
+		return fmt.Errorf("error %q does not mention %q", err, substr)
+	}
+	return nil
+}
+
+func reset() {
+	req, _ := http.NewRequest(http.MethodPost, base+"/admin/reset", nil)
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
+}
+
+func main() {
+	reset()
+
+	check("send with an array recipient", func() error {
+		sent, err := client.Emails.Send(email("smoke array", "delivered@resend.dev"))
+		if err != nil {
+			return err
+		}
+		if sent.Id == "" {
+			return errors.New("no id")
+		}
+		return nil
+	})
+
+	check("send, then get by id", func() error {
+		sent, err := client.Emails.Send(email("smoke get", "delivered@resend.dev"))
+		if err != nil {
+			return err
+		}
+		got, err := client.Emails.Get(sent.Id)
+		if err != nil {
+			return err
+		}
+		if got.Id != sent.Id || got.Subject != "smoke get" {
+			return fmt.Errorf("got id %q subject %q", got.Id, got.Subject)
+		}
+		return nil
+	})
+
+	check("get an unknown id answers not_found", func() error {
+		_, err := client.Emails.Get("0199a000-0000-7000-8000-000000000000")
+		return wantErr(err, "not found")
+	})
+
+	notApplicable("send with a string recipient", "resend-go types to as []string")
+	notApplicable("send with tags, then get them back", "resend-go's Email has no tags field")
+
+	check("get returns Resend's read fields", func() error {
+		sent, err := client.Emails.Send(email("fields", "delivered@resend.dev"))
+		if err != nil {
+			return err
+		}
+		got, err := client.Emails.Get(sent.Id)
+		if err != nil {
+			return err
+		}
+		switch {
+		case got.Object != "email":
+			return fmt.Errorf("object is %q", got.Object)
+		case !strings.HasSuffix(got.MessageId, "@email.amazonses.com>"):
+			return fmt.Errorf("message_id is %q", got.MessageId)
+		case got.Text != "fields":
+			return fmt.Errorf("text is %q", got.Text)
+		case got.LastEvent != "delivered":
+			return fmt.Errorf("last_event is %q", got.LastEvent)
+		}
+		if _, err := time.Parse("2006-01-02 15:04:05.000000+00", got.CreatedAt); err != nil {
+			return fmt.Errorf("created_at %q: %w", got.CreatedAt, err)
+		}
+		return nil
+	})
+
+	batchItems := func() []*resend.SendEmailRequest {
+		bad := email("smoke batch", "delivered@resend.dev")
+		bad.From = ""
+		return []*resend.SendEmailRequest{email("smoke batch", "delivered@resend.dev"), bad}
+	}
+
+	check("batch: strict fails on an invalid item", func() error {
+		_, err := client.Batch.Send(batchItems())
+		return wantErr(err, "Missing `from` field.")
+	})
+
+	check("batch: permissive sends the valid items", func() error {
+		got, err := client.Batch.SendWithOptions(ctx, batchItems(),
+			&resend.BatchSendEmailOptions{BatchValidation: resend.BatchValidationPermissive})
+		if err != nil {
+			return err
+		}
+		if len(got.Data) != 1 || len(got.Errors) != 1 || got.Errors[0].Index != 1 {
+			return fmt.Errorf("got data %v errors %v", got.Data, got.Errors)
+		}
+		return nil
+	})
+
+	check("idempotent retry returns the first send", func() error {
+		opts := &resend.SendEmailOptions{IdempotencyKey: fmt.Sprintf("smoke-go-%d", time.Now().UnixNano())}
+		first, err := client.Emails.SendWithOptions(ctx, email("smoke idem", "delivered@resend.dev"), opts)
+		if err != nil {
+			return err
+		}
+		again, err := client.Emails.SendWithOptions(ctx, email("smoke idem", "delivered@resend.dev"), opts)
+		if err != nil {
+			return err
+		}
+		if again.Id != first.Id {
+			return fmt.Errorf("ids differ: %s vs %s", first.Id, again.Id)
+		}
+		_, err = client.Emails.SendWithOptions(ctx, email("changed", "delivered@resend.dev"), opts)
+		return wantErr(err, "request body was modified")
+	})
+
+	check("a send to bounced@resend.dev reads back bounced", func() error {
+		sent, err := client.Emails.Send(email("smoke bounce", "bounced@resend.dev"))
+		if err != nil {
+			return err
+		}
+		got, err := client.Emails.Get(sent.Id)
+		if err != nil {
+			return err
+		}
+		if got.LastEvent != "bounced" {
+			return fmt.Errorf("last_event is %q", got.LastEvent)
+		}
+		return nil
+	})
+
+	check("a send from an unverified domain answers 403", func() error {
+		if _, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-unverified.example.com"}); err != nil {
+			return err
+		}
+		req := email("smoke domain", "delivered@resend.dev")
+		req.From = "a@smoke-go-unverified.example.com"
+		_, err := client.Emails.Send(req)
+		return wantErr(err, "domain is not verified")
+	})
+
+	failed := false
+	for _, r := range results {
+		b, _ := json.Marshal(r)
+		fmt.Println(string(b))
+		if r["pass"] == false {
+			failed = true
+		}
+	}
+	if failed {
+		os.Exit(1)
+	}
+}
