@@ -113,11 +113,9 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
 }
 
-// resendID generates a 24-char hex identifier from the deterministic
-// per-twin RNG. Routing through store.RandHex (rather than
-// crypto/rand) keeps token output reproducible per seed.
+// resendID returns a UUIDv4 for a new resource other than an email.
 func (h *Handler) resendID() string {
-	return h.store.RandHex(12)
+	return h.store.NewID()
 }
 
 func intPtr(i int) *int {

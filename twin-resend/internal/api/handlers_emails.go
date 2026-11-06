@@ -102,7 +102,7 @@ func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 // createEmail is a shared helper that creates and stores an email from a request.
 func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	now := h.store.Clock.Now()
-	id := h.store.Emails.NextID()
+	id := h.store.NewEmailID()
 
 	email := store.Email{
 		ID:        id,
