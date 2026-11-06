@@ -48,10 +48,12 @@ type AttachmentMeta struct {
 
 // Email status constants matching Resend's lifecycle.
 const (
-	EmailStatusSent      = "sent"
-	EmailStatusDelivered = "delivered"
-	EmailStatusBounced   = "bounced"
-	EmailStatusScheduled = "scheduled"
+	EmailStatusSent       = "sent"
+	EmailStatusDelivered  = "delivered"
+	EmailStatusBounced    = "bounced"
+	EmailStatusComplained = "complained"
+	EmailStatusSuppressed = "suppressed"
+	EmailStatusScheduled  = "scheduled"
 )
 
 // Domain represents a verified sending domain.

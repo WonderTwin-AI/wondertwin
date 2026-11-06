@@ -153,6 +153,13 @@ def _():
     raise AssertionError("same key with another body did not raise")
 
 
+@case("a send to bounced@resend.dev reads back bounced")
+def _():
+    sent = resend.Emails.send({"from": SENDER, "to": "bounced@resend.dev", "subject": "smoke bounce", "html": "<p>b</p>"})
+    got = resend.Emails.get(sent["id"])
+    assert got["last_event"] == "bounced", f"last_event is {got['last_event']!r}"
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)

@@ -121,6 +121,13 @@ await check("idempotent retry returns the first send", async () => {
   assert.equal(data, null);
   assert.equal(error?.statusCode, 409, `error is ${JSON.stringify(error)}`);
 });
+await check("a send to bounced@resend.dev reads back bounced", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: "bounced@resend.dev", subject: "smoke bounce", html: "<p>b</p>",
+  }));
+  const got = ok(await resend.emails.get(sent.id));
+  assert.equal(got.last_event, "bounced");
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);

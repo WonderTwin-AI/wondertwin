@@ -188,6 +188,7 @@ func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	now := h.store.Clock.Now()
 	id := h.store.NewEmailID()
+	outcome := testAddressOutcome(req.To)
 
 	email := store.Email{
 		ID:        id,
@@ -200,10 +201,10 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 		CC:        req.CC,
 		BCC:       req.BCC,
 		ReplyTo:   req.ReplyTo,
-		Status:    store.EmailStatusDelivered, // Sim: instantly delivered
+		Status:    outcome,
 		CreatedAt: now.UTC().Format(pgTimestamp),
 		MessageID: h.store.NewMessageID(),
-		LastEvent: "delivered",
+		LastEvent: outcome,
 		Tags:      req.Tags,
 		Headers:   req.Headers,
 	}
@@ -220,6 +221,33 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	h.store.Emails.Set(id, email)
 
 	return email
+}
+
+// testAddressOutcome is the terminal event a send settles on at once (quirks
+// lifecycle-001, lifecycle-002). Resend's test addresses delivered@, bounced@,
+// complained@ and suppressed@resend.dev settle on that event; all but
+// suppressed@ also accept a +label. The first test address among the
+// recipients decides; any other send is delivered.
+func testAddressOutcome(to []string) string {
+	for _, addr := range to {
+		local, domain, ok := strings.Cut(strings.ToLower(strings.TrimSpace(addr)), "@")
+		if !ok || domain != "resend.dev" {
+			continue
+		}
+		if local == "suppressed" {
+			return store.EmailStatusSuppressed
+		}
+		base, _, _ := strings.Cut(local, "+")
+		switch base {
+		case "delivered":
+			return store.EmailStatusDelivered
+		case "bounced":
+			return store.EmailStatusBounced
+		case "complained":
+			return store.EmailStatusComplained
+		}
+	}
+	return store.EmailStatusDelivered
 }
 
 // AdminListEmails handles GET /admin/emails
