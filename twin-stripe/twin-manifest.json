@@ -1,7 +1,6 @@
 {
   "display_name": "Stripe",
   "vendor_domain": "stripe.com",
-  "tier": "community",
   "category": "payments",
   "description": "Simulates the Stripe API /v1 on the dahlia release, served in the shape of 2026-08-26.dahlia: Customers, Products, Prices, PaymentIntents, PaymentMethods, Charges, Refunds, Subscriptions, Invoices, Coupons, SetupIntents, TaxRates, Disputes, Connect accounts, transfers, balance, payouts, events, checkout sessions, payment links, credit notes, promotion codes, subscription items, quotes, billing portal sessions, tokens, sources, mandates, confirmation tokens, application fees, application fee refunds, transfer reversals, account links, persons, topups, webhook endpoints, files, file links, shipping rates, reviews, and tax IDs, with signed webhook delivery. Accepts any dahlia Stripe-Version and refuses other releases with a 400. Array parameters are read in both the name[] and the indexed name[N] form the official SDKs send. Responses support expand (up to Stripe's documented four levels, including list expansion through data.), resolving any known object ID without checking Stripe's per-endpoint expandable-fields allowlist.",
   "vendor_api_version": "2026-08-26.dahlia",

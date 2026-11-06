@@ -1,7 +1,6 @@
 {
   "display_name": "Resend",
   "vendor_domain": "resend.com",
-  "tier": "community",
   "category": "email",
   "description": "Simulates the Resend email sending API, including single and batch email dispatch with delivery tracking.",
   "sdk_target": {

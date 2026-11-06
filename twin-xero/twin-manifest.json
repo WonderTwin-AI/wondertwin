@@ -1,7 +1,6 @@
 {
   "display_name": "Xero",
   "vendor_domain": "xero.com",
-  "tier": "community",
   "category": "accounting",
   "description": "Xero Accounting API app emulator, for integrations that bill customers, collect payments, issue refunds and record bank activity: OAuth tokens and connections, organisation, the chart of accounts with account creation, contacts, invoices, payments and credit notes with signed webhook events, bank transactions and manual journals. Deliberate differences from Xero are declared in divergences.json.",
   "sdk_target": {
