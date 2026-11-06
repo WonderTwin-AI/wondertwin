@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -73,18 +74,66 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 // GetEmail handles GET /emails/{id}
 func (h *Handler) GetEmail(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-
-	email, ok := h.store.Emails.Get(id)
-	if !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404,
-			"message":    "Email not found",
-			"name":       "not_found",
-		})
+	if !uuidPattern.MatchString(id) {
+		writeError(w, http.StatusUnprocessableEntity, "validation_error", "The `id` must be a valid UUID.")
 		return
 	}
 
-	twincore.JSON(w, http.StatusOK, email)
+	email, ok := h.store.Emails.Get(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "Email not found")
+		return
+	}
+
+	twincore.JSON(w, http.StatusOK, retrievedEmail(email))
+}
+
+// pgTimestamp is the form Resend reports timestamps in on a read:
+// '2026-11-05 03:21:53.923000+00'.
+const pgTimestamp = "2006-01-02 15:04:05.000000+00"
+
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// retrievedEmail is the email as GET /emails/{id} answers it (quirks
+// envelope-003, envelope-004): absent fields are null, bcc and cc come back
+// null even when the send set them, tags appear only when the send had tags,
+// and there is no status field. The stored values stay visible through
+// /admin/emails.
+func retrievedEmail(e store.Email) map[string]any {
+	out := map[string]any{
+		"object":       "email",
+		"id":           e.ID,
+		"to":           e.To,
+		"from":         e.From,
+		"created_at":   e.CreatedAt,
+		"subject":      e.Subject,
+		"bcc":          nil,
+		"cc":           nil,
+		"reply_to":     nilIfEmpty(e.ReplyTo),
+		"last_event":   e.LastEvent,
+		"scheduled_at": e.ScheduledAt,
+		"message_id":   e.MessageID,
+		"html":         nilIfBlank(e.HTML),
+		"text":         nilIfBlank(e.Text),
+	}
+	if len(e.Tags) > 0 {
+		out["tags"] = e.Tags
+	}
+	return out
+}
+
+func nilIfEmpty(v []string) any {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+func nilIfBlank(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // SendBatch handles POST /emails/batch
@@ -124,7 +173,8 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 		BCC:       req.BCC,
 		ReplyTo:   req.ReplyTo,
 		Status:    store.EmailStatusDelivered, // Sim: instantly delivered
-		CreatedAt: now.Format(time.RFC3339),
+		CreatedAt: now.UTC().Format(pgTimestamp),
+		MessageID: h.store.NewMessageID(),
 		LastEvent: "delivered",
 		Tags:      req.Tags,
 		Headers:   req.Headers,

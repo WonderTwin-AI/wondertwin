@@ -91,8 +91,8 @@ func TestSendAndGetEmail(t *testing.T) {
 	if got["subject"] != "Test Email" {
 		t.Errorf("expected subject=Test Email, got %v", got["subject"])
 	}
-	if got["status"] != "delivered" {
-		t.Errorf("expected status=delivered, got %v", got["status"])
+	if got["last_event"] != "delivered" {
+		t.Errorf("expected last_event=delivered, got %v", got["last_event"])
 	}
 }
 
@@ -132,7 +132,7 @@ func TestSendEmailMissingSubject(t *testing.T) {
 func TestEmailNotFound(t *testing.T) {
 	_, tc := setupResend(t)
 
-	resp := resendGet(tc, "/emails/email_nonexistent")
+	resp := resendGet(tc, "/emails/4ef9a417-02e9-4d39-ad75-9611e0fcc33c")
 	resp.AssertStatus(404)
 	resp.AssertBodyContains("not_found")
 }

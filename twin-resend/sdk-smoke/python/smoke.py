@@ -98,6 +98,21 @@ def _():
     assert got.get("tags") == [{"name": "category", "value": "smoke"}], f"tags is {got.get('tags')!r}"
 
 
+
+@case("get returns Resend's read fields")
+def _():
+    sent = resend.Emails.send({
+        "from": SENDER, "to": "delivered@resend.dev", "subject": "smoke fields", "html": "<p>fields</p>",
+    })
+    got = resend.Emails.get(sent["id"])
+    for k in ("object", "id", "to", "from", "created_at", "subject", "bcc", "cc", "reply_to",
+              "last_event", "scheduled_at", "message_id", "html", "text"):
+        assert k in got, f"missing {k}"
+    assert "status" not in got, "status is not a field Resend returns"
+    assert got["message_id"].endswith("@email.amazonses.com>"), f"message_id is {got['message_id']!r}"
+    assert got["text"] == "fields", f"text is {got['text']!r}"
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)
