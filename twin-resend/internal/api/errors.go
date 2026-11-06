@@ -24,7 +24,7 @@ func writeError(w http.ResponseWriter, status int, name, message string) {
 // so a request without a key gets 401 missing_api_key, not 404. Admin paths
 // are the emulator's own and need no key.
 func (h *Handler) notFound(w http.ResponseWriter, r *http.Request) {
-	if !isAdminPath(r.URL.Path) && !authenticate(w, r) {
+	if !isAdminPath(r.URL.Path) && !h.authenticate(w, r) {
 		return
 	}
 	writeError(w, http.StatusNotFound, "not_found", "The requested endpoint does not exist.")
@@ -33,7 +33,7 @@ func (h *Handler) notFound(w http.ResponseWriter, r *http.Request) {
 // methodNotAllowed answers a known path with a method it does not serve,
 // after authentication.
 func (h *Handler) methodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	if !isAdminPath(r.URL.Path) && !authenticate(w, r) {
+	if !isAdminPath(r.URL.Path) && !h.authenticate(w, r) {
 		return
 	}
 	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed",

@@ -105,16 +105,22 @@ func (h *Handler) Routes(r chi.Router) {
 // bearerAuthMiddleware validates Resend-style Bearer token auth.
 func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if authenticate(w, r) {
+		if h.authenticate(w, r) {
 			next.ServeHTTP(w, r)
 		}
 	})
 }
 
+// restrictedKeyMsg is Resend's answer when a sending_access key calls
+// anything but a send (quirk auth-004).
+const restrictedKeyMsg = "This API key is restricted to only send emails"
+
 // authenticate checks the Authorization header and answers the error itself
 // when it fails. Any non-empty Bearer token is accepted: the emulator does
-// not know the account's keys.
-func authenticate(w http.ResponseWriter, r *http.Request) bool {
+// not know the account's keys (OD-3). A token the emulator issued through
+// POST /api-keys is honoured: its use is recorded, and a sending_access key
+// may only send email.
+func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
 		writeError(w, http.StatusUnauthorized, "missing_api_key", "Missing API Key")
@@ -126,8 +132,30 @@ func authenticate(w http.ResponseWriter, r *http.Request) bool {
 			"Invalid authorization header format. Use 'Authorization: Bearer re_123'.")
 		return false
 	}
+	if key, ok := h.issuedKey(token); ok {
+		if key.Permission == store.PermissionSendingAccess && !isSendRequest(r) {
+			writeError(w, http.StatusUnauthorized, "restricted_api_key", restrictedKeyMsg)
+			return false
+		}
+		used := h.store.Clock.Now().UTC().Format(pgTimestamp)
+		key.LastUsedAt = &used
+		h.store.APIKeys.Set(key.ID, key)
+	}
 	setRateLimitHeaders(w)
 	return true
+}
+
+// isSendRequest reports whether r is POST /emails or POST /emails/batch, the
+// only calls a sending_access key may make.
+func isSendRequest(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	switch strings.TrimSuffix(r.URL.Path, "/") {
+	case "/emails", "/emails/batch":
+		return true
+	}
+	return false
 }
 
 // setRateLimitHeaders sends Resend's default rate limit, 10 requests per
