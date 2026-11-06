@@ -113,6 +113,30 @@ def _():
     assert got["text"] == "fields", f"text is {got['text']!r}"
 
 
+
+def _batch_items():
+    good = {"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke batch", "html": "<p>b</p>"}
+    bad = {"to": "delivered@resend.dev", "subject": "smoke batch", "html": "<p>b</p>"}
+    return [good, bad]
+
+
+@case("batch: strict fails on an invalid item")
+def _():
+    try:
+        resend.Batch.send(_batch_items())
+    except resend.exceptions.ResendError as e:
+        assert str(e.code) == "422", f"code is {e.code!r}"
+        return
+    raise AssertionError("strict batch with an invalid item did not raise")
+
+
+@case("batch: permissive sends the valid items")
+def _():
+    got = resend.Batch.send(_batch_items(), {"batch_validation": "permissive"})
+    assert len(got["data"]) == 1, f"data is {got.get('data')!r}"
+    assert got["errors"] == [{"index": 1, "message": "Missing `from` field."}], f"errors is {got.get('errors')!r}"
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)

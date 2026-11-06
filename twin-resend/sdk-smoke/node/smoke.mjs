@@ -93,6 +93,23 @@ await check("get returns Resend's read fields", async () => {
   assert.equal(got.text, "fields");
 });
 
+const batchItems = () => [
+  { from: SENDER, to: "delivered@resend.dev", subject: "smoke batch", html: "<p>b</p>" },
+  { to: "delivered@resend.dev", subject: "smoke batch", html: "<p>b</p>" },
+];
+
+await check("batch: strict fails on an invalid item", async () => {
+  const { data, error } = await resend.batch.send(batchItems());
+  assert.equal(data, null);
+  assert.equal(error?.statusCode, 422, `error is ${JSON.stringify(error)}`);
+});
+
+await check("batch: permissive sends the valid items", async () => {
+  const got = ok(await resend.batch.send(batchItems(), { batchValidation: "permissive" }));
+  assert.equal(got.data.length, 1, JSON.stringify(got));
+  assert.deepEqual(got.errors, [{ index: 1, message: "Missing `from` field." }]);
+});
+
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);
