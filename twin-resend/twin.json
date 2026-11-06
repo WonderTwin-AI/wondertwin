@@ -1,6 +1,6 @@
 {
   "name": "resend",
-  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back, test-address outcomes, and domains and API keys.",
+  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back, test-address outcomes, domains, API keys with sending_access, and the audiences, audience contacts and broadcasts routes the SDKs call.",
   "category": "email",
   "sdk": {
     "package": "github.com/resend/resend-go/v4",
