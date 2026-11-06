@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -35,10 +34,11 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		Name   string `json:"name"`
 		Region string `json:"region"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "name is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" {
+		missingField(w, "name")
 		return
 	}
 	if req.Region == "" {

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -39,11 +38,16 @@ func (h *Handler) CreateBroadcast(w http.ResponseWriter, r *http.Request) {
 		HTML       string   `json:"html"`
 		Text       string   `json:"text"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AudienceID == "" || req.From == "" || req.Subject == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "audience_id, from, and subject are required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
 		return
+	}
+	for _, f := range []struct{ name, value string }{
+		{"audience_id", req.AudienceID}, {"from", req.From}, {"subject", req.Subject},
+	} {
+		if f.value == "" {
+			missingField(w, f.name)
+			return
+		}
 	}
 
 	if _, ok := h.store.Audiences.Get(req.AudienceID); !ok {

@@ -40,6 +40,12 @@ func (h *Handler) methodNotAllowed(w http.ResponseWriter, r *http.Request) {
 		"Method "+r.Method+" is not allowed for the requested path.")
 }
 
+// missingField answers a missing required field the way Resend does on
+// POST /emails: 422 validation_error naming the field (quirk envelope-006).
+func missingField(w http.ResponseWriter, field string) {
+	writeError(w, http.StatusUnprocessableEntity, "validation_error", "Missing `"+field+"` field.")
+}
+
 func isAdminPath(path string) bool {
 	return path == "/admin" || strings.HasPrefix(path, "/admin/")
 }

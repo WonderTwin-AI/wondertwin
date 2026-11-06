@@ -35,10 +35,11 @@ func (h *Handler) CreateAudience(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "name is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" {
+		missingField(w, "name")
 		return
 	}
 
@@ -121,10 +122,11 @@ func (h *Handler) CreateContact(w http.ResponseWriter, r *http.Request) {
 		LastName     string `json:"last_name"`
 		Unsubscribed bool   `json:"unsubscribed"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "email is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Email == "" {
+		missingField(w, "email")
 		return
 	}
 
