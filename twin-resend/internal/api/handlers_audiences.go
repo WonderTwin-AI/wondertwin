@@ -48,7 +48,7 @@ func (h *Handler) CreateAudience(w http.ResponseWriter, r *http.Request) {
 		ID:        id,
 		Object:    "audience",
 		Name:      req.Name,
-		CreatedAt: h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt: h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Audiences.Set(id, audience)
@@ -138,7 +138,7 @@ func (h *Handler) CreateContact(w http.ResponseWriter, r *http.Request) {
 		FirstName:    req.FirstName,
 		LastName:     req.LastName,
 		Unsubscribed: req.Unsubscribed,
-		CreatedAt:    h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:    h.store.Clock.Now().UTC().Format(pgTimestamp),
 		AudienceID:   audienceID,
 	}
 

@@ -69,7 +69,7 @@ func (h *Handler) CreateBroadcast(w http.ResponseWriter, r *http.Request) {
 		HTML:       req.HTML,
 		Text:       req.Text,
 		Status:     "draft",
-		CreatedAt:  h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:  h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Broadcasts.Set(id, bc)
@@ -94,7 +94,7 @@ func (h *Handler) SendBroadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z")
+	now := h.store.Clock.Now().UTC().Format(pgTimestamp)
 	bc.Status = "sent"
 	bc.SentAt = now
 	h.store.Broadcasts.Set(id, bc)

@@ -57,7 +57,7 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 			{Record: "SPF", Name: req.Name, Type: "TXT", TTL: "Auto", Status: "not_started", Value: "v=spf1 include:amazonses.com ~all"},
 			{Record: "DKIM", Name: fmt.Sprintf("resend._domainkey.%s", req.Name), Type: "CNAME", TTL: "Auto", Status: "not_started", Value: fmt.Sprintf("%s.dkim.amazonses.com", id[:8])},
 		},
-		CreatedAt: h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt: h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Domains.Set(id, domain)

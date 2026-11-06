@@ -43,7 +43,7 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		ID:         id,
 		Name:       req.Name,
 		Token:      token,
-		CreatedAt:  h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:  h.store.Clock.Now().UTC().Format(pgTimestamp),
 		Permission: req.Permission,
 		DomainID:   req.DomainID,
 	}
