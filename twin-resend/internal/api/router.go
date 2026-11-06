@@ -42,6 +42,7 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 
 // Routes mounts the Resend API routes and admin extras.
 func (h *Handler) Routes(r chi.Router) {
+	r.Use(h.frontHeaders)
 	r.NotFound(h.notFound)
 	r.MethodNotAllowed(h.methodNotAllowed)
 
