@@ -104,13 +104,38 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// In sim mode, verification always succeeds
-	domain.Status = store.DomainStatusVerified
+	// Verification lands at once on the outcome /admin/config sets:
+	// verified by default, or pending or failed (architecture decision 7,
+	// quirk lifecycle-006).
+	outcome := h.verifyOutcome()
+	domain.Status = outcome
 	for i := range domain.Records {
-		domain.Records[i].Status = "verified"
+		domain.Records[i].Status = outcome
 	}
 	h.store.Domains.Set(id, domain)
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
+}
+
+// Domain verification outcomes /admin/config can set.
+const (
+	domainStatusPending = "pending"
+	domainStatusFailed  = "failed"
+)
+
+func validVerifyOutcome(s string) bool {
+	switch s {
+	case store.DomainStatusVerified, domainStatusPending, domainStatusFailed:
+		return true
+	}
+	return false
+}
+
+// verifyOutcome is the status POST /domains/{id}/verify gives a domain.
+func (h *Handler) verifyOutcome() string {
+	if s, ok := h.verifyMode.Load().(string); ok && s != "" {
+		return s
+	}
+	return store.DomainStatusVerified
 }
 
 // resendID returns a UUIDv4 for a new resource other than an email.

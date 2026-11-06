@@ -24,11 +24,20 @@ type Handler struct {
 	// strictSenders turns on Resend's full sender-domain rules; see
 	// senderCheck. Off by default.
 	strictSenders atomic.Bool
+
+	// verifyMode is where domain verification lands: verified, pending or
+	// failed; empty means verified.
+	verifyMode atomic.Value
+
+	// limiter is the opt-in rate limit; off by default.
+	limiter rateLimiter
 }
 
 // NewHandler creates a new API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw}
+	h.limiter.nowFunc = s.Clock.Now
+	return h
 }
 
 // Routes mounts the Resend API routes and admin extras.
@@ -141,8 +150,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 		key.LastUsedAt = &used
 		h.store.APIKeys.Set(key.ID, key)
 	}
-	setRateLimitHeaders(w)
-	return true
+	return h.limiter.admit(w)
 }
 
 // isSendRequest reports whether r is POST /emails or POST /emails/batch, the
@@ -156,16 +164,4 @@ func isSendRequest(r *http.Request) bool {
 		return true
 	}
 	return false
-}
-
-// setRateLimitHeaders sends Resend's default rate limit, 10 requests per
-// one-second window, on every authenticated answer (quirks throttle-001,
-// throttle-003). The values are fixed: the emulator never answers 429, so
-// remaining and reset describe one request into a fresh window.
-func setRateLimitHeaders(w http.ResponseWriter) {
-	h := w.Header()
-	h.Set("ratelimit-limit", "10")
-	h.Set("ratelimit-policy", "10;w=1")
-	h.Set("ratelimit-remaining", "9")
-	h.Set("ratelimit-reset", "1")
 }
