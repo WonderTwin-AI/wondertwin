@@ -24,7 +24,9 @@ func main() {
 
 	twin := twincore.New(cfg)
 	memStore := store.New()
-	memStore.Rand = twin.Rand
+	// The seed of sim.DefaultRand, held by the store so /admin/reset
+	// restores it and ids repeat from a fresh start.
+	memStore.Seed(42)
 
 	// API handlers
 	apiHandler := api.NewHandler(memStore, twin.Middleware())

@@ -42,10 +42,13 @@ func (s *MemoryStore) NewMessageID() string {
 }
 
 func (s *MemoryStore) randBytes(buf []byte) {
+	s.randMu.RLock()
+	rng := s.Rand
+	s.randMu.RUnlock()
 	for i := range buf {
 		//nolint:gosec // G115: Intn(256) returns 0..255 by contract; the
 		// conversion to byte cannot overflow.
-		buf[i] = byte(s.Rand.Intn(256))
+		buf[i] = byte(rng.Intn(256))
 	}
 }
 

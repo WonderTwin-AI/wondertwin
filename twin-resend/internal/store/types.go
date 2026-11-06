@@ -28,9 +28,10 @@ type Email struct {
 	ScheduledAt *string    `json:"scheduled_at,omitempty"`
 	Tags        []EmailTag `json:"tags,omitempty"`
 	// Headers and Attachments are kept as sent (attachment metadata only,
-	// never content); Resend does not return them on a read.
-	Headers     map[string]string `json:"-"`
-	Attachments []AttachmentMeta  `json:"-"`
+	// never content) and travel with /admin/state; Resend does not return
+	// them on a read, so retrievedEmail leaves them out.
+	Headers     map[string]string `json:"headers,omitempty"`
+	Attachments []AttachmentMeta  `json:"attachments,omitempty"`
 }
 
 // EmailTag is a name/value tag on an email.
