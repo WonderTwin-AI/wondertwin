@@ -160,6 +160,19 @@ def _():
     assert got["last_event"] == "bounced", f"last_event is {got['last_event']!r}"
 
 
+@case("a send from an unverified domain answers 403")
+def _():
+    resend.Domains.create({"name": "smoke-unverified.example.com"})
+    try:
+        resend.Emails.send({"from": "a@smoke-unverified.example.com", "to": "delivered@resend.dev",
+                            "subject": "smoke domain", "html": "<p>d</p>"})
+    except resend.exceptions.ResendError as e:
+        assert str(e.code) == "403", f"code is {e.code!r}"
+        assert "domain is not verified" in str(e), f"message is {e}"
+        return
+    raise AssertionError("send from an unverified domain did not raise")
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)

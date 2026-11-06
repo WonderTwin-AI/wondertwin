@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
@@ -19,6 +20,10 @@ type Handler struct {
 	// idemMu makes the idempotency check and reservation one step, so two
 	// concurrent requests with one key cannot both send.
 	idemMu sync.Mutex
+
+	// strictSenders turns on Resend's full sender-domain rules; see
+	// senderCheck. Off by default.
+	strictSenders atomic.Bool
 }
 
 // NewHandler creates a new API handler.

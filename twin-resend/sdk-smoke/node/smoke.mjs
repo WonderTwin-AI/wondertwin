@@ -128,6 +128,15 @@ await check("a send to bounced@resend.dev reads back bounced", async () => {
   const got = ok(await resend.emails.get(sent.id));
   assert.equal(got.last_event, "bounced");
 });
+await check("a send from an unverified domain answers 403", async () => {
+  ok(await resend.domains.create({ name: "smoke-unverified.example.com" }));
+  const { data, error } = await resend.emails.send({
+    from: "a@smoke-unverified.example.com", to: "delivered@resend.dev", subject: "smoke domain", html: "<p>d</p>",
+  });
+  assert.equal(data, null);
+  assert.equal(error?.statusCode, 403, `error is ${JSON.stringify(error)}`);
+  assert.match(error.message, /domain is not verified/);
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);
