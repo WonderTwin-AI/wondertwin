@@ -62,6 +62,23 @@ await check("get an unknown id answers not_found", async () => {
   assert.equal(error?.statusCode, 404, `error is ${JSON.stringify(error)}`);
 });
 
+await check("send with a string recipient", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: "delivered@resend.dev", subject: "smoke string", html: "<p>string</p>",
+  }));
+  const got = ok(await resend.emails.get(sent.id));
+  assert.deepEqual(got.to, ["delivered@resend.dev"]);
+});
+
+await check("send with tags, then get them back", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: ["delivered@resend.dev"], subject: "smoke tags", html: "<p>tags</p>",
+    tags: [{ name: "category", value: "smoke" }],
+  }));
+  const got = ok(await resend.emails.get(sent.id));
+  assert.deepEqual(got.tags, [{ name: "category", value: "smoke" }]);
+});
+
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);

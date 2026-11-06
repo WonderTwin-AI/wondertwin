@@ -12,14 +12,45 @@ import (
 
 // sendEmailRequest matches the Resend send email API request body.
 type sendEmailRequest struct {
-	From    string   `json:"from"`
-	To      []string `json:"to"`
-	Subject string   `json:"subject"`
-	HTML    string   `json:"html,omitempty"`
-	Text    string   `json:"text,omitempty"`
-	CC      []string `json:"cc,omitempty"`
-	BCC     []string `json:"bcc,omitempty"`
-	ReplyTo []string `json:"reply_to,omitempty"`
+	From        string            `json:"from"`
+	To          recipients        `json:"to"`
+	Subject     string            `json:"subject"`
+	HTML        string            `json:"html,omitempty"`
+	Text        *string           `json:"text,omitempty"`
+	CC          recipients        `json:"cc,omitempty"`
+	BCC         recipients        `json:"bcc,omitempty"`
+	ReplyTo     recipients        `json:"reply_to,omitempty"`
+	Tags        []store.EmailTag  `json:"tags,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	Attachments []struct {
+		Filename    string `json:"filename"`
+		ContentType string `json:"content_type"`
+	} `json:"attachments,omitempty"`
+	ScheduledAt string `json:"scheduled_at,omitempty"`
+}
+
+// maxRecipients is Resend's cap on the to field.
+const maxRecipients = 50
+
+// validateSend checks a send request the way Resend does and returns the
+// error message, or "" when the request is valid.
+func validateSend(req sendEmailRequest) string {
+	switch {
+	case req.From == "":
+		return "Missing `from` field."
+	case len(req.To) == 0:
+		return "Missing `to` field."
+	case req.Subject == "":
+		return "Missing `subject` field."
+	case len(req.To) > maxRecipients:
+		return "Invalid `to` field. The `to` field must contain at most 50 email addresses."
+	}
+	if req.ScheduledAt != "" {
+		if _, err := time.Parse(time.RFC3339, req.ScheduledAt); err != nil {
+			return "Invalid `scheduled_at` field. The date must be in ISO 8601 format."
+		}
+	}
+	return ""
 }
 
 // SendEmail handles POST /emails
@@ -28,31 +59,8 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-
-	if req.From == "" {
-		twincore.JSON(w, http.StatusUnprocessableEntity, map[string]any{
-			"statusCode": 422,
-			"message":    "The 'from' field is required.",
-			"name":       "validation_error",
-		})
-		return
-	}
-
-	if len(req.To) == 0 {
-		twincore.JSON(w, http.StatusUnprocessableEntity, map[string]any{
-			"statusCode": 422,
-			"message":    "The 'to' field is required and must contain at least one email address.",
-			"name":       "validation_error",
-		})
-		return
-	}
-
-	if req.Subject == "" {
-		twincore.JSON(w, http.StatusUnprocessableEntity, map[string]any{
-			"statusCode": 422,
-			"message":    "The 'subject' field is required.",
-			"name":       "validation_error",
-		})
+	if msg := validateSend(req); msg != "" {
+		writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
 		return
 	}
 
@@ -111,13 +119,24 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 		To:        req.To,
 		Subject:   req.Subject,
 		HTML:      req.HTML,
-		Text:      req.Text,
+		Text:      textFor(req),
 		CC:        req.CC,
 		BCC:       req.BCC,
 		ReplyTo:   req.ReplyTo,
 		Status:    store.EmailStatusDelivered, // Sim: instantly delivered
 		CreatedAt: now.Format(time.RFC3339),
 		LastEvent: "delivered",
+		Tags:      req.Tags,
+		Headers:   req.Headers,
+	}
+	for _, a := range req.Attachments {
+		email.Attachments = append(email.Attachments, store.AttachmentMeta{Filename: a.Filename, ContentType: a.ContentType})
+	}
+	if req.ScheduledAt != "" {
+		at := req.ScheduledAt
+		email.ScheduledAt = &at
+		email.Status = store.EmailStatusScheduled
+		email.LastEvent = store.EmailStatusScheduled
 	}
 
 	h.store.Emails.Set(id, email)

@@ -16,6 +16,27 @@ type Email struct {
 	Status    string   `json:"status"`
 	CreatedAt string   `json:"created_at"`
 	LastEvent string   `json:"last_event"`
+	// ScheduledAt is the ISO 8601 time a scheduled email goes out; nil when
+	// it was sent immediately.
+	ScheduledAt *string    `json:"scheduled_at,omitempty"`
+	Tags        []EmailTag `json:"tags,omitempty"`
+	// Headers and Attachments are kept as sent (attachment metadata only,
+	// never content); Resend does not return them on a read.
+	Headers     map[string]string `json:"-"`
+	Attachments []AttachmentMeta  `json:"-"`
+}
+
+// EmailTag is a name/value tag on an email.
+type EmailTag struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// AttachmentMeta is what the emulator keeps of an attachment: its name and
+// type, not its content.
+type AttachmentMeta struct {
+	Filename    string `json:"filename,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
 // Email status constants matching Resend's lifecycle.
@@ -23,6 +44,7 @@ const (
 	EmailStatusSent      = "sent"
 	EmailStatusDelivered = "delivered"
 	EmailStatusBounced   = "bounced"
+	EmailStatusScheduled = "scheduled"
 )
 
 // Domain represents a verified sending domain.
