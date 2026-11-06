@@ -32,13 +32,19 @@ func TestSendEmailStringRecipients(t *testing.T) {
 		"to": "delivered@resend.dev", "cc": "delivered+cc@resend.dev",
 		"bcc": "delivered+bcc@resend.dev", "reply_to": "delivered+reply@resend.dev",
 	}))
+	// A read returns cc and bcc as null (envelope-004); the stored values are
+	// on the admin plane.
+	stored := tc.Get("/admin/emails").JSONMap()["emails"].([]any)[0].(map[string]any)
 	for field, want := range map[string]string{
 		"to": "delivered@resend.dev", "cc": "delivered+cc@resend.dev",
 		"bcc": "delivered+bcc@resend.dev", "reply_to": "delivered+reply@resend.dev",
 	} {
-		if !reflect.DeepEqual(got[field], []any{want}) {
-			t.Errorf("%s stored as %v, want [%s]", field, got[field], want)
+		if !reflect.DeepEqual(stored[field], []any{want}) {
+			t.Errorf("%s stored as %v, want [%s]", field, stored[field], want)
 		}
+	}
+	if !reflect.DeepEqual(got["to"], []any{"delivered@resend.dev"}) || !reflect.DeepEqual(got["reply_to"], []any{"delivered+reply@resend.dev"}) {
+		t.Errorf("read returned to %v, reply_to %v", got["to"], got["reply_to"])
 	}
 }
 

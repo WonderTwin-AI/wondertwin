@@ -16,6 +16,8 @@ type Email struct {
 	Status    string   `json:"status"`
 	CreatedAt string   `json:"created_at"`
 	LastEvent string   `json:"last_event"`
+	// MessageID is the Amazon SES message id Resend reports for the send.
+	MessageID string `json:"message_id"`
 	// ScheduledAt is the ISO 8601 time a scheduled email goes out; nil when
 	// it was sent immediately.
 	ScheduledAt *string    `json:"scheduled_at,omitempty"`

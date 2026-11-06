@@ -79,6 +79,20 @@ await check("send with tags, then get them back", async () => {
   assert.deepEqual(got.tags, [{ name: "category", value: "smoke" }]);
 });
 
+await check("get returns Resend's read fields", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: "delivered@resend.dev", subject: "smoke fields", html: "<p>fields</p>",
+  }));
+  const got = ok(await resend.emails.get(sent.id));
+  for (const k of ["object", "id", "to", "from", "created_at", "subject", "bcc", "cc", "reply_to",
+    "last_event", "scheduled_at", "message_id", "html", "text"]) {
+    assert.ok(k in got, `missing ${k}`);
+  }
+  assert.ok(!("status" in got), "status is not a field Resend returns");
+  assert.match(got.message_id, /@email\.amazonses\.com>$/);
+  assert.equal(got.text, "fields");
+});
+
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);

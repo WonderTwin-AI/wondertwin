@@ -33,6 +33,14 @@ func (s *MemoryStore) NewID() string {
 	return formatUUID(b)
 }
 
+// NewMessageID returns a message id in the Amazon SES form Resend reports,
+// <{16 hex}-{uuid}-000000@email.amazonses.com>.
+func (s *MemoryStore) NewMessageID() string {
+	var b [8]byte
+	s.randBytes(b[:])
+	return fmt.Sprintf("<%x-%s-000000@email.amazonses.com>", b, s.NewID())
+}
+
 func (s *MemoryStore) randBytes(buf []byte) {
 	for i := range buf {
 		//nolint:gosec // G115: Intn(256) returns 0..255 by contract; the
