@@ -64,3 +64,15 @@ func TestFullAccessKeyAndForeignTokens(t *testing.T) {
 	// A token the emulator never issued is still accepted (OD-3).
 	tc.DoWithHeaders("GET", "/domains", nil, withKey("re_not_issued")).AssertStatus(200)
 }
+
+// TestUserAgentRequired checks a keyed request with no User-Agent answers
+// Resend's edge 403, while a request with no key still answers 401.
+func TestUserAgentRequired(t *testing.T) {
+	_, tc := setupResend(t)
+	tc.DoWithHeaders("GET", "/domains", nil, map[string]string{
+		"Authorization": "Bearer re_sim_test_123", "User-Agent": "",
+	}).AssertStatus(403).AssertBodyContains("error code: 1010")
+	tc.DoWithHeaders("GET", "/domains", nil, map[string]string{"User-Agent": ""}).
+		AssertStatus(401).AssertBodyContains("missing_api_key")
+	resendGet(tc, "/domains").AssertStatus(200)
+}

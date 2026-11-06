@@ -142,6 +142,14 @@ func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 			"Invalid authorization header format. Use 'Authorization: Bearer re_123'.")
 		return false
 	}
+	if r.Header.Get("User-Agent") == "" {
+		// Resend's edge blocks a keyed request with no User-Agent before it
+		// reaches the API (quirk auth-006).
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("error code: 1010"))
+		return false
+	}
 	if key, ok := h.issuedKey(token); ok {
 		if key.Permission == store.PermissionSendingAccess && !isSendRequest(r) {
 			writeError(w, http.StatusUnauthorized, "restricted_api_key", restrictedKeyMsg)
