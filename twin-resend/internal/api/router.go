@@ -116,5 +116,18 @@ func authenticate(w http.ResponseWriter, r *http.Request) bool {
 			"Invalid authorization header format. Use 'Authorization: Bearer re_123'.")
 		return false
 	}
+	setRateLimitHeaders(w)
 	return true
+}
+
+// setRateLimitHeaders sends Resend's default rate limit, 10 requests per
+// one-second window, on every authenticated answer (quirks throttle-001,
+// throttle-003). The values are fixed: the emulator never answers 429, so
+// remaining and reset describe one request into a fresh window.
+func setRateLimitHeaders(w http.ResponseWriter) {
+	h := w.Header()
+	h.Set("ratelimit-limit", "10")
+	h.Set("ratelimit-policy", "10;w=1")
+	h.Set("ratelimit-remaining", "9")
+	h.Set("ratelimit-reset", "1")
 }
