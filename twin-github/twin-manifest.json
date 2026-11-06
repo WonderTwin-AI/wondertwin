@@ -1,7 +1,6 @@
 {
   "display_name": "GitHub",
   "vendor_domain": "github.com",
-  "tier": "community",
   "category": "workspace",
   "description": "Emulates the GitHub REST API at calendar version 2026-03-10 for eight use cases: repository bootstrap, issue triage, pull request lifecycle, CI statuses and check runs, GitHub App installation tokens, release publishing, API version negotiation (2026-03-10 only) and workflow dispatch, plus signed webhook delivery for issues, pull_request, push and check_run.",
   "sdk_target": {

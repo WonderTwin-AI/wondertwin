@@ -48,8 +48,8 @@ jobs:
 
       - name: Enforce tier bright lines
         # Community twins never link commercial code (CTO-45 / CTO-50).
-        # Structural check: the declared tier plus the actual dependency
-        # graph via go list, not a source grep. Domain engines are not
+        # Structural check: the actual dependency graph via go list, not
+        # a source grep or a declared label. Domain engines are not
         # named here; the engine boundary below covers them structurally,
         # and a second copy of that list would only drift.
         run: |
@@ -57,18 +57,13 @@ jobs:
           forbidden='github.com/wondertwin-ai/wondertwin-pro/'
           for dir in twin-*/; do
             twin="${dir%/}"
-            tier=$(jq -r .tier "$twin/twin-manifest.json")
-            if [ "$tier" != "community" ]; then
-              echo "::error::$twin declares tier '$tier'; every twin in this repo must be community"
-              exit 1
-            fi
             # Resolve first, judge second. Folding these together let a twin
             # go list could not resolve -- one with its own go.mod, say --
             # read as "no forbidden imports", because the `if` shields the
             # assignment from errexit and grep finds nothing in empty input.
             deps=$(go list -deps "./$twin/...") || deps=""
             if [ -z "$deps" ]; then
-              echo "::error::$twin resolved no packages; the tier check did not run, so it is not clean"
+              echo "::error::$twin resolved no packages; the boundary check did not run, so it is not clean"
               exit 1
             fi
             if linked=$(printf '%s\n' "$deps" | grep -E "$forbidden"); then

@@ -1,5 +1,4 @@
 {
-  "tier": "commercial",
   "vendor": "stripe",
   "twin_id": "twin-stripe",
   "display_name": "Stripe",

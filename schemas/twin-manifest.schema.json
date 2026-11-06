@@ -6,7 +6,6 @@
   "description": "Schema for twin contribution manifests describing a twin's capabilities and coverage.",
   "type": "object",
   "required": [
-    "tier",
     "publisher",
     "vendor",
     "twin_id",
@@ -21,7 +20,7 @@
   "properties": {
     "tier": {
       "type": "string",
-      "description": "Distribution tier for the twin. Describes provenance and licensing, not pricing. 'community' = MIT licensed, public repo, no account needed. 'commercial' = BSL licensed, pro repo, account required. Pattern is permissive for forward-compat with future tiers (enterprise, hosted) per twin-naming-design \u00a73.3.",
+      "description": "Deprecated and optional. Manifests do not need to carry it. Retained only so manifests in other repositories that still declare it keep validating. Pattern is permissive.",
       "pattern": "^[a-z]+$"
     },
     "publisher": {
