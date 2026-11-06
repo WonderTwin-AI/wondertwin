@@ -7,6 +7,7 @@
 // Prints one JSON line per case ({sdk, case, pass, detail}) and exits non-zero
 // if any case fails. Case names match python/smoke.py.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const base = (process.env.RESEND_EMULATOR_URL ?? "http://localhost:4113").replace(/\/$/, "");
@@ -110,6 +111,16 @@ await check("batch: permissive sends the valid items", async () => {
   assert.deepEqual(got.errors, [{ index: 1, message: "Missing `from` field." }]);
 });
 
+await check("idempotent retry returns the first send", async () => {
+  const idempotencyKey = `smoke-${randomUUID()}`;
+  const params = { from: SENDER, to: "delivered@resend.dev", subject: "smoke idem", html: "<p>i</p>" };
+  const first = ok(await resend.emails.send(params, { idempotencyKey }));
+  const again = ok(await resend.emails.send(params, { idempotencyKey }));
+  assert.equal(again.id, first.id);
+  const { data, error } = await resend.emails.send({ ...params, subject: "changed" }, { idempotencyKey });
+  assert.equal(data, null);
+  assert.equal(error?.statusCode, 409, `error is ${JSON.stringify(error)}`);
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);
