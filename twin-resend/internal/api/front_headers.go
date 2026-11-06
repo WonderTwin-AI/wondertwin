@@ -51,7 +51,7 @@ var securityHeaders = map[string]string{
 // weakETag is the etag form Resend sends, W/"{hex length}-{27 characters of
 // base64 SHA-1}".
 func weakETag(body []byte) string {
-	sum := sha1.Sum(body) //nolint:gosec // G401: see the import.
+	sum := sha1.Sum(body) //nolint:gosec // G401: see the import. // nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-sha1
 	return `W/"` + strconv.FormatInt(int64(len(body)), 16) + "-" +
 		base64.StdEncoding.EncodeToString(sum[:])[:27] + `"`
 }
