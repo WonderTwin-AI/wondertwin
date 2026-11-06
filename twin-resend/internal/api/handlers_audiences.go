@@ -64,13 +64,14 @@ func (h *Handler) DeleteAudience(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// Delete audience and its contacts
-	h.store.Contacts.Filter(func(_ string, c store.Contact) bool {
-		if c.AudienceID == id {
-			h.store.Contacts.Delete(c.ID)
-		}
-		return false
+	// Delete the audience's contacts. Collect them first: Filter holds the
+	// store's read lock, so deleting inside it deadlocks.
+	ids, _ := h.store.Contacts.FilterWithIDs(func(_ string, c store.Contact) bool {
+		return c.AudienceID == id
 	})
+	for _, cid := range ids {
+		h.store.Contacts.Delete(cid)
+	}
 	h.store.Audiences.Delete(id)
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "audience", "id": id, "deleted": true})
 }
