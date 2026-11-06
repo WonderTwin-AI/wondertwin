@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -26,12 +25,7 @@ type sendEmailRequest struct {
 // SendEmail handles POST /emails
 func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 	var req sendEmailRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 422,
-			"message":    "Invalid request body: " + err.Error(),
-			"name":       "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -88,12 +82,7 @@ func (h *Handler) GetEmail(w http.ResponseWriter, r *http.Request) {
 // SendBatch handles POST /emails/batch
 func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 	var reqs []sendEmailRequest
-	if err := json.NewDecoder(r.Body).Decode(&reqs); err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 422,
-			"message":    "Invalid request body: " + err.Error(),
-			"name":       "validation_error",
-		})
+	if !decodeBody(w, r, &reqs) {
 		return
 	}
 

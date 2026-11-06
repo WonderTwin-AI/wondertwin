@@ -66,6 +66,18 @@ def _():
     assert got.get("to") == ["delivered@resend.dev"], f"to is {got.get('to')!r}"
 
 
+
+@case("get an unknown id answers not_found")
+def _():
+    try:
+        resend.Emails.get("4ef9a417-02e9-4d39-ad75-9611e0fcc33c")
+    except resend.exceptions.ResendError as e:
+        assert str(e.code) == "404", f"code is {e.code!r}"
+        assert e.error_type == "not_found", f"error_type is {e.error_type!r}"
+        return
+    raise AssertionError("get of an unknown id did not raise")
+
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)
