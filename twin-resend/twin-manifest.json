@@ -2,16 +2,35 @@
   "display_name": "Resend",
   "vendor_domain": "resend.com",
   "category": "email",
-  "description": "Simulates the Resend email sending API, including single and batch email dispatch with delivery tracking.",
+  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back, test-address outcomes, and domains and API keys.",
   "sdk_target": {
     "primary": {
-      "package": "github.com/resend/resend-go",
+      "package": "github.com/resend/resend-go/v4",
       "language": "go",
-      "version": "v2",
+      "version": "v4.7.0",
       "repo_url": "https://github.com/resend/resend-go",
       "docs_url": "https://resend.com/docs/api-reference"
     },
-    "additional": []
+    "additional": [
+      {
+        "package": "resend",
+        "language": "javascript",
+        "version": "6.30.0",
+        "repo_url": "https://github.com/resend/resend-node",
+        "compatibility": "tested",
+        "last_validated": "2026-11-06",
+        "validation_method": "scenario_suite"
+      },
+      {
+        "package": "resend",
+        "language": "python",
+        "version": "2.48.0",
+        "repo_url": "https://github.com/resend/resend-python",
+        "compatibility": "tested",
+        "last_validated": "2026-11-06",
+        "validation_method": "scenario_suite"
+      }
+    ]
   },
   "service_surface": {
     "openapi_spec": {
@@ -19,20 +38,19 @@
     },
     "auth_pattern": "api_key",
     "has_webhooks": false,
-    "resource_count": 1
+    "resource_count": 6
   },
   "coverage": {
     "resources_implemented": [
-      "emails"
+      "emails",
+      "domains",
+      "api_keys"
     ],
     "resources_not_implemented": [
-      "domains",
-      "api_keys",
       "audiences",
       "contacts",
       "broadcasts"
-    ],
-    "estimated_coverage_pct": 15
+    ]
   },
   "generation": {
     "method": "manual",

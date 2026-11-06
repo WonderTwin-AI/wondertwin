@@ -2,7 +2,7 @@
 // It captures email send calls and provides admin endpoints
 // for inspecting sent emails.
 //
-// SDK compatibility target: github.com/resend/resend-go/v2
+// SDK compatibility target: github.com/resend/resend-go/v4 (v4.7.0)
 // Integration method: Override base URL
 package main
 
