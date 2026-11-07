@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/testutil"
 )
 
@@ -82,15 +83,12 @@ func TestIdempotencyFailedRequestIsNotKept(t *testing.T) {
 }
 
 func TestIdempotencyConcurrentRequest(t *testing.T) {
-	_, tc := setupResend(t)
-	adm := testutil.NewAdminClient(tc)
+	tc, st := setupResendWithStore(t)
 
-	adm.LoadState(map[string]any{
-		"emails": map[string]any{},
-		"idempotency": map[string]any{
-			"POST /emails k1": map[string]any{"request_hash": "x", "created_at": "2099-01-01T00:00:00Z", "in_flight": true},
-		},
-	}).AssertStatus(200)
+	// A first request still being served holds an in-flight record.
+	st.Idempotency.Set("POST /emails k1", store.IdempotencyRecord{
+		RequestHash: "x", CreatedAt: st.Clock.Now(), InFlight: true,
+	})
 	idemSend(tc, "/emails", "k1", idemEmail("hi")).
 		AssertStatus(409).
 		AssertBodyContains(`"name":"concurrent_idempotent_requests"`)

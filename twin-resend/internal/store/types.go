@@ -28,9 +28,10 @@ type Email struct {
 	ScheduledAt *string    `json:"scheduled_at,omitempty"`
 	Tags        []EmailTag `json:"tags,omitempty"`
 	// Headers and Attachments are kept as sent (attachment metadata only,
-	// never content); Resend does not return them on a read.
-	Headers     map[string]string `json:"-"`
-	Attachments []AttachmentMeta  `json:"-"`
+	// never content) and travel with /admin/state; Resend does not return
+	// them on a read, so retrievedEmail leaves them out.
+	Headers     map[string]string `json:"headers,omitempty"`
+	Attachments []AttachmentMeta  `json:"attachments,omitempty"`
 }
 
 // EmailTag is a name/value tag on an email.
@@ -87,7 +88,20 @@ type APIKey struct {
 	Name      string `json:"name"`
 	Token     string `json:"token,omitempty"` // only returned on create
 	CreatedAt string `json:"created_at"`
+	// Permission is full_access (the default) or sending_access; a
+	// sending_access key may only send email (quirk auth-004).
+	Permission string `json:"permission,omitempty"`
+	// DomainID is the domain a sending_access key is bound to, if any.
+	DomainID string `json:"domain_id,omitempty"`
+	// LastUsedAt is when the key last authenticated a request; nil if never.
+	LastUsedAt *string `json:"last_used_at"`
 }
+
+// API key permissions.
+const (
+	PermissionFullAccess    = "full_access"
+	PermissionSendingAccess = "sending_access"
+)
 
 // Audience represents a contact list / audience.
 type Audience struct {

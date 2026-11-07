@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -13,7 +12,7 @@ import (
 // ListDomains handles GET /domains
 func (h *Handler) ListDomains(w http.ResponseWriter, r *http.Request) {
 	domains := h.store.Domains.Filter(func(_ string, _ store.Domain) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"data": domains})
+	twincore.JSON(w, http.StatusOK, listBody(domains))
 }
 
 // GetDomain handles GET /domains/{id}
@@ -35,10 +34,11 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		Name   string `json:"name"`
 		Region string `json:"region"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "name is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" {
+		missingField(w, "name")
 		return
 	}
 	if req.Region == "" {
@@ -57,7 +57,7 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 			{Record: "SPF", Name: req.Name, Type: "TXT", TTL: "Auto", Status: "not_started", Value: "v=spf1 include:amazonses.com ~all"},
 			{Record: "DKIM", Name: fmt.Sprintf("resend._domainkey.%s", req.Name), Type: "CNAME", TTL: "Auto", Status: "not_started", Value: fmt.Sprintf("%s.dkim.amazonses.com", id[:8])},
 		},
-		CreatedAt: h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt: h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Domains.Set(id, domain)
@@ -104,13 +104,38 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// In sim mode, verification always succeeds
-	domain.Status = store.DomainStatusVerified
+	// Verification lands at once on the outcome /admin/config sets:
+	// verified by default, or pending or failed (architecture decision 7,
+	// quirk lifecycle-006).
+	outcome := h.verifyOutcome()
+	domain.Status = outcome
 	for i := range domain.Records {
-		domain.Records[i].Status = "verified"
+		domain.Records[i].Status = outcome
 	}
 	h.store.Domains.Set(id, domain)
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
+}
+
+// Domain verification outcomes /admin/config can set.
+const (
+	domainStatusPending = "pending"
+	domainStatusFailed  = "failed"
+)
+
+func validVerifyOutcome(s string) bool {
+	switch s {
+	case store.DomainStatusVerified, domainStatusPending, domainStatusFailed:
+		return true
+	}
+	return false
+}
+
+// verifyOutcome is the status POST /domains/{id}/verify gives a domain.
+func (h *Handler) verifyOutcome() string {
+	if s, ok := h.verifyMode.Load().(string); ok && s != "" {
+		return s
+	}
+	return store.DomainStatusVerified
 }
 
 // resendID returns a UUIDv4 for a new resource other than an email.

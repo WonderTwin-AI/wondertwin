@@ -24,7 +24,7 @@ func writeError(w http.ResponseWriter, status int, name, message string) {
 // so a request without a key gets 401 missing_api_key, not 404. Admin paths
 // are the emulator's own and need no key.
 func (h *Handler) notFound(w http.ResponseWriter, r *http.Request) {
-	if !isAdminPath(r.URL.Path) && !authenticate(w, r) {
+	if !isAdminPath(r.URL.Path) && !h.authenticate(w, r) {
 		return
 	}
 	writeError(w, http.StatusNotFound, "not_found", "The requested endpoint does not exist.")
@@ -33,11 +33,17 @@ func (h *Handler) notFound(w http.ResponseWriter, r *http.Request) {
 // methodNotAllowed answers a known path with a method it does not serve,
 // after authentication.
 func (h *Handler) methodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	if !isAdminPath(r.URL.Path) && !authenticate(w, r) {
+	if !isAdminPath(r.URL.Path) && !h.authenticate(w, r) {
 		return
 	}
 	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed",
 		"Method "+r.Method+" is not allowed for the requested path.")
+}
+
+// missingField answers a missing required field the way Resend does on
+// POST /emails: 422 validation_error naming the field (quirk envelope-006).
+func missingField(w http.ResponseWriter, field string) {
+	writeError(w, http.StatusUnprocessableEntity, "validation_error", "Missing `"+field+"` field.")
 }
 
 func isAdminPath(path string) bool {

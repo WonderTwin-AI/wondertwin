@@ -14,6 +14,13 @@ import (
 // setupResendWithConfig wires /admin/config the way main.go does.
 func setupResendWithConfig(t *testing.T) *testutil.TwinClient {
 	t.Helper()
+	tc, _ := setupResendWithStore(t)
+	return tc
+}
+
+// setupResendWithStore is setupResendWithConfig that also returns the store.
+func setupResendWithStore(t *testing.T) (*testutil.TwinClient, *store.MemoryStore) {
+	t.Helper()
 	twin := twincore.New(&twincore.Config{Name: "twin-resend-test"})
 	memStore := store.New()
 	memStore.Rand = twin.Rand
@@ -24,7 +31,7 @@ func setupResendWithConfig(t *testing.T) *testutil.TwinClient {
 	adm.Routes(twin.Router)
 	srv := httptest.NewServer(twin.Router)
 	t.Cleanup(srv.Close)
-	return testutil.NewTwinClient(t, srv)
+	return testutil.NewTwinClient(t, srv), memStore
 }
 
 func sendFrom(tc *testutil.TwinClient, from string, to any) *testutil.Response {

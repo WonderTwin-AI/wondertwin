@@ -2,45 +2,213 @@
   "app_emulator": "twin-resend",
   "references": {
     "docs": "resend.com/docs as served 2026-09-28",
-    "sdks": ["resend-go v4.7.0", "resend-node 6.30.0", "resend-python 2.48.0"]
+    "sdks": [
+      "resend-go v4.7.0",
+      "resend-node 6.30.0",
+      "resend-python 2.48.0"
+    ]
   },
-  "status": "Declared under the operator's decisions on API keys and sender domains.",
+  "status": "Declared under the operator's decisions OD-3 and OD-4 and the research divergence records, cited per entry.",
   "divergences": [
     {
       "route": "any API route, API key",
       "resend": "Verifies the key; an invalid or deleted key answers validation_error 'API key is invalid', 401 on POST /emails and 400 on reads",
-      "app_emulator": "Accepts any non-empty Bearer token; a missing key answers 401 missing_api_key",
-      "reason": "The app emulator issues no keys, so it has none to check a token against"
+      "app_emulator": "Accepts any non-empty Bearer token; a missing key answers 401 missing_api_key. A token the emulator issued through POST /api-keys is honoured, so a sending_access key answers 401 restricted_api_key on anything but a send",
+      "reason": "The app emulator knows only the keys it issued, so it has no account keys to check other tokens against",
+      "decision": "OD-3, research/twins/resend/RESEARCH-STATUS.md"
     },
     {
       "route": "POST /emails, POST /emails/batch, from",
       "resend": "Refuses any sender domain that is not verified on the team with 403 validation_error",
       "app_emulator": "By default refuses only a domain created through POST /domains and not yet verified; a domain it has never seen is accepted. strict_sender_domains in /admin/config refuses every domain that is not created and verified",
-      "reason": "Tests run with no domain setup by default; strict mode is there for clients that need Resend's refusal"
+      "reason": "Tests run with no domain setup by default; strict mode is there for clients that need Resend's refusal",
+      "decision": "OD-4, research/twins/resend/divergence-records/from-domain-verification.json"
     },
     {
       "route": "POST /emails, POST /emails/batch, from onboarding@resend.dev (strict mode)",
       "resend": "The shared sender may send to the account owner's address and to resend.dev test addresses",
       "app_emulator": "In strict mode the shared sender may send to resend.dev test addresses only, with Resend's 403 'You can only send testing emails to your own email address' for any other recipient",
-      "reason": "The app emulator has no account owner"
+      "reason": "The app emulator has no account owner",
+      "decision": "OD-4, research/twins/resend/divergence-records/from-domain-verification.json"
     },
     {
       "route": "any authenticated route, rate limits",
       "resend": "Enforces the team's rate limit and answers 429 rate_limit_exceeded",
-      "app_emulator": "Sends Resend's headers with fixed values (ratelimit-limit 10, ratelimit-policy 10;w=1, ratelimit-remaining 9, ratelimit-reset 1) and never answers 429",
-      "reason": "A test should not fail on throttling it did not ask for"
+      "app_emulator": "Off by default: sends Resend's headers with fixed values (ratelimit-limit 10, ratelimit-policy 10;w=1, ratelimit-remaining 9, ratelimit-reset 1) and never answers 429. rate_limit in /admin/config sets a limit per one-second window of emulator-clock time across all keys, past which it answers 429 rate_limit_exceeded with retry-after",
+      "reason": "A test should not fail on throttling it did not ask for; one that tests its backoff turns the limit on",
+      "decision": "architecture-spec.md decision 10"
     },
     {
       "route": "POST /emails, POST /emails/batch, quotas",
       "resend": "Counts sends against daily and monthly quotas, reports them in x-resend-daily-quota and x-resend-monthly-quota, and answers 429 when one is exceeded",
       "app_emulator": "Keeps no quota and sends neither header",
-      "reason": "Quotas belong to a Resend plan, which the app emulator does not have"
+      "reason": "Quotas belong to a Resend plan, which the app emulator does not have",
+      "decision": "resend-bp1 s11, research/twins/resend/build-plans/resend-bp1.json"
     },
     {
       "route": "POST /emails, scheduled_at",
       "resend": "Accepts an ISO 8601 date or natural language such as 'in 1 hour'",
       "app_emulator": "Accepts ISO 8601 (RFC 3339) only; natural language answers 422 validation_error",
-      "reason": "Natural-language scheduling is planned with the coverage extension"
+      "reason": "Natural-language scheduling is planned with the coverage extension",
+      "decision": "resend-bp1 s05, research/twins/resend/build-plans/resend-bp1.json"
+    },
+    {
+      "route": "any API route, sending_access key with domain_id",
+      "resend": "A sending_access key bound to a domain_id may only send from that domain",
+      "app_emulator": "Stores the domain_id but does not restrict the sender domain",
+      "reason": "Resend's answer to a send from another domain has not been observed, so the emulator does not invent one",
+      "decision": "OD-3, research/twins/resend/RESEARCH-STATUS.md; quirk auth-004"
+    },
+    {
+      "route": "POST /domains/{id}/verify",
+      "resend": "Starts an asynchronous DNS check; the domain is pending, then verified, failed or partially_verified",
+      "app_emulator": "Settles at once on verified, or on pending or failed when domain_verification in /admin/config says so; partially_verified is not produced",
+      "reason": "The emulator checks no DNS; tests choose the outcome they need",
+      "decision": "architecture-spec.md decision 7; quirk lifecycle-006"
+    },
+    {
+      "route": "GET|POST /audiences/{audience_id}/contacts, GET|PATCH|DELETE /audiences/{audience_id}/contacts/{id}",
+      "category": "vendor_spec_under_specification",
+      "resend": "The OpenAPI documents only top-level /contacts, but resend-go and resend-node call the audience-scoped paths",
+      "app_emulator": "Serves the audience-scoped paths the SDKs call; top-level /contacts is not served",
+      "reason": "The SDKs are the more accurate description of what Resend serves",
+      "decision": "research/twins/resend/divergence-records/audience-scoped-contacts.json"
+    },
+    {
+      "route": "POST /admin/reset",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Clears all state and restores the seed; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/state",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Returns all state as JSON; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "POST /admin/state",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Replaces all state from JSON; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "POST /admin/fault/{endpoint}",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Injects a fault on an endpoint; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "DELETE /admin/fault/{endpoint}",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Removes an injected fault; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/faults",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Lists injected faults; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/requests",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Returns the request log; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "POST /admin/webhooks/flush",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Flushes queued webhooks; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "POST /admin/time/advance",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Advances the emulator clock; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/time",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Returns the emulator clock; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/health",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Readiness check; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/config",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Returns runtime config, including strict_sender_domains, domain_verification and rate_limit; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "PUT /admin/config",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Updates runtime config; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/quirks",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Lists quirks; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "PUT /admin/quirks/{quirk_id}",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Enables a quirk; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "DELETE /admin/quirks/{quirk_id}",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Disables a quirk; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "GET /admin/emails",
+      "category": "admin_endpoint",
+      "resend": "Not served",
+      "app_emulator": "Lists sent emails as stored, including fields a read does not return; needs no API key",
+      "reason": "Operator control for deterministic tests",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
     }
   ]
 }

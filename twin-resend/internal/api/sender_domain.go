@@ -4,15 +4,9 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
-	"sync/atomic"
 
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
-	"github.com/wondertwin-ai/wondertwin/twinkit/admin"
 )
-
-// strictSendersKey is the admin config key that turns on Resend's full
-// sender-domain rules.
-const strictSendersKey = "strict_sender_domains"
 
 // sharedSenderDomain is the domain of Resend's shared onboarding sender.
 const sharedSenderDomain = "resend.dev"
@@ -71,46 +65,4 @@ func senderDomain(from string) string {
 	}
 	_, domain, _ := strings.Cut(addr, "@")
 	return strings.ToLower(strings.TrimSpace(strings.TrimSuffix(domain, ">")))
-}
-
-// ConfigProvider extends the kit's runtime config with the emulator's own
-// strict_sender_domains switch, readable and settable through /admin/config.
-func (h *Handler) ConfigProvider(base admin.ConfigProvider) admin.ConfigProvider {
-	return &resendConfig{base: base, strict: &h.strictSenders}
-}
-
-type resendConfig struct {
-	base   admin.ConfigProvider
-	strict *atomic.Bool
-}
-
-func (c *resendConfig) GetConfig() map[string]any {
-	out := c.base.GetConfig()
-	out[strictSendersKey] = c.strict.Load()
-	return out
-}
-
-func (c *resendConfig) UpdateConfig(updates map[string]any) error {
-	rest := make(map[string]any, len(updates))
-	var strict *bool
-	for k, v := range updates {
-		if k != strictSendersKey {
-			rest[k] = v
-			continue
-		}
-		b, ok := v.(bool)
-		if !ok {
-			return fmt.Errorf("%s must be a boolean", strictSendersKey)
-		}
-		strict = &b
-	}
-	if len(rest) > 0 {
-		if err := c.base.UpdateConfig(rest); err != nil {
-			return err
-		}
-	}
-	if strict != nil {
-		c.strict.Store(*strict)
-	}
-	return nil
 }

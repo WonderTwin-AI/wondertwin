@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"sync"
 
 	"github.com/wondertwin-ai/wondertwin/twinkit/sim"
 	pkgstate "github.com/wondertwin-ai/wondertwin/twinkit/state"
@@ -21,10 +22,24 @@ type MemoryStore struct {
 
 	Clock *pkgstate.Clock
 
-	// Rand is the deterministic per-twin random source. Wired by
-	// main.go (and test setups) to twin.Rand so handler-level
-	// randomness shares the simulator's seed.
+	// Rand is the deterministic per-twin random source. Set it through Seed
+	// so Reset can restore it; test setups may also assign it directly.
 	Rand *sim.Rand
+
+	// randMu guards swapping Rand on Reset against concurrent id draws.
+	randMu sync.RWMutex
+	// seed is the seed Rand was created from by Seed; nil when Rand was
+	// assigned directly, in which case Reset leaves Rand as it is.
+	seed *int64
+}
+
+// Seed gives the store a fresh random source from seed, which Reset restores,
+// so a run after /admin/reset issues the same ids as a fresh start.
+func (s *MemoryStore) Seed(seed int64) {
+	s.randMu.Lock()
+	defer s.randMu.Unlock()
+	s.Rand = sim.NewRand(seed)
+	s.seed = &seed
 }
 
 // New creates a new MemoryStore with empty state.
@@ -88,6 +103,14 @@ func (s *MemoryStore) LoadState(data []byte) error {
 		s.Broadcasts.LoadSnapshot(snap.Broadcasts)
 	}
 	if snap.Idempotency != nil {
+		// A request in flight when the state was taken never finishes in
+		// this process; keeping its record would answer 409 for that key
+		// for 24 hours.
+		for k, rec := range snap.Idempotency {
+			if rec.InFlight {
+				delete(snap.Idempotency, k)
+			}
+		}
 		s.Idempotency.LoadSnapshot(snap.Idempotency)
 	}
 	return nil
@@ -103,4 +126,9 @@ func (s *MemoryStore) Reset() {
 	s.Broadcasts.Reset()
 	s.Idempotency.Reset()
 	s.Clock.Reset()
+	s.randMu.Lock()
+	if s.seed != nil {
+		s.Rand = sim.NewRand(*s.seed)
+	}
+	s.randMu.Unlock()
 }

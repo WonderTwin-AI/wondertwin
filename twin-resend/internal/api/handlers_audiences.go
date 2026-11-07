@@ -14,7 +14,7 @@ import (
 // ListAudiences handles GET /audiences
 func (h *Handler) ListAudiences(w http.ResponseWriter, r *http.Request) {
 	audiences := h.store.Audiences.Filter(func(_ string, _ store.Audience) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": audiences})
+	twincore.JSON(w, http.StatusOK, listBody(audiences))
 }
 
 // GetAudience handles GET /audiences/{id}
@@ -35,10 +35,11 @@ func (h *Handler) CreateAudience(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "name is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" {
+		missingField(w, "name")
 		return
 	}
 
@@ -47,7 +48,7 @@ func (h *Handler) CreateAudience(w http.ResponseWriter, r *http.Request) {
 		ID:        id,
 		Object:    "audience",
 		Name:      req.Name,
-		CreatedAt: h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt: h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Audiences.Set(id, audience)
@@ -63,13 +64,14 @@ func (h *Handler) DeleteAudience(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// Delete audience and its contacts
-	h.store.Contacts.Filter(func(_ string, c store.Contact) bool {
-		if c.AudienceID == id {
-			h.store.Contacts.Delete(c.ID)
-		}
-		return false
+	// Delete the audience's contacts. Collect them first: Filter holds the
+	// store's read lock, so deleting inside it deadlocks.
+	ids, _ := h.store.Contacts.FilterWithIDs(func(_ string, c store.Contact) bool {
+		return c.AudienceID == id
 	})
+	for _, cid := range ids {
+		h.store.Contacts.Delete(cid)
+	}
 	h.store.Audiences.Delete(id)
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "audience", "id": id, "deleted": true})
 }
@@ -89,7 +91,7 @@ func (h *Handler) ListContacts(w http.ResponseWriter, r *http.Request) {
 	contacts := h.store.Contacts.Filter(func(_ string, c store.Contact) bool {
 		return c.AudienceID == audienceID
 	})
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": contacts})
+	twincore.JSON(w, http.StatusOK, listBody(contacts))
 }
 
 // GetContact handles GET /audiences/{audience_id}/contacts/{id}
@@ -121,10 +123,11 @@ func (h *Handler) CreateContact(w http.ResponseWriter, r *http.Request) {
 		LastName     string `json:"last_name"`
 		Unsubscribed bool   `json:"unsubscribed"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "email is required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Email == "" {
+		missingField(w, "email")
 		return
 	}
 
@@ -136,7 +139,7 @@ func (h *Handler) CreateContact(w http.ResponseWriter, r *http.Request) {
 		FirstName:    req.FirstName,
 		LastName:     req.LastName,
 		Unsubscribed: req.Unsubscribed,
-		CreatedAt:    h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:    h.store.Clock.Now().UTC().Format(pgTimestamp),
 		AudienceID:   audienceID,
 	}
 

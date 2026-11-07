@@ -5,16 +5,35 @@
     "language": "go",
     "version": "v4.7.0"
   },
-  "build": 2,
+  "build": 3,
   "generated_at": "2026-11-06T00:00:00Z",
   "sources": {
     "openapi": {
-      "origin": "manual"
+      "origin": "vendor_published",
+      "url": "https://raw.githubusercontent.com/resend/resend-openapi/83c9782f3e14d5c6e5a89c6eb92f872aa0dad64d/resend.yaml",
+      "retrieved_at": "2026-09-29T05:46:47Z",
+      "sha256": "1bc22334de302c1bddec319da1abe1d640fc5bdb626eb0cde81bc0b67fb2d4f7",
+      "api_version": "1.5.1"
     },
     "sdk_analysis": {
       "method": "manual",
       "repo": "https://github.com/resend/resend-go",
-      "repo_ref": "v4.7.0"
+      "repo_ref": "v4.7.0",
+      "sha256": "26b13aa2be6b8a5fcf31d1ad623ca44dbc625f2fc0e7f4c34de0940b42cdf87b"
     }
+  },
+  "research_archive": "wondertwin-docs/research/twins/resend",
+  "research_completed": "2026-11-05T00:00:00Z",
+  "references": {
+    "manifest_path": "wondertwin-docs/research/twins/resend/references/manifest.json",
+    "manifest_sha256": "99892c194671d41abef63f5f96ff137b40cbdfac4ad6f049692edfa7cb763d6e",
+    "primary": "openapi-resend-1.5.1-83c9782",
+    "supporting": [
+      "sdk-go-v4.7.0",
+      "sdk-typescript-6.30.0",
+      "sdk-python-2.48.0",
+      "docs-2026-09-28-pages",
+      "discovery-probes-2026-11-04"
+    ]
   }
 }

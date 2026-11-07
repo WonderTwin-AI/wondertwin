@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +11,7 @@ import (
 // ListBroadcasts handles GET /broadcasts
 func (h *Handler) ListBroadcasts(w http.ResponseWriter, r *http.Request) {
 	broadcasts := h.store.Broadcasts.Filter(func(_ string, _ store.Broadcast) bool { return true })
-	twincore.JSON(w, http.StatusOK, map[string]any{"object": "list", "data": broadcasts})
+	twincore.JSON(w, http.StatusOK, listBody(broadcasts))
 }
 
 // GetBroadcast handles GET /broadcasts/{id}
@@ -39,11 +38,16 @@ func (h *Handler) CreateBroadcast(w http.ResponseWriter, r *http.Request) {
 		HTML       string   `json:"html"`
 		Text       string   `json:"text"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AudienceID == "" || req.From == "" || req.Subject == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"statusCode": 400, "message": "audience_id, from, and subject are required", "name": "validation_error",
-		})
+	if !decodeBody(w, r, &req) {
 		return
+	}
+	for _, f := range []struct{ name, value string }{
+		{"audience_id", req.AudienceID}, {"from", req.From}, {"subject", req.Subject},
+	} {
+		if f.value == "" {
+			missingField(w, f.name)
+			return
+		}
 	}
 
 	if _, ok := h.store.Audiences.Get(req.AudienceID); !ok {
@@ -65,7 +69,7 @@ func (h *Handler) CreateBroadcast(w http.ResponseWriter, r *http.Request) {
 		HTML:       req.HTML,
 		Text:       req.Text,
 		Status:     "draft",
-		CreatedAt:  h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z"),
+		CreatedAt:  h.store.Clock.Now().UTC().Format(pgTimestamp),
 	}
 
 	h.store.Broadcasts.Set(id, bc)
@@ -90,7 +94,7 @@ func (h *Handler) SendBroadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := h.store.Clock.Now().Format("2006-01-02T15:04:05.000Z")
+	now := h.store.Clock.Now().UTC().Format(pgTimestamp)
 	bc.Status = "sent"
 	bc.SentAt = now
 	h.store.Broadcasts.Set(id, bc)

@@ -24,15 +24,25 @@ type Handler struct {
 	// strictSenders turns on Resend's full sender-domain rules; see
 	// senderCheck. Off by default.
 	strictSenders atomic.Bool
+
+	// verifyMode is where domain verification lands: verified, pending or
+	// failed; empty means verified.
+	verifyMode atomic.Value
+
+	// limiter is the opt-in rate limit; off by default.
+	limiter rateLimiter
 }
 
 // NewHandler creates a new API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw}
+	h := &Handler{store: s, mw: mw}
+	h.limiter.nowFunc = s.Clock.Now
+	return h
 }
 
 // Routes mounts the Resend API routes and admin extras.
 func (h *Handler) Routes(r chi.Router) {
+	r.Use(h.frontHeaders)
 	r.NotFound(h.notFound)
 	r.MethodNotAllowed(h.methodNotAllowed)
 
@@ -105,16 +115,22 @@ func (h *Handler) Routes(r chi.Router) {
 // bearerAuthMiddleware validates Resend-style Bearer token auth.
 func (h *Handler) bearerAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if authenticate(w, r) {
+		if h.authenticate(w, r) {
 			next.ServeHTTP(w, r)
 		}
 	})
 }
 
+// restrictedKeyMsg is Resend's answer when a sending_access key calls
+// anything but a send (quirk auth-004).
+const restrictedKeyMsg = "This API key is restricted to only send emails"
+
 // authenticate checks the Authorization header and answers the error itself
 // when it fails. Any non-empty Bearer token is accepted: the emulator does
-// not know the account's keys.
-func authenticate(w http.ResponseWriter, r *http.Request) bool {
+// not know the account's keys (OD-3). A token the emulator issued through
+// POST /api-keys is honoured: its use is recorded, and a sending_access key
+// may only send email.
+func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) bool {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
 		writeError(w, http.StatusUnauthorized, "missing_api_key", "Missing API Key")
@@ -126,18 +142,35 @@ func authenticate(w http.ResponseWriter, r *http.Request) bool {
 			"Invalid authorization header format. Use 'Authorization: Bearer re_123'.")
 		return false
 	}
-	setRateLimitHeaders(w)
-	return true
+	if r.Header.Get("User-Agent") == "" {
+		// Resend's edge blocks a keyed request with no User-Agent before it
+		// reaches the API (quirk auth-006).
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("error code: 1010"))
+		return false
+	}
+	if key, ok := h.issuedKey(token); ok {
+		if key.Permission == store.PermissionSendingAccess && !isSendRequest(r) {
+			writeError(w, http.StatusUnauthorized, "restricted_api_key", restrictedKeyMsg)
+			return false
+		}
+		used := h.store.Clock.Now().UTC().Format(pgTimestamp)
+		key.LastUsedAt = &used
+		h.store.APIKeys.Set(key.ID, key)
+	}
+	return h.limiter.admit(w)
 }
 
-// setRateLimitHeaders sends Resend's default rate limit, 10 requests per
-// one-second window, on every authenticated answer (quirks throttle-001,
-// throttle-003). The values are fixed: the emulator never answers 429, so
-// remaining and reset describe one request into a fresh window.
-func setRateLimitHeaders(w http.ResponseWriter) {
-	h := w.Header()
-	h.Set("ratelimit-limit", "10")
-	h.Set("ratelimit-policy", "10;w=1")
-	h.Set("ratelimit-remaining", "9")
-	h.Set("ratelimit-reset", "1")
+// isSendRequest reports whether r is POST /emails or POST /emails/batch, the
+// only calls a sending_access key may make.
+func isSendRequest(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	switch strings.TrimSuffix(r.URL.Path, "/") {
+	case "/emails", "/emails/batch":
+		return true
+	}
+	return false
 }
