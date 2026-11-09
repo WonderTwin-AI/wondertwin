@@ -134,7 +134,7 @@
       "route": "POST /admin/webhooks/flush",
       "category": "admin_endpoint",
       "resend": "Not served",
-      "app_emulator": "Flushes queued webhooks; needs no API key",
+      "app_emulator": "Not wired to the Resend dispatcher: events are delivered as they are queued, so a flush would send each twice; needs no API key",
       "reason": "Operator control for deterministic tests",
       "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
     },
@@ -216,6 +216,13 @@
       "app_emulator": "Accepts http and https endpoints; refuses any other scheme with Resend's message",
       "reason": "Receivers in local development and CI run on plain http; requiring TLS would stop the emulator delivering to them",
       "decision": "resend-bp2 s08, research/twins/resend/build-plans/resend-bp2.json; observed in run 2026-11-08 (probe o08)"
+    },
+    {
+      "route": "webhook event delivery",
+      "resend": "Retries a failed delivery on Svix's schedule and disables an endpoint that keeps failing",
+      "app_emulator": "Delivers each event once as it is queued, on the twinkit retry schedule; never disables an endpoint. Event bodies follow Resend's docs and SDK types, not recorded deliveries",
+      "reason": "Svix's retry schedule and auto-disable are not part of the approved build scope",
+      "decision": "twin-resend/internal/api/webhook_delivery.go (quirks delivery-001, delivery-002)"
     }
   ]
 }
