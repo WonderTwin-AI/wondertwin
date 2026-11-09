@@ -22,6 +22,10 @@ type Handler struct {
 	// concurrent requests with one key cannot both send.
 	idemMu sync.Mutex
 
+	// settleMu makes settling a due scheduled email and recording it one
+	// step, so only one reader emits its events.
+	settleMu sync.Mutex
+
 	// strictSenders turns on Resend's full sender-domain rules; see
 	// senderCheck. Off by default.
 	strictSenders atomic.Bool

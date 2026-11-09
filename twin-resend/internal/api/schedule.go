@@ -82,8 +82,16 @@ func settleScheduled(e *store.Email, now time.Time) bool {
 // A scheduled email settles when it is next read, and its email.sent and
 // outcome events go out then.
 func (h *Handler) settledEmail(e store.Email) store.Email {
-	if settleScheduled(&e, h.store.Clock.Now()) {
+	h.settleMu.Lock()
+	if cur, ok := h.store.Emails.Get(e.ID); ok {
+		e = cur
+	}
+	settled := settleScheduled(&e, h.store.Clock.Now())
+	if settled {
 		h.store.Emails.Set(e.ID, e)
+	}
+	h.settleMu.Unlock()
+	if settled {
 		h.emitEmailEvents(e)
 	}
 	return e
