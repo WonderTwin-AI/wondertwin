@@ -2,7 +2,7 @@
   "display_name": "Resend",
   "vendor_domain": "resend.com",
   "category": "email",
-  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back and listing them with cursor pagination, test-address outcomes, domains, API keys with sending_access, and the audiences, audience contacts and broadcasts routes the SDKs call.",
+  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back and listing them with cursor pagination, test-address outcomes, domains, API keys with sending_access, and the audiences, audience contacts and broadcasts routes the SDKs call, and webhook registration with signing secrets.",
   "sdk_target": {
     "primary": {
       "package": "github.com/resend/resend-go/v4",
@@ -37,8 +37,8 @@
       "available": false
     },
     "auth_pattern": "api_key",
-    "has_webhooks": false,
-    "resource_count": 6
+    "has_webhooks": true,
+    "resource_count": 7
   },
   "coverage": {
     "resources_implemented": [
@@ -47,7 +47,8 @@
       "api_keys",
       "audiences",
       "contacts",
-      "broadcasts"
+      "broadcasts",
+      "webhooks"
     ],
     "resources_not_implemented": []
   },
