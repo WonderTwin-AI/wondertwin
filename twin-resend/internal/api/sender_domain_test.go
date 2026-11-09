@@ -49,18 +49,18 @@ func setStrict(tc *testutil.TwinClient, on bool) {
 	tc.DoWithHeaders("PUT", "/admin/config", map[string]any{"strict_sender_domains": on}, nil).AssertStatus(200)
 }
 
-const unverifiedMsg = "The unverified.example.com domain is not verified. Please, add and verify your domain on https://resend.com/domains"
+const unverifiedMsg = "The unverified.acme.dev domain is not verified. Please, add and verify your domain on https://resend.com/domains"
 
 func TestSenderDomainDefaultMode(t *testing.T) {
 	tc := setupResendWithConfig(t)
 
-	sendFrom(tc, "a@unknown.example.com", "delivered@resend.dev").AssertStatus(200)
-	createDomain(tc, "unverified.example.com", false)
-	sendFrom(tc, "Sender <a@unverified.example.com>", "delivered@resend.dev").
+	sendFrom(tc, "a@unknown.acme.dev", "delivered@resend.dev").AssertStatus(200)
+	createDomain(tc, "unverified.acme.dev", false)
+	sendFrom(tc, "Sender <a@unverified.acme.dev>", "delivered@resend.dev").
 		AssertStatus(403).AssertBodyContains(unverifiedMsg)
-	createDomain(tc, "ok.example.com", true)
-	sendFrom(tc, "a@ok.example.com", "someone@example.com").AssertStatus(200)
-	sendFrom(tc, "onboarding@resend.dev", "someone@example.com").AssertStatus(200)
+	createDomain(tc, "ok.acme.dev", true)
+	sendFrom(tc, "a@ok.acme.dev", "someone@acme.dev").AssertStatus(200)
+	sendFrom(tc, "onboarding@resend.dev", "someone@acme.dev").AssertStatus(200)
 }
 
 func TestSenderDomainStrictMode(t *testing.T) {
@@ -70,23 +70,23 @@ func TestSenderDomainStrictMode(t *testing.T) {
 		t.Fatalf("admin config strict_sender_domains = %v, want true", got)
 	}
 
-	sendFrom(tc, "snap@unverified.example.com", "delivered@resend.dev").
+	sendFrom(tc, "snap@unverified.acme.dev", "delivered@resend.dev").
 		AssertStatus(403).AssertBodyContains(unverifiedMsg)
-	createDomain(tc, "ok.example.com", true)
-	sendFrom(tc, "a@ok.example.com", "someone@example.com").AssertStatus(200)
+	createDomain(tc, "ok.acme.dev", true)
+	sendFrom(tc, "a@ok.acme.dev", "someone@acme.dev").AssertStatus(200)
 	sendFrom(tc, "onboarding@resend.dev", "bounced@resend.dev").AssertStatus(200)
-	sendFrom(tc, "onboarding@resend.dev", "someone@example.com").
+	sendFrom(tc, "onboarding@resend.dev", "someone@acme.dev").
 		AssertStatus(403).AssertBodyContains("You can only send testing emails to your own email address")
 
 	setStrict(tc, false)
-	sendFrom(tc, "a@unknown.example.com", "delivered@resend.dev").AssertStatus(200)
+	sendFrom(tc, "a@unknown.acme.dev", "delivered@resend.dev").AssertStatus(200)
 }
 
 func TestSenderDomainBatch(t *testing.T) {
 	tc := setupResendWithConfig(t)
-	createDomain(tc, "unverified.example.com", false)
+	createDomain(tc, "unverified.acme.dev", false)
 	good := map[string]any{"from": "onboarding@resend.dev", "to": "delivered@resend.dev", "subject": "hi", "html": "<p>hi</p>"}
-	bad := map[string]any{"from": "a@unverified.example.com", "to": "delivered@resend.dev", "subject": "hi", "html": "<p>hi</p>"}
+	bad := map[string]any{"from": "a@unverified.acme.dev", "to": "delivered@resend.dev", "subject": "hi", "html": "<p>hi</p>"}
 
 	resendPost(tc, "/emails/batch", []any{good, bad}).AssertStatus(403).AssertBodyContains(unverifiedMsg)
 	tc.DoWithHeaders("POST", "/emails/batch", []any{good, bad}, map[string]string{

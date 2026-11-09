@@ -32,7 +32,7 @@ func TestUpdateAPIKey(t *testing.T) {
 // still sends from onboarding@resend.dev (quirk auth-007).
 func TestDomainRestrictedKey(t *testing.T) {
 	_, tc := setupResend(t)
-	domainID := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	domainID := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 	token := resendPost(tc, "/api-keys", map[string]any{
 		"name": "bound", "permission": "sending_access", "domain_id": domainID,
 	}).AssertStatus(201).JSONMap()["token"].(string)
@@ -40,7 +40,7 @@ func TestDomainRestrictedKey(t *testing.T) {
 		return map[string]any{"from": from, "to": "delivered@resend.dev", "subject": "s", "text": "t"}
 	}
 
-	m := tc.DoWithHeaders("POST", "/emails", send("a@example.com"), withKey(token)).AssertStatus(400).JSONMap()
+	m := tc.DoWithHeaders("POST", "/emails", send("a@acme.dev"), withKey(token)).AssertStatus(400).JSONMap()
 	want := map[string]any{
 		"message":    "The associated domain with your API key is not verified. Please, create a new API key with full access or with a verified domain.",
 		"statusCode": float64(400),
@@ -48,15 +48,15 @@ func TestDomainRestrictedKey(t *testing.T) {
 	if !reflect.DeepEqual(m, want) {
 		t.Errorf("own unverified domain: got %v, want %v", m, want)
 	}
-	tc.DoWithHeaders("POST", "/emails/batch", []any{send("onboarding@resend.dev"), send("a@example.com")}, withKey(token)).
+	tc.DoWithHeaders("POST", "/emails/batch", []any{send("onboarding@resend.dev"), send("a@acme.dev")}, withKey(token)).
 		AssertStatus(400)
 
 	tc.DoWithHeaders("POST", "/emails", send("onboarding@resend.dev"), withKey(token)).AssertStatus(200)
 
 	// A key the emulator did not issue is not bound to the domain: the
 	// ordinary sender-domain rule answers 403.
-	resendPost(tc, "/emails", send("a@example.com")).AssertStatus(403)
+	resendPost(tc, "/emails", send("a@acme.dev")).AssertStatus(403)
 
 	resendPost(tc, "/domains/"+domainID+"/verify", nil).AssertStatus(200)
-	tc.DoWithHeaders("POST", "/emails", send("a@example.com"), withKey(token)).AssertStatus(200)
+	tc.DoWithHeaders("POST", "/emails", send("a@acme.dev"), withKey(token)).AssertStatus(200)
 }

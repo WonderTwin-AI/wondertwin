@@ -129,16 +129,16 @@ await check("a send to bounced@resend.dev reads back bounced", async () => {
   assert.equal(got.last_event, "bounced");
 });
 await check("a send from an unverified domain answers 403", async () => {
-  ok(await resend.domains.create({ name: "smoke-unverified.example.com" }));
+  ok(await resend.domains.create({ name: "smoke-unverified.acme.dev" }));
   const { data, error } = await resend.emails.send({
-    from: "a@smoke-unverified.example.com", to: "delivered@resend.dev", subject: "smoke domain", html: "<p>d</p>",
+    from: "a@smoke-unverified.acme.dev", to: "delivered@resend.dev", subject: "smoke domain", html: "<p>d</p>",
   });
   assert.equal(data, null);
   assert.equal(error?.statusCode, 403, `error is ${JSON.stringify(error)}`);
   assert.match(error.message, /domain is not verified/);
 });
 await check("create and get a domain", async () => {
-  const created = ok(await resend.domains.create({ name: "smoke-shape.example.com" }));
+  const created = ok(await resend.domains.create({ name: "smoke-shape.acme.dev" }));
   assert.equal(created.status, "not_started");
   assert.deepEqual(created.records.map((r) => r.name), ["resend._domainkey", "send", "send", "rsend"]);
   const got = ok(await resend.domains.get(created.id));
@@ -147,7 +147,7 @@ await check("create and get a domain", async () => {
   assert.equal(got.open_tracking, false);
 });
 await check("update, verify and delete a domain", async () => {
-  const created = ok(await resend.domains.create({ name: "smoke-update.example.com" }));
+  const created = ok(await resend.domains.create({ name: "smoke-update.acme.dev" }));
   const updated = ok(await resend.domains.update({ id: created.id, openTracking: true, tls: "enforced" }));
   assert.deepEqual(updated, { object: "domain", id: created.id });
   const got = ok(await resend.domains.get(created.id));
@@ -212,8 +212,8 @@ await check("verify a signed webhook delivery", async () => {
   }
 });
 await check("list domains with a limit pages newest first", async () => {
-  const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
-  const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));
+  const first = ok(await resend.domains.create({ name: "smoke-page-one.acme.dev" }));
+  const second = ok(await resend.domains.create({ name: "smoke-page-two.acme.dev" }));
   let page = ok(await resend.domains.list({ limit: 1 }));
   assert.deepEqual(page.data.map((d) => d.id), [second.id]);
   assert.equal(page.has_more, true);

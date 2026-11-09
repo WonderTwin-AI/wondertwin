@@ -30,7 +30,7 @@ func TestRateLimitHeaders(t *testing.T) {
 	}
 
 	authenticated := []struct{ name, method, path, body string }{
-		{"send", "POST", "/emails", `{"from":"a@example.com","to":["delivered@resend.dev"],"subject":"s","html":"h"}`},
+		{"send", "POST", "/emails", `{"from":"a@acme.dev","to":["delivered@resend.dev"],"subject":"s","html":"h"}`},
 		{"validation error", "POST", "/emails", `{}`},
 		{"unknown endpoint", "GET", "/no-such-endpoint", ""},
 		{"list domains", "GET", "/domains", ""},

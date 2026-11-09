@@ -15,13 +15,13 @@ func TestTestAddressOutcomes(t *testing.T) {
 		{"complained+x@resend.dev", "complained"},
 		// suppressed@ takes no label, so a labelled one is an ordinary address.
 		{"suppressed+x@resend.dev", "delivered"},
-		{"someone@example.com", "delivered"},
-		{[]string{"someone@example.com", "bounced@resend.dev"}, "bounced"},
+		{"someone@acme.dev", "delivered"},
+		{[]string{"someone@acme.dev", "bounced@resend.dev"}, "bounced"},
 	}
 	for _, c := range cases {
 		_, tc := setupResend(t)
 		sent := resendPost(tc, "/emails", map[string]any{
-			"from": "a@example.com", "to": c.to, "subject": "hi", "html": "<p>hi</p>",
+			"from": "a@acme.dev", "to": c.to, "subject": "hi", "html": "<p>hi</p>",
 		}).AssertStatus(200)
 		got := resendGet(tc, "/emails/"+sent.JSONMap()["id"].(string)).AssertStatus(200).JSONMap()
 		if got["last_event"] != c.want {
@@ -33,7 +33,7 @@ func TestTestAddressOutcomes(t *testing.T) {
 func TestTestAddressScheduledStaysScheduled(t *testing.T) {
 	_, tc := setupResend(t)
 	sent := resendPost(tc, "/emails", map[string]any{
-		"from": "a@example.com", "to": "bounced@resend.dev", "subject": "hi", "html": "<p>hi</p>",
+		"from": "a@acme.dev", "to": "bounced@resend.dev", "subject": "hi", "html": "<p>hi</p>",
 		"scheduled_at": "in 2 days",
 	}).AssertStatus(200)
 	got := resendGet(tc, "/emails/"+sent.JSONMap()["id"].(string)).AssertStatus(200).JSONMap()

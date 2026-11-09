@@ -105,8 +105,8 @@ func TestSendEmailValidation(t *testing.T) {
 		message string
 	}{
 		{"missing from", map[string]any{"to": "delivered@resend.dev", "subject": "s"}, "Missing `from` field."},
-		{"missing to", map[string]any{"from": "a@example.com", "subject": "s"}, "Missing `to` field."},
-		{"missing subject", map[string]any{"from": "a@example.com", "to": "delivered@resend.dev"}, "Missing `subject` field."},
+		{"missing to", map[string]any{"from": "a@acme.dev", "subject": "s"}, "Missing `to` field."},
+		{"missing subject", map[string]any{"from": "a@acme.dev", "to": "delivered@resend.dev"}, "Missing `subject` field."},
 		{"over 50 recipients", baseSend(map[string]any{"to": many}), "at most 50"},
 		{"scheduled_at unparsable", baseSend(map[string]any{"scheduled_at": "next blue moon"}), "must be a valid date"},
 	}

@@ -206,17 +206,17 @@ func main() {
 	})
 
 	check("a send from an unverified domain answers 403", func() error {
-		if _, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-unverified.example.com"}); err != nil {
+		if _, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-unverified.acme.dev"}); err != nil {
 			return err
 		}
 		req := email("smoke domain", "delivered@resend.dev")
-		req.From = "a@smoke-go-unverified.example.com"
+		req.From = "a@smoke-go-unverified.acme.dev"
 		_, err := client.Emails.Send(req)
 		return wantErr(err, "domain is not verified")
 	})
 
 	check("create and get a domain", func() error {
-		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-shape.example.com"})
+		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-shape.acme.dev"})
 		if err != nil {
 			return err
 		}
@@ -234,7 +234,7 @@ func main() {
 	})
 
 	check("update, verify and delete a domain", func() error {
-		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-update.example.com"})
+		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-update.acme.dev"})
 		if err != nil {
 			return err
 		}
@@ -353,11 +353,11 @@ func main() {
 	})
 
 	check("list domains with a limit pages newest first", func() error {
-		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
+		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.acme.dev"})
 		if err != nil {
 			return err
 		}
-		second, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-two.example.com"})
+		second, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-two.acme.dev"})
 		if err != nil {
 			return err
 		}

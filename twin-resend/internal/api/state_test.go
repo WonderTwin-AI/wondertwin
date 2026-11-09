@@ -20,17 +20,17 @@ func TestStateRoundTrip(t *testing.T) {
 	adm := testutil.NewAdminClient(tc)
 
 	emailID := resendPost(tc, "/emails", map[string]any{
-		"from": "a@example.com", "to": "delivered@resend.dev", "subject": "s", "html": "<p>h</p>",
+		"from": "a@acme.dev", "to": "delivered@resend.dev", "subject": "s", "html": "<p>h</p>",
 		"headers":     map[string]string{"X-Entity-Ref-ID": "123"},
 		"attachments": []map[string]any{{"filename": "invoice.pdf", "content": "aGVsbG8="}},
 	}).AssertStatus(200).JSONMap()["id"].(string)
-	domainID := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	domainID := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 	keyID := resendPost(tc, "/api-keys", map[string]any{"name": "ci"}).AssertStatus(201).JSONMap()["id"].(string)
 	audienceID := resendPost(tc, "/audiences", map[string]any{"name": "General"}).AssertStatus(201).JSONMap()["id"].(string)
-	contactID := resendPost(tc, "/audiences/"+audienceID+"/contacts", map[string]any{"email": "c@example.com"}).
+	contactID := resendPost(tc, "/audiences/"+audienceID+"/contacts", map[string]any{"email": "c@acme.dev"}).
 		AssertStatus(201).JSONMap()["id"].(string)
 	broadcastID := resendPost(tc, "/broadcasts", map[string]any{
-		"audience_id": audienceID, "from": "a@example.com", "subject": "news",
+		"audience_id": audienceID, "from": "a@acme.dev", "subject": "news",
 	}).AssertStatus(201).JSONMap()["id"].(string)
 
 	snap := adm.GetState().AssertStatus(200).Body
@@ -89,10 +89,10 @@ func TestResetReseeds(t *testing.T) {
 	create := func(name string) string {
 		return resendPost(tc, "/domains", map[string]any{"name": name}).AssertStatus(201).JSONMap()["id"].(string)
 	}
-	first := create("example.com")
-	create("example.org")
+	first := create("acme.dev")
+	create("acme.io")
 	testutil.NewAdminClient(tc).Reset().AssertStatus(200)
-	if again := create("example.com"); again != first {
+	if again := create("acme.dev"); again != first {
 		t.Errorf("first id after reset %s, want %s", again, first)
 	}
 }

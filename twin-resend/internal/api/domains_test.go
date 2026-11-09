@@ -33,7 +33,7 @@ func sortedKeys(m map[string]any) []string {
 // four DNS records, capabilities, and no tracking switches.
 func TestCreateDomain(t *testing.T) {
 	_, tc := setupResend(t)
-	m := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()
+	m := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()
 
 	want := []string{"capabilities", "created_at", "id", "name", "object", "records", "region", "status"}
 	if got := sortedKeys(m); !reflect.DeepEqual(got, want) {
@@ -78,7 +78,7 @@ func assertDomainRecords(t *testing.T, records []any) {
 // without object or records (probes m02, m03 of 2026-11-08).
 func TestGetDomain(t *testing.T) {
 	_, tc := setupResend(t)
-	created := resendPost(tc, "/domains", map[string]any{"name": "example.com", "region": "eu-west-1"}).AssertStatus(201).JSONMap()
+	created := resendPost(tc, "/domains", map[string]any{"name": "acme.dev", "region": "eu-west-1"}).AssertStatus(201).JSONMap()
 	id := created["id"].(string)
 
 	got := resendGet(tc, "/domains/"+id).AssertStatus(200).JSONMap()
@@ -104,7 +104,7 @@ func TestGetDomain(t *testing.T) {
 	resendGet(tc, "/domains/00000000-0000-4000-8000-000000000000").AssertStatus(404)
 
 	id = resendPost(tc, "/domains", map[string]any{
-		"name": "tracked.example.com", "open_tracking": true, "click_tracking": true,
+		"name": "tracked.acme.dev", "open_tracking": true, "click_tracking": true,
 		"capabilities": map[string]any{"receiving": "enabled"},
 	}).AssertStatus(201).JSONMap()["id"].(string)
 	got = resendGet(tc, "/domains/"+id).AssertStatus(200).JSONMap()
@@ -123,17 +123,17 @@ func TestCreateDomainErrors(t *testing.T) {
 	m := resendPost(tc, "/domains", map[string]any{}).AssertStatus(422).JSONMap()
 	assertResendError(t, m, "missing_required_field", "Missing `name` field.")
 
-	m = resendPost(tc, "/domains", map[string]any{"name": "example.com", "region": "mars-1"}).AssertStatus(422).JSONMap()
+	m = resendPost(tc, "/domains", map[string]any{"name": "acme.dev", "region": "mars-1"}).AssertStatus(422).JSONMap()
 	assertResendError(t, m, "validation_error",
 		"The `region` field must be one of \"us-east-1\", \"eu-west-1\", \"sa-east-1\", or \"ap-northeast-1\".")
 
 	for _, region := range []string{"us-east-1", "eu-west-1", "sa-east-1", "ap-northeast-1"} {
-		resendPost(tc, "/domains", map[string]any{"name": region + ".example.com", "region": region}).AssertStatus(201)
+		resendPost(tc, "/domains", map[string]any{"name": region + ".acme.dev", "region": region}).AssertStatus(201)
 	}
 
-	resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201)
-	m = resendPost(tc, "/domains", map[string]any{"name": "Example.com"}).AssertStatus(403).JSONMap()
-	assertResendError(t, m, "validation_error", "The Example.com domain has been registered already.")
+	resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201)
+	m = resendPost(tc, "/domains", map[string]any{"name": "Acme.dev"}).AssertStatus(403).JSONMap()
+	assertResendError(t, m, "validation_error", "The Acme.dev domain has been registered already.")
 }
 
 // TestDomainStateRoundTrip checks capabilities, tracking and the DKIM key
@@ -142,7 +142,7 @@ func TestDomainStateRoundTrip(t *testing.T) {
 	tc, s := setupResendWithStore(t)
 	s.Seed(7)
 	adm := testutil.NewAdminClient(tc)
-	id := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	id := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 	before := resendGet(tc, "/domains/"+id).AssertStatus(200).JSONMap()
 
 	snap := adm.GetState().AssertStatus(200).Body
@@ -153,8 +153,22 @@ func TestDomainStateRoundTrip(t *testing.T) {
 	}
 
 	adm.Reset().AssertStatus(200)
-	again := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()
+	again := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()
 	if again["records"].([]any)[0].(map[string]any)["value"] != before["records"].([]any)[0].(map[string]any)["value"] {
 		t.Error("the DKIM key did not repeat for the same seed after reset")
+	}
+}
+
+// TestCreateDomainHeldElsewhere checks the names Resend refuses as
+// registered by another account answer 422 (quirk lifecycle-013, probes m00
+// to m00c of 2026-11-08), whatever the case, while a look-alike is accepted.
+func TestCreateDomainHeldElsewhere(t *testing.T) {
+	_, tc := setupResend(t)
+	for _, name := range []string{"example.com", "mail.example.com", "News.Example.org", "app.test"} {
+		m := resendPost(tc, "/domains", map[string]any{"name": name}).AssertStatus(422).JSONMap()
+		assertResendError(t, m, "validation_error", "This domain has been registered already.")
+	}
+	for _, name := range []string{"myexample.com", "example.company", "test.dev"} {
+		resendPost(tc, "/domains", map[string]any{"name": name}).AssertStatus(201)
 	}
 }

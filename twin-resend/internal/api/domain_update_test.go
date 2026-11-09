@@ -9,7 +9,7 @@ import (
 // switches it names read back changed, the others unchanged.
 func TestUpdateDomain(t *testing.T) {
 	_, tc := setupResend(t)
-	id := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	id := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 
 	m := resendPatch(tc, "/domains/"+id, map[string]any{"open_tracking": true, "tls": "enforced"}).AssertStatus(200).JSONMap()
 	if !reflect.DeepEqual(m, map[string]any{"object": "domain", "id": id}) {
@@ -37,7 +37,7 @@ func TestUpdateDomain(t *testing.T) {
 // domain then reads 404 (probes m12, m13 of 2026-11-08).
 func TestDeleteDomain(t *testing.T) {
 	_, tc := setupResend(t)
-	id := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	id := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 
 	m := tc.DoWithHeaders("DELETE", "/domains/"+id, nil, resendHeaders).AssertStatus(200).JSONMap()
 	if !reflect.DeepEqual(m, map[string]any{"object": "domain", "id": id, "deleted": true}) {
@@ -48,14 +48,14 @@ func TestDeleteDomain(t *testing.T) {
 	tc.DoWithHeaders("DELETE", "/domains/"+id, nil, resendHeaders).AssertStatus(404)
 
 	// The name is free again once deleted.
-	resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201)
+	resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201)
 }
 
 // TestVerifyDomain checks verify answers {object, id}, the domain reads
 // verified by default (OD-4), and an unknown id answers 404.
 func TestVerifyDomain(t *testing.T) {
 	_, tc := setupResend(t)
-	id := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	id := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 
 	m := resendPost(tc, "/domains/"+id+"/verify", nil).AssertStatus(200).JSONMap()
 	if !reflect.DeepEqual(m, map[string]any{"object": "domain", "id": id}) {

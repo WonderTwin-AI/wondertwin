@@ -162,9 +162,9 @@ def _():
 
 @case("a send from an unverified domain answers 403")
 def _():
-    resend.Domains.create({"name": "smoke-unverified.example.com"})
+    resend.Domains.create({"name": "smoke-unverified.acme.dev"})
     try:
-        resend.Emails.send({"from": "a@smoke-unverified.example.com", "to": "delivered@resend.dev",
+        resend.Emails.send({"from": "a@smoke-unverified.acme.dev", "to": "delivered@resend.dev",
                             "subject": "smoke domain", "html": "<p>d</p>"})
     except resend.exceptions.ResendError as e:
         assert str(e.code) == "403", f"code is {e.code!r}"
@@ -176,7 +176,7 @@ def _():
 
 @case("create and get a domain")
 def _():
-    created = resend.Domains.create({"name": "smoke-shape.example.com"})
+    created = resend.Domains.create({"name": "smoke-shape.acme.dev"})
     assert created["status"] == "not_started", f"create is {created!r}"
     names = [r["name"] for r in created["records"]]
     assert names == ["resend._domainkey", "send", "send", "rsend"], f"records are {names!r}"
@@ -188,7 +188,7 @@ def _():
 
 @case("update, verify and delete a domain")
 def _():
-    created = resend.Domains.create({"name": "smoke-update.example.com"})
+    created = resend.Domains.create({"name": "smoke-update.acme.dev"})
     updated = resend.Domains.update({"id": created["id"], "open_tracking": True, "tls": "enforced"})
     assert (updated["object"], updated["id"]) == ("domain", created["id"]), f"update is {updated!r}"
     got = resend.Domains.get(created["id"])
@@ -280,8 +280,8 @@ def _():
 
 @case("list domains with a limit pages newest first")
 def _():
-    first = resend.Domains.create({"name": "smoke-page-one.example.com"})
-    second = resend.Domains.create({"name": "smoke-page-two.example.com"})
+    first = resend.Domains.create({"name": "smoke-page-one.acme.dev"})
+    second = resend.Domains.create({"name": "smoke-page-two.acme.dev"})
     page = resend.Domains.list({"limit": 1})
     assert [d["id"] for d in page["data"]] == [second["id"]], f"page 1 is {page!r}"
     assert page["has_more"] is True, f"has_more is {page['has_more']!r}"

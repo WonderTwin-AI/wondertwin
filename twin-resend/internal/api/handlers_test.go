@@ -65,8 +65,8 @@ func TestSendAndGetEmail(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resp := resendPost(tc, "/emails", map[string]any{
-		"from":    "sender@example.com",
-		"to":      []string{"recipient@example.com"},
+		"from":    "sender@acme.dev",
+		"to":      []string{"recipient@acme.dev"},
 		"subject": "Test Email",
 		"html":    "<p>Hello</p>",
 	})
@@ -85,8 +85,8 @@ func TestSendAndGetEmail(t *testing.T) {
 	if got["id"] != id {
 		t.Errorf("expected id=%s, got %v", id, got["id"])
 	}
-	if got["from"] != "sender@example.com" {
-		t.Errorf("expected from=sender@example.com, got %v", got["from"])
+	if got["from"] != "sender@acme.dev" {
+		t.Errorf("expected from=sender@acme.dev, got %v", got["from"])
 	}
 	if got["subject"] != "Test Email" {
 		t.Errorf("expected subject=Test Email, got %v", got["subject"])
@@ -100,7 +100,7 @@ func TestSendEmailMissingFrom(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resp := resendPost(tc, "/emails", map[string]any{
-		"to":      []string{"recipient@example.com"},
+		"to":      []string{"recipient@acme.dev"},
 		"subject": "No From",
 	})
 	resp.AssertStatus(422)
@@ -111,7 +111,7 @@ func TestSendEmailMissingTo(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resp := resendPost(tc, "/emails", map[string]any{
-		"from":    "sender@example.com",
+		"from":    "sender@acme.dev",
 		"subject": "No To",
 	})
 	resp.AssertStatus(422)
@@ -122,8 +122,8 @@ func TestSendEmailMissingSubject(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resp := resendPost(tc, "/emails", map[string]any{
-		"from": "sender@example.com",
-		"to":   []string{"recipient@example.com"},
+		"from": "sender@acme.dev",
+		"to":   []string{"recipient@acme.dev"},
 	})
 	resp.AssertStatus(422)
 	resp.AssertBodyContains("validation_error")
@@ -142,14 +142,14 @@ func TestSendBatchEmails(t *testing.T) {
 
 	resp := resendPost(tc, "/emails/batch", []map[string]any{
 		{
-			"from":    "sender@example.com",
-			"to":      []string{"a@example.com"},
+			"from":    "sender@acme.dev",
+			"to":      []string{"a@acme.dev"},
 			"subject": "Batch 1",
 			"html":    "<p>A</p>",
 		},
 		{
-			"from":    "sender@example.com",
-			"to":      []string{"b@example.com"},
+			"from":    "sender@acme.dev",
+			"to":      []string{"b@acme.dev"},
 			"subject": "Batch 2",
 			"html":    "<p>B</p>",
 		},
@@ -175,13 +175,13 @@ func TestAdminListEmails(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resendPost(tc, "/emails", map[string]any{
-		"from":    "sender@example.com",
-		"to":      []string{"alice@example.com"},
+		"from":    "sender@acme.dev",
+		"to":      []string{"alice@acme.dev"},
 		"subject": "Hello Alice",
 		"html":    "<p>Hi</p>",
 	}).AssertStatus(200)
 
-	resp := tc.Get("/admin/emails?to=alice@example.com")
+	resp := tc.Get("/admin/emails?to=alice@acme.dev")
 	resp.AssertStatus(200)
 	m := resp.JSONMap()
 	emails, ok := m["emails"].([]any)
@@ -194,8 +194,8 @@ func TestAdminListEmailsBySubject(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resendPost(tc, "/emails", map[string]any{
-		"from":    "sender@example.com",
-		"to":      []string{"bob@example.com"},
+		"from":    "sender@acme.dev",
+		"to":      []string{"bob@acme.dev"},
 		"subject": "Password Reset",
 		"html":    "<p>Reset your password</p>",
 	}).AssertStatus(200)
@@ -213,8 +213,8 @@ func TestAdminReset(t *testing.T) {
 	_, tc := setupResend(t)
 
 	resendPost(tc, "/emails", map[string]any{
-		"from":    "sender@example.com",
-		"to":      []string{"ghost@example.com"},
+		"from":    "sender@acme.dev",
+		"to":      []string{"ghost@acme.dev"},
 		"subject": "Ghost",
 		"html":    "<p>boo</p>",
 	}).AssertStatus(200)

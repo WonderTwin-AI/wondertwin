@@ -32,10 +32,10 @@ func TestCreatedAtPostgresForm(t *testing.T) {
 	pg := regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}\+00$`)
 	audienceID := resendPost(tc, "/audiences", map[string]any{"name": "General"}).AssertStatus(201).JSONMap()["id"].(string)
 	created := map[string]map[string]any{
-		"domain":  resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap(),
-		"contact": resendPost(tc, "/audiences/"+audienceID+"/contacts", map[string]any{"email": "c@example.com"}).AssertStatus(201).JSONMap(),
+		"domain":  resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap(),
+		"contact": resendPost(tc, "/audiences/"+audienceID+"/contacts", map[string]any{"email": "c@acme.dev"}).AssertStatus(201).JSONMap(),
 		"broadcast": resendPost(tc, "/broadcasts", map[string]any{
-			"audience_id": audienceID, "from": "a@example.com", "subject": "s",
+			"audience_id": audienceID, "from": "a@acme.dev", "subject": "s",
 		}).AssertStatus(201).JSONMap(),
 		"audience": resendGet(tc, "/audiences/"+audienceID).AssertStatus(200).JSONMap(),
 	}
@@ -72,7 +72,7 @@ func assertPage(t *testing.T, m map[string]any, wantIDs []string, wantMore bool)
 func TestListDomainsPagination(t *testing.T) {
 	_, tc := setupResend(t)
 	var ids []string
-	for _, name := range []string{"one.example.com", "two.example.com", "three.example.com"} {
+	for _, name := range []string{"one.acme.dev", "two.acme.dev", "three.acme.dev"} {
 		ids = append(ids, resendPost(tc, "/domains", map[string]any{"name": name}).AssertStatus(201).JSONMap()["id"].(string))
 	}
 	d1, d2, d3 := ids[0], ids[1], ids[2]

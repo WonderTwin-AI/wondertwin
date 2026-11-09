@@ -33,7 +33,7 @@ func setupPinned(t *testing.T, at time.Time) (*store.MemoryStore, *testutil.Twin
 
 func sendOne(tc *testutil.TwinClient) string {
 	resp := resendPost(tc, "/emails", map[string]any{
-		"from": "a@example.com", "to": []string{"delivered@resend.dev"}, "subject": "s", "html": "<p>h</p>",
+		"from": "a@acme.dev", "to": []string{"delivered@resend.dev"}, "subject": "s", "html": "<p>h</p>",
 	})
 	resp.AssertStatus(200)
 	return resp.JSONMap()["id"].(string)
@@ -41,8 +41,8 @@ func sendOne(tc *testutil.TwinClient) string {
 
 func batchIDs(tc *testutil.TwinClient) []string {
 	resp := resendPost(tc, "/emails/batch", []map[string]any{
-		{"from": "a@example.com", "to": []string{"delivered@resend.dev"}, "subject": "1", "html": "<p>1</p>"},
-		{"from": "a@example.com", "to": []string{"delivered@resend.dev"}, "subject": "2", "html": "<p>2</p>"},
+		{"from": "a@acme.dev", "to": []string{"delivered@resend.dev"}, "subject": "1", "html": "<p>1</p>"},
+		{"from": "a@acme.dev", "to": []string{"delivered@resend.dev"}, "subject": "2", "html": "<p>2</p>"},
 	})
 	resp.AssertStatus(200)
 	var ids []string
@@ -78,7 +78,7 @@ func TestIDsAreUUIDs(t *testing.T) {
 	}
 
 	for _, path := range []string{"/domains", "/api-keys", "/audiences"} {
-		resp := resendPost(tc, path, map[string]any{"name": "smoke.example.com"})
+		resp := resendPost(tc, path, map[string]any{"name": "smoke.acme.dev"})
 		id, _ := resp.JSONMap()["id"].(string)
 		if !uuidV4.MatchString(id) {
 			t.Errorf("%s id %q is not a UUIDv4", path, id)
@@ -93,8 +93,8 @@ func TestIDsAreDeterministic(t *testing.T) {
 	if x, y := sendOne(a), sendOne(b); x != y {
 		t.Errorf("same seed and clock issued %q and %q", x, y)
 	}
-	x := resendPost(a, "/domains", map[string]any{"name": "a.example.com"}).JSONMap()["id"]
-	y := resendPost(b, "/domains", map[string]any{"name": "a.example.com"}).JSONMap()["id"]
+	x := resendPost(a, "/domains", map[string]any{"name": "a.acme.dev"}).JSONMap()["id"]
+	y := resendPost(b, "/domains", map[string]any{"name": "a.acme.dev"}).JSONMap()["id"]
 	if x != y {
 		t.Errorf("same seed issued domain ids %v and %v", x, y)
 	}
