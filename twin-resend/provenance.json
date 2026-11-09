@@ -5,8 +5,8 @@
     "language": "go",
     "version": "v4.7.0"
   },
-  "build": 3,
-  "generated_at": "2026-11-06T00:00:00Z",
+  "build": 4,
+  "generated_at": "2026-11-09T00:00:00Z",
   "sources": {
     "openapi": {
       "origin": "vendor_published",
@@ -23,17 +23,18 @@
     }
   },
   "research_archive": "wondertwin-docs/research/twins/resend",
-  "research_completed": "2026-11-05T00:00:00Z",
+  "research_completed": "2026-11-09T00:00:00Z",
   "references": {
     "manifest_path": "wondertwin-docs/research/twins/resend/references/manifest.json",
-    "manifest_sha256": "99892c194671d41abef63f5f96ff137b40cbdfac4ad6f049692edfa7cb763d6e",
+    "manifest_sha256": "8a57e4977ad55cc4c8edecd5449c42dd6b268a8e5188b92d25265ed15cc1708b",
     "primary": "openapi-resend-1.5.1-83c9782",
     "supporting": [
       "sdk-go-v4.7.0",
       "sdk-typescript-6.30.0",
       "sdk-python-2.48.0",
       "docs-2026-09-28-pages",
-      "discovery-probes-2026-11-04"
+      "discovery-probes-2026-11-04",
+      "discovery-probes-2026-11-08"
     ]
   }
 }
