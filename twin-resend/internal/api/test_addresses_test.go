@@ -34,7 +34,7 @@ func TestTestAddressScheduledStaysScheduled(t *testing.T) {
 	_, tc := setupResend(t)
 	sent := resendPost(tc, "/emails", map[string]any{
 		"from": "a@example.com", "to": "bounced@resend.dev", "subject": "hi", "html": "<p>hi</p>",
-		"scheduled_at": "2099-01-01T00:00:00Z",
+		"scheduled_at": "in 2 days",
 	}).AssertStatus(200)
 	got := resendGet(tc, "/emails/"+sent.JSONMap()["id"].(string)).AssertStatus(200).JSONMap()
 	if got["last_event"] != "scheduled" {

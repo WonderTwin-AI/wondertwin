@@ -28,14 +28,19 @@ type sendEmailRequest struct {
 		ContentType string `json:"content_type"`
 	} `json:"attachments,omitempty"`
 	ScheduledAt string `json:"scheduled_at,omitempty"`
+
+	// scheduledFor is ScheduledAt resolved against the store clock by
+	// validateSend.
+	scheduledFor time.Time
 }
 
 // maxRecipients is Resend's cap on the to field.
 const maxRecipients = 50
 
 // validateSend checks a send request the way Resend does and returns the
-// error message, or "" when the request is valid.
-func validateSend(req sendEmailRequest) string {
+// error message, or "" when the request is valid. It resolves scheduled_at
+// against now.
+func validateSend(req *sendEmailRequest, now time.Time) string {
 	switch {
 	case req.From == "":
 		return "Missing `from` field."
@@ -47,9 +52,11 @@ func validateSend(req sendEmailRequest) string {
 		return "Invalid `to` field. The `to` field must contain at most 50 email addresses."
 	}
 	if req.ScheduledAt != "" {
-		if _, err := time.Parse(time.RFC3339, req.ScheduledAt); err != nil {
-			return "Invalid `scheduled_at` field. The date must be in ISO 8601 format."
+		at, msg := parseScheduledAt(req.ScheduledAt, now)
+		if msg != "" {
+			return msg
 		}
+		req.scheduledFor = at
 	}
 	return ""
 }
@@ -60,7 +67,7 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if msg := validateSend(req); msg != "" {
+	if msg := validateSend(&req, h.store.Clock.Now()); msg != "" {
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
 		return
 	}
@@ -89,7 +96,7 @@ func (h *Handler) GetEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	twincore.JSON(w, http.StatusOK, retrievedEmail(email))
+	twincore.JSON(w, http.StatusOK, retrievedEmail(h.settledEmail(email)))
 }
 
 // emailsPageSize is GET /emails' page size when the request names no limit;
@@ -106,7 +113,7 @@ func (h *Handler) ListEmails(w http.ResponseWriter, r *http.Request) {
 	emails := h.store.Emails.List()
 	items := make([]map[string]any, len(emails))
 	for i, e := range emails {
-		items[i] = listedEmail(e)
+		items[i] = listedEmail(h.settledEmail(e))
 	}
 	twincore.JSON(w, http.StatusOK, paginate(items, pq, emailsPageSize, func(m map[string]any) string { return m["id"].(string) }))
 }
@@ -191,16 +198,18 @@ func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 
 	var errs []map[string]any
 	valid := make([]sendEmailRequest, 0, len(reqs))
-	for i, req := range reqs {
-		status, msg := http.StatusUnprocessableEntity, validateSend(req)
+	now := h.store.Clock.Now()
+	for i := range reqs {
+		req := &reqs[i]
+		status, msg := http.StatusUnprocessableEntity, validateSend(req, now)
 		if msg == "" && len(req.Attachments) > 0 {
 			msg = "Attachments are not supported in batch emails."
 		}
 		if msg == "" {
-			status, msg = http.StatusForbidden, h.senderCheck(req)
+			status, msg = http.StatusForbidden, h.senderCheck(*req)
 		}
 		if msg == "" {
-			valid = append(valid, req)
+			valid = append(valid, *req)
 			continue
 		}
 		if !permissive {
@@ -248,8 +257,8 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	for _, a := range req.Attachments {
 		email.Attachments = append(email.Attachments, store.AttachmentMeta{Filename: a.Filename, ContentType: a.ContentType})
 	}
-	if req.ScheduledAt != "" {
-		at := req.ScheduledAt
+	if !req.scheduledFor.IsZero() {
+		at := req.scheduledFor.UTC().Format(pgTimestamp)
 		email.ScheduledAt = &at
 		email.Status = store.EmailStatusScheduled
 		email.LastEvent = store.EmailStatusScheduled

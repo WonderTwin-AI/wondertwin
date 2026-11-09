@@ -157,6 +157,14 @@ await check("list sent emails newest first", async () => {
   assert.deepEqual(page.data.map((e) => e.id), [second.id]);
   assert.equal(page.has_more, true);
 });
+await check("schedule a send in natural language", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: "delivered@resend.dev", subject: "smoke later", html: "<p>l</p>", scheduledAt: "in 1 hour",
+  }));
+  const got = ok(await resend.emails.get(sent.id));
+  assert.equal(got.last_event, "scheduled");
+  assert.ok(got.scheduled_at, `scheduled_at is ${got.scheduled_at}`);
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);

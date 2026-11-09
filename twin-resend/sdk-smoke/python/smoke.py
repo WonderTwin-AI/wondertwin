@@ -196,6 +196,15 @@ def _():
     page = resend.Emails.list({"limit": 1})
     assert [e["id"] for e in page["data"]] == [second["id"]] and page["has_more"] is True, f"limit 1 is {page!r}"
 
+
+@case("schedule a send in natural language")
+def _():
+    sent = resend.Emails.send({"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke later",
+                               "html": "<p>l</p>", "scheduled_at": "in 1 hour"})
+    got = resend.Emails.get(sent["id"])
+    assert got["last_event"] == "scheduled", f"last_event is {got['last_event']!r}"
+    assert got["scheduled_at"], f"scheduled_at is {got['scheduled_at']!r}"
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)

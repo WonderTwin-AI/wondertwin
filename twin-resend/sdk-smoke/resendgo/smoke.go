@@ -267,6 +267,24 @@ func main() {
 		return nil
 	})
 
+	check("schedule a send in natural language", func() error {
+		req := email("smoke later", "delivered@resend.dev")
+		req.ScheduledAt = "in 1 hour"
+		sent, err := client.Emails.Send(req)
+		if err != nil {
+			return err
+		}
+		got, err := client.Emails.Get(sent.Id)
+		if err != nil {
+			return err
+		}
+		// resend-go's Email type carries no scheduled_at field.
+		if got.LastEvent != "scheduled" {
+			return fmt.Errorf("last_event %q", got.LastEvent)
+		}
+		return nil
+	})
+
 	failed := false
 	for _, r := range results {
 		b, _ := json.Marshal(r)
