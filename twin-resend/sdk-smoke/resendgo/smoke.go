@@ -275,6 +275,26 @@ func main() {
 		return nil
 	})
 
+	check("register a webhook and read its secret", func() error {
+		created, err := client.Webhooks.Create(&resend.CreateWebhookRequest{
+			Endpoint: "https://example.com/smoke-go-hook", Events: []string{"email.sent", "email.delivered"},
+		})
+		if err != nil {
+			return err
+		}
+		if created.Object != "webhook" || !strings.HasPrefix(created.SigningSecret, "whsec_") {
+			return fmt.Errorf("create is %+v", created)
+		}
+		got, err := client.Webhooks.Get(created.Id)
+		if err != nil {
+			return err
+		}
+		if got.Status != "enabled" || got.SigningSecret != created.SigningSecret || len(got.Events) != 2 {
+			return fmt.Errorf("get is %+v", got)
+		}
+		return nil
+	})
+
 	check("list domains with a limit pages newest first", func() error {
 		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
 		if err != nil {

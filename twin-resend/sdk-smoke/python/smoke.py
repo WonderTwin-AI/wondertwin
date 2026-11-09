@@ -215,6 +215,16 @@ def _():
     resend.ApiKeys.remove(created["id"])
 
 
+@case("register a webhook and read its secret")
+def _():
+    created = resend.Webhooks.create({"endpoint": "https://example.com/smoke-hook", "events": ["email.sent", "email.delivered"]})
+    assert created["signing_secret"].startswith("whsec_"), f"create is {created!r}"
+    got = resend.Webhooks.get(created["id"])
+    assert got["status"] == "enabled" and got["signing_secret"] == created["signing_secret"], f"get is {got!r}"
+    hooks = resend.Webhooks.list()
+    assert [h["id"] for h in hooks["data"]] == [created["id"]], f"list is {hooks!r}"
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})
