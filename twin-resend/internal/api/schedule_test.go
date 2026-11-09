@@ -47,7 +47,7 @@ func TestScheduledAt(t *testing.T) {
 func TestScheduledEmailSettles(t *testing.T) {
 	srv, tc := setupResend(t)
 	id := resendPost(tc, "/emails", map[string]any{
-		"from": "onboarding@resend.dev", "to": "bounced@resend.dev", "subject": "later", "html": "<p>x</p>",
+		"from": "billing@acme.io", "to": "bounced@resend.dev", "subject": "later", "html": "<p>x</p>",
 		"scheduled_at": "in 1 hour",
 	}).AssertStatus(200).JSONMap()["id"].(string)
 
@@ -73,6 +73,21 @@ func TestScheduledEmailSettles(t *testing.T) {
 	body, _ := io.ReadAll(admin.Body)
 	if !strings.Contains(string(body), `"last_event":"bounced"`) {
 		t.Errorf("/admin/emails after the time: %s", body)
+	}
+}
+
+// TestScheduledSharedSenderFails checks a scheduled send from
+// onboarding@resend.dev reads failed once its time passes (quirk
+// lifecycle-015, run 2026-11-09).
+func TestScheduledSharedSenderFails(t *testing.T) {
+	_, tc := setupResend(t)
+	id := resendPost(tc, "/emails", map[string]any{
+		"from": "onboarding@resend.dev", "to": "delivered@resend.dev", "subject": "later", "html": "<p>x</p>",
+		"scheduled_at": "in 1 min",
+	}).AssertStatus(200).JSONMap()["id"].(string)
+	tc.DoWithHeaders("POST", "/admin/time/advance", map[string]any{"duration": "2m"}, nil).AssertStatus(200)
+	if got := resendGet(tc, "/emails/"+id).JSONMap()["last_event"]; got != "failed" {
+		t.Errorf("last_event %v, want failed", got)
 	}
 }
 

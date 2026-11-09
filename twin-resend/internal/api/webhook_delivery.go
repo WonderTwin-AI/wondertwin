@@ -98,18 +98,20 @@ func (h *Handler) emit(eventType string, data map[string]any) {
 	}
 	h.hooks.Enqueue(eventType, map[string]any{
 		"type":       eventType,
-		"created_at": h.store.Clock.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+		"created_at": h.store.Clock.Now().UTC().Format(eventTimeLayout),
 		"data":       data,
 	})
 }
 
 // emailEvents are the events a send emits at once: email.scheduled for a
-// scheduled send; otherwise email.sent and the event its recipient settles
-// on (quirks lifecycle-001, lifecycle-002). A complaint follows delivery.
+// scheduled send; otherwise the events its recipient's outcome brings
+// (quirks lifecycle-001, delivery-008, lifecycle-015, run 2026-11-09). A
+// complaint follows delivery; a suppressed recipient and a failed send get
+// no email.sent.
 func emailEvents(e store.Email) []string {
 	switch e.LastEvent {
-	case store.EmailStatusScheduled:
-		return []string{"email.scheduled"}
+	case store.EmailStatusScheduled, store.EmailStatusSuppressed, store.EmailStatusFailed:
+		return []string{"email." + e.LastEvent}
 	case store.EmailStatusComplained:
 		return []string{"email.sent", "email.delivered", "email.complained"}
 	case store.EmailStatusCanceled:
@@ -121,21 +123,54 @@ func emailEvents(e store.Email) []string {
 // emitEmailEvents queues the events emailEvents names for e.
 func (h *Handler) emitEmailEvents(e store.Email) {
 	for _, t := range emailEvents(e) {
-		h.emit(t, emailEventData(e))
+		h.emit(t, emailEventData(e, t))
 	}
 }
 
-// emailEventData is the data of an email event, with the fields Resend's
-// docs show: email_id, from, to, subject, created_at and tags as an object
-// (quirk delivery-001). Deliveries were not recorded; the shape is from the
-// docs and the SDK types.
-func emailEventData(e store.Email) map[string]any {
+// Recorded event details for the test addresses (hooks/005 and hooks/009
+// of run 2026-11-09).
+var (
+	bounceDetail = map[string]any{
+		"type":           "Permanent",
+		"subType":        "General",
+		"diagnosticCode": []string{"smtp; 550 5.1.1 As requested: user unknown <bounce@simulator.amazonses.com>"},
+		"message":        "The recipient's email provider sent a hard bounce message, but didn't specify the reason for the hard bounce. We recommend removing the recipient's email address from your mailing list. Sending messages to addresses that produce hard bounces can have a negative impact on your reputation as a sender.",
+	}
+	suppressedDetail = map[string]any{
+		"type":           "Suppressed",
+		"reason":         "previous_bounce",
+		"diagnosticCode": []any{nil},
+		"message":        "The recipient's email address is on the suppression list because it has a recent history of producing hard bounces.",
+	}
+)
+
+// emailEventData is the data of an email event as Resend delivers it:
+// created_at, email_id, from, to, subject, tags as an object, message_id
+// once the message reached SES, and the bounce, suppressed or failed detail
+// of the events that carry one (quirks delivery-001, delivery-008, run
+// 2026-11-09). cc and bcc are not included.
+func emailEventData(e store.Email, eventType string) map[string]any {
 	data := map[string]any{
 		"email_id":   e.ID,
 		"from":       e.From,
 		"to":         e.To,
 		"subject":    e.Subject,
 		"created_at": eventTime(e.CreatedAt),
+	}
+	switch eventType {
+	case "email.sent", "email.delivered", "email.bounced", "email.complained",
+		"email.opened", "email.clicked", "email.delivery_delayed":
+		data["message_id"] = e.MessageID
+	}
+	switch eventType {
+	case "email.bounced":
+		data["bounce"] = bounceDetail
+	case "email.suppressed":
+		data["suppressed"] = suppressedDetail
+	case "email.failed":
+		if senderDomain(e.From) == sharedSenderDomain {
+			data["failed"] = map[string]any{"reason": "domain_not_verified"}
+		}
 	}
 	if len(e.Tags) > 0 {
 		tags := make(map[string]string, len(e.Tags))
@@ -148,11 +183,14 @@ func emailEventData(e store.Email) map[string]any {
 }
 
 // eventTime turns a stored Postgres timestamp into the form Resend's event
-// data uses, 2024-02-22T23:41:11.894719+00:00.
+// data uses, ISO 8601 with milliseconds and Z (quirk envelope-003).
 func eventTime(pg string) string {
 	t, err := time.Parse(pgTimestamp, pg)
 	if err != nil {
 		return pg
 	}
-	return t.UTC().Format("2006-01-02T15:04:05.000000+00:00")
+	return t.UTC().Format(eventTimeLayout)
 }
+
+// eventTimeLayout is the timestamp form of webhook bodies.
+const eventTimeLayout = "2006-01-02T15:04:05.000Z"

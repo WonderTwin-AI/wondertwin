@@ -50,11 +50,11 @@ func (h *Handler) AdminEmailEvent(w http.ResponseWriter, r *http.Request) {
 
 	e.LastEvent = event
 	h.store.Emails.Set(e.ID, e)
-	data := emailEventData(e)
+	data := emailEventData(e, "email."+event)
 	if event == store.EmailStatusClicked {
 		data["click"] = map[string]any{
 			"link":      body.Link,
-			"timestamp": h.store.Clock.Now().UTC().Format("2006-01-02T15:04:05.000Z"),
+			"timestamp": h.store.Clock.Now().UTC().Format(eventTimeLayout),
 		}
 	}
 	h.emit("email."+event, data)
