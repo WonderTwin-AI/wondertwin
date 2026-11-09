@@ -54,6 +54,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.With(h.idempotency).Post("/", h.SendEmail)
 		r.Get("/", h.ListEmails)
 		r.Get("/{id}", h.GetEmail)
+		r.Patch("/{id}", h.UpdateEmail)
+		r.Post("/{id}/cancel", h.CancelEmail)
 		r.With(h.idempotency).Post("/batch", h.SendBatch)
 	})
 

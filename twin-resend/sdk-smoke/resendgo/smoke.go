@@ -285,6 +285,37 @@ func main() {
 		return nil
 	})
 
+	check("reschedule, then cancel a scheduled send", func() error {
+		req := email("smoke move", "delivered@resend.dev")
+		req.ScheduledAt = "in 1 hour"
+		sent, err := client.Emails.Send(req)
+		if err != nil {
+			return err
+		}
+		moved, err := client.Emails.Update(&resend.UpdateEmailRequest{Id: sent.Id, ScheduledAt: "in 2 hours"})
+		if err != nil {
+			return err
+		}
+		if moved.Id != sent.Id || moved.Object != "email" {
+			return fmt.Errorf("update answered %+v", moved)
+		}
+		cancelled, err := client.Emails.Cancel(sent.Id)
+		if err != nil {
+			return err
+		}
+		if cancelled.Id != sent.Id || cancelled.Object != "email" {
+			return fmt.Errorf("cancel answered %+v", cancelled)
+		}
+		got, err := client.Emails.Get(sent.Id)
+		if err != nil {
+			return err
+		}
+		if got.LastEvent != "canceled" {
+			return fmt.Errorf("last_event %q", got.LastEvent)
+		}
+		return nil
+	})
+
 	failed := false
 	for _, r := range results {
 		b, _ := json.Marshal(r)

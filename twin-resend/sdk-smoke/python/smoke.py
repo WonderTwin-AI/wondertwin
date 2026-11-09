@@ -205,6 +205,18 @@ def _():
     assert got["last_event"] == "scheduled", f"last_event is {got['last_event']!r}"
     assert got["scheduled_at"], f"scheduled_at is {got['scheduled_at']!r}"
 
+
+@case("reschedule, then cancel a scheduled send")
+def _():
+    sent = resend.Emails.send({"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke move",
+                               "html": "<p>m</p>", "scheduled_at": "in 1 hour"})
+    moved = resend.Emails.update({"id": sent["id"], "scheduled_at": "in 2 hours"})
+    assert moved["id"] == sent["id"] and moved["object"] == "email", f"update answered {moved!r}"
+    cancelled = resend.Emails.cancel(sent["id"])
+    assert cancelled["id"] == sent["id"] and cancelled["object"] == "email", f"cancel answered {cancelled!r}"
+    got = resend.Emails.get(sent["id"])
+    assert got["last_event"] == "canceled", f"last_event is {got['last_event']!r}"
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)
