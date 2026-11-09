@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -125,23 +126,72 @@ func TestEmailEventsDelivered(t *testing.T) {
 }
 
 // TestScheduledEmailEvents checks a scheduled send delivers email.scheduled,
-// then email.sent and its outcome once it is read after its time.
+// then email.sent and its outcome once it is read after its time; from
+// onboarding@resend.dev it delivers email.failed with the reason instead
+// (quirk lifecycle-015, run 2026-11-09).
 func TestScheduledEmailEvents(t *testing.T) {
 	_, tc := setupResend(t)
 	rc := newReceiver(t)
-	createWebhook(t, tc, rc.URL, "email.scheduled", "email.sent", "email.delivered")
+	createWebhook(t, tc, rc.URL, "email.scheduled", "email.sent", "email.delivered", "email.failed")
 
-	id := sendTo(tc, "delivered@resend.dev", map[string]any{"scheduled_at": "in 1 min"})
-	if ts := types(rc.wait(t, 1)); !reflect.DeepEqual(ts, []string{"email.scheduled"}) {
+	own := sendTo(tc, "delivered@resend.dev", map[string]any{"from": "billing@acme.io", "scheduled_at": "in 1 min"})
+	shared := sendTo(tc, "delivered@resend.dev", map[string]any{"scheduled_at": "in 1 min"})
+	if ts := types(rc.wait(t, 2)); !reflect.DeepEqual(ts, []string{"email.scheduled", "email.scheduled"}) {
 		t.Errorf("event types %v", ts)
 	}
 	tc.DoWithHeaders("POST", "/admin/time/advance", map[string]any{"duration": "2m"}, nil).AssertStatus(200)
-	resendGet(tc, "/emails/"+id).AssertStatus(200)
-	resendGet(tc, "/emails/"+id).AssertStatus(200)
-	if got := rc.wait(t, 3); len(got) != 3 {
-		t.Errorf("deliveries %v, want 3", types(got))
+	resendGet(tc, "/emails/"+own).AssertStatus(200)
+	resendGet(tc, "/emails/"+own).AssertStatus(200)
+	resendGet(tc, "/emails/"+shared).AssertStatus(200)
+	got := map[string]map[string]any{}
+	for _, d := range rc.wait(t, 5)[2:] {
+		got[d.event["type"].(string)] = d.event["data"].(map[string]any)
+	}
+	if len(got) != 3 || got["email.sent"]["email_id"] != own || got["email.delivered"]["email_id"] != own {
+		t.Errorf("after the time: %v", got)
+	}
+	if f := got["email.failed"]; f["email_id"] != shared || !reflect.DeepEqual(f["failed"], map[string]any{"reason": "domain_not_verified"}) {
+		t.Errorf("email.failed data %v", f)
 	}
 }
+
+// TestRecordedEventDetail checks the per-recipient events and data Resend
+// delivered in run 2026-11-09: message_id on sent, bounce detail, and
+// suppressed@ with only email.suppressed (quirks delivery-001, delivery-008).
+func TestRecordedEventDetail(t *testing.T) {
+	_, tc := setupResend(t)
+	rc := newReceiver(t)
+	createWebhook(t, tc, rc.URL, "email.sent", "email.bounced", "email.suppressed")
+
+	sendTo(tc, "suppressed@resend.dev", nil)
+	d := rc.wait(t, 1)[0]
+	data := d.event["data"].(map[string]any)
+	if d.event["type"] != "email.suppressed" || data["suppressed"].(map[string]any)["reason"] != "previous_bounce" {
+		t.Errorf("suppressed@: %v", d.event)
+	}
+	if _, ok := data["message_id"]; ok {
+		t.Error("email.suppressed must carry no message_id")
+	}
+
+	sendTo(tc, "bounced@resend.dev", nil)
+	for _, d := range rc.wait(t, 3)[1:] {
+		data := d.event["data"].(map[string]any)
+		if _, ok := data["message_id"]; !ok {
+			t.Errorf("%s: no message_id", d.event["type"])
+		}
+		if !isoEventTime.MatchString(data["created_at"].(string)) || !isoEventTime.MatchString(d.event["created_at"].(string)) {
+			t.Errorf("%s created_at %v / %v, want ISO with milliseconds and Z", d.event["type"], data["created_at"], d.event["created_at"])
+		}
+		if d.event["type"] == "email.bounced" && data["bounce"].(map[string]any)["type"] != "Permanent" {
+			t.Errorf("bounce detail %v", data["bounce"])
+		}
+	}
+	if n := len(rc.wait(t, 3)); n != 3 {
+		t.Errorf("%d deliveries, want 3 (no email.sent for suppressed@)", n)
+	}
+}
+
+var isoEventTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$`)
 
 // TestDisabledWebhookSkipped checks a disabled webhook, and one not
 // subscribed to an event, receive nothing.

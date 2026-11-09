@@ -64,7 +64,7 @@ func parseScheduleTime(raw string, now time.Time) (time.Time, bool) {
 // settleScheduled moves a scheduled email to its recipient outcome once the
 // store clock reaches scheduled_at, and reports whether it changed. Resend
 // sends a scheduled email at its time; test addresses then settle at once
-// (quirk lifecycle-001).
+// (quirk lifecycle-001), and one from onboarding@resend.dev fails.
 func settleScheduled(e *store.Email, now time.Time) bool {
 	if e.LastEvent != store.EmailStatusScheduled || e.ScheduledAt == nil {
 		return false
@@ -74,6 +74,11 @@ func settleScheduled(e *store.Email, now time.Time) bool {
 		return false
 	}
 	outcome := testAddressOutcome(e.To)
+	if senderDomain(e.From) == sharedSenderDomain {
+		// Resend fails a scheduled send from the shared onboarding sender
+		// at its time with domain_not_verified (quirk lifecycle-015).
+		outcome = store.EmailStatusFailed
+	}
 	e.Status, e.LastEvent = outcome, outcome
 	return true
 }

@@ -77,9 +77,9 @@
     {
       "route": "webhook delivery",
       "resend": "Retries a failed delivery immediately, then after 5 s, 5 min, 30 min, 2 h, 5 h, 10 h and 10 h, and disables an endpoint that keeps failing",
-      "app_emulator": "Retries up to three attempts one second apart and never disables an endpoint. Event bodies follow Resend's docs and SDK types; no delivery was recorded",
+      "app_emulator": "Retries up to three attempts one second apart, where Resend's first retry came 5.4 s after a failure (run 2026-11-09), and never disables an endpoint",
       "reason": "Tests need a failed delivery to settle in seconds; the vendor schedule spans a day",
-      "decision": "resend-bp2 s10 and s12, research/twins/resend/architecture-spec.md; quirk delivery-003"
+      "decision": "resend-bp2 s10 and s12, research/twins/resend/architecture-spec.md; quirk delivery-003 (obs-037)"
     },
     {
       "route": "POST /webhooks/{id}/events/{event_id}/replay, POST /webhooks/{id}/signing-secret/rotate",
@@ -91,7 +91,7 @@
     {
       "route": "scheduled email events",
       "resend": "Sends a scheduled email at its scheduled_at and delivers email.sent and its outcome then",
-      "app_emulator": "Settles a scheduled email when it is next read after scheduled_at on the store clock, and delivers email.sent and its outcome at that read",
+      "app_emulator": "Settles a scheduled email when it is next read after scheduled_at on the store clock, and delivers the events its outcome records at that read (email.sent only where a send happened)",
       "reason": "The emulator has no scheduler; settling on read keeps time under the test's control through /admin/time/advance",
       "decision": "resend-bp2 s03 and s10, research/twins/resend/build-plans/resend-bp2.json; quirk lifecycle-003"
     },
