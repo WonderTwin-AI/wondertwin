@@ -95,6 +95,24 @@ type DomainRecord struct {
 	Priority *int   `json:"priority,omitempty"`
 }
 
+// Webhook is a registered webhook endpoint.
+type Webhook struct {
+	ID        string   `json:"id"`
+	CreatedAt string   `json:"created_at"`
+	Status    string   `json:"status"` // enabled or disabled
+	Endpoint  string   `json:"endpoint"`
+	Events    []string `json:"events"`
+	// SigningSecret is whsec_ and a base64 key; Resend returns it on
+	// create and get (quirk delivery-004).
+	SigningSecret string `json:"signing_secret"`
+}
+
+// Webhook statuses.
+const (
+	WebhookEnabled  = "enabled"
+	WebhookDisabled = "disabled"
+)
+
 // APIKey represents a Resend API key.
 type APIKey struct {
 	ID        string `json:"id"`

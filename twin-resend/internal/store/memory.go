@@ -16,6 +16,7 @@ type MemoryStore struct {
 	Audiences  *pkgstate.Store[Audience]
 	Contacts   *pkgstate.Store[Contact]
 	Broadcasts *pkgstate.Store[Broadcast]
+	Webhooks   *pkgstate.Store[Webhook]
 
 	// Idempotency holds Idempotency-Key records, keyed by method, path and key.
 	Idempotency *pkgstate.Store[IdempotencyRecord]
@@ -51,6 +52,7 @@ func New() *MemoryStore {
 		Audiences:   pkgstate.New[Audience]("audience"),
 		Contacts:    pkgstate.New[Contact]("contact"),
 		Broadcasts:  pkgstate.New[Broadcast]("broadcast"),
+		Webhooks:    pkgstate.New[Webhook]("webhook"),
 		Idempotency: pkgstate.New[IdempotencyRecord]("idem"),
 		Clock:       pkgstate.NewClock(),
 	}
@@ -64,6 +66,7 @@ type stateSnapshot struct {
 	Audiences   map[string]Audience          `json:"audiences,omitempty"`
 	Contacts    map[string]Contact           `json:"contacts,omitempty"`
 	Broadcasts  map[string]Broadcast         `json:"broadcasts,omitempty"`
+	Webhooks    map[string]Webhook           `json:"webhooks,omitempty"`
 	Idempotency map[string]IdempotencyRecord `json:"idempotency,omitempty"`
 }
 
@@ -76,6 +79,7 @@ func (s *MemoryStore) Snapshot() any {
 		Audiences:   s.Audiences.Snapshot(),
 		Contacts:    s.Contacts.Snapshot(),
 		Broadcasts:  s.Broadcasts.Snapshot(),
+		Webhooks:    s.Webhooks.Snapshot(),
 		Idempotency: s.Idempotency.Snapshot(),
 	}
 }
@@ -102,6 +106,9 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	if snap.Broadcasts != nil {
 		s.Broadcasts.LoadSnapshot(snap.Broadcasts)
 	}
+	if snap.Webhooks != nil {
+		s.Webhooks.LoadSnapshot(snap.Webhooks)
+	}
 	if snap.Idempotency != nil {
 		// A request in flight when the state was taken never finishes in
 		// this process; keeping its record would answer 409 for that key
@@ -124,6 +131,7 @@ func (s *MemoryStore) Reset() {
 	s.Audiences.Reset()
 	s.Contacts.Reset()
 	s.Broadcasts.Reset()
+	s.Webhooks.Reset()
 	s.Idempotency.Reset()
 	s.Clock.Reset()
 	s.randMu.Lock()

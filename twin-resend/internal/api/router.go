@@ -83,6 +83,16 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Delete("/{id}", h.DeleteAPIKey)
 	})
 
+	// Webhooks
+	r.Route("/webhooks", func(r chi.Router) {
+		r.Use(h.bearerAuthMiddleware)
+		r.Use(h.mw.FaultInjection)
+
+		r.Get("/", h.ListWebhooks)
+		r.Post("/", h.CreateWebhook)
+		r.Get("/{id}", h.GetWebhook)
+	})
+
 	// Audiences + Contacts
 	r.Route("/audiences", func(r chi.Router) {
 		r.Use(h.bearerAuthMiddleware)

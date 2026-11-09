@@ -209,6 +209,13 @@
       "app_emulator": "Lists sent emails as stored, including fields a read does not return; needs no API key",
       "reason": "Operator control for deterministic tests",
       "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
+    },
+    {
+      "route": "POST /webhooks",
+      "resend": "Refuses an http endpoint with 422 validation_error 'Endpoint URL scheme must be https'",
+      "app_emulator": "Accepts http and https endpoints; refuses any other scheme with Resend's message",
+      "reason": "Receivers in local development and CI run on plain http; requiring TLS would stop the emulator delivering to them",
+      "decision": "resend-bp2 s08, research/twins/resend/build-plans/resend-bp2.json; observed in run 2026-11-08 (probe o08)"
     }
   ]
 }

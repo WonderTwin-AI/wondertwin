@@ -166,6 +166,15 @@ await check("create, rename and delete an API key", async () => {
   assert.deepEqual(keys.data.map((k) => k.name), ["smoke-key-renamed"]);
   ok(await resend.apiKeys.remove(created.id));
 });
+await check("register a webhook and read its secret", async () => {
+  const created = ok(await resend.webhooks.create({ endpoint: "https://example.com/smoke-hook", events: ["email.sent", "email.delivered"] }));
+  assert.match(created.signing_secret, /^whsec_/);
+  const got = ok(await resend.webhooks.get(created.id));
+  assert.equal(got.status, "enabled");
+  assert.equal(got.signing_secret, created.signing_secret);
+  const list = ok(await resend.webhooks.list());
+  assert.deepEqual(list.data.map((h) => h.id), [created.id]);
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));
