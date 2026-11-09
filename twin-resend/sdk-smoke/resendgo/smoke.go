@@ -49,7 +49,10 @@ func newClient() *resend.Client {
 	return c
 }
 
+// check runs one case on a freshly reset emulator, as the Python and Node
+// suites do.
 func check(name string, fn func() error) {
+	reset()
 	err := fn()
 	r := map[string]any{"sdk": sdk, "case": name, "pass": err == nil, "detail": ""}
 	if err != nil {
@@ -208,6 +211,33 @@ func main() {
 		req.From = "a@smoke-go-unverified.example.com"
 		_, err := client.Emails.Send(req)
 		return wantErr(err, "domain is not verified")
+	})
+
+	check("list domains with a limit pages newest first", func() error {
+		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
+		if err != nil {
+			return err
+		}
+		second, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-two.example.com"})
+		if err != nil {
+			return err
+		}
+		one := 1
+		page, err := client.Domains.ListWithOptions(context.Background(), &resend.ListOptions{Limit: &one})
+		if err != nil {
+			return err
+		}
+		if len(page.Data) != 1 || page.Data[0].Id != second.Id || !page.HasMore {
+			return fmt.Errorf("page 1 is %+v", page)
+		}
+		page, err = client.Domains.ListWithOptions(context.Background(), &resend.ListOptions{Limit: &one, After: &second.Id})
+		if err != nil {
+			return err
+		}
+		if len(page.Data) != 1 || page.Data[0].Id != first.Id || page.HasMore {
+			return fmt.Errorf("page 2 is %+v", page)
+		}
+		return nil
 	})
 
 	failed := false
