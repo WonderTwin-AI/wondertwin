@@ -64,9 +64,21 @@ type Domain struct {
 	Object    string         `json:"object"` // "domain"
 	Name      string         `json:"name"`
 	Status    string         `json:"status"` // not_started, pending, verified, failed, temporary_failure
-	Region    string         `json:"region"` // us-east-1, eu-west-1, sa-east-1
+	Region    string         `json:"region"` // us-east-1, eu-west-1, sa-east-1, ap-northeast-1
 	Records   []DomainRecord `json:"records"`
 	CreatedAt string         `json:"created_at"`
+	// Capabilities says whether the domain sends and receives; Resend
+	// creates a domain sending-enabled and receiving-disabled.
+	Capabilities  DomainCapabilities `json:"capabilities"`
+	OpenTracking  bool               `json:"open_tracking"`
+	ClickTracking bool               `json:"click_tracking"`
+}
+
+// DomainCapabilities is a domain's sending and receiving switches, each
+// "enabled" or "disabled".
+type DomainCapabilities struct {
+	Sending   string `json:"sending"`
+	Receiving string `json:"receiving"`
 }
 
 // DomainStatusVerified is the status of a domain that passed verification.

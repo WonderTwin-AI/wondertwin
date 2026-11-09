@@ -137,6 +137,15 @@ await check("a send from an unverified domain answers 403", async () => {
   assert.equal(error?.statusCode, 403, `error is ${JSON.stringify(error)}`);
   assert.match(error.message, /domain is not verified/);
 });
+await check("create and get a domain", async () => {
+  const created = ok(await resend.domains.create({ name: "smoke-shape.example.com" }));
+  assert.equal(created.status, "not_started");
+  assert.deepEqual(created.records.map((r) => r.name), ["resend._domainkey", "send", "send", "rsend"]);
+  const got = ok(await resend.domains.get(created.id));
+  assert.equal(got.name, created.name);
+  assert.deepEqual(got.capabilities, { sending: "enabled", receiving: "disabled" });
+  assert.equal(got.open_tracking, false);
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));

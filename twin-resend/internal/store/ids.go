@@ -41,6 +41,12 @@ func (s *MemoryStore) NewMessageID() string {
 	return fmt.Sprintf("<%x-%s-000000@email.amazonses.com>", b, s.NewID())
 }
 
+// RandBytes fills buf from the store's seeded Rand, so generated values
+// such as DKIM keys repeat for a seed.
+func (s *MemoryStore) RandBytes(buf []byte) {
+	s.randBytes(buf)
+}
+
 func (s *MemoryStore) randBytes(buf []byte) {
 	s.randMu.RLock()
 	rng := s.Rand

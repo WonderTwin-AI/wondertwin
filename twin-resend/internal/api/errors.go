@@ -46,6 +46,13 @@ func missingField(w http.ResponseWriter, field string) {
 	writeError(w, http.StatusUnprocessableEntity, "validation_error", "Missing `"+field+"` field.")
 }
 
+// missingRequiredField answers a missing field the way Resend's newer
+// routes do: 422 missing_required_field (POST /domains, probe m07 of
+// 2026-11-08). POST /emails names it validation_error; see missingField.
+func missingRequiredField(w http.ResponseWriter, field string) {
+	writeError(w, http.StatusUnprocessableEntity, "missing_required_field", "Missing `"+field+"` field.")
+}
+
 func isAdminPath(path string) bool {
 	return path == "/admin" || strings.HasPrefix(path, "/admin/")
 }

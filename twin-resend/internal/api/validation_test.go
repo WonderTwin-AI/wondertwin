@@ -4,6 +4,8 @@ import "testing"
 
 // TestMissingFieldsAnswer422 checks the older create routes answer a missing
 // required field as POST /emails does: 422 validation_error naming the field.
+// POST /domains answers missing_required_field; TestCreateDomainErrors
+// checks it.
 func TestMissingFieldsAnswer422(t *testing.T) {
 	_, tc := setupResend(t)
 	audienceID := resendPost(tc, "/audiences", map[string]any{"name": "General"}).
@@ -13,7 +15,6 @@ func TestMissingFieldsAnswer422(t *testing.T) {
 		path, field string
 		body        map[string]any
 	}{
-		{"/domains", "name", map[string]any{}},
 		{"/audiences", "name", map[string]any{}},
 		{"/api-keys", "name", map[string]any{}},
 		{"/audiences/" + audienceID + "/contacts", "email", map[string]any{}},
