@@ -146,6 +146,18 @@ await check("create and get a domain", async () => {
   assert.deepEqual(got.capabilities, { sending: "enabled", receiving: "disabled" });
   assert.equal(got.open_tracking, false);
 });
+await check("update, verify and delete a domain", async () => {
+  const created = ok(await resend.domains.create({ name: "smoke-update.example.com" }));
+  const updated = ok(await resend.domains.update({ id: created.id, openTracking: true, tls: "enforced" }));
+  assert.deepEqual(updated, { object: "domain", id: created.id });
+  const got = ok(await resend.domains.get(created.id));
+  assert.equal(got.open_tracking, true);
+  assert.equal(got.click_tracking, false);
+  assert.deepEqual(ok(await resend.domains.verify(created.id)), { object: "domain", id: created.id });
+  assert.deepEqual(ok(await resend.domains.remove(created.id)), { object: "domain", id: created.id, deleted: true });
+  const { error } = await resend.domains.get(created.id);
+  assert.equal(error?.name, "not_found");
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));

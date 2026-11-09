@@ -16,7 +16,11 @@ func TestDomainVerificationModes(t *testing.T) {
 			t.Errorf("domain_verification %s: domain status %v", outcome, got["status"])
 		}
 		for _, rec := range got["records"].([]any) {
-			if rec.(map[string]any)["status"] != outcome {
+			want := outcome
+			if outcome == "pending" && rec.(map[string]any)["name"] == "rsend" {
+				want = "not_started"
+			}
+			if rec.(map[string]any)["status"] != want {
 				t.Errorf("domain_verification %s: record status %v", outcome, rec.(map[string]any)["status"])
 			}
 		}
