@@ -303,6 +303,9 @@ func (h *Handler) AdminListEmails(w http.ResponseWriter, r *http.Request) {
 	subjectFilter := r.URL.Query().Get("subject")
 
 	emails := h.store.Emails.List()
+	for i, e := range emails {
+		emails[i] = h.settledEmail(e)
+	}
 
 	if toFilter != "" || subjectFilter != "" {
 		var filtered []store.Email

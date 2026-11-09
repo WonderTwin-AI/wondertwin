@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -61,6 +62,15 @@ func TestScheduledEmailSettles(t *testing.T) {
 	}
 	if got := resendGet(tc, "/emails/"+id).JSONMap()["last_event"]; got != "bounced" {
 		t.Errorf("read after the time: last_event %v, want bounced", got)
+	}
+	admin, err := http.Get(srv.URL + "/admin/emails")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Body.Close()
+	body, _ := io.ReadAll(admin.Body)
+	if !strings.Contains(string(body), `"last_event":"bounced"`) {
+		t.Errorf("/admin/emails after the time: %s", body)
 	}
 }
 
