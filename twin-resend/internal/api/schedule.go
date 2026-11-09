@@ -46,9 +46,10 @@ func parseScheduleTime(raw string, now time.Time) (time.Time, bool) {
 	if m == nil {
 		return time.Time{}, false
 	}
+	const beyondCap = int(maxScheduleAhead/time.Minute) + 1
 	n, err := strconv.Atoi(m[1])
-	if err != nil {
-		return time.Time{}, false
+	if err != nil || n > beyondCap {
+		n = beyondCap
 	}
 	unit := time.Minute
 	switch {

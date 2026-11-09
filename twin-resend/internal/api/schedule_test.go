@@ -28,6 +28,8 @@ func TestScheduledAt(t *testing.T) {
 
 	for _, c := range []struct{ at, message string }{
 		{"in 31 days", "The `scheduled_at` field must be within 30 days"},
+		{"in 9999999999 days", "The `scheduled_at` field must be within 30 days"},
+		{"in 99999999999999999999 minutes", "The `scheduled_at` field must be within 30 days"},
 		{time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), "The `scheduled_at` field must be a future date"},
 		{"next blue moon", "The `scheduled_at` must be a valid date either in ISO 8601 format or a valid natural language input like \"in 1 min\""},
 		{"tomorrow at 9am", "must be a valid date"},
