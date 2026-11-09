@@ -211,6 +211,14 @@
       "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
     },
     {
+      "route": "POST /admin/emails/{id}/events/{event}",
+      "category": "admin_endpoint",
+      "resend": "Not served; opens and clicks come from tracking, delays and failures from the mail servers",
+      "app_emulator": "Sets an email's last_event to opened, clicked, delivery_delayed or failed and delivers the matching email.* event; needs no API key",
+      "reason": "The emulator sends no real mail and tracks no opens or clicks, so tests trigger these events on demand",
+      "decision": "research/twins/resend/divergence-records/admin-endpoints.json; resend-bp2 s11"
+    },
+    {
       "route": "POST /webhooks, PATCH /webhooks/{id}",
       "resend": "Refuses an http endpoint with 422 validation_error 'Endpoint URL scheme must be https'",
       "app_emulator": "Accepts http and https endpoints; refuses any other scheme with Resend's message",

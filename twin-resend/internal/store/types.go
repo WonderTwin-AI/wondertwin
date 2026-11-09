@@ -56,6 +56,12 @@ const (
 	EmailStatusSuppressed = "suppressed"
 	EmailStatusScheduled  = "scheduled"
 	EmailStatusCanceled   = "canceled"
+	// Set only through the admin triggers: the emulator tracks no opens or
+	// clicks and never fails or delays a send on its own.
+	EmailStatusOpened          = "opened"
+	EmailStatusClicked         = "clicked"
+	EmailStatusDeliveryDelayed = "delivery_delayed"
+	EmailStatusFailed          = "failed"
 )
 
 // Domain represents a verified sending domain.
