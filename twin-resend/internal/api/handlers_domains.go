@@ -50,9 +50,7 @@ func (h *Handler) GetDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	domain, ok := h.store.Domains.Get(id)
 	if !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404, "message": "Domain not found", "name": "not_found",
-		})
+		domainNotFound(w)
 		return
 	}
 	twincore.JSON(w, http.StatusOK, domain)
@@ -147,30 +145,48 @@ func (h *Handler) dkimPublicKey() string {
 	return base64.StdEncoding.EncodeToString(der)
 }
 
-// UpdateDomain handles PATCH /domains/{id}
+// UpdateDomain handles PATCH /domains/{id}. It answers {object, id} as
+// Resend does (probe m08 of 2026-11-08) and applies the switches at once.
+// Resend still read both tracking flags false right after the PATCH on an
+// unverified domain (quirk lifecycle-014, a hypothesis); the emulator does
+// not reproduce that. tls is accepted and not stored, since no read reports
+// it.
 func (h *Handler) UpdateDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	domain, ok := h.store.Domains.Get(id)
 	if !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404, "message": "Domain not found", "name": "not_found",
-		})
+		domainNotFound(w)
 		return
 	}
-
-	// Resend PATCH /domains only supports click/open tracking toggles
-	// For the twin, just acknowledge the update
+	var req struct {
+		OpenTracking  *bool                    `json:"open_tracking"`
+		ClickTracking *bool                    `json:"click_tracking"`
+		Capabilities  store.DomainCapabilities `json:"capabilities"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.OpenTracking != nil {
+		domain.OpenTracking = *req.OpenTracking
+	}
+	if req.ClickTracking != nil {
+		domain.ClickTracking = *req.ClickTracking
+	}
+	domain.Capabilities.Sending = cmp.Or(req.Capabilities.Sending, domain.Capabilities.Sending)
+	domain.Capabilities.Receiving = cmp.Or(req.Capabilities.Receiving, domain.Capabilities.Receiving)
 	h.store.Domains.Set(id, domain)
-	twincore.JSON(w, http.StatusOK, domain)
+	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
+}
+
+func domainNotFound(w http.ResponseWriter) {
+	writeError(w, http.StatusNotFound, "not_found", "Domain not found")
 }
 
 // DeleteDomain handles DELETE /domains/{id}
 func (h *Handler) DeleteDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if _, ok := h.store.Domains.Get(id); !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404, "message": "Domain not found", "name": "not_found",
-		})
+		domainNotFound(w)
 		return
 	}
 	h.store.Domains.Delete(id)
@@ -182,17 +198,20 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	domain, ok := h.store.Domains.Get(id)
 	if !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404, "message": "Domain not found", "name": "not_found",
-		})
+		domainNotFound(w)
 		return
 	}
 	// Verification lands at once on the outcome /admin/config sets:
 	// verified by default, or pending or failed (architecture decision 7,
 	// quirk lifecycle-006).
+	// While pending, Resend leaves the rsend CNAME at not_started (probe
+	// m11 of 2026-11-08).
 	outcome := h.verifyOutcome()
 	domain.Status = outcome
-	for i := range domain.Records {
+	for i, rec := range domain.Records {
+		if outcome == domainStatusPending && rec.Name == "rsend" {
+			continue
+		}
 		domain.Records[i].Status = outcome
 	}
 	h.store.Domains.Set(id, domain)

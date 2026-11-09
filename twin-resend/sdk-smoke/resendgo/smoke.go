@@ -231,6 +231,31 @@ func main() {
 		return nil
 	})
 
+	check("update, verify and delete a domain", func() error {
+		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-update.example.com"})
+		if err != nil {
+			return err
+		}
+		if _, err := client.Domains.Update(created.Id, &resend.UpdateDomainRequest{OpenTracking: true, Tls: resend.Enforced}); err != nil {
+			return err
+		}
+		got, err := client.Domains.Get(created.Id)
+		if err != nil {
+			return err
+		}
+		if !got.OpenTracking || got.ClickTracking {
+			return fmt.Errorf("after update: %+v", got)
+		}
+		if ok, err := client.Domains.Verify(created.Id); err != nil || !ok {
+			return fmt.Errorf("verify: %v %v", ok, err)
+		}
+		if ok, err := client.Domains.Remove(created.Id); err != nil || !ok {
+			return fmt.Errorf("remove: %v %v", ok, err)
+		}
+		_, err = client.Domains.Get(created.Id)
+		return wantErr(err, "Domain not found")
+	})
+
 	check("list domains with a limit pages newest first", func() error {
 		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
 		if err != nil {

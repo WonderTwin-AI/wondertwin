@@ -186,6 +186,25 @@ def _():
     assert got["click_tracking"] is False, f"get is {got!r}"
 
 
+@case("update, verify and delete a domain")
+def _():
+    created = resend.Domains.create({"name": "smoke-update.example.com"})
+    updated = resend.Domains.update({"id": created["id"], "open_tracking": True, "tls": "enforced"})
+    assert (updated["object"], updated["id"]) == ("domain", created["id"]), f"update is {updated!r}"
+    got = resend.Domains.get(created["id"])
+    assert got["open_tracking"] is True and got["click_tracking"] is False, f"get is {got!r}"
+    verified = resend.Domains.verify(created["id"])
+    assert (verified["object"], verified["id"]) == ("domain", created["id"]), f"verify is {verified!r}"
+    removed = resend.Domains.remove(created["id"])
+    assert (removed["id"], removed["deleted"]) == (created["id"], True), f"remove is {removed!r}"
+    try:
+        resend.Domains.get(created["id"])
+    except Exception as e:
+        assert "Domain not found" in str(e), f"message is {e}"
+        return
+    raise AssertionError("get after remove did not raise")
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})
