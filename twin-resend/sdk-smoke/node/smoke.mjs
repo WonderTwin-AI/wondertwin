@@ -147,6 +147,16 @@ await check("list domains with a limit pages newest first", async () => {
   assert.deepEqual(page.data.map((d) => d.id), [first.id]);
   assert.equal(page.has_more, false);
 });
+await check("list sent emails newest first", async () => {
+  const first = ok(await resend.emails.send({ from: SENDER, to: "delivered@resend.dev", subject: "smoke list 1", html: "<p>1</p>" }));
+  const second = ok(await resend.emails.send({ from: SENDER, to: "delivered@resend.dev", subject: "smoke list 2", html: "<p>2</p>" }));
+  let page = ok(await resend.emails.list());
+  assert.deepEqual(page.data.map((e) => e.id), [second.id, first.id]);
+  assert.equal(page.has_more, false);
+  page = ok(await resend.emails.list({ limit: 1 }));
+  assert.deepEqual(page.data.map((e) => e.id), [second.id]);
+  assert.equal(page.has_more, true);
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);

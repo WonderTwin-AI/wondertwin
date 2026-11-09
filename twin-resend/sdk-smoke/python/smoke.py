@@ -185,6 +185,17 @@ def _():
     assert [d["id"] for d in page["data"]] == [first["id"]], f"page 2 is {page!r}"
     assert page["has_more"] is False, f"has_more is {page['has_more']!r}"
 
+
+@case("list sent emails newest first")
+def _():
+    first = resend.Emails.send({"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke list 1", "html": "<p>1</p>"})
+    second = resend.Emails.send({"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke list 2", "html": "<p>2</p>"})
+    page = resend.Emails.list()
+    assert [e["id"] for e in page["data"]] == [second["id"], first["id"]], f"list is {page!r}"
+    assert page["has_more"] is False, f"has_more is {page['has_more']!r}"
+    page = resend.Emails.list({"limit": 1})
+    assert [e["id"] for e in page["data"]] == [second["id"]] and page["has_more"] is True, f"limit 1 is {page!r}"
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)

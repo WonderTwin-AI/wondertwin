@@ -92,6 +92,36 @@ func (h *Handler) GetEmail(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, retrievedEmail(email))
 }
 
+// emailsPageSize is GET /emails' page size when the request names no limit;
+// the newer Resend lists always paginate (quirk pagination-002).
+const emailsPageSize = 20
+
+// ListEmails handles GET /emails: sent emails newest first, 20 to a page
+// unless limit says otherwise (quirk pagination-001).
+func (h *Handler) ListEmails(w http.ResponseWriter, r *http.Request) {
+	pq, ok := readPageQuery(w, r)
+	if !ok {
+		return
+	}
+	emails := h.store.Emails.List()
+	items := make([]map[string]any, len(emails))
+	for i, e := range emails {
+		items[i] = listedEmail(e)
+	}
+	twincore.JSON(w, http.StatusOK, paginate(items, pq, emailsPageSize, func(m map[string]any) string { return m["id"].(string) }))
+}
+
+// listedEmail is an email as GET /emails lists it: the retrieved shape
+// without object, html, text and tags (probes g01 of 2026-11-04 and l06 of
+// 2026-11-08).
+func listedEmail(e store.Email) map[string]any {
+	out := retrievedEmail(e)
+	for _, k := range []string{"object", "html", "text", "tags"} {
+		delete(out, k)
+	}
+	return out
+}
+
 // pgTimestamp is the form Resend reports timestamps in on a read:
 // '2026-11-05 03:21:53.923000+00'.
 const pgTimestamp = "2006-01-02 15:04:05.000000+00"
