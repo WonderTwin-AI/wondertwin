@@ -186,6 +186,31 @@ await check("disable, change and delete a webhook", async () => {
   const { error } = await resend.webhooks.get(created.id);
   assert.equal(error?.name, "not_found");
 });
+await check("verify a signed webhook delivery", async () => {
+  const { createServer } = await import("node:http");
+  let deliver;
+  const delivered = new Promise((resolve) => { deliver = resolve; });
+  const srv = createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => { res.end("ok"); deliver({ headers: req.headers, body }); });
+  });
+  await new Promise((resolve) => srv.listen(0, "127.0.0.1", resolve));
+  try {
+    const hook = ok(await resend.webhooks.create({ endpoint: `http://127.0.0.1:${srv.address().port}/hook`, events: ["email.delivered"] }));
+    ok(await resend.emails.send({ from: SENDER, to: "delivered@resend.dev", subject: "smoke hook", html: "<p>h</p>" }));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("no delivery within 5s")), 5000));
+    const { headers, body } = await Promise.race([delivered, timeout]);
+    const event = resend.webhooks.verify({
+      payload: body,
+      headers: { id: headers["svix-id"], timestamp: headers["svix-timestamp"], signature: headers["svix-signature"] },
+      webhookSecret: hook.signing_secret,
+    });
+    assert.equal(event.type, "email.delivered");
+  } finally {
+    srv.close();
+  }
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));

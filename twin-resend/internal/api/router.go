@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
+	"github.com/wondertwin-ai/wondertwin/twinkit/webhook"
 )
 
 // Handler holds all API handler state.
@@ -21,6 +22,10 @@ type Handler struct {
 	// concurrent requests with one key cannot both send.
 	idemMu sync.Mutex
 
+	// settleMu makes settling a due scheduled email and recording it one
+	// step, so only one reader emits its events.
+	settleMu sync.Mutex
+
 	// strictSenders turns on Resend's full sender-domain rules; see
 	// senderCheck. Off by default.
 	strictSenders atomic.Bool
@@ -31,12 +36,18 @@ type Handler struct {
 
 	// limiter is the opt-in rate limit; off by default.
 	limiter rateLimiter
+
+	// hooks delivers webhook events to the registered webhooks.
+	hooks *webhook.Dispatcher
 }
 
 // NewHandler creates a new API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 	h := &Handler{store: s, mw: mw}
 	h.limiter.nowFunc = s.Clock.Now
+	h.hooks = newDispatcher(s)
+	// /admin/reset also drops queued events and the delivery log.
+	s.OnReset(h.hooks.Reset)
 	return h
 }
 

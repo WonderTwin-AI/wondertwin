@@ -32,6 +32,15 @@ type MemoryStore struct {
 	// seed is the seed Rand was created from by Seed; nil when Rand was
 	// assigned directly, in which case Reset leaves Rand as it is.
 	seed *int64
+
+	// onReset runs after Reset clears the state, for what lives outside
+	// the store, such as queued webhook deliveries.
+	onReset []func()
+}
+
+// OnReset registers f to run at the end of every Reset.
+func (s *MemoryStore) OnReset(f func()) {
+	s.onReset = append(s.onReset, f)
 }
 
 // Seed gives the store a fresh random source from seed, which Reset restores,
@@ -139,4 +148,7 @@ func (s *MemoryStore) Reset() {
 		s.Rand = sim.NewRand(*s.seed)
 	}
 	s.randMu.Unlock()
+	for _, f := range s.onReset {
+		f()
+	}
 }

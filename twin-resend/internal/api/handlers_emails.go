@@ -277,6 +277,7 @@ func (h *Handler) createEmail(req sendEmailRequest) store.Email {
 	}
 
 	h.store.Emails.Set(id, email)
+	h.emitEmailEvents(email)
 
 	return email
 }

@@ -243,6 +243,41 @@ def _():
     raise AssertionError("get after remove did not raise")
 
 
+@case("verify a signed webhook delivery")
+def _():
+    import http.server
+    import queue
+    import threading
+
+    got = queue.Queue()
+
+    class Hook(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 - the stdlib's name
+            body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+            self.send_response(200)
+            self.end_headers()
+            got.put((dict(self.headers), body))
+
+        def log_message(self, *args):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Hook)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        hook = resend.Webhooks.create({"endpoint": f"http://127.0.0.1:{srv.server_port}/hook", "events": ["email.delivered"]})
+        resend.Emails.send({"from": SENDER, "to": "delivered@resend.dev", "subject": "smoke hook", "html": "<p>h</p>"})
+        headers, body = got.get(timeout=5)
+        headers = {k.lower(): v for k, v in headers.items()}
+        event = resend.Webhooks.verify({
+            "payload": body,
+            "headers": {"id": headers["svix-id"], "timestamp": headers["svix-timestamp"], "signature": headers["svix-signature"]},
+            "webhook_secret": hook["signing_secret"],
+        })
+        assert event["type"] == "email.delivered", f"event is {event!r}"
+    finally:
+        srv.shutdown()
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})

@@ -18,7 +18,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -318,6 +320,36 @@ func main() {
 		}
 		_, err = client.Webhooks.Get(created.Id)
 		return wantErr(err, "Webhook endpoint not found")
+	})
+
+	check("verify a signed webhook delivery", func() error {
+		got := make(chan *http.Request, 4)
+		bodies := make(chan string, 4)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			bodies <- string(b)
+			got <- r
+		}))
+		defer srv.Close()
+		hook, err := client.Webhooks.Create(&resend.CreateWebhookRequest{Endpoint: srv.URL, Events: []string{"email.delivered"}})
+		if err != nil {
+			return err
+		}
+		if _, err := client.Emails.Send(email("smoke hook", "delivered@resend.dev")); err != nil {
+			return err
+		}
+		select {
+		case r := <-got:
+			return client.Webhooks.Verify(&resend.VerifyWebhookOptions{
+				Payload: <-bodies,
+				Headers: resend.WebhookHeaders{
+					Id: r.Header.Get("svix-id"), Timestamp: r.Header.Get("svix-timestamp"), Signature: r.Header.Get("svix-signature"),
+				},
+				WebhookSecret: hook.SigningSecret,
+			})
+		case <-time.After(5 * time.Second):
+			return errors.New("no delivery within 5s")
+		}
 	})
 
 	check("list domains with a limit pages newest first", func() error {
