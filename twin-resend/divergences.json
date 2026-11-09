@@ -91,7 +91,7 @@
     {
       "route": "scheduled email events",
       "resend": "Sends a scheduled email at its scheduled_at and delivers email.sent and its outcome then",
-      "app_emulator": "Settles a scheduled email when it is next read after scheduled_at on the store clock, and delivers email.sent and its outcome at that read",
+      "app_emulator": "Settles a scheduled email when it is next read after scheduled_at on the store clock, and delivers the events its outcome records at that read (email.sent only where a send happened)",
       "reason": "The emulator has no scheduler; settling on read keeps time under the test's control through /admin/time/advance",
       "decision": "resend-bp2 s03 and s10, research/twins/resend/build-plans/resend-bp2.json; quirk lifecycle-003"
     },
