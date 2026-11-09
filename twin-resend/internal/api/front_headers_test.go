@@ -23,7 +23,7 @@ func TestFrontHeaders(t *testing.T) {
 	}
 
 	send := resendPost(tc, "/emails", map[string]any{
-		"from": "a@example.com", "to": "delivered@resend.dev", "subject": "s", "html": "<p>h</p>",
+		"from": "a@acme.dev", "to": "delivered@resend.dev", "subject": "s", "html": "<p>h</p>",
 	}).AssertStatus(200)
 	if ct := send.Headers.Get("Content-Type"); ct != "application/json" {
 		t.Errorf("POST /emails content-type %q, want application/json", ct)

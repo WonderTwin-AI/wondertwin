@@ -16,7 +16,7 @@ func TestAudiencesAndContacts(t *testing.T) {
 	}
 
 	contacts := "/audiences/" + audienceID + "/contacts"
-	c := resendPost(tc, contacts, map[string]any{"email": "c@example.com", "first_name": "Ada"}).AssertStatus(201).JSONMap()
+	c := resendPost(tc, contacts, map[string]any{"email": "c@acme.dev", "first_name": "Ada"}).AssertStatus(201).JSONMap()
 	contactID := c["id"].(string)
 	if c["object"] != "contact" || c["unsubscribed"] != false {
 		t.Errorf("create contact: %v", c)
@@ -35,13 +35,13 @@ func TestAudiencesAndContacts(t *testing.T) {
 	resendGet(tc, contacts+"/"+contactID).AssertStatus(404)
 
 	// Deleting an audience deletes its contacts.
-	other := resendPost(tc, contacts, map[string]any{"email": "d@example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	other := resendPost(tc, contacts, map[string]any{"email": "d@acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 	tc.DoWithHeaders("DELETE", "/audiences/"+audienceID, nil, resendHeaders).
 		AssertStatus(200).AssertBodyContains(`"object":"audience"`)
 	resendGet(tc, "/audiences/"+audienceID).AssertStatus(404)
 	resendGet(tc, contacts+"/"+other).AssertStatus(404)
 	resendGet(tc, contacts).AssertStatus(404)
-	resendPost(tc, contacts, map[string]any{"email": "e@example.com"}).AssertStatus(404)
+	resendPost(tc, contacts, map[string]any{"email": "e@acme.dev"}).AssertStatus(404)
 }
 
 func TestBroadcasts(t *testing.T) {
@@ -49,11 +49,11 @@ func TestBroadcasts(t *testing.T) {
 	audienceID := resendPost(tc, "/audiences", map[string]any{"name": "General"}).AssertStatus(201).JSONMap()["id"].(string)
 
 	resendPost(tc, "/broadcasts", map[string]any{
-		"audience_id": "missing", "from": "a@example.com", "subject": "s",
+		"audience_id": "missing", "from": "a@acme.dev", "subject": "s",
 	}).AssertStatus(404)
 
 	bc := resendPost(tc, "/broadcasts", map[string]any{
-		"name": "Launch", "audience_id": audienceID, "from": "a@example.com", "subject": "news", "html": "<p>hi</p>",
+		"name": "Launch", "audience_id": audienceID, "from": "a@acme.dev", "subject": "news", "html": "<p>hi</p>",
 	}).AssertStatus(201).JSONMap()
 	id := bc["id"].(string)
 	if bc["object"] != "broadcast" || bc["status"] != "draft" {

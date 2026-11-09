@@ -12,7 +12,7 @@ func TestDomainEvents(t *testing.T) {
 	rc := newReceiver(t)
 	createWebhook(t, tc, rc.URL, "domain.created", "domain.updated", "domain.deleted")
 
-	id := resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	id := resendPost(tc, "/domains", map[string]any{"name": "acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 	rc.wait(t, 1)
 	resendPatch(tc, "/domains/"+id, map[string]any{"click_tracking": true}).AssertStatus(200)
 	rc.wait(t, 2)
@@ -27,7 +27,7 @@ func TestDomainEvents(t *testing.T) {
 	}
 	for _, d := range got {
 		data := d.event["data"].(map[string]any)
-		if data["id"] != id || data["name"] != "example.com" || len(data["records"].([]any)) != 4 {
+		if data["id"] != id || data["name"] != "acme.dev" || len(data["records"].([]any)) != 4 {
 			t.Errorf("%s data %v", d.event["type"], data)
 		}
 	}

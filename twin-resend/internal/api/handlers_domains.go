@@ -88,6 +88,10 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", domainRegionMessage)
 		return
 	}
+	if heldElsewhere(req.Name) {
+		writeError(w, http.StatusUnprocessableEntity, "validation_error", "This domain has been registered already.")
+		return
+	}
 	for _, d := range h.store.Domains.List() {
 		if strings.EqualFold(d.Name, req.Name) {
 			writeError(w, http.StatusForbidden, "validation_error",
@@ -125,6 +129,20 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 		"status": domain.Status, "capabilities": domain.Capabilities, "records": domain.Records,
 		"region": domain.Region,
 	})
+}
+
+// heldElsewhere reports whether Resend refuses a name as registered by
+// another account: example.com, example.org and their subdomains, and .test
+// names (quirk lifecycle-013, probes m00 to m00c of 2026-11-08). Resend
+// knows every account's domains; the emulator knows only these.
+func heldElsewhere(name string) bool {
+	n := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
+	for _, apex := range []string{"example.com", "example.org"} {
+		if n == apex || strings.HasSuffix(n, "."+apex) {
+			return true
+		}
+	}
+	return strings.HasSuffix(n, ".test")
 }
 
 // rsaKeyHeader and rsaKeyTrailer wrap a 1024-bit modulus as the DER

@@ -9,7 +9,7 @@ func TestDomainVerificationModes(t *testing.T) {
 	tc := setupResendWithConfig(t)
 	for _, outcome := range []string{"pending", "failed", "verified"} {
 		tc.DoWithHeaders("PUT", "/admin/config", map[string]any{"domain_verification": outcome}, nil).AssertStatus(200)
-		id := resendPost(tc, "/domains", map[string]any{"name": outcome + ".example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+		id := resendPost(tc, "/domains", map[string]any{"name": outcome + ".acme.dev"}).AssertStatus(201).JSONMap()["id"].(string)
 		resendPost(tc, "/domains/"+id+"/verify", nil).AssertStatus(200)
 		got := resendGet(tc, "/domains/"+id).AssertStatus(200).JSONMap()
 		if got["status"] != outcome {

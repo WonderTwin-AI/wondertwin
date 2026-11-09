@@ -16,7 +16,7 @@ func idemSend(tc *testutil.TwinClient, path, key string, body any) *testutil.Res
 }
 
 func idemEmail(subject string) map[string]any {
-	return map[string]any{"from": "a@example.com", "to": "delivered@resend.dev", "subject": subject, "html": "<p>hi</p>"}
+	return map[string]any{"from": "a@acme.dev", "to": "delivered@resend.dev", "subject": subject, "html": "<p>hi</p>"}
 }
 
 func emailCount(t *testing.T, tc *testutil.TwinClient) int {
