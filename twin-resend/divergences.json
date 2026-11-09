@@ -75,6 +75,27 @@
       "decision": "research/twins/resend/divergence-records/audience-scoped-contacts.json"
     },
     {
+      "route": "webhook delivery",
+      "resend": "Retries a failed delivery immediately, then after 5 s, 5 min, 30 min, 2 h, 5 h, 10 h and 10 h, and disables an endpoint that keeps failing",
+      "app_emulator": "Retries up to three attempts one second apart and never disables an endpoint. Event bodies follow Resend's docs and SDK types; no delivery was recorded",
+      "reason": "Tests need a failed delivery to settle in seconds; the vendor schedule spans a day",
+      "decision": "resend-bp2 s10 and s12, research/twins/resend/architecture-spec.md; quirk delivery-003"
+    },
+    {
+      "route": "POST /webhooks/{id}/events/{event_id}/replay, POST /webhooks/{id}/signing-secret/rotate",
+      "resend": "Replays a delivered or failed event, and rotates a webhook's signing secret",
+      "app_emulator": "Not served; both answer 404",
+      "reason": "Outside the resend-bp2 scope (OD-2); replay is deferred in the event model",
+      "decision": "resend-bp2 s12, research/twins/resend/build-plans/resend-bp2.json"
+    },
+    {
+      "route": "scheduled email events",
+      "resend": "Sends a scheduled email at its scheduled_at and delivers email.sent and its outcome then",
+      "app_emulator": "Settles a scheduled email when it is next read after scheduled_at on the store clock, and delivers email.sent and its outcome at that read",
+      "reason": "The emulator has no scheduler; settling on read keeps time under the test's control through /admin/time/advance",
+      "decision": "resend-bp2 s03 and s10, research/twins/resend/build-plans/resend-bp2.json; quirk lifecycle-003"
+    },
+    {
       "route": "POST /admin/reset",
       "category": "admin_endpoint",
       "resend": "Not served",
@@ -224,13 +245,6 @@
       "app_emulator": "Accepts http and https endpoints; refuses any other scheme with Resend's message",
       "reason": "Receivers in local development and CI run on plain http; requiring TLS would stop the emulator delivering to them",
       "decision": "resend-bp2 s08, research/twins/resend/build-plans/resend-bp2.json; observed in run 2026-11-08 (probe o08)"
-    },
-    {
-      "route": "webhook event delivery",
-      "resend": "Retries a failed delivery on Svix's schedule and disables an endpoint that keeps failing",
-      "app_emulator": "Delivers each event once as it is queued, on the twinkit retry schedule; never disables an endpoint. Event bodies follow Resend's docs and SDK types, not recorded deliveries",
-      "reason": "Svix's retry schedule and auto-disable are not part of the approved build scope",
-      "decision": "twin-resend/internal/api/webhook_delivery.go (quirks delivery-001, delivery-002)"
     }
   ]
 }

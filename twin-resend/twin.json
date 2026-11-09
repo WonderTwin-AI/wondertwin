@@ -1,6 +1,6 @@
 {
   "name": "resend",
-  "description": "Simulates the Resend email API: single and batch sends with idempotency keys, reading emails back and listing them with cursor pagination, test-address outcomes, domains, API keys with sending_access, and the audiences, audience contacts and broadcasts routes the SDKs call, and webhook registration with signing secrets, and updating and deleting webhooks.",
+  "description": "Simulates the Resend email API: single and batch sends with idempotency keys and scheduling (reschedule and cancel), reading and listing emails with cursor pagination, test-address outcomes, domains (create, read, update, verify, delete), API keys (create, list, rename, delete, sending_access and domain-bound), webhooks (register, read, update, delete) with Svix-signed delivery of email and domain events, and the audiences, audience contacts and broadcasts routes the SDKs call.",
   "category": "email",
   "sdk": {
     "package": "github.com/resend/resend-go/v4",
