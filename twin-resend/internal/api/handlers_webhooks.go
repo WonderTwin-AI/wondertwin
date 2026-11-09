@@ -131,6 +131,56 @@ func (h *Handler) ListWebhooks(w http.ResponseWriter, r *http.Request) {
 	twincore.JSON(w, http.StatusOK, paginate(items, pq, 0, func(l listedWebhook) string { return l.ID }))
 }
 
+// UpdateWebhook handles PATCH /webhooks/{id}: it changes the endpoint, the
+// events or the status it names and answers {object, id} (probes o02, o05,
+// o06 of 2026-11-08). Fields it does not name stay as they are.
+func (h *Handler) UpdateWebhook(w http.ResponseWriter, r *http.Request) {
+	hook, ok := h.store.Webhooks.Get(chi.URLParam(r, "id"))
+	if !ok {
+		webhookNotFound(w)
+		return
+	}
+	var req webhookRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	msg := validateWebhookEvents(req.Events)
+	if req.Endpoint != nil {
+		msg = cmp.Or(validateWebhookEndpoint(*req.Endpoint), msg)
+	}
+	if req.Status != nil && *req.Status != store.WebhookEnabled && *req.Status != store.WebhookDisabled {
+		// Resend's wording for an unknown status is not recorded.
+		msg = cmp.Or(msg, "The `status` field must be one of \"enabled\" or \"disabled\".")
+	}
+	if msg != "" {
+		writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
+		return
+	}
+	if req.Endpoint != nil {
+		hook.Endpoint = *req.Endpoint
+	}
+	if len(req.Events) > 0 {
+		hook.Events = slices.Clone(req.Events)
+	}
+	if req.Status != nil {
+		hook.Status = *req.Status
+	}
+	h.store.Webhooks.Set(hook.ID, hook)
+	twincore.JSON(w, http.StatusOK, map[string]any{"object": "webhook", "id": hook.ID})
+}
+
+// DeleteWebhook handles DELETE /webhooks/{id}, answering {object, id,
+// deleted: true} (probes o11, o12 of 2026-11-08).
+func (h *Handler) DeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if _, ok := h.store.Webhooks.Get(id); !ok {
+		webhookNotFound(w)
+		return
+	}
+	h.store.Webhooks.Delete(id)
+	twincore.JSON(w, http.StatusOK, map[string]any{"object": "webhook", "id": id, "deleted": true})
+}
+
 func webhookNotFound(w http.ResponseWriter) {
 	writeError(w, http.StatusNotFound, "not_found", "Webhook endpoint not found")
 }
