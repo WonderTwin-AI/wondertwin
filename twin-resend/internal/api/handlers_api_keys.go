@@ -8,14 +8,19 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
-// ListAPIKeys handles GET /api-keys. Tokens are never listed (quirk auth-005).
+// ListAPIKeys handles GET /api-keys, newest first; every key when limit is
+// absent (quirk pagination-002). Tokens are never listed (quirk auth-005).
 func (h *Handler) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	keys := h.store.APIKeys.Filter(func(_ string, _ store.APIKey) bool { return true })
+	pq, ok := readPageQuery(w, r)
+	if !ok {
+		return
+	}
+	keys := h.store.APIKeys.List()
 	stripped := make([]map[string]any, len(keys))
 	for i, k := range keys {
 		stripped[i] = map[string]any{"id": k.ID, "name": k.Name, "created_at": k.CreatedAt, "last_used_at": k.LastUsedAt}
 	}
-	twincore.JSON(w, http.StatusOK, listBody(stripped))
+	twincore.JSON(w, http.StatusOK, paginate(stripped, pq, 0, func(k map[string]any) string { return k["id"].(string) }))
 }
 
 // CreateAPIKey handles POST /api-keys. It answers 201 {id, object, token};

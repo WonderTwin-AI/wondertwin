@@ -9,10 +9,15 @@ import (
 	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
-// ListDomains handles GET /domains
+// ListDomains handles GET /domains, newest first; every domain when limit is
+// absent (quirk pagination-002).
 func (h *Handler) ListDomains(w http.ResponseWriter, r *http.Request) {
-	domains := h.store.Domains.Filter(func(_ string, _ store.Domain) bool { return true })
-	twincore.JSON(w, http.StatusOK, listBody(domains))
+	pq, ok := readPageQuery(w, r)
+	if !ok {
+		return
+	}
+	domains := h.store.Domains.List()
+	twincore.JSON(w, http.StatusOK, paginate(domains, pq, 0, func(d store.Domain) string { return d.ID }))
 }
 
 // GetDomain handles GET /domains/{id}

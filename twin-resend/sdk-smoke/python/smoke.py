@@ -173,6 +173,18 @@ def _():
     raise AssertionError("send from an unverified domain did not raise")
 
 
+
+@case("list domains with a limit pages newest first")
+def _():
+    first = resend.Domains.create({"name": "smoke-page-one.example.com"})
+    second = resend.Domains.create({"name": "smoke-page-two.example.com"})
+    page = resend.Domains.list({"limit": 1})
+    assert [d["id"] for d in page["data"]] == [second["id"]], f"page 1 is {page!r}"
+    assert page["has_more"] is True, f"has_more is {page['has_more']!r}"
+    page = resend.Domains.list({"limit": 1, "after": second["id"]})
+    assert [d["id"] for d in page["data"]] == [first["id"]], f"page 2 is {page!r}"
+    assert page["has_more"] is False, f"has_more is {page['has_more']!r}"
+
 for r in results:
     print(json.dumps(r))
 sys.exit(0 if results and all(r["pass"] for r in results) else 1)
