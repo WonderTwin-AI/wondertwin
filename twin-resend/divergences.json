@@ -47,10 +47,10 @@
     },
     {
       "route": "POST /emails, scheduled_at",
-      "resend": "Accepts an ISO 8601 date or natural language such as 'in 1 hour'",
-      "app_emulator": "Accepts ISO 8601 (RFC 3339) only; natural language answers 422 validation_error",
-      "reason": "Natural-language scheduling is planned with the coverage extension",
-      "decision": "resend-bp1 s05, research/twins/resend/build-plans/resend-bp1.json"
+      "resend": "Accepts ISO 8601 or natural language, such as 'in 1 hour', 'tomorrow at 9am' or 'Friday at 3pm ET'",
+      "app_emulator": "Accepts ISO 8601 and the relative form 'in N min|hour|day'; other natural language answers 422 validation_error with Resend's unparsable-date message",
+      "reason": "Resend documents examples, not a grammar, for absolute natural-language times; the relative form covers the documented SDK examples and is deterministic against the store clock",
+      "decision": "resend-bp2 s03, research/twins/resend/build-plans/resend-bp2.json; quirk lifecycle-003"
     },
     {
       "route": "any API route, sending_access key with domain_id",

@@ -54,13 +54,13 @@ func TestSendEmailKeepsFields(t *testing.T) {
 		"tags":         []map[string]string{{"name": "category", "value": "welcome"}},
 		"headers":      map[string]string{"X-Entity-Ref-ID": "123"},
 		"attachments":  []map[string]string{{"filename": "a.txt", "content": "aGVsbG8="}},
-		"scheduled_at": "2026-11-06T09:00:00Z",
+		"scheduled_at": "in 2 hours",
 	}))
 	if !reflect.DeepEqual(got["tags"], []any{map[string]any{"name": "category", "value": "welcome"}}) {
 		t.Errorf("tags %v", got["tags"])
 	}
-	if got["scheduled_at"] != "2026-11-06T09:00:00Z" || got["last_event"] != "scheduled" {
-		t.Errorf("scheduled_at %v, last_event %v; want the time and scheduled", got["scheduled_at"], got["last_event"])
+	if at, _ := got["scheduled_at"].(string); !pgTime.MatchString(at) || got["last_event"] != "scheduled" {
+		t.Errorf("scheduled_at %v, last_event %v; want the time in the Postgres form and scheduled", got["scheduled_at"], got["last_event"])
 	}
 	for _, f := range []string{"headers", "attachments"} {
 		if _, ok := got[f]; ok {
@@ -108,7 +108,7 @@ func TestSendEmailValidation(t *testing.T) {
 		{"missing to", map[string]any{"from": "a@example.com", "subject": "s"}, "Missing `to` field."},
 		{"missing subject", map[string]any{"from": "a@example.com", "to": "delivered@resend.dev"}, "Missing `subject` field."},
 		{"over 50 recipients", baseSend(map[string]any{"to": many}), "at most 50"},
-		{"scheduled_at not ISO 8601", baseSend(map[string]any{"scheduled_at": "in 1 min"}), "scheduled_at"},
+		{"scheduled_at unparsable", baseSend(map[string]any{"scheduled_at": "next blue moon"}), "must be a valid date"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
