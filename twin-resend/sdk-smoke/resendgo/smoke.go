@@ -256,6 +256,25 @@ func main() {
 		return wantErr(err, "Domain not found")
 	})
 
+	check("create, rename and delete an API key", func() error {
+		created, err := client.ApiKeys.Create(&resend.CreateApiKeyRequest{Name: "smoke-go-key"})
+		if err != nil {
+			return err
+		}
+		renamed, err := client.ApiKeys.Update(created.Id, &resend.UpdateApiKeyRequest{Name: "smoke-go-key-renamed"})
+		if err != nil || renamed.Object != "api_key" || renamed.Id != created.Id {
+			return fmt.Errorf("update: %+v %v", renamed, err)
+		}
+		keys, err := client.ApiKeys.List()
+		if err != nil || len(keys.Data) != 1 || keys.Data[0].Name != "smoke-go-key-renamed" {
+			return fmt.Errorf("list: %+v %v", keys, err)
+		}
+		if ok, err := client.ApiKeys.Remove(created.Id); err != nil || !ok {
+			return fmt.Errorf("remove: %v %v", ok, err)
+		}
+		return nil
+	})
+
 	check("list domains with a limit pages newest first", func() error {
 		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
 		if err != nil {
