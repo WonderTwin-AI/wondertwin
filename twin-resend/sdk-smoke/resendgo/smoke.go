@@ -295,6 +295,31 @@ func main() {
 		return nil
 	})
 
+	check("disable, change and delete a webhook", func() error {
+		created, err := client.Webhooks.Create(&resend.CreateWebhookRequest{
+			Endpoint: "https://example.com/smoke-go-hook", Events: []string{"email.sent"},
+		})
+		if err != nil {
+			return err
+		}
+		disabled, endpoint := "disabled", "https://example.com/smoke-go-hook-2"
+		updated, err := client.Webhooks.Update(created.Id, &resend.UpdateWebhookRequest{
+			Status: &disabled, Endpoint: &endpoint, Events: []string{"email.bounced"},
+		})
+		if err != nil || updated.Id != created.Id {
+			return fmt.Errorf("update: %+v %v", updated, err)
+		}
+		got, err := client.Webhooks.Get(created.Id)
+		if err != nil || got.Status != "disabled" || got.Endpoint != endpoint || len(got.Events) != 1 {
+			return fmt.Errorf("get: %+v %v", got, err)
+		}
+		if _, err := client.Webhooks.Remove(created.Id); err != nil {
+			return err
+		}
+		_, err = client.Webhooks.Get(created.Id)
+		return wantErr(err, "Webhook endpoint not found")
+	})
+
 	check("list domains with a limit pages newest first", func() error {
 		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
 		if err != nil {

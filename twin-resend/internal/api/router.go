@@ -91,6 +91,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Get("/", h.ListWebhooks)
 		r.Post("/", h.CreateWebhook)
 		r.Get("/{id}", h.GetWebhook)
+		r.Patch("/{id}", h.UpdateWebhook)
+		r.Delete("/{id}", h.DeleteWebhook)
 	})
 
 	// Audiences + Contacts

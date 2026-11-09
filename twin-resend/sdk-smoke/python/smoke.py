@@ -225,6 +225,24 @@ def _():
     assert [h["id"] for h in hooks["data"]] == [created["id"]], f"list is {hooks!r}"
 
 
+@case("disable, change and delete a webhook")
+def _():
+    created = resend.Webhooks.create({"endpoint": "https://example.com/smoke-hook", "events": ["email.sent"]})
+    updated = resend.Webhooks.update({"webhook_id": created["id"], "status": "disabled",
+                                      "endpoint": "https://example.com/smoke-hook-2", "events": ["email.bounced"]})
+    assert (updated["object"], updated["id"]) == ("webhook", created["id"]), f"update is {updated!r}"
+    got = resend.Webhooks.get(created["id"])
+    assert got["status"] == "disabled" and got["events"] == ["email.bounced"], f"get is {got!r}"
+    removed = resend.Webhooks.remove(created["id"])
+    assert (removed["id"], removed["deleted"]) == (created["id"], True), f"remove is {removed!r}"
+    try:
+        resend.Webhooks.get(created["id"])
+    except Exception as e:
+        assert "Webhook endpoint not found" in str(e), f"message is {e}"
+        return
+    raise AssertionError("get after remove did not raise")
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})

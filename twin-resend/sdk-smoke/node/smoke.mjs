@@ -175,6 +175,17 @@ await check("register a webhook and read its secret", async () => {
   const list = ok(await resend.webhooks.list());
   assert.deepEqual(list.data.map((h) => h.id), [created.id]);
 });
+await check("disable, change and delete a webhook", async () => {
+  const created = ok(await resend.webhooks.create({ endpoint: "https://example.com/smoke-hook", events: ["email.sent"] }));
+  const updated = ok(await resend.webhooks.update(created.id, { status: "disabled", endpoint: "https://example.com/smoke-hook-2", events: ["email.bounced"] }));
+  assert.deepEqual(updated, { object: "webhook", id: created.id });
+  const got = ok(await resend.webhooks.get(created.id));
+  assert.equal(got.status, "disabled");
+  assert.deepEqual(got.events, ["email.bounced"]);
+  assert.deepEqual(ok(await resend.webhooks.remove(created.id)), { object: "webhook", id: created.id, deleted: true });
+  const { error } = await resend.webhooks.get(created.id);
+  assert.equal(error?.name, "not_found");
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));
