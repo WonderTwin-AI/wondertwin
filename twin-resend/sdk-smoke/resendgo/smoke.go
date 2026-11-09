@@ -213,6 +213,24 @@ func main() {
 		return wantErr(err, "domain is not verified")
 	})
 
+	check("create and get a domain", func() error {
+		created, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-shape.example.com"})
+		if err != nil {
+			return err
+		}
+		if len(created.Records) != 4 || created.Records[0].Name != "resend._domainkey" || created.Status != "not_started" {
+			return fmt.Errorf("create is %+v", created)
+		}
+		got, err := client.Domains.Get(created.Id)
+		if err != nil {
+			return err
+		}
+		if got.Name != created.Name || len(got.Records) != 4 || got.Capabilities == nil || got.Capabilities.Sending != "enabled" {
+			return fmt.Errorf("get is %+v", got)
+		}
+		return nil
+	})
+
 	check("list domains with a limit pages newest first", func() error {
 		first, err := client.Domains.Create(&resend.CreateDomainRequest{Name: "smoke-go-page-one.example.com"})
 		if err != nil {

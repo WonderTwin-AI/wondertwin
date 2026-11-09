@@ -174,6 +174,18 @@ def _():
 
 
 
+@case("create and get a domain")
+def _():
+    created = resend.Domains.create({"name": "smoke-shape.example.com"})
+    assert created["status"] == "not_started", f"create is {created!r}"
+    names = [r["name"] for r in created["records"]]
+    assert names == ["resend._domainkey", "send", "send", "rsend"], f"records are {names!r}"
+    got = resend.Domains.get(created["id"])
+    assert got["name"] == created["name"], f"get is {got!r}"
+    assert got["capabilities"] == {"sending": "enabled", "receiving": "disabled"}, f"get is {got!r}"
+    assert got["click_tracking"] is False, f"get is {got!r}"
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})

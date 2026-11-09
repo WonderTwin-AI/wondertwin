@@ -86,13 +86,13 @@ func TestResetReseeds(t *testing.T) {
 	t.Cleanup(srv.Close)
 	tc := testutil.NewTwinClient(t, srv)
 
-	create := func() string {
-		return resendPost(tc, "/domains", map[string]any{"name": "example.com"}).AssertStatus(201).JSONMap()["id"].(string)
+	create := func(name string) string {
+		return resendPost(tc, "/domains", map[string]any{"name": name}).AssertStatus(201).JSONMap()["id"].(string)
 	}
-	first := create()
-	create()
+	first := create("example.com")
+	create("example.org")
 	testutil.NewAdminClient(tc).Reset().AssertStatus(200)
-	if again := create(); again != first {
+	if again := create("example.com"); again != first {
 		t.Errorf("first id after reset %s, want %s", again, first)
 	}
 }
