@@ -79,6 +79,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 		r.Get("/", h.ListAPIKeys)
 		r.Post("/", h.CreateAPIKey)
+		r.Patch("/{id}", h.UpdateAPIKey)
 		r.Delete("/{id}", h.DeleteAPIKey)
 	})
 

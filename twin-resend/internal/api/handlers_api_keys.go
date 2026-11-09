@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/wondertwin-ai/wondertwin/twin-resend/internal/store"
@@ -59,18 +60,68 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateAPIKey handles PATCH /api-keys/{id}, which renames a key and
+// answers {object, id} (probes n02, n08 of 2026-11-08).
+func (h *Handler) UpdateAPIKey(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	key, ok := h.store.APIKeys.Get(id)
+	if !ok {
+		apiKeyNotFound(w)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if req.Name == "" {
+		missingField(w, "name")
+		return
+	}
+	key.Name = req.Name
+	h.store.APIKeys.Set(id, key)
+	twincore.JSON(w, http.StatusOK, map[string]any{"object": "api_key", "id": id})
+}
+
+func apiKeyNotFound(w http.ResponseWriter) {
+	writeError(w, http.StatusNotFound, "not_found", "API key not found")
+}
+
 // DeleteAPIKey handles DELETE /api-keys/{id}, answering 200
 // {object, id, deleted} (quirk envelope-005).
 func (h *Handler) DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if _, ok := h.store.APIKeys.Get(id); !ok {
-		twincore.JSON(w, http.StatusNotFound, map[string]any{
-			"statusCode": 404, "message": "API key not found", "name": "not_found",
-		})
+		apiKeyNotFound(w)
 		return
 	}
 	h.store.APIKeys.Delete(id)
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "api_key", "id": id, "deleted": true})
+}
+
+// unverifiedKeyDomainMsg is Resend's answer to a send from the domain a
+// sending key is bound to while that domain is unverified (quirk auth-007).
+const unverifiedKeyDomainMsg = "The associated domain with your API key is not verified. Please, create a new API key with full access or with a verified domain."
+
+// keyDomainRefused reports whether r's key is bound to a domain that is
+// not verified and from names that domain. Resend answers such a send 400
+// with no error name, and still lets the key send from other domains such
+// as onboarding@resend.dev (quirk auth-007, probes n06, n07 of 2026-11-08).
+func (h *Handler) keyDomainRefused(r *http.Request, from string) bool {
+	key, ok := h.issuedKey(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	if !ok || key.DomainID == "" {
+		return false
+	}
+	d, ok := h.store.Domains.Get(key.DomainID)
+	return ok && d.Status != store.DomainStatusVerified && strings.EqualFold(d.Name, senderDomain(from))
+}
+
+// refuseKeyDomain writes Resend's answer for keyDomainRefused.
+func refuseKeyDomain(w http.ResponseWriter) {
+	twincore.JSON(w, http.StatusBadRequest, map[string]any{
+		"message": unverifiedKeyDomainMsg, "statusCode": http.StatusBadRequest,
+	})
 }
 
 // issuedKey returns the stored key whose token is token, if the emulator

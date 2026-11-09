@@ -71,6 +71,10 @@ func (h *Handler) SendEmail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", msg)
 		return
 	}
+	if h.keyDomainRefused(r, req.From) {
+		refuseKeyDomain(w)
+		return
+	}
 	if msg := h.senderCheck(req); msg != "" {
 		writeError(w, http.StatusForbidden, "validation_error", msg)
 		return
@@ -195,6 +199,14 @@ func (h *Handler) SendBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	permissive := strings.EqualFold(r.Header.Get("x-batch-validation"), "permissive")
+	// How Resend answers a batch naming a key's unverified domain is not
+	// recorded; the emulator refuses the whole batch as it does one send.
+	for _, req := range reqs {
+		if h.keyDomainRefused(r, req.From) {
+			refuseKeyDomain(w)
+			return
+		}
+	}
 
 	var errs []map[string]any
 	valid := make([]sendEmailRequest, 0, len(reqs))

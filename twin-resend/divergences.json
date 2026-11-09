@@ -53,11 +53,11 @@
       "decision": "resend-bp2 s03, research/twins/resend/build-plans/resend-bp2.json; quirk lifecycle-003"
     },
     {
-      "route": "any API route, sending_access key with domain_id",
-      "resend": "A sending_access key bound to a domain_id may only send from that domain",
-      "app_emulator": "Stores the domain_id but does not restrict the sender domain",
-      "reason": "Resend's answer to a send from another domain has not been observed, so the emulator does not invent one",
-      "decision": "OD-3, research/twins/resend/RESEARCH-STATUS.md; quirk auth-004"
+      "route": "POST /emails/batch, sending key with domain_id",
+      "resend": "Not recorded for a batch. A single send from the key's own unverified domain answers 400 with message and statusCode and no name; the key may still send from onboarding@resend.dev",
+      "app_emulator": "Refuses the whole batch with the single-send 400 when any item is from the key's own unverified domain",
+      "reason": "Only the single-send answer was recorded; the batch reuses it rather than inventing a per-item error",
+      "decision": "resend-bp2 s07, research/twins/resend/build-plans/resend-bp2.json; quirk auth-007"
     },
     {
       "route": "POST /domains/{id}/verify",

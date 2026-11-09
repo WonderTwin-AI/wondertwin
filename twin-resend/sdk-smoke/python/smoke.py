@@ -205,6 +205,16 @@ def _():
     raise AssertionError("get after remove did not raise")
 
 
+@case("create, rename and delete an API key")
+def _():
+    created = resend.ApiKeys.create({"name": "smoke-key"})
+    renamed = resend.ApiKeys.update({"id": created["id"], "name": "smoke-key-renamed"})
+    assert (renamed["object"], renamed["id"]) == ("api_key", created["id"]), f"update is {renamed!r}"
+    keys = resend.ApiKeys.list()
+    assert [k["name"] for k in keys["data"]] == ["smoke-key-renamed"], f"list is {keys!r}"
+    resend.ApiKeys.remove(created["id"])
+
+
 @case("list domains with a limit pages newest first")
 def _():
     first = resend.Domains.create({"name": "smoke-page-one.example.com"})

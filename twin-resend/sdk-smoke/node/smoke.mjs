@@ -158,6 +158,14 @@ await check("update, verify and delete a domain", async () => {
   const { error } = await resend.domains.get(created.id);
   assert.equal(error?.name, "not_found");
 });
+await check("create, rename and delete an API key", async () => {
+  const created = ok(await resend.apiKeys.create({ name: "smoke-key" }));
+  const renamed = ok(await resend.apiKeys.update(created.id, { name: "smoke-key-renamed" }));
+  assert.deepEqual(renamed, { object: "api_key", id: created.id });
+  const keys = ok(await resend.apiKeys.list());
+  assert.deepEqual(keys.data.map((k) => k.name), ["smoke-key-renamed"]);
+  ok(await resend.apiKeys.remove(created.id));
+});
 await check("list domains with a limit pages newest first", async () => {
   const first = ok(await resend.domains.create({ name: "smoke-page-one.example.com" }));
   const second = ok(await resend.domains.create({ name: "smoke-page-two.example.com" }));
