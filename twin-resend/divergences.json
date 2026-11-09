@@ -211,7 +211,7 @@
       "decision": "research/twins/resend/divergence-records/admin-endpoints.json"
     },
     {
-      "route": "POST /webhooks",
+      "route": "POST /webhooks, PATCH /webhooks/{id}",
       "resend": "Refuses an http endpoint with 422 validation_error 'Endpoint URL scheme must be https'",
       "app_emulator": "Accepts http and https endpoints; refuses any other scheme with Resend's message",
       "reason": "Receivers in local development and CI run on plain http; requiring TLS would stop the emulator delivering to them",
