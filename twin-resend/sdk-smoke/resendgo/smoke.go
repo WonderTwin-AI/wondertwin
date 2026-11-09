@@ -240,6 +240,33 @@ func main() {
 		return nil
 	})
 
+	check("list sent emails newest first", func() error {
+		first, err := client.Emails.Send(email("smoke list 1", "delivered@resend.dev"))
+		if err != nil {
+			return err
+		}
+		second, err := client.Emails.Send(email("smoke list 2", "delivered@resend.dev"))
+		if err != nil {
+			return err
+		}
+		page, err := client.Emails.List()
+		if err != nil {
+			return err
+		}
+		if len(page.Data) != 2 || page.Data[0].Id != second.Id || page.Data[1].Id != first.Id || page.HasMore {
+			return fmt.Errorf("list is %+v", page)
+		}
+		one := 1
+		page, err = client.Emails.ListWithOptions(context.Background(), &resend.ListOptions{Limit: &one})
+		if err != nil {
+			return err
+		}
+		if len(page.Data) != 1 || page.Data[0].Id != second.Id || !page.HasMore {
+			return fmt.Errorf("limit 1 is %+v", page)
+		}
+		return nil
+	})
+
 	failed := false
 	for _, r := range results {
 		b, _ := json.Marshal(r)
