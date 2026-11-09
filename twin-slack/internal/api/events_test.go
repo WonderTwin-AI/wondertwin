@@ -187,6 +187,9 @@ func TestNoRequestURLSendsNothing(t *testing.T) {
 	ch := seedChannel(tc, "quiet")
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"unsent"}}.Encode(), true)
 	mustOK(t, 200, posted)
+	// Events are queued to a worker; drain them so the unsent ones are
+	// settled before a Request URL exists.
+	call(t, srv, "POST", "/admin/webhooks/flush", "", "", false)
 	_, m := call(t, srv, "GET", "/admin/events/deliveries", "", "", false)
 	if d := m["deliveries"].([]any); len(d) != 0 {
 		t.Errorf("deliveries with no Request URL: %v", d)
