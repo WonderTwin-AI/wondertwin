@@ -55,6 +55,7 @@ const (
 	EmailStatusComplained = "complained"
 	EmailStatusSuppressed = "suppressed"
 	EmailStatusScheduled  = "scheduled"
+	EmailStatusCanceled   = "canceled"
 )
 
 // Domain represents a verified sending domain.

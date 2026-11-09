@@ -165,6 +165,17 @@ await check("schedule a send in natural language", async () => {
   assert.equal(got.last_event, "scheduled");
   assert.ok(got.scheduled_at, `scheduled_at is ${got.scheduled_at}`);
 });
+await check("reschedule, then cancel a scheduled send", async () => {
+  const sent = ok(await resend.emails.send({
+    from: SENDER, to: "delivered@resend.dev", subject: "smoke move", html: "<p>m</p>", scheduledAt: "in 1 hour",
+  }));
+  const moved = ok(await resend.emails.update({ id: sent.id, scheduledAt: "in 2 hours" }));
+  assert.deepEqual(moved, { object: "email", id: sent.id });
+  const cancelled = ok(await resend.emails.cancel(sent.id));
+  assert.deepEqual(cancelled, { object: "email", id: sent.id });
+  const got = ok(await resend.emails.get(sent.id));
+  assert.equal(got.last_event, "canceled");
+});
 
 for (const r of results) console.log(JSON.stringify(r));
 process.exit(results.length && results.every((r) => r.pass) ? 0 : 1);
