@@ -119,6 +119,7 @@ func (h *Handler) CreateDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.Domains.Set(id, domain)
+	h.emit("domain.created", domainEventData(domain))
 	twincore.JSON(w, http.StatusCreated, map[string]any{
 		"object": domain.Object, "id": domain.ID, "name": domain.Name, "created_at": domain.CreatedAt,
 		"status": domain.Status, "capabilities": domain.Capabilities, "records": domain.Records,
@@ -175,6 +176,7 @@ func (h *Handler) UpdateDomain(w http.ResponseWriter, r *http.Request) {
 	domain.Capabilities.Sending = cmp.Or(req.Capabilities.Sending, domain.Capabilities.Sending)
 	domain.Capabilities.Receiving = cmp.Or(req.Capabilities.Receiving, domain.Capabilities.Receiving)
 	h.store.Domains.Set(id, domain)
+	h.emit("domain.updated", domainEventData(domain))
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
 }
 
@@ -185,11 +187,13 @@ func domainNotFound(w http.ResponseWriter) {
 // DeleteDomain handles DELETE /domains/{id}
 func (h *Handler) DeleteDomain(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if _, ok := h.store.Domains.Get(id); !ok {
+	domain, ok := h.store.Domains.Get(id)
+	if !ok {
 		domainNotFound(w)
 		return
 	}
 	h.store.Domains.Delete(id)
+	h.emit("domain.deleted", domainEventData(domain))
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id, "deleted": true})
 }
 
@@ -215,6 +219,7 @@ func (h *Handler) VerifyDomain(w http.ResponseWriter, r *http.Request) {
 		domain.Records[i].Status = outcome
 	}
 	h.store.Domains.Set(id, domain)
+	h.emit("domain.updated", domainEventData(domain))
 	twincore.JSON(w, http.StatusOK, map[string]any{"object": "domain", "id": id})
 }
 
@@ -247,4 +252,14 @@ func (h *Handler) resendID() string {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+// domainEventData is the data of a domain.* event: the domain as get reads
+// it, without object and tracking, with created_at in the event form.
+// Domain events were not recorded; the shape follows Resend's docs.
+func domainEventData(d store.Domain) map[string]any {
+	return map[string]any{
+		"id": d.ID, "name": d.Name, "status": d.Status, "created_at": eventTime(d.CreatedAt),
+		"region": d.Region, "records": d.Records,
+	}
 }

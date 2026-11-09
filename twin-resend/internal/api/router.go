@@ -137,6 +137,7 @@ func (h *Handler) Routes(r chi.Router) {
 
 	// Admin extras (no auth required)
 	r.Get("/admin/emails", h.AdminListEmails)
+	r.Post("/admin/emails/{id}/events/{event}", h.AdminEmailEvent)
 }
 
 // bearerAuthMiddleware validates Resend-style Bearer token auth.
