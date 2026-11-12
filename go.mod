@@ -3,27 +3,28 @@ module github.com/wondertwin-ai/wondertwin
 go 1.26.11
 
 require (
-	github.com/go-chi/chi/v5 v5.4.0
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/go-github/v92 v92.0.0
+	github.com/resend/resend-go/v4 v4.12.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/wondertwin-ai/wondertwin/twinkit v0.0.0-20260420175506-73cb526cc94c
-	golang.org/x/crypto v0.57.0
+	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.59.0
+	modernc.org/sqlite v1.61.1
 )
 
 replace github.com/wondertwin-ai/wondertwin/twinkit => ./twinkit
 
 require (
-	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
-	modernc.org/libc v1.75.7 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
