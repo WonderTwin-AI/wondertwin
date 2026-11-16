@@ -11,11 +11,11 @@ import (
 // ACCREC or ACCPAY, a status of DRAFT, SUBMITTED or AUTHORISED (the others
 // come from later writes), a contact that exists, a unique number, and for a
 // document that is not a draft, line items that name accounts. An account code
-// that is not in the chart is refused on any status.
-// The wording is a guess at Xero's, except "Invoice # must be unique", which
+// that is not in the chart is refused on any status, as is an
+// InvoiceAddressType outside the spec enum. The wording is a guess at Xero's, except "Invoice # must be unique", which
 // localstack/finance-ops recognises by those words.
 func (h *Handler) validateInvoice(tenant string, in store.Invoice, existing []store.Invoice) []string {
-	var msgs []string
+	msgs := invoiceAddressMessages(in.InvoiceAddresses)
 	if in.Type != "ACCREC" && in.Type != "ACCPAY" {
 		msgs = append(msgs, "Type must be ACCREC or ACCPAY.")
 	}

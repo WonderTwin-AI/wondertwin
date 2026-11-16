@@ -79,6 +79,22 @@ const defaultLineAmountTypes = "Exclusive"
 // enum, the same on every resource. The wording is a guess.
 const lineAmountTypesMessage = "LineAmountTypes must be Exclusive, Inclusive or NoTax."
 
+// specInvoiceAddressTypes is the InvoiceAddress InvoiceAddressType enum.
+// xero-python checks it only when the value is not empty.
+var specInvoiceAddressTypes = newEnumSet("FROM", "TO")
+
+// invoiceAddressMessages is the refusal of each InvoiceAddressType outside the
+// spec enum, on an invoice or a credit note. The wording is a guess.
+func invoiceAddressMessages(addresses []store.InvoiceAddress) []string {
+	var msgs []string
+	for _, a := range addresses {
+		if a.InvoiceAddressType != "" && !specInvoiceAddressTypes[a.InvoiceAddressType] {
+			msgs = append(msgs, fmt.Sprintf("Invoice Address Type '%s' is not valid.", a.InvoiceAddressType))
+		}
+	}
+	return msgs
+}
+
 // The Contact enums. xero-python checks each of the inline ones only when the
 // value is not empty, so "" reads back; PaymentTermType is an enum class, which
 // has no "" value.
