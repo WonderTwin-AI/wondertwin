@@ -581,6 +581,18 @@
       "quirk_ids": [
         "err-001"
       ]
+    },
+    {
+      "route": "Every write route except PUT /api.xro/2.0/Accounts (a body or record that is not a JSON object)",
+      "reason": "A body that is not a JSON object (a bare [], a string, a number) or an envelope whose records are not objects, such as {\"Invoices\":[1]}, is refused with a 400 ValidationException, \"The request body, and each record in it, must be a JSON object.\", whose element echoes no object. PUT /Contacts with {\"Contacts\":[1]} still answers \"Contacts is not valid\", as it reads the envelope whole, and PUT /Accounts keeps its own \"The request body must be a single Account object.\". Xero's answer to such a body is not observed, so the words are a guess.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json err-001; twin-xero/twin-manifest.json GAP-034",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#536. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "err-001"
+      ]
     }
   ]
 }
