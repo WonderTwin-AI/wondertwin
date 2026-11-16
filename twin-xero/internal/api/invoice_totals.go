@@ -35,10 +35,8 @@ func ptr(f float64) *float64 { return &f }
 func computeLines(lineAmountTypes string, lines []store.LineItem, unitdp int) ([]store.LineItem, totals, []string) {
 	var t totals
 	var msgs []string
-	switch lineAmountTypes {
-	case "", "Exclusive", "Inclusive", "NoTax":
-	default:
-		msgs = append(msgs, "LineAmountTypes must be Exclusive, Inclusive or NoTax.")
+	if lineAmountTypes != "" && !specLineAmountTypes[lineAmountTypes] {
+		msgs = append(msgs, lineAmountTypesMessage)
 	}
 	out := make([]store.LineItem, len(lines))
 	for i, l := range lines {

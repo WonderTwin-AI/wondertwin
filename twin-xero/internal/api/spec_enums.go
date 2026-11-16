@@ -55,3 +55,10 @@ func lineTaxabilityMessage(n int, l store.LineItem) string {
 	}
 	return fmt.Sprintf("Line %d: Taxability '%s' is not valid.", n, l.Taxability)
 }
+
+// specLineAmountTypes is the LineAmountTypes enum.
+var specLineAmountTypes = newEnumSet("Exclusive", "Inclusive", "NoTax")
+
+// lineAmountTypesMessage is the refusal of a LineAmountTypes outside the spec
+// enum, the same on every resource. The wording is a guess.
+const lineAmountTypesMessage = "LineAmountTypes must be Exclusive, Inclusive or NoTax."

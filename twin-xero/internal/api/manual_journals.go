@@ -71,7 +71,8 @@ func (h *Handler) CreateManualJournals(w http.ResponseWriter, r *http.Request) {
 // buildManualJournal validates a new manual journal and fills in what Xero
 // computes or defaults: the ID, each line's AccountID, Status DRAFT, today's
 // date (time-004, a guess from invoices), LineAmountTypes NoTax and
-// ShowOnCashBasisReports true. Anything the client sent for those is ignored.
+// ShowOnCashBasisReports true. Anything the client sent for those is ignored. A
+// LineAmountTypes outside the spec enum is refused, as on bank transactions.
 func (h *Handler) buildManualJournal(tenant string, in store.ManualJournal, keys map[string]json.RawMessage) (store.ManualJournal, []string) {
 	now := h.store.Clock.Now().UTC()
 	switch in.Status {
@@ -83,6 +84,9 @@ func (h *Handler) buildManualJournal(tenant string, in store.ManualJournal, keys
 	}
 	if in.LineAmountTypes == "" {
 		in.LineAmountTypes = "NoTax"
+	}
+	if !specLineAmountTypes[in.LineAmountTypes] {
+		return in, []string{lineAmountTypesMessage}
 	}
 	if _, ok := keys["ShowOnCashBasisReports"]; !ok {
 		in.ShowOnCashBasisReports = true
