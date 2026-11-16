@@ -83,19 +83,26 @@ def repo(tmp: str) -> Path:
     return root
 
 
-def change(root: Path, paths, message: str):
+BOT = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
+
+
+def change(root: Path, paths, message: str, author=None):
     for rel in paths:
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("x\n")
     sh(root, "git", "add", "-A")
-    sh(root, "git", "commit", "-qm", message)
+    extra = ["--author", author] if author else []
+    sh(root, "git", "commit", "-qm", message, *extra)
 
 
-def run(root: Path):
+def run(root: Path, pr_author=None):
+    env = {k: v for k, v in ENV.items() if k != "GOVERNANCE_PR_AUTHOR"}
+    if pr_author:
+        env["GOVERNANCE_PR_AUTHOR"] = pr_author
     return subprocess.run(
         [sys.executable, str(root / "scripts" / "check-governance"), "main", "HEAD"],
-        cwd=root, capture_output=True, text=True, env=ENV,
+        cwd=root, capture_output=True, text=True, env=env,
     )
 
 
@@ -120,11 +127,14 @@ def shared_kit() -> str:
     return kits[0]
 
 
-def case(label, paths, message, want_rc, *want_text):
+def case(label, paths, message, want_rc, *want_text,
+         commits=None, pr_author=None):
+    """`commits` overrides the single change: a list of (paths, message, author)."""
     with tempfile.TemporaryDirectory() as tmp:
         root = repo(tmp)
-        change(root, paths, message)
-        r = run(root)
+        for c_paths, c_msg, c_author in commits or [(paths, message, None)]:
+            change(root, c_paths, c_msg, c_author)
+        r = run(root, pr_author)
         out = r.stdout + r.stderr
         if r.returncode != want_rc:
             print(f"FAIL {label}: exit {r.returncode}, wanted {want_rc}\n{out}")
@@ -169,6 +179,34 @@ def main():
          ["schemas/twin.schema.json"], "touch the schemas", 1, "shared")
     case("an unrelated file needs no citation",
          ["docs/notes.md"], "unrelated", 0, "not fleet-shaped")
+    # Dependabot cannot write a trailer. Its PRs pass only when GitHub says the
+    # PR is Dependabot's AND every commit is; each half alone must not pass.
+    two = ["twin-alpha/go.mod", "twin-beta/go.mod"]
+    case("a Dependabot PR needs no citation",
+         None, None, 0, "Dependabot",
+         commits=[(two, "chore(deps): bump", BOT)], pr_author="dependabot[bot]")
+    case("a Dependabot kit bump needs no citation",
+         None, None, 0, "Dependabot",
+         commits=[(["twinkit/go.mod"], "chore(deps): bump", BOT)],
+         pr_author="dependabot[bot]")
+    case("a forged Dependabot author without the PR event fails",
+         None, None, 1, "no `Skill:`",
+         commits=[(two, "chore(deps): bump", BOT)])
+    case("a human PR claiming the Dependabot author fails",
+         None, None, 1, "no `Skill:`",
+         commits=[(two, "chore(deps): bump", BOT)], pr_author="someone")
+    case("a human commit on a Dependabot PR needs a citation",
+         None, None, 1, "no `Skill:`",
+         commits=[(two, "chore(deps): bump", BOT),
+                  (["twin-gamma/x.go"], "fix build", None)],
+         pr_author="dependabot[bot]")
+    case("a cited human commit on a Dependabot PR passes",
+         None, None, 0, "governed by",
+         commits=[(two, "chore(deps): bump", BOT),
+                  (["twin-gamma/x.go"],
+                   "fix build\n\nSkill: none (follow-up to a dependency bump)",
+                   None)],
+         pr_author="dependabot[bot]")
 
     if FAILED:
         print(f"test-check-governance: {len(FAILED)} failed")

@@ -26,6 +26,7 @@ exercise. Two is where "this change is about one emulator" stops being true.
 Usage:  scripts/check-governance <base-ref> [head-ref]
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -47,6 +48,17 @@ CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 # loudly here rather than quietly ceasing to treat kit changes as fleet-shaped.
 KIT_DIR = r"twinkit[a-z-]*"
 SHARED_DIR = re.compile(rf"^({KIT_DIR}|schemas)/")
+# Dependabot cannot write a commit trailer, so without this every grouped
+# dependency bump that reaches the kit or two emulators failed the gate and
+# routine dependency updates stopped merging. A Dependabot PR is its own record:
+# the bot, the manifests and the versions are all in the PR.
+#
+# The exemption needs BOTH signals. Commit authorship alone is forgeable by
+# anyone with `git commit --author`; the PR author comes from the GitHub event
+# (CI passes it as GOVERNANCE_PR_AUTHOR) and is not. And a human commit pushed
+# onto a Dependabot branch puts the PR back under the citation rule.
+BOT_LOGIN = "dependabot[bot]"
+BOT_EMAIL = "49699333+dependabot[bot]@users.noreply.github.com"
 
 
 def git(*args: str) -> str:
@@ -71,6 +83,18 @@ def main() -> int:
     if not fleet:
         scope = emulators[0] if emulators else "no emulator"
         print(f"check-governance: not fleet-shaped ({scope}); no skill citation required")
+        return 0
+
+    authors = set(git("log", "--format=%ae", f"{base}..{head}").split())
+    if (
+        os.environ.get("GOVERNANCE_PR_AUTHOR") == BOT_LOGIN
+        and authors == {BOT_EMAIL}
+    ):
+        print(
+            "check-governance: fleet-shaped, governed by:\n"
+            "  none (automated Dependabot dependency update; "
+            "every commit is Dependabot's)"
+        )
         return 0
 
     body = git("log", "--format=%B", f"{base}..{head}")
