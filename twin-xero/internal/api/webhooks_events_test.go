@@ -262,3 +262,37 @@ func TestAWriteWithNoSubscriberQueuesNothing(t *testing.T) {
 		t.Errorf("a dropped event used sequence number %d", n)
 	}
 }
+
+// Xero's webhook categories are contacts, invoices, credit notes, prepayments
+// and overpayments, so a write to an account, a spend or receive money bank
+// transaction or a manual journal emits no event, even to a subscription for
+// every category.
+func TestAccountBankTransactionAndJournalWritesEmitNoEvent(t *testing.T) {
+	h := newTestHandler(t)
+	cid := newContactID(t, h, "Bank")
+	srv, _ := receiver(t)
+	subscribe(h, "all", srv.URL, "k", store.WebhookOK, "CONTACT", "INVOICE", "CREDITNOTE", "PREPAYMENT", "OVERPAYMENT")
+	before := h.store.WebhookSeq.Load()
+
+	loanAccount(t, h)
+	bt := createBankTransaction(t, h, spend(cid, "FEE-1"))
+	updated(t, h, bt, `{"Reference":"FEE-1a"}`)
+	if code, out := postBankTransactions(t, h, "", `{"BankTransactions":[{"BankTransactionID":"`+bt+`","Reference":"FEE-1b"},`+spend(cid, "FEE-2")+`]}`); code != 200 {
+		t.Fatalf("POST /BankTransactions: %d %v", code, out)
+	}
+	updated(t, h, bt, `{"Status":"DELETED"}`)
+	draft := createManualJournal(t, h, advanceJournal("DRAFT", 10, -10, "2100"))
+	updatedJournal(t, h, draft, `{"Status":"POSTED"}`)
+	if code, out := postManualJournals(t, h, "", `{"ManualJournals":[{"ManualJournalID":"`+draft+`","Status":"VOIDED"},`+advanceJournal("POSTED", 5, -5, "2100")+`]}`); code != 200 {
+		t.Fatalf("POST /ManualJournals: %d %v", code, out)
+	}
+
+	if n := h.store.WebhookSeq.Load(); n != before {
+		t.Errorf("%d events were emitted, want none", n-before)
+	}
+	h.pend.Lock()
+	defer h.pend.Unlock()
+	if len(h.pending) != 0 || h.started {
+		t.Fatalf("queued %d events, worker started %v, want neither", len(h.pending), h.started)
+	}
+}
