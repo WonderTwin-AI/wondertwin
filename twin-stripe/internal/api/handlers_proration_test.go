@@ -57,6 +57,9 @@ func TestProrationOnPriceUpgrade(t *testing.T) {
 	if total <= 0 {
 		t.Errorf("expected positive proration total for upgrade, got %v", total)
 	}
+	if inv["total_excluding_tax"] != total {
+		t.Errorf("total_excluding_tax = %v, want the untaxed total %v", inv["total_excluding_tax"], total)
+	}
 
 	// Check line items: should have credit + charge.
 	lines := inv["lines"].(map[string]any)

@@ -5,27 +5,47 @@ import (
 	"testing"
 )
 
+// taxRateSpec is a manual tax rate to create for a test invoice.
+type taxRateSpec struct {
+	percentage string
+	inclusive  bool
+}
+
 // manualInvoice creates a customer, pending items of the given amounts and an
 // invoice taxed at one manual rate, and returns the invoice as JSON.
 func manualInvoice(t *testing.T, percentage string, inclusive bool, amounts ...int) map[string]any {
 	t.Helper()
+	return manualInvoiceRates(t, []taxRateSpec{{percentage, inclusive}}, amounts...)
+}
+
+// manualInvoiceRates is manualInvoice with any number of manual rates. The
+// first rate's ID is returned under "_rate".
+func manualInvoiceRates(t *testing.T, rates []taxRateSpec, amounts ...int) map[string]any {
+	t.Helper()
 	_, tc := setupStripe(t)
-	resp := stripePost(tc, fmt.Sprintf("/v1/tax_rates?display_name=VAT&percentage=%s&inclusive=%t&country=CH", percentage, inclusive), nil)
-	resp.AssertStatus(200)
-	rate := resp.JSONMap()["id"].(string)
-	resp = stripePost(tc, "/v1/customers?name=Tax", nil)
+	var ids []string
+	for _, r := range rates {
+		resp := stripePost(tc, fmt.Sprintf("/v1/tax_rates?display_name=VAT&percentage=%s&inclusive=%t&country=CH", r.percentage, r.inclusive), nil)
+		resp.AssertStatus(200)
+		ids = append(ids, resp.JSONMap()["id"].(string))
+	}
+	resp := stripePost(tc, "/v1/customers?name=Tax", nil)
 	resp.AssertStatus(200)
 	cus := resp.JSONMap()["id"].(string)
 	for _, a := range amounts {
 		stripePost(tc, fmt.Sprintf("/v1/invoiceitems?customer=%s&amount=%d&currency=usd", cus, a), nil).AssertStatus(200)
 	}
-	resp = stripePost(tc, "/v1/invoices?customer="+cus+"&default_tax_rates[0]="+rate, nil)
+	path := "/v1/invoices?customer=" + cus
+	for i, id := range ids {
+		path += fmt.Sprintf("&default_tax_rates[%d]=%s", i, id)
+	}
+	resp = stripePost(tc, path, nil)
 	resp.AssertStatus(200)
 	inv := resp.JSONMap()
 	resp = stripePost(tc, "/v1/invoices/"+inv["id"].(string)+"/finalize", nil)
 	resp.AssertStatus(200)
 	out := resp.JSONMap()
-	out["_rate"] = rate
+	out["_rate"] = ids[0]
 	return out
 }
 
@@ -92,6 +112,11 @@ func TestInvoiceTaxRounding(t *testing.T) {
 		{"rounded on the sum", "8.1", false, []int{1006, 1006, 1006}, 244, []float64{82, 81, 81}, 3262},
 		// Carved out of an inclusive price: 46800 - 46800/1.081 = 3506.75.
 		{"inclusive carve out", "8.1", true, []int{46800}, 3507, []float64{3507}, 46800},
+		// Exact decimal ties that binary floats land just below.
+		{"7.25 percent tie", "7.25", false, []int{200}, 15, []float64{15}, 215},
+		{"7.45 percent below half", "7.45", false, []int{100}, 7, []float64{7}, 107},
+		{"7.45 percent tie", "7.45", false, []int{1000}, 75, []float64{75}, 1075},
+		{"1.15 percent below half", "1.15", false, []int{300}, 3, []float64{3}, 303},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -112,5 +137,53 @@ func TestInvoiceTaxRounding(t *testing.T) {
 				t.Errorf("invoice total = %v, want %v", inv["total"], c.sum)
 			}
 		})
+	}
+}
+
+func TestInvoiceTaxSharedInclusiveBase(t *testing.T) {
+	// Two 10% inclusive rates on 12000 back out of one base: 12000/1.2 = 10000.
+	inv := manualInvoiceRates(t, []taxRateSpec{{"10", true}, {"10", true}}, 12000)
+	taxes := inv["total_taxes"].([]any)
+	if len(taxes) != 2 {
+		t.Fatalf("expected two total_taxes entries, got %v", taxes)
+	}
+	for i, tx := range taxes {
+		tax := tx.(map[string]any)
+		if tax["amount"] != 1000.0 || tax["taxable_amount"] != 10000.0 || tax["tax_behavior"] != "inclusive" {
+			t.Errorf("total_taxes[%d] = %v, want amount 1000 on taxable 10000, inclusive", i, tax)
+		}
+	}
+	lineTaxes := inv["lines"].(map[string]any)["data"].([]any)[0].(map[string]any)["taxes"].([]any)
+	for i, tx := range lineTaxes {
+		tax := tx.(map[string]any)
+		if tax["amount"] != 1000.0 || tax["taxable_amount"] != 10000.0 {
+			t.Errorf("lines[0].taxes[%d] = %v, want amount 1000 on taxable 10000", i, tax)
+		}
+	}
+	for k, v := range map[string]float64{"subtotal": 12000, "total_excluding_tax": 10000, "total": 12000} {
+		if inv[k] != v {
+			t.Errorf("%s = %v, want %v", k, inv[k], v)
+		}
+	}
+}
+
+func TestInvoiceTaxExclusiveOnInclusiveBase(t *testing.T) {
+	// A 10% exclusive rate beside a 20% inclusive one taxes the 10000 base, not 12000.
+	inv := manualInvoiceRates(t, []taxRateSpec{{"20", true}, {"10", false}}, 12000)
+	taxes := inv["total_taxes"].([]any)
+	if len(taxes) != 2 {
+		t.Fatalf("expected two total_taxes entries, got %v", taxes)
+	}
+	want := []float64{2000, 1000}
+	for i, tx := range taxes {
+		tax := tx.(map[string]any)
+		if tax["amount"] != want[i] || tax["taxable_amount"] != 10000.0 {
+			t.Errorf("total_taxes[%d] = %v, want amount %v on taxable 10000", i, tax, want[i])
+		}
+	}
+	for k, v := range map[string]float64{"total_excluding_tax": 10000, "total": 13000} {
+		if inv[k] != v {
+			t.Errorf("%s = %v, want %v", k, inv[k], v)
+		}
 	}
 }
