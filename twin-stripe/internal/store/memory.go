@@ -58,6 +58,10 @@ type MemoryStore struct {
 	Persons               *pkgstate.Store[Person]
 	TopUps                *pkgstate.Store[TopUp]
 	Discounts             *pkgstate.Store[Discount]
+	TaxRegistrations      *pkgstate.Store[TaxRegistration]
+
+	// taxSettings is the account's Stripe Tax settings, nil until loaded.
+	taxSettings *TaxSettings
 	// DeletedCustomers keeps the stub Stripe returns when a deleted
 	// customer is retrieved.
 	DeletedCustomers *pkgstate.Store[DeletedObject]
@@ -139,6 +143,7 @@ func New() *MemoryStore {
 		Persons:               pkgstate.New[Person]("person"),
 		TopUps:                pkgstate.New[TopUp]("tu"),
 		Discounts:             pkgstate.New[Discount]("di"),
+		TaxRegistrations:      pkgstate.New[TaxRegistration]("taxreg"),
 		DeletedCustomers:      pkgstate.New[DeletedObject]("cus"),
 		Balances:              make(map[string]*AccountBalance),
 		PlatformBalance:       NewAccountBalance(),
@@ -310,6 +315,8 @@ type stateSnapshot struct {
 	Persons               map[string]Person               `json:"persons"`
 	TopUps                map[string]TopUp                `json:"topups"`
 	Discounts             map[string]Discount             `json:"discounts"`
+	TaxSettings           *TaxSettings                    `json:"tax_settings,omitempty"`
+	TaxRegistrations      map[string]TaxRegistration      `json:"tax_registrations"`
 	DeletedCustomers      map[string]DeletedObject        `json:"deleted_customers,omitempty"`
 	Balances              map[string]*AccountBalance      `json:"balances"`
 	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
@@ -362,9 +369,41 @@ func (s *MemoryStore) Snapshot() any {
 		TopUps:                s.TopUps.Snapshot(),
 		Discounts:             s.Discounts.Snapshot(),
 		DeletedCustomers:      s.DeletedCustomers.Snapshot(),
+		TaxRegistrations:      s.TaxRegistrations.Snapshot(),
+		TaxSettings:           s.taxSettingsCopy(),
 		Balances:              s.snapshotBalances(),
 		PlatformBalance:       s.PlatformBalance,
 	}
+}
+
+func (s *MemoryStore) taxSettingsCopy() *TaxSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.taxSettings == nil {
+		return nil
+	}
+	c := *s.taxSettings
+	return &c
+}
+
+// TaxSettings returns the account's Stripe Tax settings, if any were loaded.
+func (s *MemoryStore) TaxSettings() (TaxSettings, bool) {
+	c := s.taxSettingsCopy()
+	if c == nil {
+		return TaxSettings{}, false
+	}
+	return *c, true
+}
+
+// TaxActive reports whether Stripe Tax is set up: settings active, with a head
+// office. Without that, Stripe refuses automatic tax.
+func (s *MemoryStore) TaxActive() bool {
+	ts, ok := s.TaxSettings()
+	if !ok || ts.Status != "active" || ts.HeadOffice == nil {
+		return false
+	}
+	country, _ := ts.HeadOffice.Address["country"].(string)
+	return country != ""
 }
 
 func (s *MemoryStore) snapshotBalances() map[string]*AccountBalance {
@@ -428,9 +467,11 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.TopUps.LoadSnapshot(snap.TopUps)
 	s.Discounts.LoadSnapshot(snap.Discounts)
 	s.DeletedCustomers.LoadSnapshot(snap.DeletedCustomers)
+	s.TaxRegistrations.LoadSnapshot(snap.TaxRegistrations)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.taxSettings = snap.TaxSettings
 	if snap.Balances != nil {
 		s.Balances = snap.Balances
 	}
@@ -486,10 +527,12 @@ func (s *MemoryStore) Reset() {
 	s.TopUps.Reset()
 	s.Discounts.Reset()
 	s.DeletedCustomers.Reset()
+	s.TaxRegistrations.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.taxSettings = nil
 	s.Balances = make(map[string]*AccountBalance)
 	s.PlatformBalance = NewAccountBalance()
 }

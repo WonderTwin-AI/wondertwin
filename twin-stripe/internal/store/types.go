@@ -927,3 +927,49 @@ func (s *MemoryStore) Now() int64 {
 	}
 	return s.Clock.Now().Unix()
 }
+
+// TaxSettings is the account's Stripe Tax settings (tax.settings). The app
+// emulator holds no tax content of its own: settings come only from the seed
+// or POST /admin/state, and without them automatic tax is off.
+type TaxSettings struct {
+	Object     string         `json:"object"`
+	Status     string         `json:"status"` // active or pending
+	HeadOffice *TaxHeadOffice `json:"head_office"`
+	Defaults   TaxDefaults    `json:"defaults"`
+	Livemode   bool           `json:"livemode"`
+}
+
+// TaxHeadOffice is where the business is located.
+type TaxHeadOffice struct {
+	Address map[string]any `json:"address"`
+}
+
+// TaxDefaults are the account's default tax behaviour and code.
+type TaxDefaults struct {
+	Provider    string  `json:"provider"`
+	TaxBehavior *string `json:"tax_behavior"`
+	TaxCode     *string `json:"tax_code"`
+}
+
+// TaxRegistration is a Stripe Tax registration (tax.registration), plus the one
+// field that is ours: the registration's standard rate, which Stripe's engine
+// supplies and the seed declares (divergences.json).
+type TaxRegistration struct {
+	ID             string         `json:"id"`
+	Object         string         `json:"object"`
+	Country        string         `json:"country"`
+	CountryOptions map[string]any `json:"country_options"`
+	Status         string         `json:"status"` // active, expired or scheduled
+	ActiveFrom     int64          `json:"active_from"`
+	ExpiresAt      *int64         `json:"expires_at"`
+	Created        int64          `json:"created"`
+	Livemode       bool           `json:"livemode"`
+	StandardRate   *StandardRate  `json:"standard_rate,omitempty"`
+}
+
+// StandardRate is a registration's declared standard rate.
+type StandardRate struct {
+	Percentage  float64 `json:"percentage"`
+	TaxType     string  `json:"tax_type"`
+	DisplayName string  `json:"display_name"`
+}
