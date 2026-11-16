@@ -396,6 +396,54 @@ def case_chart_of_accounts():
     assert by_code["200"].updated_date_utc.year >= 2026, "the SDK parsed UpdatedDateUTC as a /Date()/ value"
 
 
+def raw_write(method, path, tenant, token, body):
+    conn = http.client.HTTPConnection(urllib.parse.urlsplit(BASE).netloc)
+    conn.request(method, f"/api.xro/2.0{path}", json.dumps(body), {
+        "Content-Type": "application/json", "Accept": "application/json",
+        "Authorization": f"Bearer {token}", "Xero-Tenant-Id": tenant})
+    res = conn.getresponse()
+    return res.status, json.loads(res.read() or b"null")
+
+
+def case_off_spec_enums_are_refused_so_reads_still_parse():
+    """A value outside a spec enum, stored, makes xero-python raise ValueError on every later read of the list.
+    xero-python will not send such values, so each goes by raw HTTP and must get a 400 ValidationException; then
+    the accounts, bank transactions and manual journals still read back through the SDK."""
+    client, _, first = signed_in()
+    api, tenant = accounting_for(client)
+    token = first["access_token"]
+    contact = new_contact(api, tenant)
+    tag = uuid.uuid4().hex[:4]
+    bt_line = {"Description": "Advance", "Quantity": 1, "UnitAmount": 10, "AccountCode": "200"}
+    receive = {"Type": "RECEIVE", "Contact": {"ContactID": contact}, "BankAccount": {"Code": "090"}, "LineItems": [bt_line]}
+    journal = {"Narration": "Off spec", "JournalLines": [{"LineAmount": 5, "AccountCode": "404"}, {"LineAmount": -5, "AccountCode": "090"}]}
+    off_spec = [
+        ("Account Type", "PUT", "/Accounts", {"Code": f"W{tag}", "Name": f"Wages {tag}", "Type": "WAGESEXPENSE"}),
+        ("Account BankAccountType", "PUT", "/Accounts",
+         {"Code": f"B{tag}", "Name": f"Bank {tag}", "Type": "BANK", "BankAccountNumber": "1", "BankAccountType": "BOGUS"}),
+        ("Account CurrencyCode", "PUT", "/Accounts",
+         {"Code": f"C{tag}", "Name": f"Currency {tag}", "Type": "BANK", "BankAccountNumber": "2", "CurrencyCode": "ZZZ"}),
+        ("line Taxability", "PUT", "/BankTransactions", dict(receive, LineItems=[dict(bt_line, Taxability="BOGUS")])),
+        ("journal LineAmountTypes (PUT)", "PUT", "/ManualJournals", dict(journal, LineAmountTypes="Bogus")),
+        ("journal LineAmountTypes (POST)", "POST", "/ManualJournals", dict(journal, LineAmountTypes="Bogus")),
+    ]
+    for what, method, path, body in off_spec:
+        status, answer = raw_write(method, path, tenant, token, body)
+        assert status == 400 and answer.get("Type") == "ValidationException", f"{what}: {status} {answer}"
+
+    # one valid record of each, so the reads below parse a non-empty list
+    api.create_bank_transactions(tenant, BankTransactions(bank_transactions=[BankTransaction(
+        type="RECEIVE", contact=Contact(contact_id=contact), bank_account=Account(code="090"),
+        line_items=[LineItem(description="Advance", quantity=1, unit_amount=10, account_code="200")])]))
+    api.create_manual_journals(tenant, ManualJournals(manual_journals=[ManualJournal(narration="On spec", journal_lines=[
+        ManualJournalLine(line_amount=5, account_code="404"), ManualJournalLine(line_amount=-5, account_code="090")])]))
+    codes = [a.code for a in api.get_accounts(tenant).accounts]
+    assert not {f"W{tag}", f"B{tag}", f"C{tag}"} & set(codes), "a refused account must not reach the chart"
+    assert api.get_bank_transactions(tenant, page=1).bank_transactions, "get_bank_transactions parses"
+    assert api.get_bank_transactions(tenant).bank_transactions is not None, "the unpaged form parses"
+    assert api.get_manual_journals(tenant).manual_journals, "get_manual_journals parses"
+
+
 def accounting_api():
     """An AccountingApi signed in as a code exchange, and the tenant id from the connection."""
     client, _, _ = signed_in()
@@ -934,6 +982,7 @@ CASES = [
     ("update_or_create_bank_transactions creates, updates by BankTransactionID and answers a mixed batch in place", case_update_or_create_bank_transactions),
     ("update_or_create_manual_journals creates a draft, posts it by ManualJournalID and answers a mixed batch in place", case_update_or_create_manual_journals),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
+    ("values outside the spec enums are refused by raw HTTP, so accounts, bank transactions and journals still read through the SDK", case_off_spec_enums_are_refused_so_reads_still_parse),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
     ("connect: a code exchange, then get_connections returns the tenant", case_connect_tenant),
