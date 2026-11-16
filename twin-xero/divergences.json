@@ -516,7 +516,7 @@
     },
     {
       "route": "PUT, POST and GET /api.xro/2.0/BankTransactions (CurrencyCode, unitdp)",
-      "reason": "A CurrencyCode the client sends is overwritten by the bank account's currency when that account has one, as the default bank account does, so it is kept only for a bank account without a currency. unitdp is read on writes only: GET /BankTransactions and GET /BankTransactions/{BankTransactionID} return amounts as stored whatever unitdp asks. Xero's behaviour for either is not observed. No quirk in the research covers them.",
+      "reason": "On a new bank transaction, a CurrencyCode in the spec enum that the client sends is overwritten by the bank account's currency when that account has one, as the default bank account does, so it is kept only for a bank account without a currency; one outside the spec enum is refused before that, even when the bank account's currency would replace it. On an update a CurrencyCode the client sends is ignored entirely: the stored currency stays, or the bank account's currency replaces it when that account has one. unitdp is read on writes only: GET /BankTransactions and GET /BankTransactions/{BankTransactionID} return amounts as stored whatever unitdp asks. Xero's behaviour for either is not observed. No quirk in the research covers them.",
       "references": {
         "docs": "twin-xero/twin-manifest.json GAP-027, GAP-028",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"

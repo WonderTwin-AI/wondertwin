@@ -132,7 +132,7 @@
       "behaviour: an unknown BankTransaction Status on create is replaced by AUTHORISED, not refused (GAP-024)",
       "behaviour: an account of Type PAYG gets Class LIABILITY by inference from its name (GAP-025)",
       "behaviour: the validation messages for an off-spec BankAccountType, CurrencyCode, line Taxability or LineAmountTypes, and for a PUT /Accounts body that is not one object, are guesses (GAP-026)",
-      "behaviour: a CurrencyCode sent on a bank transaction is overwritten by the bank account's currency when that account has one (GAP-027)",
+      "behaviour: a spec CurrencyCode sent on a new bank transaction is overwritten by the bank account's currency when that account has one, and one sent on an update is ignored, the bank account's currency winning when it has one (GAP-027)",
       "behaviour: unitdp is ignored on GET /BankTransactions and GET /BankTransactions/{id} (GAP-028)",
       "behaviour: a manual journal line on a bank account, or with a zero amount, is accepted, and Xero's behaviour for either is unverified (GAP-029)"
     ],
