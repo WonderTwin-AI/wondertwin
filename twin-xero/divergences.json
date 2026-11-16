@@ -569,6 +569,18 @@
       "quirk_ids": [
         "err-001"
       ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/Invoices, POST /api.xro/2.0/Invoices/{InvoiceID}, PUT and POST /api.xro/2.0/CreditNotes (InvoiceAddresses)",
+      "reason": "On an invoice or credit note create, an InvoiceAddresses item whose InvoiceAddressType is neither FROM nor TO is refused with a 400 ValidationException, \"Invoice Address Type 'X' is not valid.\", because xero-python cannot read the document back with it; an empty InvoiceAddressType stays accepted. An update, by POST /Invoices/{InvoiceID} or by an InvoiceID or CreditNoteID on POST /Invoices or POST /CreditNotes, ignores InvoiceAddresses and keeps the stored ones. The message is a guess, and whether Xero lets an update change InvoiceAddresses is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json err-001; twin-xero/twin-manifest.json GAP-033",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#536. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "err-001"
+      ]
     }
   ]
 }

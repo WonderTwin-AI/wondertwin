@@ -137,7 +137,8 @@
       "behaviour: a manual journal line on a bank account, or with a zero amount, is accepted, and Xero's behaviour for either is unverified (GAP-029)",
       "behaviour: a CurrencyCode outside the spec enum is refused with a guessed message on invoice and credit note creates and updates and on bank transaction creates, where Xero's answer is unobserved (GAP-030)",
       "behaviour: an empty LineAmountTypes on an invoice or credit note update becomes Exclusive, where keeping the stored value or refusing would also be defensible (GAP-031)",
-      "behaviour: contact enum values outside the spec are refused on PUT and POST /Contacts with guessed messages, and a payment term with no Type is refused, where Xero's answer is unobserved (GAP-032)"
+      "behaviour: contact enum values outside the spec are refused on PUT and POST /Contacts with guessed messages, and a payment term with no Type is refused, where Xero's answer is unobserved (GAP-032)",
+      "behaviour: an InvoiceAddressType other than FROM or TO is refused on invoice and credit note creates with a guessed message, and updates ignore InvoiceAddresses (GAP-033)"
     ],
     "estimated_coverage_pct": 35
   },
