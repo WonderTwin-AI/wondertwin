@@ -30,18 +30,19 @@ func ptr(f float64) *float64 { return &f }
 // amount) or NoTax. unitdp is how many decimals a UnitAmount keeps (2 by
 // default, 4 with unitdp=4). Quantity defaults to 1, a line with only a
 // LineAmount takes it as its UnitAmount, and a LineAmount that disagrees with
-// Quantity x UnitAmount less any discount is refused. The wording of the
-// refusals is a guess.
+// Quantity x UnitAmount less any discount is refused, as is a Taxability
+// outside the spec enum. The wording of the refusals is a guess.
 func computeLines(lineAmountTypes string, lines []store.LineItem, unitdp int) ([]store.LineItem, totals, []string) {
 	var t totals
 	var msgs []string
-	switch lineAmountTypes {
-	case "", "Exclusive", "Inclusive", "NoTax":
-	default:
-		msgs = append(msgs, "LineAmountTypes must be Exclusive, Inclusive or NoTax.")
+	if lineAmountTypes != "" && !specLineAmountTypes[lineAmountTypes] {
+		msgs = append(msgs, lineAmountTypesMessage)
 	}
 	out := make([]store.LineItem, len(lines))
 	for i, l := range lines {
+		if msg := lineTaxabilityMessage(i+1, l); msg != "" {
+			msgs = append(msgs, msg)
+		}
 		qty := 1.0
 		if l.Quantity != nil {
 			qty = *l.Quantity

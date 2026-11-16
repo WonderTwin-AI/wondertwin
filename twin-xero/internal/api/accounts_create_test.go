@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -97,4 +98,124 @@ func TestCreateAccountIsDroppedByResetAndCanBeMadeAgain(t *testing.T) {
 func rawString(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
+}
+
+// specAccountTypes is the AccountType enum of the Accounting spec 19.0.0, the
+// values xero-python's AccountType can read back.
+var specAccountTypes = []string{
+	"BANK", "CURRENT", "CURRLIAB", "DEPRECIATN", "DIRECTCOSTS", "EQUITY", "EXPENSE", "FIXED", "INVENTORY",
+	"LIABILITY", "NONCURRENT", "OTHERINCOME", "OVERHEADS", "PREPAYMENT", "REVENUE", "SALES", "TERMLIAB", "PAYG",
+}
+
+func TestCreateAccountAcceptsEverySpecTypeAndReadsItBack(t *testing.T) {
+	if len(accountClass) != len(specAccountTypes) {
+		t.Errorf("accepted %d Types, the spec enum has %d", len(accountClass), len(specAccountTypes))
+	}
+	h := newTestHandler(t)
+	for i, typ := range specAccountTypes {
+		body := fmt.Sprintf(`{"Code":"T%02d","Name":"Type %s","Type":"%s"}`, i, typ, typ)
+		if code, b := putAccount(t, h, body); code != 200 {
+			t.Fatalf("Type %s is in the spec enum: %d %v", typ, code, b)
+		}
+	}
+	got := map[string]any{}
+	for _, a := range listAccounts(t, h, store.DefaultTenantID).Accounts {
+		got[a["Code"].(string)] = a["Type"]
+	}
+	for i, typ := range specAccountTypes {
+		if c := fmt.Sprintf("T%02d", i); got[c] != typ {
+			t.Errorf("account %s reads back Type %v, want %s", c, got[c], typ)
+		}
+	}
+}
+
+func TestCreateAccountRefusesTypesOutsideTheSpec(t *testing.T) {
+	for _, typ := range []string{"PAYGLIABILITY", "SUPERANNUATIONEXPENSE", "SUPERANNUATIONLIABILITY", "WAGESEXPENSE"} {
+		t.Run(typ, func(t *testing.T) {
+			h := newTestHandler(t)
+			code, body := putAccount(t, h, `{"Code":"2100","Name":"Off spec","Type":"`+typ+`"}`)
+			want := "Account Type '" + typ + "' is not valid."
+			if code != 400 || body["Type"] != "ValidationException" || !strings.Contains(rawString(body), want) {
+				t.Fatalf("xero-python cannot read Type %s back; want a 400 ValidationException, got %d %v", typ, code, body)
+			}
+		})
+	}
+}
+
+func TestCreateAccountRefusesOffSpecBankAccountTypeAndCurrency(t *testing.T) {
+	for _, c := range []struct{ name, body, want string }{
+		{"bank account type", `{"Code":"830","Name":"Bogus Bank","Type":"BANK","BankAccountNumber":"1","BankAccountType":"BOGUS"}`, "Bank Account Type 'BOGUS' is not valid."},
+		{"currency", `{"Code":"830","Name":"Bogus Bank","Type":"BANK","BankAccountNumber":"1","CurrencyCode":"ZZZ"}`, "Currency Code 'ZZZ' is not valid."},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newTestHandler(t)
+			code, body := putAccount(t, h, c.body)
+			if code != 400 || body["Type"] != "ValidationException" || !strings.Contains(rawString(body), c.want) {
+				t.Fatalf("xero-python cannot read the value back; want a 400 ValidationException with %q, got %d %v", c.want, code, body)
+			}
+			if chartHas(t, h, "830") {
+				t.Error("a refused account must not reach the chart")
+			}
+		})
+	}
+}
+
+func TestCreateAccountKeepsSpecBankAccountTypeAndCurrency(t *testing.T) {
+	h := newTestHandler(t)
+	code, body := putAccount(t, h, `{"Code":"831","Name":"Card","Type":"BANK","BankAccountNumber":"2","BankAccountType":"CREDITCARD","CurrencyCode":"NZD"}`)
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, body)
+	}
+	a := body["Accounts"].([]any)[0].(map[string]any)
+	if a["BankAccountType"] != "CREDITCARD" || a["CurrencyCode"] != "NZD" {
+		t.Errorf("spec values must be stored as sent: %v", a)
+	}
+}
+
+func TestCreateAccountIgnoresReadOnlyFields(t *testing.T) {
+	h := newTestHandler(t)
+	code, body := putAccount(t, h, `{"Code":"832","Name":"Read only","Type":"EXPENSE","SystemAccount":"BOGUS","ReportingCodeName":"Mine","HasAttachments":true,"ValidationErrors":[{"Message":"x"}]}`)
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, body)
+	}
+	for _, a := range listAccounts(t, h, store.DefaultTenantID).Accounts {
+		if a["Code"] != "832" {
+			continue
+		}
+		if _, ok := a["SystemAccount"]; ok {
+			t.Errorf("SystemAccount is read-only and must not be stored: %v", a)
+		}
+		if _, ok := a["ReportingCodeName"]; ok {
+			t.Errorf("ReportingCodeName is read-only and must not be stored: %v", a)
+		}
+		if _, ok := a["ValidationErrors"]; ok {
+			t.Errorf("ValidationErrors must not be stored from the request: %v", a)
+		}
+		if a["HasAttachments"] != false {
+			t.Errorf("HasAttachments is read-only and must stay false: %v", a)
+		}
+		return
+	}
+	t.Fatal("account 832 is not in the chart")
+}
+
+func TestCreateAccountTrimsTheCode(t *testing.T) {
+	h := newTestHandler(t)
+	if code, b := putAccount(t, h, `{"Code":" 821 ","Name":"Padded","Type":"EXPENSE"}`); code != 200 {
+		t.Fatalf("status %d: %v", code, b)
+	}
+	if !chartHas(t, h, "821") {
+		t.Error(`the Code " 821 " must be stored as "821"`)
+	}
+	if code, b := putAccount(t, h, `{"Code":"821 ","Name":"Padded again","Type":"EXPENSE"}`); code != 400 || !strings.Contains(rawString(b), "Please enter a unique Code.") {
+		t.Errorf("a padded duplicate Code must be refused as a duplicate: %d %v", code, b)
+	}
+}
+
+func TestCreateAccountExplainsANonObjectBody(t *testing.T) {
+	h := newTestHandler(t)
+	code, body := putAccount(t, h, `[]`)
+	if code != 400 || body["Type"] != "ValidationException" || !strings.Contains(rawString(body), "The request body must be a single Account object.") {
+		t.Fatalf("want a 400 ValidationException that names the problem, got %d %v", code, body)
+	}
 }

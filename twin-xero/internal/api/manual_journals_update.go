@@ -75,7 +75,8 @@ func (h *Handler) UpdateManualJournal(w http.ResponseWriter, r *http.Request) {
 
 // applyManualJournalUpdate overlays the fields the update carries on the stored
 // manual journal and returns the result, or the reasons it is refused. A
-// journal that stays or becomes POSTED is checked again, balance included.
+// journal that stays or becomes POSTED is checked again, balance included, and
+// a LineAmountTypes outside the spec enum is refused whatever the status.
 func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJournal, keys map[string]json.RawMessage) (store.ManualJournal, []string) {
 	moves, open := manualJournalStatusChanges[old.Status]
 	if !open {
@@ -100,6 +101,9 @@ func (h *Handler) applyManualJournalUpdate(tenant string, old, in store.ManualJo
 	set("LineAmountTypes", func() { out.LineAmountTypes = in.LineAmountTypes })
 	set("ShowOnCashBasisReports", func() { out.ShowOnCashBasisReports = in.ShowOnCashBasisReports })
 	set("JournalLines", func() { out.JournalLines = in.JournalLines })
+	if !specLineAmountTypes[out.LineAmountTypes] {
+		return old, []string{lineAmountTypesMessage}
+	}
 	if old.Status != "DRAFT" {
 		sent := out
 		sent.JournalLines = slices.Clone(out.JournalLines)

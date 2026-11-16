@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
@@ -85,5 +86,30 @@ func TestCreateBankTransactionsInBulkWithSummarizeErrorsFalse(t *testing.T) {
 	}
 	if n := h.store.BankTransactions.For(store.DefaultTenantID).Count(); n != 1 {
 		t.Errorf("only the valid item is created, got %d", n)
+	}
+}
+
+// A Status outside the spec enum is never stored, so xero-python can always
+// read the bank transaction back. On create the Status sent is ignored and the
+// transaction is AUTHORISED; whether Xero refuses an unknown Status instead is
+// not documented, so this pins the emulator's behaviour rather than Xero's. On
+// update the unknown Status is refused as a move AUTHORISED cannot make.
+func TestBankTransactionStatusOutsideTheSpecIsNeverStored(t *testing.T) {
+	h := newTestHandler(t)
+	lender := newContactID(t, h, "Lender Capital")
+	code, body := putBankTransactions(t, h, "", strings.Replace(settlement(lender), `{"Type"`, `{"Status":"BOGUS","Type"`, 1))
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, body)
+	}
+	bt := body["BankTransactions"].([]any)[0].(map[string]any)
+	if bt["Status"] != "AUTHORISED" {
+		t.Errorf("Status = %v, want AUTHORISED whatever was sent", bt["Status"])
+	}
+	id := bt["BankTransactionID"].(string)
+	if code, body := postBankTransaction(t, h, id, `{"Status":"BOGUS"}`); code != 400 || body["Type"] != "ValidationException" {
+		t.Errorf("an unknown Status on update must be refused: %d %v", code, body)
+	}
+	if got, _ := h.store.BankTransactions.For(store.DefaultTenantID).Get(id); got.Status != "AUTHORISED" {
+		t.Errorf("Status = %q after a refused update, want AUTHORISED", got.Status)
 	}
 }
