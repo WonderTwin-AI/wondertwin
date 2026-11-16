@@ -108,6 +108,12 @@
       "stripe": "No equivalent",
       "app_emulator": "Control plane for tests: health, reset, state, time, faults, and Stripe-specific triggers (fail a payout, fund an account, complete a Checkout Session, advance subscriptions, authenticate a PaymentIntent, create and resolve disputes, register bank account tokens)",
       "reason": "Lets tests drive outcomes that Stripe produces asynchronously or from the Dashboard"
+    },
+    {
+      "route": "POST /v1/invoices, invoice lines[].taxes[].amount",
+      "stripe": "Rounds the tax at each rate once on the sum of the lines, then gives a leftover cent to one line by a rule it does not document; samples disagree on which line",
+      "app_emulator": "Rounds each line half up, then moves a leftover cent to the line rounding moved furthest from its exact amount, the first such line on a tie. Totals and total_taxes match Stripe; only which line holds the cent may differ",
+      "reason": "Operator decision 2026-11-16: the rule is not settled (quirk lifecycle-007), so a fixed rule is declared instead of guessed"
     }
   ]
 }

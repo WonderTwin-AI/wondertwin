@@ -393,7 +393,9 @@ type Invoice struct {
 	HostedInvoiceURL     string            `json:"hosted_invoice_url,omitempty"`
 	Number               string            `json:"number,omitempty"`
 	TotalDiscountAmounts []DiscountAmount  `json:"total_discount_amounts,omitempty"`
-	TotalTaxAmounts      []TaxAmount       `json:"total_tax_amounts,omitempty"`
+	TotalTaxes           []InvoiceTax      `json:"total_taxes,omitempty"`
+	TotalExcludingTax    *int64            `json:"total_excluding_tax"`
+	AutomaticTax         AutomaticTax      `json:"automatic_tax"`
 	Discounts            []string          `json:"discounts"`
 	DefaultTaxRates      []TaxRate         `json:"default_tax_rates,omitempty"`
 	DueDate              int64             `json:"due_date,omitempty"`
@@ -414,15 +416,16 @@ type InvoiceLines struct {
 
 // InvoiceLine represents a line item on an invoice.
 type InvoiceLine struct {
-	ID          string  `json:"id"`
-	Object      string  `json:"object"`
-	Amount      int64   `json:"amount"`
-	Currency    string  `json:"currency"`
-	Description string  `json:"description,omitempty"`
-	Price       *Price  `json:"price,omitempty"`
-	Quantity    int64   `json:"quantity,omitempty"`
-	Period      *Period `json:"period,omitempty"`
-	Type        string  `json:"type"` // subscription or invoiceitem
+	ID          string       `json:"id"`
+	Object      string       `json:"object"`
+	Amount      int64        `json:"amount"`
+	Currency    string       `json:"currency"`
+	Description string       `json:"description,omitempty"`
+	Price       *Price       `json:"price,omitempty"`
+	Quantity    int64        `json:"quantity,omitempty"`
+	Period      *Period      `json:"period,omitempty"`
+	Type        string       `json:"type"` // subscription or invoiceitem
+	Taxes       []InvoiceTax `json:"taxes,omitempty"`
 }
 
 // DiscountAmount represents a discount amount on an invoice.
@@ -431,11 +434,29 @@ type DiscountAmount struct {
 	Discount string `json:"discount"`
 }
 
-// TaxAmount represents a tax amount on an invoice.
-type TaxAmount struct {
-	Amount    int64  `json:"amount"`
-	Inclusive bool   `json:"inclusive"`
-	TaxRate   string `json:"tax_rate"`
+// InvoiceTax is one tax on an invoice (total_taxes) or on a line (taxes),
+// in the dahlia shape that replaced total_tax_amounts.
+type InvoiceTax struct {
+	Amount           int64          `json:"amount"`
+	TaxBehavior      string         `json:"tax_behavior"`
+	TaxRateDetails   TaxRateDetails `json:"tax_rate_details"`
+	TaxabilityReason string         `json:"taxability_reason"`
+	TaxableAmount    int64          `json:"taxable_amount"`
+	Type             string         `json:"type"`
+}
+
+// TaxRateDetails names the tax rate an InvoiceTax was computed at.
+type TaxRateDetails struct {
+	TaxRate string `json:"tax_rate"`
+}
+
+// AutomaticTax is an invoice's automatic_tax. Off until automatic tax is used.
+type AutomaticTax struct {
+	Enabled        bool    `json:"enabled"`
+	DisabledReason *string `json:"disabled_reason"`
+	Liability      any     `json:"liability"`
+	Provider       *string `json:"provider"`
+	Status         *string `json:"status"`
 }
 
 // Period represents a billing period.
