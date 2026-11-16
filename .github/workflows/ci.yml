@@ -26,6 +26,9 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
+          # From the event, not the commits, so it cannot be forged by a
+          # contributor; check-governance exempts only Dependabot's own PRs.
+          GOVERNANCE_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           git fetch --quiet origin "$BASE_REF"
           ./scripts/check-governance "origin/$BASE_REF" HEAD

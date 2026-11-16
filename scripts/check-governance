@@ -26,6 +26,7 @@ exercise. Two is where "this change is about one emulator" stops being true.
 Usage:  scripts/check-governance <base-ref> [head-ref]
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -47,6 +48,24 @@ CITATION = re.compile(r"^Skill:\s*(\S.*)$", re.MULTILINE)
 # loudly here rather than quietly ceasing to treat kit changes as fleet-shaped.
 KIT_DIR = r"twinkit[a-z-]*"
 SHARED_DIR = re.compile(rf"^({KIT_DIR}|schemas)/")
+# Dependabot cannot write a commit trailer, so without this every grouped
+# dependency bump that reaches the kit or two emulators failed the gate and
+# routine dependency updates stopped merging. A Dependabot PR is its own record:
+# the bot, the manifests and the versions are all in the PR.
+#
+# The exemption needs BOTH signals. Commit authorship alone is forgeable by
+# anyone with `git commit --author`; the PR author comes from the GitHub event
+# (CI passes it as GOVERNANCE_PR_AUTHOR), so a contributor opening their own PR
+# cannot claim it. A commit under its own author on a Dependabot branch puts
+# the PR back under the citation rule. Someone with write access could still
+# push a commit with a forged Dependabot author onto a Dependabot branch; that
+# is acceptable because this gate is an audit record, not a security boundary.
+#
+# Merge commits do not count as authors. In CI, HEAD is the merge commit GitHub
+# synthesises for the PR, and a branch may merge main in; neither is a change
+# anyone authored here. A range with no non-merge commits is never exempt.
+BOT_LOGIN = "dependabot[bot]"
+BOT_EMAIL = "49699333+dependabot[bot]@users.noreply.github.com"
 
 
 def git(*args: str) -> str:
@@ -71,6 +90,20 @@ def main() -> int:
     if not fleet:
         scope = emulators[0] if emulators else "no emulator"
         print(f"check-governance: not fleet-shaped ({scope}); no skill citation required")
+        return 0
+
+    authors = set(
+        git("log", "--no-merges", "--format=%ae", f"{base}..{head}").split()
+    )
+    if (
+        os.environ.get("GOVERNANCE_PR_AUTHOR") == BOT_LOGIN
+        and authors == {BOT_EMAIL}
+    ):
+        print(
+            "check-governance: fleet-shaped, governed by:\n"
+            "  none (automated Dependabot dependency update; "
+            "every commit is Dependabot's)"
+        )
         return 0
 
     body = git("log", "--format=%B", f"{base}..{head}")
