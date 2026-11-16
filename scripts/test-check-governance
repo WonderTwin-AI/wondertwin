@@ -96,6 +96,22 @@ def change(root: Path, paths, message: str, author=None):
     sh(root, "git", "commit", "-qm", message, *extra)
 
 
+GITHUB = "GitHub <noreply@github.com>"
+
+
+def merge_main(root: Path, paths, message: str, author: str):
+    """Merge a new main commit into the branch, as GitHub's PR merge ref does.
+
+    `paths` are written into the merge commit itself, so a merge can carry
+    changes that no non-merge commit in the range made.
+    """
+    sh(root, "git", "checkout", "-q", "main")
+    change(root, ["docs/upstream.md"], "upstream")
+    sh(root, "git", "checkout", "-q", "work")
+    sh(root, "git", "merge", "-q", "--no-ff", "--no-commit", "main")
+    change(root, paths, message, author)
+
+
 def run(root: Path, pr_author=None):
     env = {k: v for k, v in ENV.items() if k != "GOVERNANCE_PR_AUTHOR"}
     if pr_author:
@@ -129,11 +145,13 @@ def shared_kit() -> str:
 
 def case(label, paths, message, want_rc, *want_text,
          commits=None, pr_author=None):
-    """`commits` overrides the single change: a list of (paths, message, author)."""
+    """`commits` overrides the single change: a list of (paths, message, author),
+    with an optional fourth element True to make that step a merge of main."""
     with tempfile.TemporaryDirectory() as tmp:
         root = repo(tmp)
-        for c_paths, c_msg, c_author in commits or [(paths, message, None)]:
-            change(root, c_paths, c_msg, c_author)
+        for c_paths, c_msg, c_author, *merge in commits or [(paths, message, None)]:
+            step = merge_main if merge and merge[0] else change
+            step(root, c_paths, c_msg, c_author)
         r = run(root, pr_author)
         out = r.stdout + r.stderr
         if r.returncode != want_rc:
@@ -206,6 +224,15 @@ def main():
                   (["twin-gamma/x.go"],
                    "fix build\n\nSkill: none (follow-up to a dependency bump)",
                    None)],
+         pr_author="dependabot[bot]")
+    case("a Dependabot PR under GitHub's merge commit needs no citation",
+         None, None, 0, "Dependabot",
+         commits=[(two, "chore(deps): bump", BOT),
+                  ([], "Merge main into work", GITHUB, True)],
+         pr_author="dependabot[bot]")
+    case("a merge-only range on a Dependabot PR needs a citation",
+         None, None, 1, "no `Skill:`",
+         commits=[(two, "Merge main into work", BOT, True)],
          pr_author="dependabot[bot]")
 
     if FAILED:

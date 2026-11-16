@@ -55,8 +55,15 @@ SHARED_DIR = re.compile(rf"^({KIT_DIR}|schemas)/")
 #
 # The exemption needs BOTH signals. Commit authorship alone is forgeable by
 # anyone with `git commit --author`; the PR author comes from the GitHub event
-# (CI passes it as GOVERNANCE_PR_AUTHOR) and is not. And a human commit pushed
-# onto a Dependabot branch puts the PR back under the citation rule.
+# (CI passes it as GOVERNANCE_PR_AUTHOR), so a contributor opening their own PR
+# cannot claim it. A commit under its own author on a Dependabot branch puts
+# the PR back under the citation rule. Someone with write access could still
+# push a commit with a forged Dependabot author onto a Dependabot branch; that
+# is acceptable because this gate is an audit record, not a security boundary.
+#
+# Merge commits do not count as authors. In CI, HEAD is the merge commit GitHub
+# synthesises for the PR, and a branch may merge main in; neither is a change
+# anyone authored here. A range with no non-merge commits is never exempt.
 BOT_LOGIN = "dependabot[bot]"
 BOT_EMAIL = "49699333+dependabot[bot]@users.noreply.github.com"
 
@@ -85,7 +92,9 @@ def main() -> int:
         print(f"check-governance: not fleet-shaped ({scope}); no skill citation required")
         return 0
 
-    authors = set(git("log", "--format=%ae", f"{base}..{head}").split())
+    authors = set(
+        git("log", "--no-merges", "--format=%ae", f"{base}..{head}").split()
+    )
     if (
         os.environ.get("GOVERNANCE_PR_AUTHOR") == BOT_LOGIN
         and authors == {BOT_EMAIL}
