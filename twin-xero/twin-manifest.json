@@ -135,7 +135,8 @@
       "behaviour: a spec CurrencyCode sent on a new bank transaction is overwritten by the bank account's currency when that account has one, and one sent on an update is ignored, the bank account's currency winning when it has one (GAP-027)",
       "behaviour: unitdp is ignored on GET /BankTransactions and GET /BankTransactions/{id} (GAP-028)",
       "behaviour: a manual journal line on a bank account, or with a zero amount, is accepted, and Xero's behaviour for either is unverified (GAP-029)",
-      "behaviour: a CurrencyCode outside the spec enum is refused with a guessed message on invoice and credit note creates and updates and on bank transaction creates, where Xero's answer is unobserved (GAP-030)"
+      "behaviour: a CurrencyCode outside the spec enum is refused with a guessed message on invoice and credit note creates and updates and on bank transaction creates, where Xero's answer is unobserved (GAP-030)",
+      "behaviour: an empty LineAmountTypes on an invoice or credit note update becomes Exclusive, where keeping the stored value or refusing would also be defensible (GAP-031)"
     ],
     "estimated_coverage_pct": 35
   },

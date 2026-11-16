@@ -547,6 +547,16 @@
       "quirk_ids": [
         "err-001"
       ]
+    },
+    {
+      "route": "POST /api.xro/2.0/Invoices/{InvoiceID}, POST /api.xro/2.0/Invoices and POST /api.xro/2.0/CreditNotes (update with an empty LineAmountTypes)",
+      "reason": "An update of an invoice or credit note that sends \"LineAmountTypes\": \"\" stores Exclusive, as a create without one does, because the spec says line amounts are exclusive of tax by default when not specified and xero-python's enum has no empty value. Keeping the stored value, or refusing the empty value, would also be defensible. What Xero does is not observed. No quirk in the research covers it.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-031",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#536. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
     }
   ]
 }
