@@ -83,14 +83,22 @@ type badValueError struct{ Field string }
 
 func (e *badValueError) Error() string { return "invalid date in " + e.Field }
 
+// nonObjectBodyMessage is the refusal of a body, or of a record in it, that is
+// not a JSON object. The wording is a guess.
+const nonObjectBodyMessage = "The request body, and each record in it, must be a JSON object."
+
 // writeBadBody answers a body that did not decode. JSON that is not JSON stays a
 // plain 400 problem. A value of the wrong type or a date that cannot be read is a
 // ValidationException that names the field, as every other refused value is
-// (audit finding F3). The exact words are a guess; Xero's are not observed.
+// (audit finding F3). A body, or a record in an envelope, that is not a JSON
+// object at all (a bare [] or a string) has no field to name, so it gets
+// nonObjectBodyMessage. The exact words are a guess; Xero's are not observed.
 func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, err error) {
 	var typeErr *json.UnmarshalTypeError
 	var valueErr *badValueError
 	switch {
+	case errors.As(err, &typeErr) && typeErr.Field == "":
+		writeValidationException(w, validationElement{Messages: []string{nonObjectBodyMessage}})
 	case errors.As(err, &typeErr):
 		writeValidationException(w, validationElement{Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
 	case errors.As(err, &valueErr):
