@@ -13,6 +13,12 @@ func TestBankTransactionValidationRefusesWhatXeroDocuments(t *testing.T) {
 	for _, c := range []struct{ name, body, want string }{
 		{"no contact", `{"Type":"RECEIVE","BankAccount":{"Code":"090"},"LineItems":[` + line + `]}`,
 			"The Contact must contain at least 1 of the following elements to identify the contact"},
+		{"empty contact", `{"Type":"RECEIVE","Contact":{},"BankAccount":{"Code":"090"},"LineItems":[` + line + `]}`,
+			"The Contact must contain at least 1 of the following elements to identify the contact: Name, ContactID, ContactNumber"},
+		{"contact by name", `{"Type":"RECEIVE","Contact":{"Name":"Lender Capital"},"BankAccount":{"Code":"090"},"LineItems":[` + line + `]}`,
+			"The Contact must contain a ContactID to identify the contact; a Name or ContactNumber alone is not accepted."},
+		{"contact by number", `{"Type":"RECEIVE","Contact":{"ContactNumber":"LC-1"},"BankAccount":{"Code":"090"},"LineItems":[` + line + `]}`,
+			"The Contact must contain a ContactID to identify the contact; a Name or ContactNumber alone is not accepted."},
 		{"unknown contact", `{"Type":"RECEIVE","Contact":{"ContactID":"nope"},"BankAccount":{"Code":"090"},"LineItems":[` + line + `]}`,
 			"Contact nope could not be found."},
 		{"no bank account", `{"Type":"RECEIVE","Contact":{"ContactID":"CID"},"LineItems":[` + line + `]}`,

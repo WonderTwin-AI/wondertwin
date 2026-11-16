@@ -15,12 +15,13 @@ type bankTransaction struct {
 }
 
 // inBankTransaction returns the submitted bank transaction whole, with the
-// contact kept as a reference. The create handler owns resetting every computed
-// field.
+// contact kept as a reference. A contact that names none of Name, ContactID and
+// ContactNumber is no contact at all. The create handler owns resetting every
+// computed field.
 func inBankTransaction(w bankTransaction) store.BankTransaction {
 	in := w.BankTransaction
 	in.Contact = nil
-	if w.Contact != nil {
+	if c := w.Contact; c != nil && (c.ContactID != "" || c.Name != "" || c.ContactNumber != "") {
 		in.Contact = &store.ContactRef{ContactID: w.Contact.ContactID}
 	}
 	in.Date = tm(w.Date)

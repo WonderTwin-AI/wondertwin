@@ -31,7 +31,7 @@ func (h *Handler) CreateManualJournals(w http.ResponseWriter, r *http.Request) {
 	keys := make([]map[string]json.RawMessage, len(in.ManualJournals))
 	for i, item := range in.ManualJournals {
 		if err == nil {
-			err = decodeBody(item, &sent[i])
+			err = decodeItem(item, &sent[i])
 		}
 		if err == nil {
 			err = json.Unmarshal(item, &keys[i])
@@ -99,7 +99,7 @@ func (h *Handler) buildManualJournal(tenant string, in store.ManualJournal, keys
 		in.Date = &d
 	}
 	in.ManualJournalID, in.StatusAttributeString, in.UpdatedDateUTC = h.store.NewID(), "OK", now
-	in.HasAttachments, in.Warnings, in.ValidationErrors = false, nil, nil
+	in.HasAttachments, in.Attachments, in.Warnings, in.ValidationErrors = false, nil, nil, nil
 	return in, nil
 }
 

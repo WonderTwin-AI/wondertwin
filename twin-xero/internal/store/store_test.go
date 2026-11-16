@@ -3,6 +3,7 @@ package store_test
 import (
 	"encoding/json"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/wondertwin-ai/wondertwin/twin-xero/internal/store"
@@ -329,5 +330,19 @@ func TestManualJournalResetClearsEveryTenant(t *testing.T) {
 	s.Reset()
 	if s.ManualJournals.For("t1").Count() != 0 || s.ManualJournals.For(store.DefaultTenantID).Count() != 0 {
 		t.Fatal("reset must clear every tenant's manual journals")
+	}
+}
+
+func TestManualJournalCarriesTheSpecsAttachments(t *testing.T) {
+	var mj store.ManualJournal
+	if err := json.Unmarshal([]byte(`{"Narration":"n","Attachments":[{"AttachmentID":"a1","FileName":"x.pdf","ContentLength":3}]}`), &mj); err != nil {
+		t.Fatal(err)
+	}
+	if len(mj.Attachments) != 1 || mj.Attachments[0].FileName != "x.pdf" {
+		t.Fatalf("Attachments = %+v", mj.Attachments)
+	}
+	b, _ := json.Marshal(store.ManualJournal{Narration: "n"})
+	if strings.Contains(string(b), `"Attachments"`) {
+		t.Fatalf("a journal with no attachments writes the key: %s", b)
 	}
 }

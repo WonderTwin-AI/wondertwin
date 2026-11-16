@@ -39,7 +39,7 @@ func (h *Handler) CreateBankTransactions(w http.ResponseWriter, r *http.Request)
 	sent := make([]bankTransaction, len(in.BankTransactions))
 	for i, item := range in.BankTransactions {
 		if err == nil {
-			err = decodeBody(item, &sent[i])
+			err = decodeItem(item, &sent[i])
 		}
 	}
 	if err != nil {

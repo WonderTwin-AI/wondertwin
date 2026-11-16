@@ -90,18 +90,45 @@ func (e *badValueError) Error() string { return "invalid date in " + e.Field }
 func (h *Handler) writeBadBody(w http.ResponseWriter, r *http.Request, err error) {
 	var typeErr *json.UnmarshalTypeError
 	var valueErr *badValueError
+	var object any
+	if sub := (*submittedError)(nil); errors.As(err, &sub) {
+		object = sub.Object
+	}
 	switch {
 	case errors.As(err, &typeErr):
-		writeValidationException(w, validationElement{Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
+		writeValidationException(w, validationElement{Object: object, Messages: []string{lastKey(typeErr.Field) + " is not valid"}})
 	case errors.As(err, &valueErr):
 		field := valueErr.Field
 		if field == "" {
 			field = "Date"
 		}
-		writeValidationException(w, validationElement{Messages: []string{field + " is not a valid date"}})
+		writeValidationException(w, validationElement{Object: object, Messages: []string{field + " is not a valid date"}})
 	default:
 		h.writeProblem(w, r, http.StatusBadRequest, "Bad Request", "The request body is not valid JSON")
 	}
+}
+
+// submittedError is a value error in one submitted object, carried with that
+// object so its ValidationException element can echo it as every other
+// refusal's element does (err-001).
+type submittedError struct {
+	Object json.RawMessage
+	err    error
+}
+
+func (e *submittedError) Error() string { return e.err.Error() }
+func (e *submittedError) Unwrap() error { return e.err }
+
+// decodeItem is decodeBody for one submitted object: a value of the wrong type
+// or a date that cannot be read comes back carrying the object.
+func decodeItem(item json.RawMessage, v any) error {
+	err := decodeBody(item, v)
+	var typeErr *json.UnmarshalTypeError
+	var valueErr *badValueError
+	if errors.As(err, &typeErr) || errors.As(err, &valueErr) {
+		return &submittedError{Object: item, err: err}
+	}
+	return err
 }
 
 // decodeBody is json.Unmarshal that, when a date cannot be read, says which key
