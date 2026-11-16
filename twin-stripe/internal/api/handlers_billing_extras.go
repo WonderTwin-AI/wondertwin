@@ -219,6 +219,10 @@ func (h *Handler) GetTaxRate(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	tr, ok := h.store.TaxRates.Get(id)
 	if !ok {
+		// Rates Stripe Tax created are retrievable but never listed.
+		tr, ok = h.store.StripeTaxRates.Get(id)
+	}
+	if !ok {
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such tax_rate: "+id)
 		return
 	}
