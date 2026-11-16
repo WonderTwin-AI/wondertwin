@@ -171,7 +171,10 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 	set("Date", func() { out.Date = in.Date })
 	set("DueDate", func() { out.DueDate = in.DueDate })
 	set("LineAmountTypes", func() { out.LineAmountTypes = in.LineAmountTypes })
-	set("CurrencyCode", func() { out.CurrencyCode = in.CurrencyCode })
+	set("CurrencyCode", func() {
+		out.CurrencyCode = in.CurrencyCode
+		msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)
+	})
 	set("CurrencyRate", func() { out.CurrencyRate = in.CurrencyRate })
 	set("Contact", func() {
 		if in.Contact != nil {

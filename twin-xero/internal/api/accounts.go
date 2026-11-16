@@ -103,9 +103,7 @@ func validateAccount(a store.Account, chart []store.Account) []string {
 	if !specBankAccountTypes[a.BankAccountType] {
 		msgs = append(msgs, fmt.Sprintf("Bank Account Type '%s' is not valid.", a.BankAccountType))
 	}
-	if a.CurrencyCode != "" && !specCurrencyCodes[a.CurrencyCode] {
-		msgs = append(msgs, fmt.Sprintf("Currency Code '%s' is not valid.", a.CurrencyCode))
-	}
+	msgs = append(msgs, currencyCodeMessages(a.CurrencyCode)...)
 	for _, c := range chart {
 		if a.Name != "" && strings.EqualFold(c.Name, a.Name) {
 			msgs = append(msgs, "Please enter a unique Name.")

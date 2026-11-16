@@ -80,10 +80,12 @@ func (h *Handler) CreateInvoices(w http.ResponseWriter, r *http.Request) {
 // AmountDue, which equals Total until a payment arrives (crud-004). Anything
 // the client sent for those is ignored. The defaults are guesses where the
 // research is silent: status DRAFT, DueDate equal to Date, Date today, and an
-// ACCREC number of INV- and four digits.
+// ACCREC number of INV- and four digits. A CurrencyCode outside the spec enum
+// is refused, as xero-python cannot read it back.
 func (h *Handler) buildInvoice(tenant string, in store.Invoice, existing []store.Invoice, unitdp int) (store.Invoice, []string) {
 	now := h.store.Clock.Now().UTC()
 	msgs := h.validateInvoice(tenant, in, existing)
+	msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)
 
 	lines, t, lineMsgs := computeLines(in.LineAmountTypes, in.LineItems, unitdp)
 	msgs = append(msgs, lineMsgs...)

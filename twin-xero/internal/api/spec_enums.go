@@ -39,6 +39,16 @@ var specCurrencyCodes = newEnumSet(
 	"VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW", "ZMK", "ZWD",
 )
 
+// currencyCodeMessages is the refusal of a CurrencyCode outside the spec enum,
+// or nil when it is in it or not sent. Accounts, Invoices, CreditNotes and
+// BankTransactions give the same words, which are a guess.
+func currencyCodeMessages(code string) []string {
+	if code == "" || specCurrencyCodes[code] {
+		return nil
+	}
+	return []string{fmt.Sprintf("Currency Code '%s' is not valid.", code)}
+}
+
 // specBankAccountTypes is the Account BankAccountType enum, which allows "".
 var specBankAccountTypes = newEnumSet("BANK", "CREDITCARD", "PAYPAL", "NONE", "")
 
