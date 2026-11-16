@@ -26,17 +26,18 @@ func (h *Handler) Accounts(w http.ResponseWriter, r *http.Request) {
 	h.writeEnvelope(w, http.StatusOK, "Accounts", out)
 }
 
-// accountClass is the Class Xero derives from an account's Type. Class is
-// read-only, so a Class the client sends is ignored. The mapping is inference
-// from the documented class and type lists (crud-021).
+// accountClass is the Class Xero derives from an account's Type. Its keys are
+// exactly the spec's AccountType enum (Accounting 19.0.0), the values
+// xero-python can read back; any other Type is refused. Class is read-only, so
+// a Class the client sends is ignored. The mapping is inference from the
+// documented class and type lists (crud-021); PAYG as a LIABILITY is inference
+// from its name, as no captured page classes it.
 var accountClass = map[string]string{
 	"BANK": "ASSET", "CURRENT": "ASSET", "FIXED": "ASSET", "INVENTORY": "ASSET", "NONCURRENT": "ASSET", "PREPAYMENT": "ASSET",
 	"EQUITY":     "EQUITY",
 	"DEPRECIATN": "EXPENSE", "DIRECTCOSTS": "EXPENSE", "EXPENSE": "EXPENSE", "OVERHEADS": "EXPENSE",
-	"SUPERANNUATIONEXPENSE": "EXPENSE", "WAGESEXPENSE": "EXPENSE",
-	"CURRLIAB": "LIABILITY", "LIABILITY": "LIABILITY", "TERMLIAB": "LIABILITY", "PAYGLIABILITY": "LIABILITY",
-	"SUPERANNUATIONLIABILITY": "LIABILITY",
-	"OTHERINCOME":             "REVENUE", "REVENUE": "REVENUE", "SALES": "REVENUE",
+	"CURRLIAB": "LIABILITY", "LIABILITY": "LIABILITY", "TERMLIAB": "LIABILITY", "PAYG": "LIABILITY",
+	"OTHERINCOME": "REVENUE", "REVENUE": "REVENUE", "SALES": "REVENUE",
 }
 
 // CreateAccount serves PUT /api.xro/2.0/Accounts: it adds one account to the
