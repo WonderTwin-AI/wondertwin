@@ -8,25 +8,26 @@ import (
 // Account is a chart-of-accounts entry. UpdatedDateUTC is written as
 // /Date(ms+0000)/ by the API layer, which shadows it.
 type Account struct {
-	Code                    string    `json:"Code"`
-	Name                    string    `json:"Name"`
-	AccountID               string    `json:"AccountID"`
-	Type                    string    `json:"Type"`
-	BankAccountNumber       string    `json:"BankAccountNumber,omitempty"`
-	Status                  string    `json:"Status"`
-	Description             string    `json:"Description,omitempty"`
-	BankAccountType         string    `json:"BankAccountType,omitempty"`
-	CurrencyCode            string    `json:"CurrencyCode,omitempty"`
-	TaxType                 string    `json:"TaxType"`
-	EnablePaymentsToAccount bool      `json:"EnablePaymentsToAccount"`
-	ShowInExpenseClaims     bool      `json:"ShowInExpenseClaims"`
-	Class                   string    `json:"Class"`
-	SystemAccount           string    `json:"SystemAccount,omitempty"`
-	ReportingCode           string    `json:"ReportingCode,omitempty"`
-	ReportingCodeName       string    `json:"ReportingCodeName,omitempty"`
-	HasAttachments          bool      `json:"HasAttachments"`
-	UpdatedDateUTC          time.Time `json:"UpdatedDateUTC"`
-	AddToWatchlist          bool      `json:"AddToWatchlist"`
+	Code                    string            `json:"Code"`
+	Name                    string            `json:"Name"`
+	AccountID               string            `json:"AccountID"`
+	Type                    string            `json:"Type"`
+	BankAccountNumber       string            `json:"BankAccountNumber,omitempty"`
+	Status                  string            `json:"Status"`
+	Description             string            `json:"Description,omitempty"`
+	BankAccountType         string            `json:"BankAccountType,omitempty"`
+	CurrencyCode            string            `json:"CurrencyCode,omitempty"`
+	TaxType                 string            `json:"TaxType"`
+	EnablePaymentsToAccount bool              `json:"EnablePaymentsToAccount"`
+	ShowInExpenseClaims     bool              `json:"ShowInExpenseClaims"`
+	Class                   string            `json:"Class"`
+	SystemAccount           string            `json:"SystemAccount,omitempty"`
+	ReportingCode           string            `json:"ReportingCode,omitempty"`
+	ReportingCodeName       string            `json:"ReportingCodeName,omitempty"`
+	HasAttachments          bool              `json:"HasAttachments"`
+	UpdatedDateUTC          time.Time         `json:"UpdatedDateUTC"`
+	AddToWatchlist          bool              `json:"AddToWatchlist"`
+	ValidationErrors        []ValidationError `json:"ValidationErrors,omitempty"`
 }
 
 // seedAccountID is a fixed ID per chart position, so IDs survive a reset.

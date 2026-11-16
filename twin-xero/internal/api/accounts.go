@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,18 +45,28 @@ var accountClass = map[string]string{
 // tenant's chart, sent bare as xero-python sends it. Code (at most 10
 // characters), Name (at most 150) and Type are required, and Name and Code are
 // unique in the chart. Only the duplicate Name message is documented; the
-// others are guesses (crud-021). The account is ACTIVE, its Class follows its
-// Type, and reset removes it with every other account a client added.
+// others are guesses (crud-021). Type, BankAccountType and CurrencyCode must be
+// values of the spec's enums, and Code is trimmed of surrounding whitespace.
+// The account is ACTIVE, its Class follows its Type, the read-only
+// SystemAccount, ReportingCodeName, HasAttachments and ValidationErrors are
+// ignored, and reset removes it with every other account a client added. The
+// spec documents only the bare form, so {"Accounts": [...]} is not read.
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	var in account
 	if err == nil {
 		err = decodeBody(raw, &in)
 	}
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field == "" {
+		writeValidationException(w, validationElement{Messages: []string{"The request body must be a single Account object."}})
+		return
+	}
 	if err != nil {
 		h.writeBadBody(w, r, err)
 		return
 	}
+	in.Code = strings.TrimSpace(in.Code)
 	accounts := h.store.Accounts.For(tenantID(r))
 	if msgs := validateAccount(in.Account, accounts.List()); len(msgs) > 0 {
 		writeValidationException(w, validationElement{Object: json.RawMessage(raw), Messages: msgs})
@@ -64,6 +75,7 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	a := in.Account
 	a.AccountID, a.UpdatedDateUTC = h.store.NewID(), h.store.Clock.Now().UTC()
 	a.Class, a.Status = accountClass[a.Type], "ACTIVE"
+	a.SystemAccount, a.ReportingCodeName, a.HasAttachments, a.ValidationErrors = "", "", false, nil
 	if a.TaxType == "" {
 		a.TaxType = "NONE"
 	}
@@ -87,6 +99,12 @@ func validateAccount(a store.Account, chart []store.Account) []string {
 	}
 	if _, ok := accountClass[a.Type]; !ok {
 		msgs = append(msgs, fmt.Sprintf("Account Type '%s' is not valid.", a.Type))
+	}
+	if !specBankAccountTypes[a.BankAccountType] {
+		msgs = append(msgs, fmt.Sprintf("Bank Account Type '%s' is not valid.", a.BankAccountType))
+	}
+	if a.CurrencyCode != "" && !specCurrencyCodes[a.CurrencyCode] {
+		msgs = append(msgs, fmt.Sprintf("Currency Code '%s' is not valid.", a.CurrencyCode))
 	}
 	for _, c := range chart {
 		if a.Name != "" && strings.EqualFold(c.Name, a.Name) {
