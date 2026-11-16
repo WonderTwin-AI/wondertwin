@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -157,7 +158,7 @@ func (h *Handler) applyInvoiceUpdate(tenant string, old, in store.Invoice, keys 
 	set("DueDate", func() { out.DueDate = in.DueDate })
 	set("ExpectedPaymentDate", func() { out.ExpectedPaymentDate = in.ExpectedPaymentDate })
 	set("PlannedPaymentDate", func() { out.PlannedPaymentDate = in.PlannedPaymentDate })
-	set("LineAmountTypes", func() { out.LineAmountTypes = in.LineAmountTypes })
+	set("LineAmountTypes", func() { out.LineAmountTypes = cmp.Or(in.LineAmountTypes, defaultLineAmountTypes) })
 	set("CurrencyCode", func() {
 		out.CurrencyCode = in.CurrencyCode
 		msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)

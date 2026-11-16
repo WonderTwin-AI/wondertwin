@@ -69,6 +69,12 @@ func lineTaxabilityMessage(n int, l store.LineItem) string {
 // specLineAmountTypes is the LineAmountTypes enum.
 var specLineAmountTypes = newEnumSet("Exclusive", "Inclusive", "NoTax")
 
+// defaultLineAmountTypes is the LineAmountTypes of an invoice or credit note
+// sent without one, or with "": the spec says line amounts are exclusive of tax
+// by default. xero-python has no "" value, so an update that sends "" takes the
+// default too rather than storing "".
+const defaultLineAmountTypes = "Exclusive"
+
 // lineAmountTypesMessage is the refusal of a LineAmountTypes outside the spec
 // enum, the same on every resource. The wording is a guess.
 const lineAmountTypesMessage = "LineAmountTypes must be Exclusive, Inclusive or NoTax."

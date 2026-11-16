@@ -112,7 +112,7 @@ func (h *Handler) buildCreditNote(tenant string, in store.CreditNote, existing [
 		in.Status = "DRAFT"
 	}
 	if in.LineAmountTypes == "" {
-		in.LineAmountTypes = "Exclusive"
+		in.LineAmountTypes = defaultLineAmountTypes
 	}
 	if in.Date == nil {
 		d := now.Truncate(24 * time.Hour)

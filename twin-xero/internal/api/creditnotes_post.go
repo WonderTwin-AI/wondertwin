@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -170,7 +171,7 @@ func (h *Handler) updateCreditNote(tenant string, old, in store.CreditNote, keys
 	set("BrandingThemeID", func() { out.BrandingThemeID = in.BrandingThemeID })
 	set("Date", func() { out.Date = in.Date })
 	set("DueDate", func() { out.DueDate = in.DueDate })
-	set("LineAmountTypes", func() { out.LineAmountTypes = in.LineAmountTypes })
+	set("LineAmountTypes", func() { out.LineAmountTypes = cmp.Or(in.LineAmountTypes, defaultLineAmountTypes) })
 	set("CurrencyCode", func() {
 		out.CurrencyCode = in.CurrencyCode
 		msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)

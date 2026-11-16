@@ -103,7 +103,7 @@ func (h *Handler) buildInvoice(tenant string, in store.Invoice, existing []store
 		in.Status = "DRAFT"
 	}
 	if in.LineAmountTypes == "" {
-		in.LineAmountTypes = "Exclusive"
+		in.LineAmountTypes = defaultLineAmountTypes
 	}
 	if in.Date == nil {
 		d := now.Truncate(24 * time.Hour)
