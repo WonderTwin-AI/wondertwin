@@ -79,7 +79,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/BankTransactions (Contact)",
-      "reason": "Only Contact.ContactID is read, as for invoices. Xero identifies the contact by Name, ContactID or ContactNumber, looks it up or creates it by name, and updates the contact record from any other contact field sent. Here a bank transaction with no ContactID is refused with Xero's message naming all three elements, even when it sends a Name or ContactNumber, one with an unknown ContactID is refused, and the other contact fields are ignored.",
+      "reason": "Only Contact.ContactID is read, as for invoices. Xero identifies the contact by Name, ContactID or ContactNumber, looks it up or creates it by name, and updates the contact record from any other contact field sent. Here a bank transaction with no Contact, or one naming none of the three, is refused with Xero's published message. One that sends a Name or ContactNumber without a ContactID is refused with \"The Contact must contain a ContactID to identify the contact; a Name or ContactNumber alone is not accepted.\", a message of this emulator's own. One with an unknown ContactID is refused, and the other contact fields are ignored.",
       "references": {
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/quirk-hypotheses.json crud-005, crud-017"
@@ -358,7 +358,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/BankTransactions (defaults, types and reconciliation)",
-      "reason": "A bank transaction that names no LineAmountTypes is tax inclusive, as the BankTransactions page says; the spec's shared schema says exclusive. One with no Date is dated today. The validation messages are guesses except the Contact one, which Xero publishes. Overpayment and prepayment types are stored as bank transactions only: no Overpayment or Prepayment record is created, the line is not coded to the receivable or payable account, and the single-line rule is not enforced. IsReconciled is a stored flag: there are no bank statement lines to reconcile against.",
+      "reason": "A bank transaction that names no LineAmountTypes is tax inclusive, as the BankTransactions page says; the spec's shared schema says exclusive. One with no Date is dated today. The validation messages are guesses except the one for a Contact that names none of Name, ContactID and ContactNumber, which Xero publishes. Overpayment and prepayment types are stored as bank transactions only: no Overpayment or Prepayment record is created, the line is not coded to the receivable or payable account, and the single-line rule is not enforced. IsReconciled is a stored flag: there are no bank statement lines to reconcile against.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-018, err-005, time-004",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
@@ -372,7 +372,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/Accounts",
-      "reason": "One account is created per call, sent bare as xero-python sends it. Code (at most 10 characters), Name (at most 150) and Type are required and Name and Code are unique; only the duplicate Name message is Xero's, the others are guesses. Class is derived from Type by inference, Status is ACTIVE and TaxType defaults to NONE. A BANK account needs no bank account number here. Reset removes every account a client added and restores the default chart.",
+      "reason": "One account is created per call, sent bare as xero-python sends it. Code (at most 10 characters), Name (at most 150) and Type are required, Type must be one of the spec 19.0.0 AccountType values, and Name and Code are unique; only the duplicate Name message is Xero's, the others are guesses. Class is derived from Type by inference, Status is ACTIVE and TaxType defaults to NONE. A BANK account needs no bank account number here. Reset removes every account a client added and restores the default chart.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-021",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
@@ -394,6 +394,133 @@
         "crud-020",
         "page-004",
         "time-004"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions and /api.xro/2.0/ManualJournals (tax)",
+      "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0, as on invoices: tax rates (TaxRates) are not modelled, so no rate is applied for the line's TaxType and TotalTax is the sum of what was sent. A manual journal with LineAmountTypes NoTax always gets 0. Xero computes the tax from the tenant's rates and refuses a bank transaction line whose TaxAmount differs from the computed value; here no such line is refused.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004, err-005; twin-xero/twin-manifest.json GAP-013",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded. Modelling tax rates is a scope question.",
+      "quirk_ids": [
+        "crud-004",
+        "err-005"
+      ]
+    },
+    {
+      "route": "POST /api.xro/2.0/BankTransactions and POST /api.xro/2.0/ManualJournals (unknown ID in a batch)",
+      "reason": "When any item in the batch carries a BankTransactionID or ManualJournalID that matches nothing, the whole request answers 404 and nothing is written, the valid items included and with summarizeErrors=false too. How Xero answers a mixed batch is not settled by the research.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022; twin-xero/twin-manifest.json GAP-018",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-022"
+      ]
+    },
+    {
+      "route": "POST /api.xro/2.0/BankTransactions/{BankTransactionID} and POST /api.xro/2.0/ManualJournals/{ManualJournalID} (more than one item)",
+      "reason": "An update sent in the plural envelope applies its first item to the record the path names, and any further items are ignored without an error. What Xero does with them is not observed. No quirk in the research covers it.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-019",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "GET list endpoints (where on a path the list does not read)",
+      "reason": "A where expression on a path the list does not read, such as Contact.Name on BankTransactions, treats the path as null: an equality test matches no record and answers 200 with an empty list, and an inequality test matches every record. Whether Xero answers an error for such a path, or matches it, is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json query-001; twin-xero/twin-manifest.json GAP-020",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "query-001"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions and /api.xro/2.0/ManualJournals (empty array)",
+      "reason": "A body whose BankTransactions or ManualJournals array is empty answers 200 with an empty array and writes nothing. Whether Xero refuses an empty batch is not settled by the references. No quirk in the research covers it.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-021",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "paged GET list endpoints on an empty tenant",
+      "reason": "With page sent and no record to list, the pagination object reports pageCount 1 with itemCount 0. Xero's pageCount for an empty list is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json page-001; twin-xero/twin-manifest.json GAP-022",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "page-001"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions (Status on create)",
+      "reason": "A Status sent with a new bank transaction is ignored and the transaction is AUTHORISED, so an unknown Status is replaced rather than refused. On update an unknown Status is refused. Neither the spec nor the BankTransactions page says whether Xero refuses an unknown Status on create.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-019; twin-xero/twin-manifest.json GAP-024",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-019"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Accounts (enums, body form and PAYG)",
+      "reason": "BankAccountType and CurrencyCode must be values of the spec's enums, refused with \"Bank Account Type '...' is not valid.\" and \"Currency Code '...' is not valid.\", and a body that is not one Account object (an array, for instance) is refused with \"The request body must be a single Account object.\"; these messages are guesses. The wrapped {\"Accounts\": [...]} form is not read, as the spec documents only the bare form, so it is refused for its missing fields. An account of Type PAYG gets Class LIABILITY by inference from its name, as no captured page classes it.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-021; twin-xero/twin-manifest.json GAP-023, GAP-025, GAP-026",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#533. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-021"
+      ]
+    },
+    {
+      "route": "Line items and LineAmountTypes on Invoices, CreditNotes, BankTransactions and ManualJournals (values outside the spec enums)",
+      "reason": "A line Taxability outside the spec enum is refused with \"Line N: Taxability '...' is not valid.\", and a LineAmountTypes other than Exclusive, Inclusive or NoTax with \"LineAmountTypes must be Exclusive, Inclusive or NoTax.\", now on manual journals too. Xero's wording for these is not observed, so the messages are guesses.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json err-001; twin-xero/twin-manifest.json GAP-026",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#533. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "err-001"
+      ]
+    },
+    {
+      "route": "PUT, POST and GET /api.xro/2.0/BankTransactions (CurrencyCode, unitdp)",
+      "reason": "A CurrencyCode the client sends is overwritten by the bank account's currency when that account has one, as the default bank account does, so it is kept only for a bank account without a currency. unitdp is read on writes only: GET /BankTransactions and GET /BankTransactions/{BankTransactionID} return amounts as stored whatever unitdp asks. Xero's behaviour for either is not observed. No quirk in the research covers them.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-027, GAP-028",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/ManualJournals (journal line on a bank account or with a zero amount)",
+      "reason": "A journal line coded to a bank account, or with a LineAmount of zero, is accepted. Bank transactions refuse a line on a bank account; whether Xero refuses either on a manual journal is not settled, as there is no ManualJournals page in the research.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020; twin-xero/twin-manifest.json GAP-029",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-020"
       ]
     }
   ]
