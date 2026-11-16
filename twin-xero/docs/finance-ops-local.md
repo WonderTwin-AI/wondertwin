@@ -54,7 +54,7 @@ Without `finance-ops`, `twin-xero/sdk-smoke/run.sh` runs the same call sequence 
 ## 6. Not settled here
 
 - **How the twin starts next to LocalStack and the Stripe twin.** The Makefile starts the Stripe twin with `TWINS_ENABLED=stripe` (the Application Twins extension) and `xero-local` as a plain container. This page assumes a plain `twin-xero --port=N` process.
-- **Real Xero behaviour for several guessed rules.** Every deliberate difference is in `twin-xero/divergences.json`, each with a quirk id. The ones the demo touches: allocation to a paid invoice and payment of a credit note up to its total (alloc-001, alloc-002), update-or-create matching (crud-009 to crud-011), and `order` and `If-Modified-Since` being ignored (query-001, page-003).
+- **Real Xero behaviour for several guessed rules.** Every deliberate difference is in `twin-xero/divergences.json`, with the research quirk ids that cover it (none where no quirk does). The ones the demo touches: allocation to a paid invoice and payment of a credit note up to its total (alloc-001, alloc-002), update-or-create matching (crud-009 to crud-011), and `order` and `If-Modified-Since` being ignored (query-001, page-003).
 
 ## 7. If something fails
 
