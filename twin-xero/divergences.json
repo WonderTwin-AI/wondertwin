@@ -557,6 +557,18 @@
       },
       "operator_note": "Introduced with WonderTwin-AI/wondertwin#536. A guess awaiting operator review; no operator decision is recorded.",
       "quirk_ids": []
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/Contacts (enum values outside the spec)",
+      "reason": "A contact whose ContactStatus, TaxNumberType, SalesDefaultLineAmountType, PurchasesDefaultLineAmountType, DefaultCurrency, Addresses AddressType, Phones PhoneType, ContactGroups Status, BrandingTheme Type, or PaymentTerms Bills or Sales Type is outside its spec 19.0.0 enum is refused with a 400 ValidationException naming the field, such as \"Contact Status 'X' is not valid.\", because xero-python cannot read the contact list back with such a value. An empty value of the inline enums stays accepted, as xero-python reads it back. A PaymentTerms Bills or Sales term with no Type is refused, because the SDK's PaymentTermType enum has no empty value; omitting Type from the response would also keep reads working, and the references do not say which Xero does. The messages follow the PUT /Accounts refusals and are guesses.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json err-001; twin-xero/twin-manifest.json GAP-032",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#536. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "err-001"
+      ]
     }
   ]
 }
