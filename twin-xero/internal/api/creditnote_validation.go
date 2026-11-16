@@ -11,10 +11,10 @@ import (
 // ACCRECCREDIT or ACCPAYCREDIT, a status of DRAFT, SUBMITTED or AUTHORISED (the
 // others come from later writes), a contact that exists, a unique number, and
 // for one that is not a draft, line items that name accounts. An account code
-// that is not in the chart is refused on any status. The wording is a guess at
-// Xero's.
+// that is not in the chart is refused on any status, as is an
+// InvoiceAddressType outside the spec enum. The wording is a guess at Xero's.
 func (h *Handler) validateCreditNote(tenant string, in store.CreditNote, existing []store.CreditNote) []string {
-	var msgs []string
+	msgs := invoiceAddressMessages(in.InvoiceAddresses)
 	if in.Type != "ACCRECCREDIT" && in.Type != "ACCPAYCREDIT" {
 		msgs = append(msgs, "Type must be ACCRECCREDIT or ACCPAYCREDIT.")
 	}

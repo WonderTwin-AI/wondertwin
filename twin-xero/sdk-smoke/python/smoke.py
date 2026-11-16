@@ -408,7 +408,8 @@ def raw_write(method, path, tenant, token, body):
 def case_off_spec_enums_are_refused_so_reads_still_parse():
     """A value outside a spec enum, stored, makes xero-python raise ValueError on every later read of the list.
     xero-python will not send such values, so each goes by raw HTTP and must get a 400 ValidationException; then
-    the accounts, bank transactions and manual journals still read back through the SDK."""
+    the accounts, contacts, invoices, credit notes, bank transactions and manual journals still read back through
+    the SDK. An empty LineAmountTypes on an update takes the spec's default instead of being stored."""
     client, _, first = signed_in()
     api, tenant = accounting_for(client)
     token = first["access_token"]
@@ -417,6 +418,18 @@ def case_off_spec_enums_are_refused_so_reads_still_parse():
     bt_line = {"Description": "Advance", "Quantity": 1, "UnitAmount": 10, "AccountCode": "200"}
     receive = {"Type": "RECEIVE", "Contact": {"ContactID": contact}, "BankAccount": {"Code": "090"}, "LineItems": [bt_line]}
     journal = {"Narration": "Off spec", "JournalLines": [{"LineAmount": 5, "AccountCode": "404"}, {"LineAmount": -5, "AccountCode": "090"}]}
+    doc_line = {"Description": "Work", "Quantity": 1, "UnitAmount": 10, "AccountCode": "200"}
+    invoice = {"Type": "ACCREC", "Contact": {"ContactID": contact}, "LineItems": [doc_line]}
+    credit_note = {"Type": "ACCRECCREDIT", "Contact": {"ContactID": contact}, "LineItems": [doc_line]}
+    status, _ = raw_write("PUT", "/Accounts", tenant, token,  # a bank account with no currency, so a sent one would be kept
+                          {"Code": f"N{tag}", "Name": f"No currency {tag}", "Type": "BANK", "BankAccountNumber": "3"})
+    assert status == 200, f"bank account setup: {status}"
+    made = api.create_invoices(tenant, Invoices(invoices=[Invoice(
+        type="ACCREC", contact=Contact(contact_id=contact), line_amount_types=LineAmountTypes.NOTAX,
+        line_items=[LineItem(description="Work", quantity=1, unit_amount=10, account_code="200")])])).invoices[0].invoice_id
+    note = api.create_credit_notes(tenant, CreditNotes(credit_notes=[CreditNote(
+        type="ACCRECCREDIT", contact=Contact(contact_id=contact), line_amount_types=LineAmountTypes.NOTAX,
+        line_items=[LineItem(description="Work", quantity=1, unit_amount=10, account_code="200")])])).credit_notes[0].credit_note_id
     off_spec = [
         ("Account Type", "PUT", "/Accounts", {"Code": f"W{tag}", "Name": f"Wages {tag}", "Type": "WAGESEXPENSE"}),
         ("Account BankAccountType", "PUT", "/Accounts",
@@ -426,10 +439,37 @@ def case_off_spec_enums_are_refused_so_reads_still_parse():
         ("line Taxability", "PUT", "/BankTransactions", dict(receive, LineItems=[dict(bt_line, Taxability="BOGUS")])),
         ("journal LineAmountTypes (PUT)", "PUT", "/ManualJournals", dict(journal, LineAmountTypes="Bogus")),
         ("journal LineAmountTypes (POST)", "POST", "/ManualJournals", dict(journal, LineAmountTypes="Bogus")),
+        ("invoice CurrencyCode (PUT)", "PUT", "/Invoices", dict(invoice, CurrencyCode="ZZZ")),
+        ("invoice CurrencyCode (POST by id)", "POST", f"/Invoices/{made}", {"CurrencyCode": "ZZZ"}),
+        ("invoice InvoiceAddressType", "PUT", "/Invoices", dict(invoice, InvoiceAddresses=[{"InvoiceAddressType": "BOGUS"}])),
+        ("credit note CurrencyCode (PUT)", "PUT", "/CreditNotes", dict(credit_note, CurrencyCode="ZZZ")),
+        ("credit note CurrencyCode (POST update)", "POST", "/CreditNotes", {"CreditNotes": [{"CreditNoteID": note, "CurrencyCode": "ZZZ"}]}),
+        ("credit note InvoiceAddressType", "PUT", "/CreditNotes", dict(credit_note, InvoiceAddresses=[{"InvoiceAddressType": "BOGUS"}])),
+        ("bank transaction CurrencyCode", "PUT", "/BankTransactions", dict(receive, BankAccount={"Code": f"N{tag}"}, CurrencyCode="ZZZ")),
+        ("contact ContactStatus", "PUT", "/Contacts", {"Name": f"Status {tag}", "ContactStatus": "BOGUS"}),
+        ("contact TaxNumberType (POST update)", "POST", "/Contacts", {"Contacts": [{"ContactID": contact, "TaxNumberType": "BOGUS"}]}),
+        ("contact DefaultCurrency", "PUT", "/Contacts", {"Name": f"Currency {tag}", "DefaultCurrency": "ZZZ"}),
+        ("contact SalesDefaultLineAmountType", "PUT", "/Contacts", {"Name": f"Sales {tag}", "SalesDefaultLineAmountType": "BOGUS"}),
+        ("contact AddressType", "PUT", "/Contacts", {"Name": f"Address {tag}", "Addresses": [{"AddressType": "BOGUS"}]}),
+        ("contact PhoneType", "PUT", "/Contacts", {"Name": f"Phone {tag}", "Phones": [{"PhoneType": "BOGUS"}]}),
+        ("contact group Status", "PUT", "/Contacts", {"Name": f"Group {tag}", "ContactGroups": [{"Name": "g", "Status": "BOGUS"}]}),
+        ("contact BrandingTheme Type", "PUT", "/Contacts", {"Name": f"Theme {tag}", "BrandingTheme": {"Name": "t", "Type": "BOGUS"}}),
+        ("contact payment term with no Type", "PUT", "/Contacts", {"Name": f"Terms {tag}", "PaymentTerms": {"Bills": {"Day": 5}}}),
+        ("a bare [] body", "PUT", "/Invoices", []),
     ]
     for what, method, path, body in off_spec:
         status, answer = raw_write(method, path, tenant, token, body)
         assert status == 400 and answer.get("Type") == "ValidationException", f"{what}: {status} {answer}"
+    status, answer = raw_write("PUT", "/Contacts", tenant, token, [])
+    assert "is not valid" not in json.dumps(answer), f"a bare [] is named, not ' is not valid': {answer}"
+
+    # an empty LineAmountTypes on an update takes the default rather than being stored as ""
+    for path, body in ((f"/Invoices/{made}", {"LineAmountTypes": ""}),
+                       ("/Invoices", {"Invoices": [{"InvoiceID": made, "LineAmountTypes": ""}]}),
+                       ("/CreditNotes", {"CreditNotes": [{"CreditNoteID": note, "LineAmountTypes": ""}]})):
+        status, answer = raw_write("POST", path, tenant, token, body)
+        assert status == 200, f"POST {path} with LineAmountTypes '': {status} {answer}"
+    assert api.get_invoice(tenant, made).invoices[0].line_amount_types == LineAmountTypes.EXCLUSIVE
 
     # one valid record of each, so the reads below parse a non-empty list
     api.create_bank_transactions(tenant, BankTransactions(bank_transactions=[BankTransaction(
@@ -442,6 +482,12 @@ def case_off_spec_enums_are_refused_so_reads_still_parse():
     assert api.get_bank_transactions(tenant, page=1).bank_transactions, "get_bank_transactions parses"
     assert api.get_bank_transactions(tenant).bank_transactions is not None, "the unpaged form parses"
     assert api.get_manual_journals(tenant).manual_journals, "get_manual_journals parses"
+    assert api.get_invoices(tenant).invoices, "get_invoices parses"
+    notes = {c.credit_note_id: c for c in api.get_credit_notes(tenant).credit_notes}
+    assert notes[note].line_amount_types == LineAmountTypes.EXCLUSIVE, "get_credit_notes parses, with the default"
+    names = [c.name for c in api.get_contacts(tenant, page=1).contacts]
+    assert not [n for n in names if n.endswith(f" {tag}")], "a refused contact must not be stored"
+    assert api.get_contacts(tenant).contacts, "the unpaged contact list parses"
 
 
 def accounting_api():
@@ -982,7 +1028,7 @@ CASES = [
     ("update_or_create_bank_transactions creates, updates by BankTransactionID and answers a mixed batch in place", case_update_or_create_bank_transactions),
     ("update_or_create_manual_journals creates a draft, posts it by ManualJournalID and answers a mixed batch in place", case_update_or_create_manual_journals),
     ("the chart of accounts carries the finance-ops accounts", case_chart_of_accounts),
-    ("values outside the spec enums are refused by raw HTTP, so accounts, bank transactions and journals still read through the SDK", case_off_spec_enums_are_refused_so_reads_still_parse),
+    ("values outside the spec enums are refused by raw HTTP, so accounts, contacts, invoices, credit notes, bank transactions and journals still read through the SDK", case_off_spec_enums_are_refused_so_reads_still_parse),
     ("made-up tokens are accepted by default", case_made_up_tokens_are_accepted_by_default),
     ("strict auth refuses made-up tokens", case_strict_auth_refuses_made_up_tokens),
     ("connect: a code exchange, then get_connections returns the tenant", case_connect_tenant),

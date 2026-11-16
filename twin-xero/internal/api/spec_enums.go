@@ -39,6 +39,16 @@ var specCurrencyCodes = newEnumSet(
 	"VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW", "ZMK", "ZWD",
 )
 
+// currencyCodeMessages is the refusal of a CurrencyCode outside the spec enum,
+// or nil when it is in it or not sent. Accounts, Invoices, CreditNotes and
+// BankTransactions give the same words, which are a guess.
+func currencyCodeMessages(code string) []string {
+	if code == "" || specCurrencyCodes[code] {
+		return nil
+	}
+	return []string{fmt.Sprintf("Currency Code '%s' is not valid.", code)}
+}
+
 // specBankAccountTypes is the Account BankAccountType enum, which allows "".
 var specBankAccountTypes = newEnumSet("BANK", "CREDITCARD", "PAYPAL", "NONE", "")
 
@@ -59,6 +69,82 @@ func lineTaxabilityMessage(n int, l store.LineItem) string {
 // specLineAmountTypes is the LineAmountTypes enum.
 var specLineAmountTypes = newEnumSet("Exclusive", "Inclusive", "NoTax")
 
+// defaultLineAmountTypes is the LineAmountTypes of an invoice or credit note
+// sent without one, or with "": the spec says line amounts are exclusive of tax
+// by default. xero-python has no "" value, so an update that sends "" takes the
+// default too rather than storing "".
+const defaultLineAmountTypes = "Exclusive"
+
 // lineAmountTypesMessage is the refusal of a LineAmountTypes outside the spec
 // enum, the same on every resource. The wording is a guess.
 const lineAmountTypesMessage = "LineAmountTypes must be Exclusive, Inclusive or NoTax."
+
+// specInvoiceAddressTypes is the InvoiceAddress InvoiceAddressType enum.
+// xero-python checks it only when the value is not empty.
+var specInvoiceAddressTypes = newEnumSet("FROM", "TO")
+
+// invoiceAddressMessages is the refusal of each InvoiceAddressType outside the
+// spec enum, on an invoice or a credit note. The wording is a guess.
+func invoiceAddressMessages(addresses []store.InvoiceAddress) []string {
+	var msgs []string
+	for _, a := range addresses {
+		if a.InvoiceAddressType != "" && !specInvoiceAddressTypes[a.InvoiceAddressType] {
+			msgs = append(msgs, fmt.Sprintf("Invoice Address Type '%s' is not valid.", a.InvoiceAddressType))
+		}
+	}
+	return msgs
+}
+
+// The Contact enums. xero-python checks each of the inline ones only when the
+// value is not empty, so "" reads back; PaymentTermType is an enum class, which
+// has no "" value.
+var (
+	specContactStatuses               = newEnumSet("ACTIVE", "ARCHIVED", "GDPRREQUEST")
+	specTaxNumberTypes                = newEnumSet("SSN", "EIN", "ITIN", "ATIN")
+	specContactDefaultLineAmountTypes = newEnumSet("INCLUSIVE", "EXCLUSIVE", "NONE")
+	specAddressTypes                  = newEnumSet("POBOX", "STREET")
+	specPhoneTypes                    = newEnumSet("DEFAULT", "DDI", "MOBILE", "FAX", "OFFICE")
+	specContactGroupStatuses          = newEnumSet("ACTIVE", "DELETED")
+	specBrandingThemeTypes            = newEnumSet("INVOICE")
+	specPaymentTermTypes              = newEnumSet("DAYSAFTERBILLDATE", "DAYSAFTERBILLMONTH", "OFCURRENTMONTH", "OFFOLLOWINGMONTH")
+)
+
+// contactEnumMessages is the refusal of each value on a contact outside its
+// spec enum, so that every write of a contact (PUT and POST /Contacts) keeps
+// the contact list readable through xero-python. The wording follows the
+// Accounts refusals and is a guess.
+func contactEnumMessages(c store.Contact) []string {
+	var msgs []string
+	check := func(field, v string, allowed enumSet, emptyOK bool) {
+		if (v == "" && emptyOK) || allowed[v] {
+			return
+		}
+		msgs = append(msgs, fmt.Sprintf("%s '%s' is not valid.", field, v))
+	}
+	check("Contact Status", c.ContactStatus, specContactStatuses, true)
+	check("Tax Number Type", c.TaxNumberType, specTaxNumberTypes, true)
+	check("Sales Default Line Amount Type", c.SalesDefaultLineAmountType, specContactDefaultLineAmountTypes, true)
+	check("Purchases Default Line Amount Type", c.PurchasesDefaultLineAmountType, specContactDefaultLineAmountTypes, true)
+	check("Default Currency", c.DefaultCurrency, specCurrencyCodes, true)
+	for _, a := range c.Addresses {
+		check("Address Type", a.AddressType, specAddressTypes, true)
+	}
+	for _, p := range c.Phones {
+		check("Phone Type", p.PhoneType, specPhoneTypes, true)
+	}
+	for _, g := range c.ContactGroups {
+		check("Contact Group Status", g.Status, specContactGroupStatuses, true)
+	}
+	if c.BrandingTheme != nil {
+		check("Branding Theme Type", c.BrandingTheme.Type, specBrandingThemeTypes, true)
+	}
+	if c.PaymentTerms != nil {
+		if b := c.PaymentTerms.Bills; b != nil {
+			check("Payment Terms Bills Type", b.Type, specPaymentTermTypes, false)
+		}
+		if s := c.PaymentTerms.Sales; s != nil {
+			check("Payment Terms Sales Type", s.Type, specPaymentTermTypes, false)
+		}
+	}
+	return msgs
+}

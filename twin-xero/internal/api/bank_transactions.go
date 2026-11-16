@@ -82,13 +82,15 @@ func (h *Handler) CreateBankTransactions(w http.ResponseWriter, r *http.Request)
 // computes or defaults: the ID, line IDs and accounts, totals, Status
 // AUTHORISED (bank transactions have no draft), the currency of the bank
 // account, and today's date when none is sent (time-004, a guess from invoices).
-// Anything the client sent for those is ignored.
+// Anything the client sent for those is ignored, but a CurrencyCode outside the
+// spec enum is refused even when the bank account's currency would replace it.
 func (h *Handler) buildBankTransaction(tenant string, in store.BankTransaction, unitdp int) (store.BankTransaction, []string) {
 	now := h.store.Clock.Now().UTC()
 	var msgs []string
 	if !bankTransactionTypes[in.Type] {
 		msgs = append(msgs, fmt.Sprintf("Bank transaction Type '%s' cannot be created. Use RECEIVE, SPEND, or an overpayment or prepayment type.", in.Type))
 	}
+	msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)
 	msgs = append(msgs, bankTransactionLines(&in, unitdp)...)
 	msgs = append(msgs, h.validateBankTransaction(tenant, in)...)
 	chart := h.store.Accounts.For(tenant).List()

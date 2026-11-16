@@ -90,10 +90,12 @@ func (h *Handler) CreateCreditNotes(w http.ResponseWriter, r *http.Request) {
 // RemainingCredit, which equals Total until credit is allocated. Anything the
 // client sent for those is ignored. The defaults are guesses where the research
 // is silent: status DRAFT, Date today, and an ACCRECCREDIT number of CN- and
-// four digits.
+// four digits. A CurrencyCode outside the spec enum is refused, as xero-python
+// cannot read it back.
 func (h *Handler) buildCreditNote(tenant string, in store.CreditNote, existing []store.CreditNote, unitdp int) (store.CreditNote, []string) {
 	now := h.store.Clock.Now().UTC()
 	msgs := h.validateCreditNote(tenant, in, existing)
+	msgs = append(msgs, currencyCodeMessages(in.CurrencyCode)...)
 
 	lines, t, lineMsgs := computeLines(in.LineAmountTypes, in.LineItems, unitdp)
 	msgs = append(msgs, lineMsgs...)
@@ -110,7 +112,7 @@ func (h *Handler) buildCreditNote(tenant string, in store.CreditNote, existing [
 		in.Status = "DRAFT"
 	}
 	if in.LineAmountTypes == "" {
-		in.LineAmountTypes = "Exclusive"
+		in.LineAmountTypes = defaultLineAmountTypes
 	}
 	if in.Date == nil {
 		d := now.Truncate(24 * time.Hour)
