@@ -26,7 +26,7 @@ var maxLengths = []struct {
 
 // validateContact returns the reasons a new contact is refused: a name is
 // required and unique among active contacts, an account number is unique, and
-// fields keep to their lengths. The wording is a guess at Xero's, written so the
+// fields keep to their lengths and enum fields to the spec's values. The wording is a guess at Xero's, written so the
 // duplicate-name and duplicate-account-number checks in finance-ops recognise it.
 func validateContact(c store.Contact, existing []store.Contact) []string {
 	var msgs []string
@@ -44,6 +44,7 @@ func validateContact(c store.Contact, existing []store.Contact) []string {
 			break
 		}
 	}
+	msgs = append(msgs, contactEnumMessages(c)...)
 	for _, e := range existing {
 		if c.AccountNumber != "" && e.AccountNumber == c.AccountNumber {
 			msgs = append(msgs, fmt.Sprintf("Account number %s already exists. Please enter a different account number.", c.AccountNumber))

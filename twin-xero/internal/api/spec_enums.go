@@ -78,3 +78,57 @@ const defaultLineAmountTypes = "Exclusive"
 // lineAmountTypesMessage is the refusal of a LineAmountTypes outside the spec
 // enum, the same on every resource. The wording is a guess.
 const lineAmountTypesMessage = "LineAmountTypes must be Exclusive, Inclusive or NoTax."
+
+// The Contact enums. xero-python checks each of the inline ones only when the
+// value is not empty, so "" reads back; PaymentTermType is an enum class, which
+// has no "" value.
+var (
+	specContactStatuses               = newEnumSet("ACTIVE", "ARCHIVED", "GDPRREQUEST")
+	specTaxNumberTypes                = newEnumSet("SSN", "EIN", "ITIN", "ATIN")
+	specContactDefaultLineAmountTypes = newEnumSet("INCLUSIVE", "EXCLUSIVE", "NONE")
+	specAddressTypes                  = newEnumSet("POBOX", "STREET")
+	specPhoneTypes                    = newEnumSet("DEFAULT", "DDI", "MOBILE", "FAX", "OFFICE")
+	specContactGroupStatuses          = newEnumSet("ACTIVE", "DELETED")
+	specBrandingThemeTypes            = newEnumSet("INVOICE")
+	specPaymentTermTypes              = newEnumSet("DAYSAFTERBILLDATE", "DAYSAFTERBILLMONTH", "OFCURRENTMONTH", "OFFOLLOWINGMONTH")
+)
+
+// contactEnumMessages is the refusal of each value on a contact outside its
+// spec enum, so that every write of a contact (PUT and POST /Contacts) keeps
+// the contact list readable through xero-python. The wording follows the
+// Accounts refusals and is a guess.
+func contactEnumMessages(c store.Contact) []string {
+	var msgs []string
+	check := func(field, v string, allowed enumSet, emptyOK bool) {
+		if (v == "" && emptyOK) || allowed[v] {
+			return
+		}
+		msgs = append(msgs, fmt.Sprintf("%s '%s' is not valid.", field, v))
+	}
+	check("Contact Status", c.ContactStatus, specContactStatuses, true)
+	check("Tax Number Type", c.TaxNumberType, specTaxNumberTypes, true)
+	check("Sales Default Line Amount Type", c.SalesDefaultLineAmountType, specContactDefaultLineAmountTypes, true)
+	check("Purchases Default Line Amount Type", c.PurchasesDefaultLineAmountType, specContactDefaultLineAmountTypes, true)
+	check("Default Currency", c.DefaultCurrency, specCurrencyCodes, true)
+	for _, a := range c.Addresses {
+		check("Address Type", a.AddressType, specAddressTypes, true)
+	}
+	for _, p := range c.Phones {
+		check("Phone Type", p.PhoneType, specPhoneTypes, true)
+	}
+	for _, g := range c.ContactGroups {
+		check("Contact Group Status", g.Status, specContactGroupStatuses, true)
+	}
+	if c.BrandingTheme != nil {
+		check("Branding Theme Type", c.BrandingTheme.Type, specBrandingThemeTypes, true)
+	}
+	if c.PaymentTerms != nil {
+		if b := c.PaymentTerms.Bills; b != nil {
+			check("Payment Terms Bills Type", b.Type, specPaymentTermTypes, false)
+		}
+		if s := c.PaymentTerms.Sales; s != nil {
+			check("Payment Terms Sales Type", s.Type, specPaymentTermTypes, false)
+		}
+	}
+	return msgs
+}
