@@ -79,3 +79,48 @@ func TestPriceTaxBehaviorIsStoredAndReturned(t *testing.T) {
 		t.Errorf("retrieved tax_behavior = %v", got)
 	}
 }
+
+func TestCustomerAddressEmptyPartClearsToNull(t *testing.T) {
+	_, tc := setupStripe(t)
+	cus := stripePost(tc, "/v1/customers?"+form("address[line1]", "Main 1", "address[line2]", "Apt 2",
+		"address[country]", "US", "address[state]", ""), nil).JSONMap()
+	if a := cus["address"].(map[string]any); a["state"] != nil || a["line2"] != "Apt 2" {
+		t.Errorf("created address = %v, want state null", a)
+	}
+	upd := stripePost(tc, "/v1/customers/"+cus["id"].(string)+"?"+form("address[line2]", ""), nil).JSONMap()
+	a := upd["address"].(map[string]any)
+	if a["line2"] != nil || a["line1"] != "Main 1" || a["country"] != "US" {
+		t.Errorf("address after address[line2]= = %v, want line2 null and the other parts kept", a)
+	}
+}
+
+func TestPriceTaxBehaviorIsNeverEmpty(t *testing.T) {
+	_, tc := setupStripe(t)
+	cs := stripePost(tc, "/v1/checkout/sessions?"+form("mode", "payment", "success_url", "https://example.com/s",
+		"line_items[0][price_data][currency]", "usd", "line_items[0][price_data][unit_amount]", "2500",
+		"line_items[0][price_data][product_data][name]", "T-shirt", "line_items[0][quantity]", "1",
+		"line_items[1][price_data][currency]", "usd", "line_items[1][price_data][unit_amount]", "100",
+		"line_items[1][price_data][product_data][name]", "Sticker", "line_items[1][price_data][tax_behavior]", "inclusive",
+		"line_items[1][quantity]", "1"), nil)
+	cs.AssertStatus(200)
+	items := stripeGet(tc, "/v1/checkout/sessions/"+cs.JSONMap()["id"].(string)+"/line_items").JSONMap()["data"].([]any)
+	for i, want := range []string{"unspecified", "inclusive"} {
+		id := items[i].(map[string]any)["price"].(map[string]any)["id"].(string)
+		if got := stripeGet(tc, "/v1/prices/"+id).JSONMap()["tax_behavior"]; got != want {
+			t.Errorf("price_data price %d tax_behavior = %v, want %s", i, got, want)
+		}
+	}
+
+	state := tc.Get("/admin/state").JSONMap()
+	prices, _ := state["prices"].(map[string]any)
+	if prices == nil {
+		prices = map[string]any{}
+	}
+	prices["price_seeded"] = map[string]any{"id": "price_seeded", "object": "price", "active": true, "currency": "usd",
+		"product": "prod_x", "unit_amount": 100, "type": "one_time", "billing_scheme": "per_unit", "created": 1}
+	state["prices"] = prices
+	tc.Post("/admin/state", state).AssertStatus(200)
+	if got := stripeGet(tc, "/v1/prices/price_seeded").JSONMap()["tax_behavior"]; got != "unspecified" {
+		t.Errorf("seeded price tax_behavior = %v, want unspecified", got)
+	}
+}

@@ -28,7 +28,7 @@ func (h *Handler) CreateCustomer(w http.ResponseWriter, r *http.Request) {
 		Created:     h.store.Now(),
 	}
 	cus.Metadata = parseMetadata(r)
-	cus.Address, _ = formAddress(r, "address")
+	cus.Address, _ = formAddress(r, "address", nil)
 	cus.Shipping, _ = formShipping(r, nil)
 
 	h.store.Customers.Set(id, cus)
@@ -81,9 +81,7 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("description"); v != "" {
 		cus.Description = v
 	}
-	if addr, set := formAddress(r, "address"); set {
-		cus.Address = mergeAddress(cus.Address, addr)
-	}
+	cus.Address, _ = formAddress(r, "address", cus.Address)
 	cus.Shipping, _ = formShipping(r, cus.Shipping)
 
 	h.store.Customers.Set(id, cus)
