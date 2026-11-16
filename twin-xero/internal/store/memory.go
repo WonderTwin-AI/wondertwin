@@ -187,6 +187,10 @@ func (s *MemoryStore) Reset() {
 	s.seedTenant()
 }
 
-// OnReset registers a function Reset calls last, so state the store does not own
-// (the webhook dispatcher's queue and delivery log) is cleared with it.
+// OnReset registers a function Reset calls, so state the store does not own (the
+// webhook dispatcher's queue and delivery log) is cleared with it. Reset calls
+// the hooks after the clock, tokens, clients, authorization codes, connections,
+// organisations, accounts and webhooks are cleared, but before the contacts,
+// invoices, credit notes, payments, bank transactions and manual journals are,
+// and before the default connection and tenant are seeded again.
 func (s *MemoryStore) OnReset(f func()) { s.onReset = append(s.onReset, f) }
