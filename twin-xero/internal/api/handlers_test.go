@@ -1,8 +1,10 @@
 package api_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +50,61 @@ func TestAdminStateRoundTrip(t *testing.T) {
 	ac.GetState().AssertStatus(200)
 	ac.LoadState(map[string]any{}).AssertStatus(200)
 	ac.LoadState(map[string]any{"unknown": true}).AssertStatus(200)
+}
+
+// The state export carries the bank transactions and manual journals, so a
+// reset followed by an import brings them back as they were, whole.
+func TestAdminStateRoundTripKeepsBankTransactionsAndJournals(t *testing.T) {
+	tc, ac, _ := setupXero(t)
+	hdr := map[string]string{"Authorization": "Bearer any", "xero-tenant-id": store.DefaultTenantID}
+	call := func(method, path string, body any) *testutil.Response {
+		t.Helper()
+		return tc.DoWithHeaders(method, "/api.xro/2.0"+path, body, hdr)
+	}
+	first := func(r *testutil.Response, plural, id string) (map[string]any, string) {
+		t.Helper()
+		items, _ := r.JSONMap()[plural].([]any)
+		if len(items) != 1 {
+			t.Fatalf("want one %s, got %s", plural, r.Body)
+		}
+		item := items[0].(map[string]any)
+		return item, item[id].(string)
+	}
+
+	_, cid := first(call(http.MethodPut, "/Contacts", map[string]any{"Contacts": []any{map[string]any{"Name": "Lender Capital"}}}).AssertStatus(200), "Contacts", "ContactID")
+	call(http.MethodPut, "/Accounts", map[string]any{"Code": "2100", "Name": "Merchant Advance Loan", "Type": "TERMLIAB"}).AssertStatus(200)
+	_, btID := first(call(http.MethodPut, "/BankTransactions", map[string]any{
+		"Type": "RECEIVE", "Contact": map[string]any{"ContactID": cid}, "BankAccount": map[string]any{"Code": "090"}, "Reference": "ADV-1",
+		"LineItems": []any{map[string]any{"Description": "Advance", "UnitAmount": 5000, "AccountCode": "200"}},
+	}).AssertStatus(200), "BankTransactions", "BankTransactionID")
+	_, mjID := first(call(http.MethodPut, "/ManualJournals", map[string]any{
+		"Narration": "Advance booked as a loan", "Status": "POSTED", "Date": "2026-11-03",
+		"JournalLines": []any{
+			map[string]any{"LineAmount": 5000, "AccountCode": "090", "Description": "Advance received"},
+			map[string]any{"LineAmount": -5000, "AccountCode": "2100", "Description": "Loan from lender"},
+		},
+	}).AssertStatus(200), "ManualJournals", "ManualJournalID")
+
+	bt, _ := first(call(http.MethodGet, "/BankTransactions/"+btID, nil).AssertStatus(200), "BankTransactions", "BankTransactionID")
+	mj, _ := first(call(http.MethodGet, "/ManualJournals/"+mjID, nil).AssertStatus(200), "ManualJournals", "ManualJournalID")
+	state := ac.GetState().AssertStatus(200)
+
+	ac.Reset().AssertStatus(200)
+	call(http.MethodGet, "/BankTransactions/"+btID, nil).AssertStatus(404)
+	call(http.MethodGet, "/ManualJournals/"+mjID, nil).AssertStatus(404)
+
+	ac.LoadState(json.RawMessage(state.Body)).AssertStatus(200)
+	btAfter, _ := first(call(http.MethodGet, "/BankTransactions/"+btID, nil).AssertStatus(200), "BankTransactions", "BankTransactionID")
+	mjAfter, _ := first(call(http.MethodGet, "/ManualJournals/"+mjID, nil).AssertStatus(200), "ManualJournals", "ManualJournalID")
+	if !reflect.DeepEqual(bt, btAfter) {
+		t.Errorf("bank transaction changed across the round trip:\nbefore %v\nafter  %v", bt, btAfter)
+	}
+	if !reflect.DeepEqual(mj, mjAfter) {
+		t.Errorf("manual journal changed across the round trip:\nbefore %v\nafter  %v", mj, mjAfter)
+	}
+	if bt["Reference"] != "ADV-1" || len(mj["JournalLines"].([]any)) != 2 {
+		t.Errorf("the imported records lost their content: %v %v", bt, mj)
+	}
 }
 
 func TestAdminStateRejectsMalformedJSON(t *testing.T) {
