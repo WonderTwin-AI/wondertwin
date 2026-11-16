@@ -32,7 +32,7 @@ func (h *Handler) UpdateOrCreateBankTransactions(w http.ResponseWriter, r *http.
 	keys := make([]map[string]json.RawMessage, len(in.BankTransactions))
 	for i, item := range in.BankTransactions {
 		if err == nil {
-			err = decodeBody(item, &sent[i])
+			err = decodeItem(item, &sent[i])
 		}
 		if err == nil {
 			err = json.Unmarshal(item, &keys[i])

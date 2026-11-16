@@ -60,3 +60,40 @@ func TestAnUnreadableDateNamesItsOwnFieldNotASiblingWithTheSameValue(t *testing.
 		})
 	}
 }
+
+// A value of the wrong type on a bank transaction or a manual journal is refused
+// with an element that echoes the submitted object, as every other refusal's
+// element does (err-001), not with a bare list of messages.
+func TestAnUnreadableValueEchoesTheSubmittedObject(t *testing.T) {
+	h := newTestHandler(t)
+	bt := `{"Type":"SPEND","Reference":"echo-me","LineItems":[{"Description":"x","Quantity":"1","UnitAmount":5,"AccountCode":"404"}]}`
+	mj := `{"Narration":"echo-me","JournalLines":[{"LineAmount":"100","AccountCode":"404"},{"LineAmount":-100,"AccountCode":"090"}]}`
+	btDate := `{"Type":"SPEND","Reference":"echo-me","Date":"2026-13-45"}`
+	cases := []struct{ name, method, path, body, msg string }{
+		{"PUT bank transaction", http.MethodPut, "/api.xro/2.0/BankTransactions", `{"BankTransactions":[` + bt + `]}`, "Quantity is not valid"},
+		{"POST bank transaction", http.MethodPost, "/api.xro/2.0/BankTransactions", bt, "Quantity is not valid"},
+		{"POST one bank transaction", http.MethodPost, "/api.xro/2.0/BankTransactions/any", bt, "Quantity is not valid"},
+		{"PUT bank transaction date", http.MethodPut, "/api.xro/2.0/BankTransactions", btDate, "Date is not a valid date"},
+		{"PUT manual journal", http.MethodPut, "/api.xro/2.0/ManualJournals", mj, "LineAmount is not valid"},
+		{"POST manual journal", http.MethodPost, "/api.xro/2.0/ManualJournals", `{"ManualJournals":[` + mj + `]}`, "LineAmount is not valid"},
+		{"POST one manual journal", http.MethodPost, "/api.xro/2.0/ManualJournals/any", mj, "LineAmount is not valid"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := do(h, tc.method, tc.path, tc.body, accounting(t, h, store.DefaultTenantID))
+			body := decode(t, rec)
+			if rec.Code != 400 || body["Type"] != "ValidationException" {
+				t.Fatalf("%d %s", rec.Code, rec.Body)
+			}
+			els := body["Elements"].([]any)
+			el := els[0].(map[string]any)
+			if el["Reference"] != "echo-me" && el["Narration"] != "echo-me" {
+				t.Fatalf("the element does not echo the submitted object: %v", el)
+			}
+			errs := el["ValidationErrors"].([]any)
+			if len(errs) != 1 || errs[0].(map[string]any)["Message"] != tc.msg {
+				t.Fatalf("ValidationErrors = %v, want %q", errs, tc.msg)
+			}
+		})
+	}
+}

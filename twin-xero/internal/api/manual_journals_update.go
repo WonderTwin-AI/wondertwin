@@ -48,7 +48,7 @@ func (h *Handler) UpdateManualJournal(w http.ResponseWriter, r *http.Request) {
 		err = json.Unmarshal(one, &keys)
 	}
 	if err == nil {
-		err = decodeBody(one, &sent)
+		err = decodeItem(one, &sent)
 	}
 	if err != nil {
 		h.writeBadBody(w, r, err)

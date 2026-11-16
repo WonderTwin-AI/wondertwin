@@ -31,7 +31,7 @@ func (h *Handler) UpdateOrCreateManualJournals(w http.ResponseWriter, r *http.Re
 	keys := make([]map[string]json.RawMessage, len(in.ManualJournals))
 	for i, item := range in.ManualJournals {
 		if err == nil {
-			err = decodeBody(item, &sent[i])
+			err = decodeItem(item, &sent[i])
 		}
 		if err == nil {
 			err = json.Unmarshal(item, &keys[i])
