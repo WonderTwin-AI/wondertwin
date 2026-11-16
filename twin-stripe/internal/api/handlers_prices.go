@@ -32,9 +32,13 @@ func (h *Handler) CreatePrice(w http.ResponseWriter, r *http.Request) {
 		Type:          "one_time",
 		BillingScheme: "per_unit",
 		Nickname:      r.FormValue("nickname"),
+		TaxBehavior:   "unspecified",
 		Livemode:      false,
 		Metadata:      parseMetadata(r),
 		Created:       h.store.Now(),
+	}
+	if v := r.FormValue("tax_behavior"); v != "" {
+		price.TaxBehavior = v
 	}
 
 	if v := r.FormValue("unit_amount"); v != "" {
@@ -104,6 +108,11 @@ func (h *Handler) UpdatePrice(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("nickname"); v != "" {
 		price.Nickname = v
+	}
+	// Stripe lets only an unspecified tax_behavior be set later; that refusal is
+	// not modelled (divergences.json), so an update always takes the new value.
+	if v := r.FormValue("tax_behavior"); v != "" {
+		price.TaxBehavior = v
 	}
 
 	h.store.Prices.Set(id, price)
