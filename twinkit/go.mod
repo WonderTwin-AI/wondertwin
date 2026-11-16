@@ -1,5 +1,5 @@
 module github.com/wondertwin-ai/wondertwin/twinkit
 
-go 1.26.10
+go 1.26.11
 
 require github.com/go-chi/chi/v5 v5.4.0
