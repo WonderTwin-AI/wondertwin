@@ -12,13 +12,18 @@ import (
 // page documents the rules; it publishes the wording of only the Contact
 // message, so the rest are guesses (err-005). A Contact is required, as the page
 // says and the spec does not (crud-017; the operator chose to require it on
-// 2026-11-03). The bank account must be an account of Type BANK, every line
-// needs an account code from the chart that is not itself a bank account, and
-// the total must be positive.
+// 2026-11-03). A contact that names none of Name, ContactID and ContactNumber
+// gets the spec's published message. One given by Name or ContactNumber alone
+// is refused too, since only ContactID is read (crud-005), and its message says
+// so rather than claim the Name it was sent would do. The bank account must be
+// an account of Type BANK, every line needs an account code from the chart that
+// is not itself a bank account, and the total must be positive.
 func (h *Handler) validateBankTransaction(tenant string, in store.BankTransaction) []string {
 	var msgs []string
-	if in.Contact == nil || in.Contact.ContactID == "" {
+	if in.Contact == nil {
 		msgs = append(msgs, "The Contact must contain at least 1 of the following elements to identify the contact: Name, ContactID, ContactNumber")
+	} else if in.Contact.ContactID == "" {
+		msgs = append(msgs, "The Contact must contain a ContactID to identify the contact; a Name or ContactNumber alone is not accepted.")
 	} else if _, ok := h.store.Contacts.For(tenant).Get(in.Contact.ContactID); !ok {
 		msgs = append(msgs, fmt.Sprintf("Contact %s could not be found.", in.Contact.ContactID))
 	}
