@@ -139,7 +139,10 @@
       "behaviour: an empty LineAmountTypes on an invoice or credit note update becomes Exclusive, where keeping the stored value or refusing would also be defensible (GAP-031)",
       "behaviour: contact enum values outside the spec are refused on PUT and POST /Contacts with guessed messages, and a payment term with no Type is refused, where Xero's answer is unobserved (GAP-032)",
       "behaviour: an InvoiceAddressType other than FROM or TO is refused on invoice and credit note creates with a guessed message, and updates ignore InvoiceAddresses (GAP-033)",
-      "behaviour: a request body, or a record in its envelope, that is not a JSON object is refused on every write route with a guessed message (GAP-034)"
+      "behaviour: a request body, or a record in its envelope, that is not a JSON object is refused on every write route with a guessed message (GAP-034)",
+      "behaviour: Status or Options sent on a manual journal line's Tracking item are dropped, as the line's Tracking is stored in the line-item tracking shape (GAP-035)",
+      "behaviour: a manual journal update with an empty LineAmountTypes is refused while a create defaults it to NoTax, unlike the Exclusive default on invoices and credit notes (GAP-036)",
+      "behaviour: an empty CurrencyCode on an invoice or credit note update is stored and omitted from the response, silently clearing the currency (GAP-037)"
     ],
     "estimated_coverage_pct": 35
   },
