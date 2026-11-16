@@ -92,30 +92,18 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Apply default tax rates if provided.
-	var taxAmount int64
-	taxableAmount := total - discountAmount
+	var rates []store.TaxRate
 	for i := 0; i < 10; i++ {
 		trID := r.FormValue("default_tax_rates[" + strconv.Itoa(i) + "]")
 		if trID == "" {
 			break
 		}
-		tr, ok := h.store.TaxRates.Get(trID)
-		if !ok {
-			continue
-		}
-		inv.DefaultTaxRates = append(inv.DefaultTaxRates, tr)
-		lineTax := int64(float64(taxableAmount) * tr.Percentage / 100)
-		inv.TotalTaxAmounts = append(inv.TotalTaxAmounts, store.TaxAmount{
-			Amount:    lineTax,
-			Inclusive: tr.Inclusive,
-			TaxRate:   trID,
-		})
-		if !tr.Inclusive {
-			taxAmount += lineTax
+		if tr, ok := h.store.TaxRates.Get(trID); ok {
+			rates = append(rates, tr)
 		}
 	}
-
-	inv.Total = total - discountAmount + taxAmount
+	inv.DefaultTaxRates = rates
+	applyManualTaxes(&inv, discountAmount, rates)
 	inv.AmountDue = inv.Total
 	inv.AmountRemaining = inv.Total
 

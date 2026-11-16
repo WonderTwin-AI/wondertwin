@@ -282,23 +282,24 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 			}
 
 			inv := store.Invoice{
-				ID:               invID,
-				Object:           "invoice",
-				Customer:         sub.Customer,
-				Subscription:     sub.ID,
-				Status:           "paid",
-				Total:            prorationAmount,
-				Subtotal:         prorationAmount,
-				AmountDue:        prorationAmount,
-				AmountPaid:       prorationAmount,
-				Currency:         currency,
-				CollectionMethod: sub.CollectionMethod,
-				Paid:             true,
-				Lines:            &store.InvoiceLines{Object: "list", Data: lines, URL: "/v1/invoices/" + invID + "/lines"},
-				Number:           "INV-" + invID,
-				Description:      "Proration",
-				Livemode:         false,
-				Created:          h.store.Now(),
+				ID:                invID,
+				Object:            "invoice",
+				Customer:          sub.Customer,
+				Subscription:      sub.ID,
+				Status:            "paid",
+				Total:             prorationAmount,
+				TotalExcludingTax: &prorationAmount,
+				Subtotal:          prorationAmount,
+				AmountDue:         prorationAmount,
+				AmountPaid:        prorationAmount,
+				Currency:          currency,
+				CollectionMethod:  sub.CollectionMethod,
+				Paid:              true,
+				Lines:             &store.InvoiceLines{Object: "list", Data: lines, URL: "/v1/invoices/" + invID + "/lines"},
+				Number:            "INV-" + invID,
+				Description:       "Proration",
+				Livemode:          false,
+				Created:           h.store.Now(),
 			}
 			h.store.Invoices.Set(invID, inv)
 			sub.LatestInvoice = invID
@@ -426,34 +427,12 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		totalDiscounts = []store.DiscountAmount{{Amount: discountAmount, Discount: discountID}}
 	}
 
-	// Apply tax rates from subscription.
-	var taxAmount int64
-	taxableAmount := total - discountAmount
-	var taxAmounts []store.TaxAmount
-	for _, tr := range sub.DefaultTaxRates {
-		lineTax := int64(float64(taxableAmount) * tr.Percentage / 100)
-		taxAmounts = append(taxAmounts, store.TaxAmount{
-			Amount:    lineTax,
-			Inclusive: tr.Inclusive,
-			TaxRate:   tr.ID,
-		})
-		if !tr.Inclusive {
-			taxAmount += lineTax
-		}
-	}
-
-	invoiceTotal := total - discountAmount + taxAmount
-
 	inv := store.Invoice{
 		ID:                   id,
 		Object:               "invoice",
 		Customer:             sub.Customer,
 		Subscription:         sub.ID,
 		Status:               "paid", // auto-paid for charge_automatically
-		AmountDue:            invoiceTotal,
-		AmountPaid:           invoiceTotal,
-		AmountRemaining:      0,
-		Total:                invoiceTotal,
 		Subtotal:             total,
 		Currency:             currency,
 		CollectionMethod:     sub.CollectionMethod,
@@ -461,7 +440,6 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		Discounts:            discountIDs,
 		TotalDiscountAmounts: totalDiscounts,
 		DefaultTaxRates:      sub.DefaultTaxRates,
-		TotalTaxAmounts:      taxAmounts,
 		Lines: &store.InvoiceLines{
 			Object:  "list",
 			Data:    lines,
@@ -474,6 +452,9 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		Livemode:    false,
 		Created:     h.store.Now(),
 	}
+	applyManualTaxes(&inv, discountAmount, sub.DefaultTaxRates)
+	invoiceTotal := inv.Total
+	inv.AmountDue, inv.AmountPaid = invoiceTotal, invoiceTotal
 
 	if sub.CollectionMethod == "send_invoice" {
 		inv.Status = "open"

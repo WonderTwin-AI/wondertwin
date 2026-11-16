@@ -193,17 +193,17 @@ func TestExclusiveTaxRateOnInvoice(t *testing.T) {
 		t.Errorf("expected total=11000 (with 10%% exclusive tax), got %v", inv["total"])
 	}
 
-	// Verify tax amounts.
-	taxAmounts, ok := inv["total_tax_amounts"].([]any)
-	if !ok || len(taxAmounts) != 1 {
-		t.Fatalf("expected 1 tax amount, got %v", taxAmounts)
+	// Verify the dahlia total_taxes entry.
+	taxes, ok := inv["total_taxes"].([]any)
+	if !ok || len(taxes) != 1 {
+		t.Fatalf("expected 1 total_taxes entry, got %v", inv["total_taxes"])
 	}
-	ta := taxAmounts[0].(map[string]any)
+	ta := taxes[0].(map[string]any)
 	if ta["amount"].(float64) != 1000 {
 		t.Errorf("expected tax amount=1000, got %v", ta["amount"])
 	}
-	if ta["inclusive"] != false {
-		t.Errorf("expected inclusive=false, got %v", ta["inclusive"])
+	if ta["tax_behavior"] != "exclusive" {
+		t.Errorf("expected tax_behavior=exclusive, got %v", ta["tax_behavior"])
 	}
 }
 
@@ -230,17 +230,20 @@ func TestInclusiveTaxRateOnInvoice(t *testing.T) {
 		t.Errorf("expected total=12000 (inclusive tax doesn't add to total), got %v", inv["total"])
 	}
 
-	// But tax amount should still be computed.
-	taxAmounts, ok := inv["total_tax_amounts"].([]any)
-	if !ok || len(taxAmounts) != 1 {
-		t.Fatalf("expected 1 tax amount, got %v", taxAmounts)
+	// The tax is carved out of the price: 12000 - 12000/1.2 = 2000.
+	taxes, ok := inv["total_taxes"].([]any)
+	if !ok || len(taxes) != 1 {
+		t.Fatalf("expected 1 total_taxes entry, got %v", inv["total_taxes"])
 	}
-	ta := taxAmounts[0].(map[string]any)
-	if ta["amount"].(float64) != 2400 {
-		t.Errorf("expected tax amount=2400 (20%% of 12000), got %v", ta["amount"])
+	ta := taxes[0].(map[string]any)
+	if ta["amount"].(float64) != 2000 {
+		t.Errorf("expected tax amount=2000 (carved out of 12000 at 20%%), got %v", ta["amount"])
 	}
-	if ta["inclusive"] != true {
-		t.Errorf("expected inclusive=true, got %v", ta["inclusive"])
+	if ta["tax_behavior"] != "inclusive" || ta["taxable_amount"].(float64) != 10000 {
+		t.Errorf("expected inclusive on taxable 10000, got %v on %v", ta["tax_behavior"], ta["taxable_amount"])
+	}
+	if inv["total_excluding_tax"].(float64) != 10000 {
+		t.Errorf("expected total_excluding_tax=10000, got %v", inv["total_excluding_tax"])
 	}
 }
 
