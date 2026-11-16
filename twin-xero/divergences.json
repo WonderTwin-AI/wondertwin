@@ -2,7 +2,7 @@
   "twin_id": "twin-xero",
   "tier": "community",
   "vendor_api_version": "Xero Accounting API 2.0 as served 2026-09-28, spec 19.0.0",
-  "reviewed_at": "2026-10-26",
+  "reviewed_at": "2026-11-15",
   "divergences": [
     {
       "route": "GET /connections, GET /Connections and every authenticated route",
@@ -79,7 +79,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/BankTransactions (Contact)",
-      "reason": "Only Contact.ContactID is read, as for invoices. Xero identifies the contact by Name, ContactID or ContactNumber, looks it up or creates it by name, and updates the contact record from any other contact field sent. Here a bank transaction with no ContactID is refused with Xero's message naming all three elements, even when it sends a Name or ContactNumber, one with an unknown ContactID is refused, and the other contact fields are ignored.",
+      "reason": "Only Contact.ContactID is read, as for invoices. Xero identifies the contact by Name, ContactID or ContactNumber, looks it up or creates it by name, and updates the contact record from any other contact field sent. Here a bank transaction with no Contact, or one naming none of the three, is refused with Xero's published message. One that sends a Name or ContactNumber without a ContactID is refused with \"The Contact must contain a ContactID to identify the contact; a Name or ContactNumber alone is not accepted.\", a message of this emulator's own. One with an unknown ContactID is refused, and the other contact fields are ignored.",
       "references": {
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json",
         "docs": "research/twins/xero/quirk-hypotheses.json crud-005, crud-017"
@@ -178,7 +178,8 @@
       "route": "PUT /CreditNotes (inline Allocations)",
       "reason": "By default an inline Allocation is accepted against an AUTHORISED or PAID invoice of the same contact and type, bounded only by the credit note's total: AmountCredited grows, AmountDue never goes below zero and a PAID invoice stays PAID. Both rules are guesses; the research has one example (part of an AUTHORISED credit note against an outstanding invoice) and does not say what Xero does with a PAID invoice or an amount above AmountDue. strict_auth (the --strict-auth flag, or PUT /admin/config) refuses an invoice that is not AUTHORISED and an amount above its AmountDue.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
+        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added for an integration whose refund flow allocates the whole refund to an invoice that is normally already PAID. Whether real Xero accepts that is unverified. Approved by the operator.",
       "quirk_ids": [
@@ -190,7 +191,8 @@
       "route": "POST /Payments (payments on credit notes)",
       "reason": "By default a payment on a credit note is accepted when the credit note is AUTHORISED or already PAID and the payments on it add up to no more than its Total; the payment lowers RemainingCredit (never below zero) and the credit note becomes PAID at zero. Both rules are guesses; the research does not cover refund payments. strict_auth (the --strict-auth flag, or PUT /admin/config) requires an AUTHORISED credit note and an amount within RemainingCredit.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002"
+        "docs": "research/twins/xero/quirk-hypotheses.json alloc-001, alloc-002",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added for an integration whose refund flow allocates a credit note to an invoice in full and then pays the credit note's whole total as ARCREDITPAYMENT. Whether real Xero accepts that sequence is unverified. Approved by the operator.",
       "quirk_ids": [
@@ -202,7 +204,8 @@
       "route": "GET /_xero/health and POST /_xero/reset",
       "reason": "Xero has no health or reset endpoint. These two paths are control-plane aliases for GET /admin/health and POST /admin/reset, served so a consumer written for an earlier Xero emulator that used these paths can use this one unchanged. They are not Xero API, and no other control path of that emulator (such as /_xero/state) is aliased.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json compat-001"
+        "docs": "research/twins/xero/quirk-hypotheses.json compat-001",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added for an integration whose Makefile waits on /_xero/health and whose test fixture posts /_xero/reset before each test. Approved by the operator.",
       "quirk_ids": [
@@ -213,7 +216,8 @@
       "route": "POST /Contacts (updateOrCreateContacts)",
       "reason": "A contact that carries the ContactID of a stored contact is updated, with only the fields the body carries changed, and one with no ContactID is created by the rules of PUT /Contacts. Whether Xero also matches a Name that belongs to another contact is not settled by the research (reports disagree), so this emulator never does: such a Name is refused as PUT refuses it. A ContactID that matches nothing answers a 404 whose body is a guess. These rules are a guess until a sandbox observes them.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-009"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-009",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added so a consumer that creates by POST on the collection can use this emulator. Update-or-create by Name, which an earlier Xero emulator did, is deliberately not reproduced: it is not Xero behaviour (recorded as a known gap). Approved by the operator.",
       "quirk_ids": [
@@ -224,7 +228,8 @@
       "route": "POST /Invoices (updateOrCreateInvoices)",
       "reason": "An invoice that carries the InvoiceID of a stored invoice is updated by the rules of POST /Invoices/{InvoiceID}, and one with no InvoiceID is created by the rules of PUT /Invoices. Whether Xero also matches on InvoiceNumber is not settled by the research, so this emulator does not: a number that belongs to another invoice is refused as PUT refuses it. An InvoiceID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-010"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-010",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added so a consumer that creates invoices by POST on the collection can use this emulator. Approved by the operator.",
       "quirk_ids": [
@@ -235,7 +240,8 @@
       "route": "POST /CreditNotes (updateOrCreateCreditNotes)",
       "reason": "A credit note that carries the CreditNoteID of a stored one is updated, and one with no CreditNoteID is created by the rules of PUT /CreditNotes. An update is partial, may move the status DRAFT or SUBMITTED to AUTHORISED or DELETED, SUBMITTED back to DRAFT, and AUTHORISED to VOIDED, and the lines, totals and status of a credit note with credit applied or paid are fixed and it cannot be voided. An update may add Allocations, up to the credit remaining and by the rules of an inline allocation on PUT; one it already carries (a credit note read and sent back) is ignored. Whether Xero also matches on CreditNoteNumber, and every one of these update rules, are guesses: the research has no example of a credit note update. A CreditNoteID that matches nothing answers a 404 whose body is a guess and writes nothing.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-011, alloc-001, alloc-002"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-011, alloc-001, alloc-002",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added so a consumer that creates credit notes by POST on the collection can use this emulator. Approved by the operator.",
       "quirk_ids": [
@@ -246,7 +252,8 @@
       "route": "POST /BankTransactions (updateOrCreateBankTransactions)",
       "reason": "A bank transaction that carries the BankTransactionID of a stored one is updated by the rules of POST /BankTransactions/{BankTransactionID}, and one with no BankTransactionID is created by the rules of PUT /BankTransactions. Whether Xero also matches on Reference is not settled by the research, so this emulator does not. A BankTransactionID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-022"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added so a consumer that creates bank transactions by POST on the collection can use this emulator (xero-bp3-s12). Recorded by operator decision in review.",
       "quirk_ids": [
@@ -257,7 +264,8 @@
       "route": "POST /ManualJournals (updateOrCreateManualJournals)",
       "reason": "A manual journal that carries the ManualJournalID of a stored one is updated by the rules of POST /ManualJournals/{ManualJournalID}, and one with no ManualJournalID is created by the rules of PUT /ManualJournals. Whether Xero also matches on any other field is not settled by the research, so this emulator matches by ManualJournalID only, and a repeated ManualJournalID is applied in order. A ManualJournalID that matches nothing answers a 404 whose body is a guess and writes nothing. These rules are a guess until a sandbox observes them.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-022"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Added so a consumer that creates manual journals by POST on the collection can use this emulator (xero-bp3-s13). Recorded by operator decision in review.",
       "quirk_ids": [
@@ -268,7 +276,8 @@
       "route": "PUT and POST /ManualJournals (journal line with an unknown account code)",
       "reason": "A journal line whose AccountCode matches no account in the chart is refused with a 400 ValidationException, and nothing is created. The spec's example has Xero remove such a line and answer with a Warning. The refusal's wording is a guess.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-020"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Refused by operator decision 2026-11-03 (xero-bp3-s08). Approved by the operator.",
       "quirk_ids": [
@@ -279,7 +288,8 @@
       "route": "POST /api.xro/2.0/ManualJournals/{ManualJournalID}",
       "reason": "The update rules are inferred from Xero's status list, not observed: a DRAFT may be edited, posted (if balanced) or deleted, a POSTED journal may only be voided, and a DELETED or VOIDED journal cannot be updated. Fields sent with the values already stored do not count as an edit, so a POSTED journal read and sent back with Status VOIDED is voided. JournalLines sent replace every line. The wording of the 400 refusals is a guess, as is the body of the 404 for an unknown ManualJournalID.",
       "references": {
-        "docs": "research/twins/xero/quirk-hypotheses.json crud-020"
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Raised in review while building manual journal update (xero-bp3-s10). Recorded by operator decision.",
       "quirk_ids": [
@@ -290,7 +300,8 @@
       "route": "every list endpoint (order, If-Modified-Since)",
       "reason": "The order query parameter and the If-Modified-Since header are accepted and ignored: the default order applies and every record is returned, where Xero orders as asked and limits the list to records changed since the date. That is silent wrong data, not an error. Accounts also ignores where.",
       "references": {
-        "docs": "research/twins/xero/feature-gap-register.md GAP-002; research/twins/xero/quirk-hypotheses.json query-001, page-003"
+        "docs": "research/twins/xero/feature-gap-register.md GAP-002; research/twins/xero/quirk-hypotheses.json query-001, page-003",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Deferred: the first integration this emulator was built for passes neither order nor If-Modified-Since.",
       "quirk_ids": [
@@ -302,7 +313,8 @@
       "route": "every PUT and POST (Idempotency-Key)",
       "reason": "The Idempotency-Key header is ignored, so a retried write creates a duplicate where Xero replays the cached response for a repeated key and answers 400 for the same key with a different request.",
       "references": {
-        "docs": "research/twins/xero/feature-gap-register.md GAP-003; research/twins/xero/quirk-hypotheses.json crud-007"
+        "docs": "research/twins/xero/feature-gap-register.md GAP-003; research/twins/xero/quirk-hypotheses.json crud-007",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Deferred and recorded. An integration that checks for a duplicate by lookup, not by header, is unaffected.",
       "quirk_ids": [
@@ -313,7 +325,8 @@
       "route": "PUT /Contacts and POST /Contacts (summarizeErrors=false)",
       "reason": "summarizeErrors is not read on the contact routes: a contact array with an invalid item is refused as a whole, where Xero answers 200 with a per-item StatusAttributeString and ValidationErrors when summarizeErrors=false. Invoices and credit notes do read it.",
       "references": {
-        "docs": "research/twins/xero/feature-gap-register.md GAP-004; research/twins/xero/quirk-hypotheses.json crud-006"
+        "docs": "research/twins/xero/feature-gap-register.md GAP-004; research/twins/xero/quirk-hypotheses.json crud-006",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
       },
       "operator_note": "Deferred and recorded. An integration that creates one contact per call is unaffected.",
       "quirk_ids": [
@@ -358,7 +371,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/BankTransactions (defaults, types and reconciliation)",
-      "reason": "A bank transaction that names no LineAmountTypes is tax inclusive, as the BankTransactions page says; the spec's shared schema says exclusive. One with no Date is dated today. The validation messages are guesses except the Contact one, which Xero publishes. Overpayment and prepayment types are stored as bank transactions only: no Overpayment or Prepayment record is created, the line is not coded to the receivable or payable account, and the single-line rule is not enforced. IsReconciled is a stored flag: there are no bank statement lines to reconcile against.",
+      "reason": "A bank transaction that names no LineAmountTypes is tax inclusive, as the BankTransactions page says; the spec's shared schema says exclusive. One with no Date is dated today. The validation messages are guesses except the one for a Contact that names none of Name, ContactID and ContactNumber, which Xero publishes. Overpayment and prepayment types are stored as bank transactions only: no Overpayment or Prepayment record is created, the line is not coded to the receivable or payable account, and the single-line rule is not enforced. IsReconciled is a stored flag: there are no bank statement lines to reconcile against.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-018, err-005, time-004",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
@@ -372,7 +385,7 @@
     },
     {
       "route": "PUT /api.xro/2.0/Accounts",
-      "reason": "One account is created per call, sent bare as xero-python sends it. Code (at most 10 characters), Name (at most 150) and Type are required and Name and Code are unique; only the duplicate Name message is Xero's, the others are guesses. Class is derived from Type by inference, Status is ACTIVE and TaxType defaults to NONE. A BANK account needs no bank account number here. Reset removes every account a client added and restores the default chart.",
+      "reason": "One account is created per call, sent bare as xero-python sends it. Code (at most 10 characters), Name (at most 150) and Type are required, Type must be one of the spec 19.0.0 AccountType values, and Name and Code are unique; only the duplicate Name message is Xero's, the others are guesses. Class is derived from Type by inference, Status is ACTIVE and TaxType defaults to NONE. A BANK account needs no bank account number here. Reset removes every account a client added and restores the default chart.",
       "references": {
         "docs": "research/twins/xero/quirk-hypotheses.json crud-021",
         "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
@@ -394,6 +407,133 @@
         "crud-020",
         "page-004",
         "time-004"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions and /api.xro/2.0/ManualJournals (tax)",
+      "reason": "TaxAmount on a line is the TaxAmount the client sent, or 0, as on invoices: tax rates (TaxRates) are not modelled, so no rate is applied for the line's TaxType and TotalTax is the sum of what was sent. A manual journal with LineAmountTypes NoTax always gets 0. Xero computes the tax from the tenant's rates and refuses a bank transaction line whose TaxAmount differs from the computed value; here no such line is refused.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-004, err-005; twin-xero/twin-manifest.json GAP-013",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded. Modelling tax rates is a scope question.",
+      "quirk_ids": [
+        "crud-004",
+        "err-005"
+      ]
+    },
+    {
+      "route": "POST /api.xro/2.0/BankTransactions and POST /api.xro/2.0/ManualJournals (unknown ID in a batch)",
+      "reason": "When any item in the batch carries a BankTransactionID or ManualJournalID that matches nothing, the whole request answers 404 and nothing is written, the valid items included and with summarizeErrors=false too. How Xero answers a mixed batch is not settled by the research.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-022; twin-xero/twin-manifest.json GAP-018",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-022"
+      ]
+    },
+    {
+      "route": "POST /api.xro/2.0/BankTransactions/{BankTransactionID} and POST /api.xro/2.0/ManualJournals/{ManualJournalID} (more than one item)",
+      "reason": "An update sent in the plural envelope applies its first item to the record the path names, and any further items are ignored without an error. What Xero does with them is not observed. No quirk in the research covers it.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-019",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "GET list endpoints (where on a path the list does not read)",
+      "reason": "A where expression on a path the list does not read, such as Contact.Name on BankTransactions, treats the path as null: an equality test matches no record and answers 200 with an empty list, and an inequality test matches every record. Whether Xero answers an error for such a path, or matches it, is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json query-001; twin-xero/twin-manifest.json GAP-020",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "query-001"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions and /api.xro/2.0/ManualJournals (empty array)",
+      "reason": "A body whose BankTransactions or ManualJournals array is empty answers 200 with an empty array and writes nothing. Whether Xero refuses an empty batch is not settled by the references. No quirk in the research covers it.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-021",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "paged GET list endpoints on an empty tenant",
+      "reason": "With page sent and no record to list, the pagination object reports pageCount 1 with itemCount 0. Xero's pageCount for an empty list is not observed.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json page-001; twin-xero/twin-manifest.json GAP-022",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "page-001"
+      ]
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/BankTransactions (Status on create)",
+      "reason": "A Status sent with a new bank transaction is ignored and the transaction is AUTHORISED, so an unknown Status is replaced rather than refused. On update an unknown Status is refused. Neither the spec nor the BankTransactions page says whether Xero refuses an unknown Status on create.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-019; twin-xero/twin-manifest.json GAP-024",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-019"
+      ]
+    },
+    {
+      "route": "PUT /api.xro/2.0/Accounts (enums, body form and PAYG)",
+      "reason": "BankAccountType and CurrencyCode must be values of the spec's enums, refused with \"Bank Account Type '...' is not valid.\" and \"Currency Code '...' is not valid.\", and a body that is not one Account object (an array, for instance) is refused with \"The request body must be a single Account object.\"; these messages are guesses. The wrapped {\"Accounts\": [...]} form is not read, as the spec documents only the bare form, so it is refused for its missing fields. An account of Type PAYG gets Class LIABILITY by inference from its name, as no captured page classes it.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-021; twin-xero/twin-manifest.json GAP-023, GAP-025, GAP-026",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#533. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-021"
+      ]
+    },
+    {
+      "route": "Line items and LineAmountTypes on Invoices, CreditNotes, BankTransactions and ManualJournals (values outside the spec enums)",
+      "reason": "A line Taxability outside the spec enum is refused with \"Line N: Taxability '...' is not valid.\", and a LineAmountTypes other than Exclusive, Inclusive or NoTax with \"LineAmountTypes must be Exclusive, Inclusive or NoTax.\", now on manual journals too. Xero's wording for these is not observed, so the messages are guesses.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json err-001; twin-xero/twin-manifest.json GAP-026",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "Introduced with WonderTwin-AI/wondertwin#533. A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "err-001"
+      ]
+    },
+    {
+      "route": "PUT, POST and GET /api.xro/2.0/BankTransactions (CurrencyCode, unitdp)",
+      "reason": "A CurrencyCode the client sends is overwritten by the bank account's currency when that account has one, as the default bank account does, so it is kept only for a bank account without a currency. unitdp is read on writes only: GET /BankTransactions and GET /BankTransactions/{BankTransactionID} return amounts as stored whatever unitdp asks. Xero's behaviour for either is not observed. No quirk in the research covers them.",
+      "references": {
+        "docs": "twin-xero/twin-manifest.json GAP-027, GAP-028",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": []
+    },
+    {
+      "route": "PUT and POST /api.xro/2.0/ManualJournals (journal line on a bank account or with a zero amount)",
+      "reason": "A journal line coded to a bank account, or with a LineAmount of zero, is accepted. Bank transactions refuse a line on a bank account; whether Xero refuses either on a manual journal is not settled, as there is no ManualJournals page in the research.",
+      "references": {
+        "docs": "research/twins/xero/quirk-hypotheses.json crud-020; twin-xero/twin-manifest.json GAP-029",
+        "manifest": "WonderTwin-AI/wondertwin-docs research/twins/xero/references/manifest.json"
+      },
+      "operator_note": "A guess awaiting operator review; no operator decision is recorded.",
+      "quirk_ids": [
+        "crud-020"
       ]
     }
   ]
