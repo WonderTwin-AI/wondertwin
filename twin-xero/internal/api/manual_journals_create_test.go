@@ -111,3 +111,25 @@ func TestCreateManualJournalsWithSummarizeErrorsFalse(t *testing.T) {
 		t.Errorf("only the balanced journal is created, got %d", n)
 	}
 }
+
+// Attachments is on the spec's ManualJournal. A file is attached through the
+// Attachments endpoint, not in the journal, so one sent on create is dropped
+// with HasAttachments, and a journal with none writes no Attachments key.
+func TestCreateManualJournalsDropsSentAttachments(t *testing.T) {
+	h := newTestHandler(t)
+	loanAccount(t, h)
+	body := strings.Replace(advanceJournal("DRAFT", 10, -10, "2100"), `"Narration"`,
+		`"HasAttachments":true,"Attachments":[{"AttachmentID":"a1","FileName":"x.pdf"}],"Narration"`, 1)
+	code, out := putManualJournals(t, h, "", body)
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, out)
+	}
+	mj := out["ManualJournals"].([]any)[0].(map[string]any)
+	if _, ok := mj["Attachments"]; ok || mj["HasAttachments"] != false {
+		t.Fatalf("sent attachments must not be stored: %v", mj)
+	}
+	stored, _ := h.store.ManualJournals.For(store.DefaultTenantID).Get(mj["ManualJournalID"].(string))
+	if stored.Attachments != nil {
+		t.Fatalf("stored Attachments = %v, want none", stored.Attachments)
+	}
+}

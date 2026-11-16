@@ -95,7 +95,7 @@ func (h *Handler) buildManualJournal(tenant string, in store.ManualJournal, keys
 		in.Date = &d
 	}
 	in.ManualJournalID, in.StatusAttributeString, in.UpdatedDateUTC = h.store.NewID(), "OK", now
-	in.HasAttachments, in.Warnings, in.ValidationErrors = false, nil, nil
+	in.HasAttachments, in.Attachments, in.Warnings, in.ValidationErrors = false, nil, nil, nil
 	return in, nil
 }
 

@@ -4,7 +4,8 @@ import "time"
 
 // ManualJournal is a journal posted straight to the ledger, as Xero returns it.
 // Its dates are written as /Date(ms+0000)/ by the API layer, which shadows them.
-// Xero's journal lines carry no ID of their own.
+// Xero's journal lines carry no ID of their own. Attachments, as on a contact,
+// is written only when the journal has some.
 type ManualJournal struct {
 	ManualJournalID        string            `json:"ManualJournalID"`
 	Narration              string            `json:"Narration"`
@@ -15,6 +16,7 @@ type ManualJournal struct {
 	URL                    string            `json:"Url,omitempty"`
 	ShowOnCashBasisReports bool              `json:"ShowOnCashBasisReports"`
 	HasAttachments         bool              `json:"HasAttachments"`
+	Attachments            []Attachment      `json:"Attachments,omitempty"`
 	UpdatedDateUTC         time.Time         `json:"UpdatedDateUTC"`
 	StatusAttributeString  string            `json:"StatusAttributeString,omitempty"`
 	Warnings               []ValidationError `json:"Warnings,omitempty"`
