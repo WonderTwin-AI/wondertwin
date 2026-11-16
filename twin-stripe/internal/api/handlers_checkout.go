@@ -404,7 +404,10 @@ func (h *Handler) inlinePrice(r *http.Request, prefix string) string {
 	price := store.Price{
 		ID: priceID, Object: "price", Active: false, Currency: currency, Product: productID,
 		UnitAmount: unit, UnitAmountDecimal: strconv.FormatInt(unit, 10),
-		Type: "one_time", BillingScheme: "per_unit", Created: now,
+		Type: "one_time", BillingScheme: "per_unit", TaxBehavior: "unspecified", Created: now,
+	}
+	if v := r.FormValue(prefix + "[tax_behavior]"); v != "" {
+		price.TaxBehavior = v
 	}
 	if interval := r.FormValue(prefix + "[recurring][interval]"); interval != "" {
 		price.Type = "recurring"

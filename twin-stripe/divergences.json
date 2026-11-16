@@ -120,6 +120,12 @@
       "stripe": "Set in the Dashboard or through /v1/tax/settings and /v1/tax/registrations; Stripe's tax engine supplies each registration's rate",
       "app_emulator": "Loaded only from the seed file or POST /admin/state (keys tax_settings and tax_registrations, in Stripe's shapes). Each registration carries one field Stripe does not have, standard_rate (percentage, tax_type, display_name), the rate the app emulator applies. /v1/tax/settings and /v1/tax/registrations are not served. Without settings, automatic tax is off and refused as Stripe refuses it",
       "reason": "Operator decision 2026-11-15: tax settings live in the seed; the app emulator holds no tax content and never decides a rate"
+    },
+    {
+      "route": "POST /v1/prices/{price}, tax_behavior",
+      "stripe": "A price's tax_behavior can be set later only while it is unspecified; once exclusive or inclusive it cannot change",
+      "app_emulator": "An update always takes the tax_behavior sent",
+      "reason": "Operator decision 2026-11-16: storing tax_behavior adds no refusal, so no existing call can start failing"
     }
   ]
 }

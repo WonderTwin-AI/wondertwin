@@ -160,6 +160,8 @@ type Customer struct {
 	Currency      string            `json:"currency,omitempty"`
 	DefaultSource string            `json:"default_source,omitempty"`
 	InvoicePrefix string            `json:"invoice_prefix,omitempty"`
+	Address       *Address          `json:"address"`
+	Shipping      *Shipping         `json:"shipping"`
 	Balance       int64             `json:"balance"`
 	Delinquent    bool              `json:"delinquent"`
 	Livemode      bool              `json:"livemode"`
@@ -202,6 +204,7 @@ type Price struct {
 	BillingScheme     string            `json:"billing_scheme"` // per_unit or tiered
 	Recurring         *PriceRecurring   `json:"recurring,omitempty"`
 	Nickname          string            `json:"nickname,omitempty"`
+	TaxBehavior       string            `json:"tax_behavior"` // exclusive, inclusive or unspecified
 	Livemode          bool              `json:"livemode"`
 	Metadata          map[string]string `json:"metadata,omitempty"`
 	Created           int64             `json:"created"`
@@ -972,4 +975,21 @@ type StandardRate struct {
 	Percentage  float64 `json:"percentage"`
 	TaxType     string  `json:"tax_type"`
 	DisplayName string  `json:"display_name"`
+}
+
+// Address is a postal address. Unset parts are null, as Stripe returns them.
+type Address struct {
+	City       *string `json:"city"`
+	Country    *string `json:"country"`
+	Line1      *string `json:"line1"`
+	Line2      *string `json:"line2"`
+	PostalCode *string `json:"postal_code"`
+	State      *string `json:"state"`
+}
+
+// Shipping is a customer's shipping details.
+type Shipping struct {
+	Address *Address `json:"address"`
+	Name    string   `json:"name"`
+	Phone   *string  `json:"phone"`
 }
