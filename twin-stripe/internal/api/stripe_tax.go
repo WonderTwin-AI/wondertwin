@@ -207,11 +207,11 @@ func (h *Handler) applyAutomaticTax(inv *store.Invoice, discount int64) {
 	var taxed taxedLines
 	if !untaxed {
 		shares := spread(discount, amounts)
-		// Invoice items carry no price here, so every line takes the account
-		// default tax_behavior.
+		// A line takes its price's tax_behavior; invoice items carry no price
+		// here, so theirs is the account default.
 		lines := make([]taxLine, len(amounts))
 		for i, a := range amounts {
-			lines[i] = taxLine{Amount: a - shares[i]}
+			lines[i] = taxLine{Amount: a - shares[i], TaxBehavior: lineTaxBehavior(inv.Lines.Data[i])}
 		}
 		taxed = h.automaticTaxes(country, inv.Currency, lines)
 	}
@@ -242,4 +242,27 @@ func (h *Handler) taxReadyToFinalize(w http.ResponseWriter, inv *store.Invoice) 
 		return false
 	}
 	return true
+}
+
+// lineTaxBehavior is the tax_behavior of the price an invoice line bills.
+func lineTaxBehavior(l store.InvoiceLine) string {
+	if l.PriceTaxBehavior != "" {
+		return l.PriceTaxBehavior
+	}
+	if l.Price != nil {
+		return l.Price.TaxBehavior
+	}
+	return ""
+}
+
+// subscriptionLocationMessage is Stripe's refusal to create an automatically
+// taxed subscription for a customer with no location (quirk error-007).
+const subscriptionLocationMessage = "The customer's location isn't recognized. Set a valid customer address in order to automatically calculate tax."
+
+// subscriptionTax is a subscription's automatic_tax for enabled.
+func subscriptionTax(enabled bool) store.SubscriptionTax {
+	if !enabled {
+		return store.SubscriptionTax{}
+	}
+	return store.SubscriptionTax{Enabled: true, Liability: map[string]any{"type": "self"}}
 }

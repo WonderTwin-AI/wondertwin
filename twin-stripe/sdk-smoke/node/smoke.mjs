@@ -36,6 +36,22 @@ async function expectError(fn) {
   assert.fail('expected the call to fail');
 }
 
+const TAX_SEED = {
+  tax_settings: {object: 'tax.settings', status: 'active', head_office: {address: {country: 'CH'}},
+    defaults: {provider: 'stripe', tax_behavior: 'inferred_by_currency'}},
+  tax_registrations: {taxreg_smoke_ch: {id: 'taxreg_smoke_ch', object: 'tax.registration', country: 'CH',
+    status: 'active', active_from: 1794700000, standard_rate: {percentage: 8.1, tax_type: 'vat', display_name: 'VAT'}}},
+};
+
+// Rewrites the app emulator's state with update applied; the Stripe SDK has no admin calls.
+async function adminState(update) {
+  const state = await (await fetch(new URL('/admin/state', base))).json();
+  const res = await fetch(new URL('/admin/state', base), {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...state, ...update}),
+  });
+  assert.equal(res.status, 200);
+}
+
 const cases = {
   async 'stripe-card-payment'() {
     const customer = await stripe.customers.create({email: 'jenny.rosen@example.com', name: 'Jenny Rosen'});
@@ -85,6 +101,26 @@ const cases = {
     assert.equal(inv.status, 'paid');
     assert.equal(inv.amount_paid, 1500);
     assert.equal(inv.customer.id, customer.id);
+  },
+
+  async 'subscription-standard-rated-tax'() {
+    // Stripe Tax on for this case only: other cases run with tax off.
+    await adminState(TAX_SEED);
+    try {
+      const product = await stripe.products.create({name: 'Pro yearly'});
+      const price = await stripe.prices.create({product: product.id, unit_amount: 46800, currency: 'usd',
+        recurring: {interval: 'year'}, tax_behavior: 'exclusive'});
+      const customer = await stripe.customers.create({name: 'Zurich', address: {country: 'CH', city: 'Zurich'}});
+      const sub = await stripe.subscriptions.create({customer: customer.id, items: [{price: price.id}],
+        automatic_tax: {enabled: true}, expand: ['latest_invoice']});
+      assert.equal(sub.automatic_tax.enabled, true);
+      const inv = sub.latest_invoice;
+      assert.deepEqual(inv.total_taxes.map((t) => t.amount), [3791]);
+      assert.equal(inv.total_taxes[0].taxability_reason, 'standard_rated');
+      assert.deepEqual([inv.subtotal, inv.total_excluding_tax, inv.total], [46800, 46800, 50591]);
+    } finally {
+      await adminState({tax_settings: null, tax_registrations: {}});
+    }
   },
 
   async 'stripe-checkout-session'() {

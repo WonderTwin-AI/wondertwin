@@ -101,6 +101,44 @@ def case_subscription_billing():
     eq(inv.customer.id, customer.id, "expanded customer")
 
 
+TAX_SEED = {
+    "tax_settings": {"object": "tax.settings", "status": "active", "head_office": {"address": {"country": "CH"}},
+                     "defaults": {"provider": "stripe", "tax_behavior": "inferred_by_currency"}},
+    "tax_registrations": {"taxreg_smoke_ch": {
+        "id": "taxreg_smoke_ch", "object": "tax.registration", "country": "CH", "status": "active",
+        "active_from": 1794700000, "standard_rate": {"percentage": 8.1, "tax_type": "vat", "display_name": "VAT"}}},
+}
+
+
+def admin_state(update):
+    """Rewrites the app emulator's state with update applied; the Stripe SDK has no admin calls."""
+    conn = http.client.HTTPConnection(urlsplit(BASE).netloc)
+    conn.request("GET", "/admin/state")
+    state = json.loads(conn.getresponse().read())
+    state.update(update)
+    conn.request("POST", "/admin/state", json.dumps(state), {"Content-Type": "application/json"})
+    eq(conn.getresponse().status, 200, "admin state")
+
+
+def case_subscription_standard_rated_tax():
+    # Stripe Tax on for this case only: other cases run with tax off.
+    admin_state(TAX_SEED)
+    try:
+        product = v1.products.create({"name": "Pro yearly"})
+        price = v1.prices.create({"product": product.id, "unit_amount": 46800, "currency": "usd",
+                                  "recurring": {"interval": "year"}, "tax_behavior": "exclusive"})
+        customer = v1.customers.create({"name": "Zurich", "address": {"country": "CH", "city": "Zurich"}})
+        sub = v1.subscriptions.create({"customer": customer.id, "items": [{"price": price.id}],
+                                       "automatic_tax": {"enabled": True}, "expand": ["latest_invoice"]})
+        eq(sub.automatic_tax.enabled, True, "subscription automatic_tax")
+        inv = sub.latest_invoice
+        eq([t.amount for t in inv.total_taxes], [3791], "total_taxes")
+        eq(inv.total_taxes[0].taxability_reason, "standard_rated", "taxability_reason")
+        eq((inv.subtotal, inv.total_excluding_tax, inv.total), (46800, 46800, 50591), "totals")
+    finally:
+        admin_state({"tax_settings": None, "tax_registrations": {}})
+
+
 def case_checkout_session():
     session = v1.checkout.sessions.create(
         {
@@ -407,6 +445,7 @@ CASES = {
     "stripe-card-payment": case_card_payment,
     "stripe-card-decline": case_card_decline,
     "stripe-subscription-billing": case_subscription_billing,
+    "subscription-standard-rated-tax": case_subscription_standard_rated_tax,
     "stripe-checkout-session": case_checkout_session,
     "stripe-webhook-endpoint-events": case_webhook_endpoint_events,
     "stripe-refund": case_refund,
