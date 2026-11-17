@@ -209,7 +209,7 @@ func (h *Handler) applyAutomaticTax(inv *store.Invoice, discount int64) {
 		shares := spread(discount, amounts)
 		lines := make([]taxLine, len(amounts))
 		for i, a := range amounts {
-			lines[i] = taxLine{Amount: a - shares[i], TaxBehavior: inv.Lines.Data[i].PriceTaxBehavior}
+			lines[i] = taxLine{Amount: a - shares[i]}
 		}
 		taxed = h.automaticTaxes(country, inv.Currency, lines)
 	}
