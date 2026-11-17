@@ -207,6 +207,8 @@ func (h *Handler) applyAutomaticTax(inv *store.Invoice, discount int64) {
 	var taxed taxedLines
 	if !untaxed {
 		shares := spread(discount, amounts)
+		// Invoice items carry no price here, so every line takes the account
+		// default tax_behavior.
 		lines := make([]taxLine, len(amounts))
 		for i, a := range amounts {
 			lines[i] = taxLine{Amount: a - shares[i]}
