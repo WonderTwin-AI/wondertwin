@@ -18,6 +18,9 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
+	if !h.requireTaxSetUp(w, r, true) {
+		return
+	}
 
 	id := h.store.StripeID(h.store.CheckoutSessions.NextID())
 	now := h.store.Now()
@@ -86,9 +89,17 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	if automaticTaxRequested(r) {
+		h.applyCheckoutTax(&cs)
+	}
+
 	h.store.CheckoutSessions.Set(id, cs)
 	h.emitEvent("checkout.session.created", h.renderCheckoutSession(cs, false))
-	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
+	m := h.renderCheckoutSession(cs, expandRequested(r, "line_items"))
+	if expandRequested(r, "total_details.breakdown") {
+		h.addTaxBreakdown(m, cs)
+	}
+	twincore.JSON(w, http.StatusOK, m)
 }
 
 func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
@@ -333,6 +344,7 @@ func (h *Handler) ListPaymentLinks(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderCheckoutSession(cs store.CheckoutSession, withLineItems bool) map[string]any {
 	m := mapFromJSON(cs)
 	delete(m, "line_items")
+	delete(m, "tax_breakdown")
 	if withLineItems {
 		m["line_items"] = h.checkoutLineItemList(cs)
 	}

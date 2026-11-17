@@ -610,10 +610,35 @@ type CheckoutSession struct {
 	Currency      string             `json:"currency,omitempty"`
 	AmountTotal   int64              `json:"amount_total"`
 	LineItems     []CheckoutLineItem `json:"line_items,omitempty"`
+
+	// Set only when the session uses automatic tax, so other sessions
+	// render as before.
+	AmountSubtotal *int64                `json:"amount_subtotal,omitempty"`
+	AutomaticTax   *CheckoutAutomaticTax `json:"automatic_tax,omitempty"`
+	TotalDetails   *CheckoutTotalDetails `json:"total_details,omitempty"`
+	// TaxBreakdown backs total_details.breakdown.taxes, rendered only when
+	// expanded.
+	TaxBreakdown []InvoiceTax `json:"tax_breakdown,omitempty"`
 	ExpiresAt     int64              `json:"expires_at"`
 	Livemode      bool               `json:"livemode"`
 	Metadata      map[string]string  `json:"metadata,omitempty"`
 	Created       int64              `json:"created"`
+}
+
+// CheckoutAutomaticTax is a checkout session's automatic_tax.
+type CheckoutAutomaticTax struct {
+	AddressCollectionPrecision *string `json:"address_collection_precision"`
+	Enabled                    bool    `json:"enabled"`
+	Liability                  any     `json:"liability"`
+	Provider                   *string `json:"provider"`
+	Status                     *string `json:"status"`
+}
+
+// CheckoutTotalDetails is a checkout session's total_details.
+type CheckoutTotalDetails struct {
+	AmountDiscount int64 `json:"amount_discount"`
+	AmountShipping int64 `json:"amount_shipping"`
+	AmountTax      int64 `json:"amount_tax"`
 }
 
 // CheckoutLineItem represents a line item in a checkout session.
