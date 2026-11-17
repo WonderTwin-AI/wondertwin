@@ -138,6 +138,12 @@
       "stripe": "Refuses automatic_tax when Stripe Tax is not set up, and taxes the quote or payment link when it is",
       "app_emulator": "Ignores automatic_tax: no refusal when tax is off, no tax when it is on",
       "reason": "Operator decision 2026-11-15: quotes and payment links stay out of the Stripe Tax scope (quirk crud-018)"
+    },
+    {
+      "route": "POST /v1/subscriptions/{subscription}, item changes with proration",
+      "stripe": "create_prorations adds pending proration items to the next invoice and always_invoice invoices them at once; each item gets its own credit and charge line, taxed at its price's tax_behavior",
+      "app_emulator": "Both create_prorations and always_invoice invoice the proration at once, paid. The subscription's items are combined into one credit line and one charge line, each taxed at the first item's tax_behavior",
+      "reason": "Proration predates Stripe Tax here; stripe-bp2-s05 taxes these lines and keeps their shape, which matches Stripe for single-item subscriptions"
     }
   ]
 }

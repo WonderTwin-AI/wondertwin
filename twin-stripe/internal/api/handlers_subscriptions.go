@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 
@@ -20,8 +21,16 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parameter_missing", "Missing required param: customer.")
 		return
 	}
-	if _, exists := h.store.Customers.Get(customer); !exists {
+	cus, exists := h.store.Customers.Get(customer)
+	if !exists {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such customer: "+customer)
+		return
+	}
+	if !h.requireTaxSetUp(w, r, false) {
+		return
+	}
+	if automaticTaxRequested(r) && customerTaxCountry(cus) == "" {
+		writeError(w, http.StatusBadRequest, apiError{Type: "invalid_request_error", Code: "customer_tax_location_invalid", Message: subscriptionLocationMessage})
 		return
 	}
 
@@ -39,6 +48,7 @@ func (h *Handler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 		DefaultPaymentMethod: r.FormValue("default_payment_method"),
 		Livemode:             false,
 		Metadata:             parseMetadata(r),
+		AutomaticTax:         subscriptionTax(automaticTaxRequested(r)),
 		Created:              now.Unix(),
 	}
 
@@ -170,11 +180,18 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.requireTaxSetUp(w, r, false) {
+		return
+	}
+
 	meta, ok := updateMetadata(w, r, sub.Metadata)
 	if !ok {
 		return
 	}
 	sub.Metadata = meta
+	if v := r.FormValue("automatic_tax[enabled]"); v != "" {
+		sub.AutomaticTax = subscriptionTax(v == "true")
+	}
 
 	if v := r.FormValue("cancel_at_period_end"); v == "true" {
 		sub.CancelAtPeriodEnd = true
@@ -198,16 +215,39 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	hasItemChanges := false
 	for i := 0; i < 10; i++ {
 		priceID := r.FormValue("items[" + strconv.Itoa(i) + "][price]")
-		if priceID == "" {
+		itemID := r.FormValue("items[" + strconv.Itoa(i) + "][id]")
+		if priceID == "" && itemID == "" {
 			break
 		}
 		hasItemChanges = true
-		price, ok := h.store.Prices.Get(priceID)
-		if !ok {
-			stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
-			return
+		// items[N][id] changes an existing item, keeping what is not sent.
+		var existing *store.SubscriptionItem
+		if itemID != "" && sub.Items != nil {
+			for j := range sub.Items.Data {
+				if sub.Items.Data[j].ID == itemID {
+					existing = &sub.Items.Data[j]
+				}
+			}
+			if existing == nil {
+				stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such subscription item: "+itemID)
+				return
+			}
+		}
+		var price store.Price
+		if priceID == "" {
+			price = existing.Price
+		} else {
+			p, ok := h.store.Prices.Get(priceID)
+			if !ok {
+				stripeError(w, http.StatusBadRequest, "invalid_request_error", "resource_missing", "No such price: "+priceID)
+				return
+			}
+			price = p
 		}
 		qty := int64(1)
+		if existing != nil {
+			qty = existing.Quantity
+		}
 		if v := r.FormValue("items[" + strconv.Itoa(i) + "][quantity]"); v != "" {
 			if q, err := strconv.ParseInt(v, 10, 64); err == nil {
 				qty = q
@@ -223,7 +263,10 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	if hasItemChanges && sub.Items != nil && prorationBehavior == "create_prorations" {
+	// always_invoice invoices the proration at once, as create_prorations
+	// already does here.
+	prorates := prorationBehavior == "create_prorations" || prorationBehavior == "always_invoice"
+	if hasItemChanges && sub.Items != nil && prorates {
 		now := h.store.Clock.Now().Unix()
 		periodTotal := sub.CurrentPeriodEnd - sub.CurrentPeriodStart
 		if periodTotal <= 0 {
@@ -240,14 +283,14 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		for _, item := range sub.Items.Data {
 			oldTotal += item.Price.UnitAmount * item.Quantity
 		}
-		credit := int64(float64(oldTotal) * fraction)
+		credit := int64(math.Round(float64(oldTotal) * fraction))
 
 		// Charge for remaining time on new items.
 		var newTotal int64
 		for _, item := range newItems {
 			newTotal += item.Price.UnitAmount * item.Quantity
 		}
-		charge := int64(float64(newTotal) * fraction)
+		charge := int64(math.Round(float64(newTotal) * fraction))
 
 		prorationAmount := charge - credit
 
@@ -255,8 +298,15 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		if prorationAmount != 0 {
 			invID := h.store.StripeID(h.store.Invoices.NextID())
 			currency := "usd"
+			// Proration lines sum the items; each takes the first item's
+			// tax_behavior.
+			var oldBehavior, newBehavior string
 			if len(newItems) > 0 {
 				currency = newItems[0].Price.Currency
+				newBehavior = newItems[0].Price.TaxBehavior
+			}
+			if len(sub.Items.Data) > 0 {
+				oldBehavior = sub.Items.Data[0].Price.TaxBehavior
 			}
 
 			var lines []store.InvoiceLine
@@ -268,6 +318,8 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 					Currency:    currency,
 					Description: "Unused time on previous plan",
 					Type:        "invoiceitem",
+
+					PriceTaxBehavior: oldBehavior,
 				})
 			}
 			if charge > 0 {
@@ -278,6 +330,8 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 					Currency:    currency,
 					Description: "Remaining time on new plan",
 					Type:        "invoiceitem",
+
+					PriceTaxBehavior: newBehavior,
 				})
 			}
 
@@ -300,6 +354,11 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 				Description:       "Proration",
 				Livemode:          false,
 				Created:           h.store.Now(),
+			}
+			if sub.AutomaticTax.Enabled {
+				inv.AutomaticTax.Enabled = true
+				h.applyInvoiceTax(&inv)
+				inv.AmountDue, inv.AmountPaid, inv.AmountRemaining = inv.Total, inv.Total, 0
 			}
 			h.store.Invoices.Set(invID, inv)
 			sub.LatestInvoice = invID
@@ -398,6 +457,8 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 			Price:    &item.Price,
 			Quantity: item.Quantity,
 			Type:     "subscription",
+
+			PriceTaxBehavior: item.Price.TaxBehavior,
 			Period: &store.Period{
 				Start: sub.CurrentPeriodStart,
 				End:   sub.CurrentPeriodEnd,
@@ -452,9 +513,10 @@ func (h *Handler) createSubscriptionInvoice(sub *store.Subscription, items []sto
 		Livemode:    false,
 		Created:     h.store.Now(),
 	}
-	applyManualTaxes(&inv, discountAmount, sub.DefaultTaxRates)
+	inv.AutomaticTax.Enabled = sub.AutomaticTax.Enabled
+	h.applyInvoiceTax(&inv)
 	invoiceTotal := inv.Total
-	inv.AmountDue, inv.AmountPaid = invoiceTotal, invoiceTotal
+	inv.AmountDue, inv.AmountPaid, inv.AmountRemaining = invoiceTotal, invoiceTotal, 0
 
 	if sub.CollectionMethod == "send_invoice" {
 		inv.Status = "open"

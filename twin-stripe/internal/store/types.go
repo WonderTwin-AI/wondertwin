@@ -336,11 +336,20 @@ type Subscription struct {
 	LatestInvoice        string             `json:"latest_invoice,omitempty"`
 	Discounts            []string           `json:"discounts"`
 	DefaultTaxRates      []TaxRate          `json:"default_tax_rates,omitempty"`
+	AutomaticTax         SubscriptionTax    `json:"automatic_tax"`
 	DefaultPaymentMethod string             `json:"default_payment_method,omitempty"`
 	CollectionMethod     string             `json:"collection_method"` // charge_automatically or send_invoice
 	Livemode             bool               `json:"livemode"`
 	Metadata             map[string]string  `json:"metadata,omitempty"`
 	Created              int64              `json:"created"`
+}
+
+// SubscriptionTax is a subscription's automatic_tax. Unlike an invoice's it
+// has no status or provider (quirk crud-016).
+type SubscriptionTax struct {
+	Enabled        bool    `json:"enabled"`
+	DisabledReason *string `json:"disabled_reason"`
+	Liability      any     `json:"liability"`
 }
 
 // SubscriptionItems wraps the list of subscription items.
@@ -429,6 +438,10 @@ type InvoiceLine struct {
 	Period      *Period      `json:"period,omitempty"`
 	Type        string       `json:"type"` // subscription or invoiceitem
 	Taxes       []InvoiceTax `json:"taxes,omitempty"`
+
+	// PriceTaxBehavior is the tax_behavior of the price a line bills, for
+	// Stripe Tax, where Price is not set (proration lines). Not serialized.
+	PriceTaxBehavior string `json:"-"`
 }
 
 // DiscountAmount represents a discount amount on an invoice.
