@@ -176,3 +176,36 @@ func TestProrationTaxOffLeavesProrationUntaxed(t *testing.T) {
 		t.Errorf("total_taxes %v total %v, want untaxed 46800", inv["total_taxes"], inv["total"])
 	}
 }
+
+// items[N][id] edits the named item in place; items not named stay as they were.
+func TestUpdateItemByIDKeepsOtherItems(t *testing.T) {
+	_, tc := setupStripe(t)
+	priceA, priceB := yearlyPrice(tc, ""), yearlyPrice(tc, "")
+	resp := stripePost(tc, "/v1/subscriptions?customer="+taxCustomer(tc, "CH")+"&items[0][price]="+priceA+"&items[1][price]="+priceB, nil)
+	resp.AssertStatus(200)
+	sub := resp.JSONMap()
+	before := sub["items"].(map[string]any)["data"].([]any)
+	if len(before) != 2 {
+		t.Fatalf("created %d items, want 2", len(before))
+	}
+	first, second := before[0].(map[string]any), before[1].(map[string]any)
+
+	upd := stripePost(tc, "/v1/subscriptions/"+sub["id"].(string)+"?items[0][id]="+second["id"].(string)+"&items[0][quantity]=3", nil)
+	upd.AssertStatus(200)
+	type item struct {
+		id, price string
+		qty       float64
+	}
+	var got []item
+	for _, d := range upd.JSONMap()["items"].(map[string]any)["data"].([]any) {
+		m := d.(map[string]any)
+		got = append(got, item{m["id"].(string), m["price"].(map[string]any)["id"].(string), m["quantity"].(float64)})
+	}
+	want := []item{{first["id"].(string), priceA, 1}, {second["id"].(string), priceB, 3}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("items = %v, want %v", got, want)
+	}
+
+	again := stripePost(tc, "/v1/subscriptions/"+sub["id"].(string)+"?items[0][id]="+second["id"].(string)+"&items[0][quantity]=4", nil)
+	again.AssertStatus(200)
+}

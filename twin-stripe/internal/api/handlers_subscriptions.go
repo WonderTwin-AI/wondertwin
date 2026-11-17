@@ -214,6 +214,12 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	var newItems []store.SubscriptionItem
 	hasItemChanges := false
 	for i := 0; i < 10; i++ {
+		if r.FormValue("items["+strconv.Itoa(i)+"][id]") != "" && sub.Items != nil {
+			newItems = append(newItems, sub.Items.Data...)
+			break
+		}
+	}
+	for i := 0; i < 10; i++ {
 		priceID := r.FormValue("items[" + strconv.Itoa(i) + "][price]")
 		itemID := r.FormValue("items[" + strconv.Itoa(i) + "][id]")
 		if priceID == "" && itemID == "" {
@@ -222,10 +228,10 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 		hasItemChanges = true
 		// items[N][id] changes an existing item, keeping what is not sent.
 		var existing *store.SubscriptionItem
-		if itemID != "" && sub.Items != nil {
-			for j := range sub.Items.Data {
-				if sub.Items.Data[j].ID == itemID {
-					existing = &sub.Items.Data[j]
+		if itemID != "" {
+			for j := range newItems {
+				if newItems[j].ID == itemID {
+					existing = &newItems[j]
 				}
 			}
 			if existing == nil {
@@ -253,7 +259,12 @@ func (h *Handler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 				qty = q
 			}
 		}
-		siID := id + "_si_" + strconv.Itoa(i)
+		if existing != nil {
+			existing.Price = price
+			existing.Quantity = qty
+			continue
+		}
+		siID := id + "_si_" + strconv.Itoa(len(newItems))
 		newItems = append(newItems, store.SubscriptionItem{
 			ID:       siID,
 			Object:   "subscription_item",
