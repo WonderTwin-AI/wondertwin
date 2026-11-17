@@ -439,8 +439,9 @@ type InvoiceLine struct {
 	Type        string       `json:"type"` // subscription or invoiceitem
 	Taxes       []InvoiceTax `json:"taxes,omitempty"`
 
-	// PriceTaxBehavior is the tax_behavior of the price a line bills, for
-	// Stripe Tax, where Price is not set (proration lines). Not serialized.
+	// PriceTaxBehavior is the tax_behavior of the price a line bills, read by
+	// Stripe Tax ahead of Price; proration lines have no Price, so it is
+	// their only source. Not serialized.
 	PriceTaxBehavior string `json:"-"`
 }
 
