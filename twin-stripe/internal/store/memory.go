@@ -59,6 +59,10 @@ type MemoryStore struct {
 	TopUps                *pkgstate.Store[TopUp]
 	Discounts             *pkgstate.Store[Discount]
 	TaxRegistrations      *pkgstate.Store[TaxRegistration]
+	// StripeTaxRates are the tax rates Stripe Tax creates for its own
+	// calculations: retrievable by ID, never listed with the account's rates.
+	StripeTaxRates *pkgstate.Store[TaxRate]
+	stripeRateMu   sync.Mutex
 
 	// taxSettings is the account's Stripe Tax settings, nil until loaded.
 	taxSettings *TaxSettings
@@ -144,6 +148,7 @@ func New() *MemoryStore {
 		TopUps:                pkgstate.New[TopUp]("tu"),
 		Discounts:             pkgstate.New[Discount]("di"),
 		TaxRegistrations:      pkgstate.New[TaxRegistration]("taxreg"),
+		StripeTaxRates:        pkgstate.New[TaxRate]("txr_stripe"),
 		DeletedCustomers:      pkgstate.New[DeletedObject]("cus"),
 		Balances:              make(map[string]*AccountBalance),
 		PlatformBalance:       NewAccountBalance(),
@@ -317,6 +322,7 @@ type stateSnapshot struct {
 	Discounts             map[string]Discount             `json:"discounts"`
 	TaxSettings           *TaxSettings                    `json:"tax_settings,omitempty"`
 	TaxRegistrations      map[string]TaxRegistration      `json:"tax_registrations"`
+	StripeTaxRates        map[string]TaxRate              `json:"stripe_tax_rates"`
 	DeletedCustomers      map[string]DeletedObject        `json:"deleted_customers,omitempty"`
 	Balances              map[string]*AccountBalance      `json:"balances"`
 	PlatformBalance       *AccountBalance                 `json:"platform_balance"`
@@ -370,6 +376,7 @@ func (s *MemoryStore) Snapshot() any {
 		Discounts:             s.Discounts.Snapshot(),
 		DeletedCustomers:      s.DeletedCustomers.Snapshot(),
 		TaxRegistrations:      s.TaxRegistrations.Snapshot(),
+		StripeTaxRates:        s.StripeTaxRates.Snapshot(),
 		TaxSettings:           s.taxSettingsCopy(),
 		Balances:              s.snapshotBalances(),
 		PlatformBalance:       s.PlatformBalance,
@@ -468,6 +475,7 @@ func (s *MemoryStore) LoadState(data []byte) error {
 	s.Discounts.LoadSnapshot(snap.Discounts)
 	s.DeletedCustomers.LoadSnapshot(snap.DeletedCustomers)
 	s.TaxRegistrations.LoadSnapshot(snap.TaxRegistrations)
+	s.StripeTaxRates.LoadSnapshot(snap.StripeTaxRates)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -528,6 +536,7 @@ func (s *MemoryStore) Reset() {
 	s.Discounts.Reset()
 	s.DeletedCustomers.Reset()
 	s.TaxRegistrations.Reset()
+	s.StripeTaxRates.Reset()
 	s.Clock.Reset()
 
 	s.mu.Lock()
@@ -535,4 +544,21 @@ func (s *MemoryStore) Reset() {
 	s.taxSettings = nil
 	s.Balances = make(map[string]*AccountBalance)
 	s.PlatformBalance = NewAccountBalance()
+}
+
+// StripeTaxRate returns the Stripe-created tax rate that matches, creating it
+// with mk on first use, so every calculation for one country, rate and
+// behaviour references the same rate, as Stripe's do.
+func (s *MemoryStore) StripeTaxRate(match func(TaxRate) bool, mk func(id string) TaxRate) TaxRate {
+	s.stripeRateMu.Lock()
+	defer s.stripeRateMu.Unlock()
+	for _, tr := range s.StripeTaxRates.List() {
+		if match(tr) {
+			return tr
+		}
+	}
+	id := s.StripeID(s.StripeTaxRates.NextID())
+	tr := mk(id)
+	s.StripeTaxRates.Set(id, tr)
+	return tr
 }

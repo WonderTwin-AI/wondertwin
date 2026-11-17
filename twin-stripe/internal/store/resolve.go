@@ -60,6 +60,9 @@ func (s *MemoryStore) Resolve(id string) (map[string]any, bool) {
 	case "seti":
 		return resolveFrom(s.SetupIntents, id)
 	case "txr":
+		if v, ok := resolveFrom(s.StripeTaxRates, id); ok {
+			return v, ok
+		}
 		return resolveFrom(s.TaxRates, id)
 	case "dp":
 		return resolveFrom(s.Disputes, id)

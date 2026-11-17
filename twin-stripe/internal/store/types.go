@@ -532,6 +532,12 @@ type TaxRate struct {
 	Livemode     bool              `json:"livemode"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
 	Created      int64             `json:"created"`
+
+	// Set on the rates Stripe Tax creates; manual rates leave them out.
+	EffectivePercentage *float64 `json:"effective_percentage,omitempty"`
+	JurisdictionLevel   string   `json:"jurisdiction_level,omitempty"`
+	RateType            string   `json:"rate_type,omitempty"`
+	TaxType             string   `json:"tax_type,omitempty"`
 }
 
 // Dispute represents a Stripe dispute/chargeback.
