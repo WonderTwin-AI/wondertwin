@@ -292,6 +292,16 @@ const cases = {
     assert.ok(err.doc_url);
   },
 
+  async 'error-tax-not-set-up'() {
+    const customer = await stripe.customers.create({name: 'No tax', address: {country: 'CH'}});
+    const err = await expectError(() =>
+      stripe.invoices.create({customer: customer.id, automatic_tax: {enabled: true}}),
+    );
+    assert.ok(err instanceof Stripe.errors.StripeInvalidRequestError);
+    assert.deepEqual([err.statusCode, err.code, err.param], [400, undefined, undefined]);
+    assert.equal(err.message, 'You must have a valid head office address to enable automatic tax calculation in test mode. Visit https://dashboard.stripe.com/test/settings/tax to update it.');
+  },
+
   async 'error-unknown-bank-token'() {
     const account = await stripe.accounts.create({ type: 'custom', country: 'US' });
     const err = await expectError(() =>

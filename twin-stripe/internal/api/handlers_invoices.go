@@ -15,6 +15,9 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
+	if !h.requireTaxSetUp(w, r, false) {
+		return
+	}
 
 	customer := r.FormValue("customer")
 	if customer == "" {
@@ -103,9 +106,8 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	inv.DefaultTaxRates = rates
-	applyManualTaxes(&inv, discountAmount, rates)
-	inv.AmountDue = inv.Total
-	inv.AmountRemaining = inv.Total
+	inv.AutomaticTax.Enabled = automaticTaxRequested(r)
+	h.applyInvoiceTax(&inv)
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.created", mapFromJSON(inv))
@@ -131,6 +133,9 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
+	if !h.requireTaxSetUp(w, r, false) {
+		return
+	}
 
 	meta, ok := updateMetadata(w, r, inv.Metadata)
 	if !ok {
@@ -147,6 +152,10 @@ func (h *Handler) UpdateInvoice(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("collection_method"); v != "" {
 		inv.CollectionMethod = v
 	}
+	if v := r.FormValue("automatic_tax[enabled]"); v != "" {
+		inv.AutomaticTax.Enabled = v == "true"
+	}
+	h.applyInvoiceTax(&inv)
 
 	h.store.Invoices.Set(id, inv)
 	h.emitEvent("invoice.updated", mapFromJSON(inv))
@@ -174,6 +183,9 @@ func (h *Handler) FinalizeInvoice(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "invoice_not_draft", "Invoice is not a draft.")
 		return
 	}
+	if !h.taxReadyToFinalize(w, &inv) {
+		return
+	}
 	inv.Status = "open"
 	inv.HostedInvoiceURL = fmt.Sprintf("https://invoice.stripe.com/i/%s", id)
 	h.store.Invoices.Set(id, inv)
@@ -196,6 +208,9 @@ func (h *Handler) SendInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if inv.Status == "draft" {
+		if !h.taxReadyToFinalize(w, &inv) {
+			return
+		}
 		inv.Status = "open"
 		inv.HostedInvoiceURL = fmt.Sprintf("https://invoice.stripe.com/i/%s", id)
 		h.emitEvent("invoice.finalized", mapFromJSON(inv))

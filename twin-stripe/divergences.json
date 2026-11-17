@@ -132,6 +132,12 @@
       "stripe": "A country with no registration is taxed zero (not_collecting) at a tax rate seen only as throwaway preview IDs; a registered country's rate is named after the jurisdiction Stripe's engine resolves",
       "app_emulator": "The not_collecting rate is one zero-percent rate per country, display_name Tax, otherwise shaped like the registered rate. jurisdiction is the country's English name for 40 common countries and the country code elsewhere",
       "reason": "Operator decision 2026-11-15: the app emulator holds no tax content; these fields were not captured"
+    },
+    {
+      "route": "POST /v1/quotes and POST /v1/payment_links, automatic_tax",
+      "stripe": "Refuses automatic_tax when Stripe Tax is not set up, and taxes the quote or payment link when it is",
+      "app_emulator": "Ignores automatic_tax: no refusal when tax is off, no tax when it is on",
+      "reason": "Operator decision 2026-11-15: quotes and payment links stay out of the Stripe Tax scope (quirk crud-018)"
     }
   ]
 }
