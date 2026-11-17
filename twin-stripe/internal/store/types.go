@@ -429,6 +429,11 @@ type InvoiceLine struct {
 	Period      *Period      `json:"period,omitempty"`
 	Type        string       `json:"type"` // subscription or invoiceitem
 	Taxes       []InvoiceTax `json:"taxes,omitempty"`
+
+	// PriceTaxBehavior is the line's price tax_behavior, for Stripe Tax. Not
+	// serialized; a line without one, or loaded from state, takes the account
+	// default.
+	PriceTaxBehavior string `json:"-"`
 }
 
 // DiscountAmount represents a discount amount on an invoice.

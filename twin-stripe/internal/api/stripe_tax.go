@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/wondertwin-ai/wondertwin/twin-stripe/internal/store"
@@ -158,4 +159,85 @@ var countryNames = map[string]string{
 	"LV": "Latvia", "MT": "Malta", "MX": "Mexico", "NL": "Netherlands", "NO": "Norway",
 	"NZ": "New Zealand", "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SE": "Sweden",
 	"SG": "Singapore", "SI": "Slovenia", "SK": "Slovakia", "US": "United States", "ZA": "South Africa",
+}
+
+// customerLocationMessage is Stripe's refusal to finalize an automatically
+// taxed invoice whose customer has no location (quirk error-008, 2026-11-15).
+const customerLocationMessage = "When `automatic_tax[enabled]=true`, enough customer location information must be provided to accurately determine tax rates for the customer."
+
+// applyInvoiceTax recomputes an invoice's tax and totals from its lines and
+// discounts: Stripe Tax when automatic_tax is enabled, else its default tax
+// rates. Called on every change, so a draft and its finalized invoice agree.
+func (h *Handler) applyInvoiceTax(inv *store.Invoice) {
+	var discount int64
+	for _, d := range inv.TotalDiscountAmounts {
+		discount += d.Amount
+	}
+	if inv.AutomaticTax.Enabled {
+		h.applyAutomaticTax(inv, discount)
+	} else {
+		inv.AutomaticTax = store.AutomaticTax{}
+		applyManualTaxes(inv, discount, inv.DefaultTaxRates)
+	}
+	inv.AmountDue = inv.Total - inv.AmountPaid
+	inv.AmountRemaining = inv.AmountDue
+}
+
+// applyAutomaticTax taxes an invoice through Stripe Tax. With lines and no
+// customer location it carries no tax and status requires_location_inputs,
+// and finalizing is refused; with no lines it is complete and untaxed, as
+// Stripe answered.
+func (h *Handler) applyAutomaticTax(inv *store.Invoice, discount int64) {
+	provider, status := "stripe", "complete"
+	inv.AutomaticTax = store.AutomaticTax{Enabled: true, Liability: map[string]any{"type": "self"}, Provider: &provider, Status: &status}
+
+	var amounts []int64
+	if inv.Lines != nil {
+		for _, l := range inv.Lines.Data {
+			amounts = append(amounts, l.Amount)
+		}
+	}
+	cus, _ := h.store.Customers.Get(inv.Customer)
+	country := customerTaxCountry(cus)
+	untaxed := len(amounts) == 0 || country == ""
+	if len(amounts) > 0 && country == "" {
+		status = "requires_location_inputs"
+	}
+
+	var taxed taxedLines
+	if !untaxed {
+		shares := spread(discount, amounts)
+		lines := make([]taxLine, len(amounts))
+		for i, a := range amounts {
+			lines[i] = taxLine{Amount: a - shares[i], TaxBehavior: inv.Lines.Data[i].PriceTaxBehavior}
+		}
+		taxed = h.automaticTaxes(country, inv.Currency, lines)
+	}
+	if inv.Lines != nil {
+		for i := range inv.Lines.Data {
+			inv.Lines.Data[i].Taxes = nil
+			if !untaxed {
+				inv.Lines.Data[i].Taxes = taxed.lineTaxes[i]
+			}
+		}
+	}
+	inv.TotalTaxes = taxed.totalTaxes
+	excluding := inv.Subtotal - discount - taxed.inclusiveTax
+	inv.TotalExcludingTax = &excluding
+	inv.Total = inv.Subtotal - discount + taxed.exclusiveTax
+}
+
+// taxReadyToFinalize recomputes a draft's tax, since its customer may have
+// changed, and refuses to finalize when Stripe Tax lacks the customer's
+// location. The invoice stays a draft.
+func (h *Handler) taxReadyToFinalize(w http.ResponseWriter, inv *store.Invoice) bool {
+	if !inv.AutomaticTax.Enabled {
+		return true
+	}
+	h.applyInvoiceTax(inv)
+	if inv.AutomaticTax.Status != nil && *inv.AutomaticTax.Status == "requires_location_inputs" {
+		writeError(w, http.StatusBadRequest, apiError{Type: "invalid_request_error", Code: "customer_tax_location_invalid", Message: customerLocationMessage})
+		return false
+	}
+	return true
 }

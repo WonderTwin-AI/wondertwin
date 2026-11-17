@@ -317,6 +317,20 @@ def case_error_missing_resource():
     eq(bool(err.error.doc_url), True, "doc_url")
 
 
+TAX_NOT_SET_UP = ("You must have a valid head office address to enable automatic tax calculation in test mode. "
+                  "Visit https://dashboard.stripe.com/test/settings/tax to update it.")
+
+
+def case_error_tax_not_set_up():
+    customer = v1.customers.create({"name": "No tax", "address": {"country": "CH"}})
+    err = expect_error(lambda: v1.invoices.create({"customer": customer.id, "automatic_tax": {"enabled": True}}),
+                       stripe.InvalidRequestError)
+    eq(err.http_status, 400, "status")
+    eq(err.code, None, "code")
+    eq(err.param, None, "param")
+    eq(err.user_message or str(err.error.message), TAX_NOT_SET_UP, "message")
+
+
 def case_error_unknown_bank_token():
     account = v1.accounts.create({"type": "custom", "country": "US"})
     err = expect_error(
@@ -407,6 +421,7 @@ CASES = {
     "deleted-customer-retrieve": case_deleted_customer_retrieve,
     "error-bad-key": case_error_bad_key,
     "error-missing-resource": case_error_missing_resource,
+    "error-tax-not-set-up": case_error_tax_not_set_up,
     "error-unknown-bank-token": case_error_unknown_bank_token,
     "error-declined-card": case_error_declined_card,
     "error-idempotency-mismatch": case_error_idempotency_mismatch,
