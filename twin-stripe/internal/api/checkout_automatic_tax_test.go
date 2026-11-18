@@ -113,3 +113,49 @@ func TestCheckoutAutomaticTaxOffUnchanged(t *testing.T) {
 		t.Errorf("automatic_tax = %v, want off", at)
 	}
 }
+
+// Retrieve and list render the stored breakdown when it is expanded, so
+// breakdown.taxes matches amount_tax after creation too.
+func TestCheckoutAutomaticTaxBreakdownOnRetrieveAndList(t *testing.T) {
+	_, tc := setupStripe(t)
+	seedTax(t, tc)
+	id, _ := autoCheckout(tc, taxCustomer(tc, "CH"), yearlyPrice(tc, "exclusive"), autoTax).JSONMap()["id"].(string)
+
+	check := func(name string, cs map[string]any) {
+		t.Helper()
+		td, _ := cs["total_details"].(map[string]any)
+		if num(td, "amount_tax") != 3791 {
+			t.Errorf("%s: total_details = %v", name, td)
+		}
+		b, _ := td["breakdown"].(map[string]any)
+		taxes, _ := b["taxes"].([]any)
+		if len(taxes) != 1 {
+			t.Fatalf("%s: breakdown taxes = %v", name, taxes)
+		}
+		tax := taxes[0].(map[string]any)
+		if num(tax, "amount") != 3791 || num(tax, "taxable_amount") != 46800 {
+			t.Errorf("%s: breakdown tax = %v", name, tax)
+		}
+		rate, _ := tax["rate"].(map[string]any)
+		if rate["object"] != "tax_rate" || rate["country"] != "CH" || rate["percentage"] != 8.1 {
+			t.Errorf("%s: breakdown rate = %v", name, rate)
+		}
+	}
+
+	got := stripeGet(tc, "/v1/checkout/sessions/"+id+"?expand[]=total_details.breakdown")
+	got.AssertStatus(200)
+	check("retrieve", got.JSONMap())
+
+	list := stripeGet(tc, "/v1/checkout/sessions?expand[]=data.total_details.breakdown")
+	list.AssertStatus(200)
+	data, _ := list.JSONMap()["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("list data = %v", data)
+	}
+	check("list", data[0].(map[string]any))
+
+	plain := stripeGet(tc, "/v1/checkout/sessions/"+id).JSONMap()
+	if b, _ := plain["total_details"].(map[string]any)["breakdown"].(map[string]any); b != nil && len(b["taxes"].([]any)) != 0 {
+		t.Errorf("retrieve rendered breakdown taxes without expand: %v", b)
+	}
+}

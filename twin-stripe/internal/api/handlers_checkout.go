@@ -109,7 +109,11 @@ func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
-	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
+	m := h.renderCheckoutSession(cs, expandRequested(r, "line_items"))
+	if expandRequested(r, "total_details.breakdown") {
+		h.addTaxBreakdown(m, cs)
+	}
+	twincore.JSON(w, http.StatusOK, m)
 }
 
 func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
@@ -119,9 +123,14 @@ func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	withItems := expandRequested(r, "data.line_items")
+	withBreakdown := expandRequested(r, "data.total_details.breakdown")
 	data := make([]map[string]any, 0, len(page.Data))
 	for _, cs := range page.Data {
-		data = append(data, h.renderCheckoutSession(cs, withItems))
+		m := h.renderCheckoutSession(cs, withItems)
+		if withBreakdown {
+			h.addTaxBreakdown(m, cs)
+		}
+		data = append(data, m)
 	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
