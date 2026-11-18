@@ -246,6 +246,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 				CurrentPeriodStart: now,
 				CurrentPeriodEnd:   now + 30*86400, // ~1 month
 				CollectionMethod:   "charge_automatically",
+				AutomaticTax:       subscriptionTax(cs.AutomaticTax != nil && cs.AutomaticTax.Enabled),
 				Livemode:           false,
 				Created:            now,
 				Items: &store.SubscriptionItems{

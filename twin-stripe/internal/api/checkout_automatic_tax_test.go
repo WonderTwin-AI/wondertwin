@@ -190,3 +190,42 @@ func TestCheckoutAutomaticTaxExpiredEventOmitsInternalBreakdown(t *testing.T) {
 		t.Fatalf("no checkout.session.expired event for %s in %v", id, events)
 	}
 }
+
+// Completing a taxed subscription session creates a subscription with
+// automatic tax on, whose first invoice is taxed and paid for amount_total.
+func TestCheckoutAutomaticTaxSubscriptionCompletion(t *testing.T) {
+	_, tc := setupStripe(t)
+	seedTax(t, tc)
+	price := yearlyPrice(tc, "exclusive")
+	cus := taxCustomer(tc, "CH")
+
+	cs := autoCheckout(tc, cus, price, autoTax).JSONMap()
+	tc.Post("/admin/checkout/sessions/"+cs["id"].(string)+"/complete", nil).AssertStatus(200)
+	got := stripeGet(tc, "/v1/checkout/sessions/"+cs["id"].(string)).JSONMap()
+	subResp := stripeGet(tc, "/v1/subscriptions/"+got["subscription"].(string))
+	subResp.AssertStatus(200)
+	sub := subResp.JSONMap()
+	if !reflect.DeepEqual(sub["automatic_tax"], subscriptionTaxOn) {
+		t.Errorf("subscription automatic_tax = %v, want %v", sub["automatic_tax"], subscriptionTaxOn)
+	}
+	inv := latestInvoice(tc, sub)
+	tt := totalTaxes(inv)
+	if len(tt) != 1 || num(tt[0], "amount") != 3791 {
+		t.Errorf("total_taxes = %v, want one 3791", tt)
+	}
+	if num(inv, "total") != num(cs, "amount_total") || num(inv, "total") != 50591 || num(inv, "amount_paid") != 50591 ||
+		num(inv, "amount_remaining") != 0 || inv["status"] != "paid" {
+		t.Errorf("invoice: status %v total %v paid %v remaining %v", inv["status"], inv["total"], inv["amount_paid"], inv["amount_remaining"])
+	}
+
+	plain := autoCheckout(tc, cus, price, "").JSONMap()
+	tc.Post("/admin/checkout/sessions/"+plain["id"].(string)+"/complete", nil).AssertStatus(200)
+	plainSubID := stripeGet(tc, "/v1/checkout/sessions/"+plain["id"].(string)).JSONMap()["subscription"].(string)
+	plainSub := stripeGet(tc, "/v1/subscriptions/"+plainSubID).JSONMap()
+	if at, _ := plainSub["automatic_tax"].(map[string]any); at["enabled"] != false {
+		t.Errorf("untaxed completion automatic_tax = %v", at)
+	}
+	if pinv := latestInvoice(tc, plainSub); num(pinv, "total") != 46800 || len(totalTaxes(pinv)) != 0 {
+		t.Errorf("untaxed completion invoice total %v total_taxes %v", pinv["total"], pinv["total_taxes"])
+	}
+}
