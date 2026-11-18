@@ -156,7 +156,7 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	cs.Status = "expired"
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
-	h.emitEvent("checkout.session.expired", mapFromJSON(cs))
+	h.emitEvent("checkout.session.expired", h.renderCheckoutSession(cs, false))
 	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 

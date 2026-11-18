@@ -159,3 +159,34 @@ func TestCheckoutAutomaticTaxBreakdownOnRetrieveAndList(t *testing.T) {
 		t.Errorf("retrieve rendered breakdown taxes without expand: %v", b)
 	}
 }
+
+// The expired event carries the rendered session, without the internal breakdown.
+func TestCheckoutAutomaticTaxExpiredEventOmitsInternalBreakdown(t *testing.T) {
+	_, tc := setupStripe(t)
+	seedTax(t, tc)
+	id, _ := autoCheckout(tc, taxCustomer(tc, "CH"), yearlyPrice(tc, "exclusive"), autoTax).JSONMap()["id"].(string)
+	stripePost(tc, "/v1/checkout/sessions/"+id+"/expire", nil).AssertStatus(200)
+
+	events, _ := stripeGet(tc, "/v1/events?type=checkout.session.expired").JSONMap()["data"].([]any)
+	found := false
+	for _, e := range events {
+		ev := e.(map[string]any)
+		if ev["type"] != "checkout.session.expired" {
+			continue
+		}
+		obj, _ := ev["data"].(map[string]any)["object"].(map[string]any)
+		if obj["id"] != id {
+			continue
+		}
+		found = true
+		if _, ok := obj["tax_breakdown"]; ok {
+			t.Errorf("expired event data.object carries internal tax_breakdown: %v", obj["tax_breakdown"])
+		}
+		if num(obj["total_details"].(map[string]any), "amount_tax") != 3791 {
+			t.Errorf("expired event total_details = %v", obj["total_details"])
+		}
+	}
+	if !found {
+		t.Fatalf("no checkout.session.expired event for %s in %v", id, events)
+	}
+}
