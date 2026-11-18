@@ -618,11 +618,11 @@ type CheckoutSession struct {
 	TotalDetails   *CheckoutTotalDetails `json:"total_details,omitempty"`
 	// TaxBreakdown backs total_details.breakdown.taxes, rendered only when
 	// expanded.
-	TaxBreakdown []InvoiceTax `json:"tax_breakdown,omitempty"`
-	ExpiresAt     int64              `json:"expires_at"`
-	Livemode      bool               `json:"livemode"`
-	Metadata      map[string]string  `json:"metadata,omitempty"`
-	Created       int64              `json:"created"`
+	TaxBreakdown []InvoiceTax      `json:"tax_breakdown,omitempty"`
+	ExpiresAt    int64             `json:"expires_at"`
+	Livemode     bool              `json:"livemode"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Created      int64             `json:"created"`
 }
 
 // CheckoutAutomaticTax is a checkout session's automatic_tax.
