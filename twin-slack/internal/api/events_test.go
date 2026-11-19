@@ -153,6 +153,9 @@ func TestPostedMessageIsDeliveredAsASignedEventCallback(t *testing.T) {
 	srv, tc := setupSlack(t)
 	rc := newReceiver(t)
 	ch := seedChannel(tc, "events")
+	// seedChannel queues a channel_created event; drain it before a Request
+	// URL exists, or the worker may deliver it there ahead of the message.
+	call(t, srv, "POST", "/admin/webhooks/flush", "", "", false)
 	configureEvents(t, srv, map[string]any{"request_url": rc.srv.URL, "signing_secret": "s3cret"})
 
 	_, posted := call(t, srv, "POST", "/api/chat.postMessage", formType, url.Values{"channel": {ch}, "text": {"hello"}}.Encode(), true)
