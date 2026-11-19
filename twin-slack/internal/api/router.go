@@ -186,6 +186,8 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Get("/admin/events/config", h.AdminEventsConfig)
 	r.Post("/admin/events/config", h.AdminEventsConfig)
 	r.Get("/admin/events/deliveries", h.AdminEventDeliveries)
+	// Socket Mode disconnect messages, which Slack sends on its own schedule.
+	r.Post("/admin/socket/disconnect", h.AdminSocketDisconnect)
 }
 
 // jsonContentType is the content type of every Web API answer.

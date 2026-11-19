@@ -870,8 +870,14 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		wasSocketMode := h.events.config().SocketMode
 		h.ConfigureEvents(cfg)
 		cfg = h.events.config()
+		// Turning Socket Mode off disables every connection, with the
+		// link_disabled message Slack sends when the toggle goes off.
+		if wasSocketMode && !cfg.SocketMode {
+			h.sockets.disconnect("link_disabled")
+		}
 	}
 	delays := make([]int64, len(cfg.RetryDelays))
 	for i, d := range cfg.RetryDelays {
