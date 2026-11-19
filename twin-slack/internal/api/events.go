@@ -362,25 +362,29 @@ func withEventDefaults(cfg EventsConfig) EventsConfig {
 }
 
 // adminState is the app emulator's state as POST /admin/reset, GET and
-// POST /admin/state see it: the store, plus the event bus on reset.
+// POST /admin/state see it: the store, plus the event bus and Socket Mode
+// connections on reset.
 type adminState struct {
 	*store.MemoryStore
-	events *eventBus
+	events  *eventBus
+	sockets *sockets
 }
 
 func (s adminState) Reset() {
 	s.MemoryStore.Reset()
 	s.events.reset()
+	s.sockets.reset()
 }
 
 // AdminState is the state the admin handler manages. Resetting it also
-// clears the Events API delivery log and drops queued events.
+// clears the Events API delivery log, drops queued events, and closes every
+// Socket Mode connection.
 func (h *Handler) AdminState() interface {
 	Snapshot() any
 	LoadState(data []byte) error
 	Reset()
 } {
-	return adminState{MemoryStore: h.store, events: h.events}
+	return adminState{MemoryStore: h.store, events: h.events, sockets: h.sockets}
 }
 
 // EventsFlusher is what the admin handler's /admin/webhooks/flush waits on.

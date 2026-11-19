@@ -17,13 +17,15 @@ type Handler struct {
 	store  *store.MemoryStore
 	mw     *twincore.Middleware
 	events *eventBus
+	// sockets holds Socket Mode tickets and connections.
+	sockets *sockets
 	// deliverMu keeps two calls from posting the same scheduled message.
 	deliverMu sync.Mutex
 }
 
 // NewHandler creates a new Slack API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw, events: newEventBus()}
+	return &Handler{store: s, mw: mw, events: newEventBus(), sockets: newSockets()}
 }
 
 // Routes mounts the Slack Web API-compatible routes.
@@ -162,6 +164,11 @@ func (h *Handler) Routes(r chi.Router) {
 	// A file's private URLs, which serve its bytes to a caller with a token.
 	r.Get(filesPath+"{teamFile}/{name}", h.ServeFile(false))
 	r.Get(filesPath+"{teamFile}/download/{name}", h.ServeFile(true))
+
+	// A Socket Mode URL, which apps.connections.open hands out. It lives
+	// outside /api, as it does on Slack's socket host, and its ticket is the
+	// credential.
+	r.Get(socketPath, h.SocketConnect)
 
 	// Admin extras (no auth required)
 	r.Get("/admin/messages", h.AdminListMessages)
