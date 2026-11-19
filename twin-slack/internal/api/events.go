@@ -296,16 +296,29 @@ func (b *eventBus) deliverSocket(job eventJob) {
 		return
 	}
 	rec := EventDelivery{EventID: job.id, EventType: job.typ, Transport: "socket", EnvelopeID: envelopeID()}
+	b.mu.Lock()
+	if job.gen != b.gen {
+		b.mu.Unlock()
+		return
+	}
+	b.deliveries = append(b.deliveries, rec)
+	b.mu.Unlock()
+	var sendErr string
 	if c := b.sockets.newest(); c == nil {
-		rec.Error = "no Socket Mode connection open"
+		sendErr = "no Socket Mode connection open"
 	} else if err := c.send(socketEnvelope(rec.EnvelopeID, job.body)); err != nil {
-		rec.Error = err.Error()
+		sendErr = err.Error()
+	}
+	if sendErr == "" {
+		return
 	}
 	b.mu.Lock()
-	if job.gen == b.gen {
-		b.deliveries = append(b.deliveries, rec)
+	defer b.mu.Unlock()
+	for i := range b.deliveries {
+		if b.deliveries[i].EnvelopeID == rec.EnvelopeID {
+			b.deliveries[i].Error = sendErr
+		}
 	}
-	b.mu.Unlock()
 }
 
 // ack records the app's acknowledgement of an envelope. An ack for an
