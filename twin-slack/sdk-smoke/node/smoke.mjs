@@ -11,11 +11,13 @@ import {readFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {createHmac} from 'node:crypto';
 import {WebClient, LogLevel, ErrorCode} from '@slack/web-api';
+import {SocketModeClient, LogLevel as SMLogLevel} from '@slack/socket-mode';
 
 const base = (process.env.SLACK_EMULATOR_URL || 'http://localhost:4197').replace(/\/$/, '');
 const TOKEN = 'xoxb-sdk-smoke-node';
 const pkg = JSON.parse(readFileSync(new URL('./node_modules/@slack/web-api/package.json', import.meta.url)));
-const sdk = `@slack/web-api ${pkg.version}`;
+const smPkg = JSON.parse(readFileSync(new URL('./node_modules/@slack/socket-mode/package.json', import.meta.url)));
+const sdk = `@slack/web-api ${pkg.version}, @slack/socket-mode ${smPkg.version}`;
 
 const web = new WebClient(TOKEN, {
   slackApiUrl: `${base}/api/`,
@@ -301,6 +303,46 @@ const cases = {
     assert.equal((await doomed.auth.revoke()).revoked, true);
     assert.equal(await platformError(() => doomed.auth.test()), 'token_revoked');
     assert.equal((await web.auth.test()).ok, true);
+  },
+
+  async 'slack-socket-mode'() {
+    // start() resolves only after the hello, so the connection is open before
+    // the message is posted.
+    const channel = await newChannel();
+    const admin = (path, body) => fetch(`${base}${path}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    await admin('/admin/webhooks/flush', {});
+    assert.equal((await admin('/admin/events/config', {socket_mode: true})).status, 200);
+    const sm = new SocketModeClient({
+      appToken: 'xapp-1-A_SIM-1-smoke-node',
+      clientOptions: {slackApiUrl: `${base}/api/`},
+      logLevel: SMLogLevel.ERROR,
+    });
+    try {
+      const arrived = new Promise((resolve) => {
+        sm.on('message', async ({event, body, ack, retry_num}) => {
+          await ack();
+          resolve({event, body, retry_num});
+        });
+      });
+      await sm.start();
+      await web.chat.postMessage({channel, text: 'over socket mode'});
+      const got = await Promise.race([arrived, new Promise((_, reject) => setTimeout(() => reject(new Error('no envelope within 5s')), 5000))]);
+      assert.equal(got.body.type, 'event_callback');
+      assert.equal(got.event.text, 'over socket mode');
+      assert.equal(got.retry_num, 0);
+      let acked = false;
+      for (let i = 0; i < 100 && !acked; i++) {
+        const {deliveries} = await (await fetch(`${base}/admin/events/deliveries`)).json();
+        acked = deliveries.some((d) => d.transport === 'socket' && d.acked);
+        if (!acked) await new Promise((r) => setTimeout(r, 25));
+      }
+      assert.ok(acked, 'the app emulator logs the ack');
+    } finally {
+      await sm.disconnect();
+      await admin('/admin/events/config', {socket_mode: false});
+    }
   },
 
   async 'error-not-authed'() {
