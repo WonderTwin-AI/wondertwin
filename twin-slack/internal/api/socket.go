@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -120,10 +122,19 @@ func (s *sockets) add(c *socketConn) int {
 }
 
 // full reports whether the app holds as many connections as Slack allows.
+// Retiring connections do not count, so a refresh_requested hand-off works
+// at the limit. Whether Slack counts them is undocumented; this is a labelled
+// guess (socket-007).
 func (s *sockets) full() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return len(s.conns) >= maxSocketConnections
+	n := 0
+	for _, c := range s.conns {
+		if !c.retiring {
+			n++
+		}
+	}
+	return n >= maxSocketConnections
 }
 
 // disconnect sends a disconnect message with reason to every open connection
@@ -346,11 +357,9 @@ func (h *Handler) AdminSocketDisconnect(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Reason string `json:"reason"`
 	}
-	if r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			twincore.Error(w, http.StatusBadRequest, "invalid JSON body")
-			return
-		}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		twincore.Error(w, http.StatusBadRequest, "invalid JSON body")
+		return
 	}
 	switch req.Reason {
 	case "":
