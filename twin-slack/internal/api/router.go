@@ -25,7 +25,10 @@ type Handler struct {
 
 // NewHandler creates a new Slack API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
-	return &Handler{store: s, mw: mw, events: newEventBus(), sockets: newSockets()}
+	socks := newSockets()
+	events := newEventBus()
+	events.sockets = socks
+	return &Handler{store: s, mw: mw, events: events, sockets: socks}
 }
 
 // Routes mounts the Slack Web API-compatible routes.

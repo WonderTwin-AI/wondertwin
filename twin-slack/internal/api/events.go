@@ -50,6 +50,9 @@ type EventsConfig struct {
 	// RetryDelays are the waits before each retry. There is one retry per
 	// entry, so the default three entries give four attempts.
 	RetryDelays []time.Duration
+	// SocketMode sends events over Socket Mode connections instead of to the
+	// Request URL, which is kept for when Socket Mode is turned off again.
+	SocketMode bool
 }
 
 // EventDelivery records one delivery attempt.
@@ -61,6 +64,11 @@ type EventDelivery struct {
 	RetryReason string `json:"retry_reason,omitempty"`
 	StatusCode  int    `json:"status_code"`
 	Error       string `json:"error,omitempty"`
+	// Transport is socket for a Socket Mode delivery, which has an envelope
+	// and is acked rather than answered with a status.
+	Transport  string `json:"transport,omitempty"`
+	EnvelopeID string `json:"envelope_id,omitempty"`
+	Acked      bool   `json:"acked,omitempty"`
 }
 
 // slackSigner signs a body the way Slack signs requests to an app:
@@ -115,6 +123,8 @@ type eventBus struct {
 	resetCh chan struct{}
 	jobs    chan eventJob
 	pending sync.WaitGroup
+	// sockets carries events while Socket Mode is on.
+	sockets *sockets
 }
 
 func newEventBus() *eventBus {
@@ -223,6 +233,10 @@ func (b *eventBus) run() {
 
 // deliver makes the first attempt and Slack's retries, until one succeeds.
 func (b *eventBus) deliver(job eventJob) {
+	if b.config().SocketMode {
+		b.deliverSocket(job)
+		return
+	}
 	delays := b.config().RetryDelays
 	reason := ""
 	for retry := 0; retry <= len(delays); retry++ {
@@ -271,6 +285,39 @@ func (b *eventBus) attempt(job eventJob, retry int, reason string) (EventDeliver
 	// does a failure the receiver answered with x-slack-no-retry: 1, which
 	// asks Slack not to redeliver this event.
 	return rec, !sent || noRetry || (err == nil && rec.StatusCode >= 200 && rec.StatusCode < 300)
+}
+
+// deliverSocket sends an event as one events_api envelope on the newest open
+// connection. It is sent once and never resent, acked or not. With no
+// connection open the event is dropped, as Slack warns events may be lost
+// until the app connects (socket-019).
+func (b *eventBus) deliverSocket(job eventJob) {
+	if !b.current(job) {
+		return
+	}
+	rec := EventDelivery{EventID: job.id, EventType: job.typ, Transport: "socket", EnvelopeID: envelopeID()}
+	if c := b.sockets.newest(); c == nil {
+		rec.Error = "no Socket Mode connection open"
+	} else if err := c.send(socketEnvelope(rec.EnvelopeID, job.body)); err != nil {
+		rec.Error = err.Error()
+	}
+	b.mu.Lock()
+	if job.gen == b.gen {
+		b.deliveries = append(b.deliveries, rec)
+	}
+	b.mu.Unlock()
+}
+
+// ack records the app's acknowledgement of an envelope. An ack for an
+// envelope the log does not hold is ignored.
+func (b *eventBus) ack(envelopeID string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i := range b.deliveries {
+		if b.deliveries[i].EnvelopeID == envelopeID {
+			b.deliveries[i].Acked = true
+		}
+	}
 }
 
 // wait sleeps before a retry. It returns false if a reset came first.
@@ -757,8 +804,9 @@ func echoed(answer []byte) string {
 }
 
 // AdminEventsConfig handles GET and POST /admin/events/config. POST takes any
-// of request_url, signing_secret, verification_token and retry_delays_ms, and
-// leaves the others as they are. A non-empty request_url must pass Slack's
+// of request_url, signing_secret, verification_token, retry_delays_ms and
+// socket_mode, and leaves the others as they are. With socket_mode on, events
+// go to Socket Mode connections and not to the Request URL, which is kept. A non-empty request_url must pass Slack's
 // url_verification handshake, or nothing changes. The --webhook-url flag sets
 // the Request URL at startup without one, since the app may not be up yet.
 func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
@@ -769,6 +817,7 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 			SigningSecret     *string `json:"signing_secret"`
 			VerificationToken *string `json:"verification_token"`
 			RetryDelaysMS     []int   `json:"retry_delays_ms"`
+			SocketMode        *bool   `json:"socket_mode"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			twincore.Error(w, http.StatusBadRequest, "invalid JSON body")
@@ -794,6 +843,9 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 			}
 			cfg.RetryDelays = delays
 		}
+		if req.SocketMode != nil {
+			cfg.SocketMode = *req.SocketMode
+		}
 		// The handshake is signed with the settings later deliveries use.
 		cfg = withEventDefaults(cfg)
 		if req.RequestURL != nil && cfg.RequestURL != "" {
@@ -814,6 +866,7 @@ func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 		"signing_secret":     cfg.SigningSecret,
 		"verification_token": cfg.VerificationToken,
 		"retry_delays_ms":    delays,
+		"socket_mode":        cfg.SocketMode,
 	})
 }
 
