@@ -296,6 +296,10 @@ func (b *eventBus) deliverSocket(job eventJob) {
 		return
 	}
 	rec := EventDelivery{EventID: job.id, EventType: job.typ, Transport: "socket", EnvelopeID: envelopeID()}
+	c := b.sockets.newest()
+	if c == nil {
+		rec.Error = "no Socket Mode connection open"
+	}
 	b.mu.Lock()
 	if job.gen != b.gen {
 		b.mu.Unlock()
@@ -303,20 +307,18 @@ func (b *eventBus) deliverSocket(job eventJob) {
 	}
 	b.deliveries = append(b.deliveries, rec)
 	b.mu.Unlock()
-	var sendErr string
-	if c := b.sockets.newest(); c == nil {
-		sendErr = "no Socket Mode connection open"
-	} else if err := c.send(socketEnvelope(rec.EnvelopeID, job.body)); err != nil {
-		sendErr = err.Error()
+	if c == nil {
+		return
 	}
-	if sendErr == "" {
+	err := c.send(socketEnvelope(rec.EnvelopeID, job.body))
+	if err == nil {
 		return
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for i := range b.deliveries {
 		if b.deliveries[i].EnvelopeID == rec.EnvelopeID {
-			b.deliveries[i].Error = sendErr
+			b.deliveries[i].Error = err.Error()
 		}
 	}
 }
