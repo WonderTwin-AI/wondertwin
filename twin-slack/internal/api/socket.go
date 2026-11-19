@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -35,6 +36,7 @@ const (
 // socketConn is one open Socket Mode connection.
 type socketConn struct {
 	id   string
+	seq  int
 	conn *websocket.Conn
 	// done is cancelled when the connection closes, from either side.
 	ctx  context.Context
@@ -47,6 +49,8 @@ type sockets struct {
 	mu      sync.Mutex
 	tickets map[string]bool
 	conns   map[string]*socketConn
+	// opened counts connections, so the newest is known.
+	opened int
 }
 
 func newSockets() *sockets {
@@ -78,8 +82,25 @@ func (s *sockets) redeem(ticket string) bool {
 func (s *sockets) add(c *socketConn) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.opened++
+	c.seq = s.opened
 	s.conns[c.id] = c
 	return len(s.conns)
+}
+
+// newest is the connection opened last, or nil with none open. Slack says only
+// that a payload may go to any open connection (socket-009); the newest is the
+// one an SDK keeps after replacing a connection, so envelopes go there.
+func (s *sockets) newest() *socketConn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var newest *socketConn
+	for _, c := range s.conns {
+		if newest == nil || c.seq > newest.seq {
+			newest = c
+		}
+	}
+	return newest
 }
 
 func (s *sockets) remove(c *socketConn) {
@@ -171,11 +192,18 @@ func (h *Handler) SocketConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reading answers the app's pings with pongs echoing their payload and
-	// replies to its close. Acks are read here too, until a later slice acts
-	// on them.
+	// replies to its close. An ack may arrive on any connection, including
+	// one other than the envelope's, as the SDKs send it on whichever is open.
 	for {
-		if _, _, err := conn.Read(ctx); err != nil {
+		_, data, err := conn.Read(ctx)
+		if err != nil {
 			return
+		}
+		var ack struct {
+			EnvelopeID string `json:"envelope_id"`
+		}
+		if json.Unmarshal(data, &ack) == nil && ack.EnvelopeID != "" {
+			h.events.ack(ack.EnvelopeID)
 		}
 	}
 }
@@ -202,6 +230,26 @@ func socketHello(appID string, numConnections int) map[string]any {
 			"approximate_connection_time": approximateConnectionTime,
 		},
 	}
+}
+
+// socketEnvelope wraps an event_callback for Socket Mode. The payload is the
+// body HTTP delivery would POST (socket-003); an envelope is never resent, so
+// retry_attempt is always 0 (socket-002).
+func socketEnvelope(envelopeID string, body []byte) map[string]any {
+	return map[string]any{
+		"envelope_id":              envelopeID,
+		"type":                     "events_api",
+		"payload":                  json.RawMessage(body),
+		"accepts_response_payload": false,
+		"retry_attempt":            0,
+		"retry_reason":             "",
+	}
+}
+
+// envelopeID is shaped like Slack's, a UUID.
+func envelopeID() string {
+	h := randomHex(16)
+	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 }
 
 func randomHex(n int) string {
