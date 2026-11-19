@@ -500,3 +500,23 @@ func TestNewMiddleware(t *testing.T) {
 		t.Error("expected non-nil Idempotent")
 	}
 }
+
+func TestRequestLogLetsHandlersHijack(t *testing.T) {
+	mw := NewMiddleware(&Config{}, slog.Default())
+	hijacked := make(chan error, 1)
+	srv := httptest.NewServer(mw.RequestLog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, _, err := http.NewResponseController(w).Hijack()
+		if err == nil {
+			conn.Close()
+		}
+		hijacked <- err
+	})))
+	defer srv.Close()
+
+	if resp, err := http.Get(srv.URL); err == nil {
+		resp.Body.Close()
+	}
+	if err := <-hijacked; err != nil {
+		t.Fatalf("hijack through RequestLog: %v", err)
+	}
+}

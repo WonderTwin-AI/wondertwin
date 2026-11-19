@@ -229,6 +229,12 @@ func (sr *statusRecorder) WriteHeader(code int) {
 	sr.ResponseWriter.WriteHeader(code)
 }
 
+// Unwrap gives http.ResponseController and WebSocket libraries the server's
+// own writer, so a handler can still hijack the connection or flush.
+func (sr *statusRecorder) Unwrap() http.ResponseWriter {
+	return sr.ResponseWriter
+}
+
 // RequestLog middleware captures request details into the ring buffer.
 func (m *Middleware) RequestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

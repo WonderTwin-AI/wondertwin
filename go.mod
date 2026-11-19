@@ -3,6 +3,7 @@ module github.com/wondertwin-ai/wondertwin
 go 1.26.11
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/google/go-github/v92 v92.0.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
