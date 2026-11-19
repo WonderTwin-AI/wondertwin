@@ -821,8 +821,9 @@ func echoed(answer []byte) string {
 // AdminEventsConfig handles GET and POST /admin/events/config. POST takes any
 // of request_url, signing_secret, verification_token, retry_delays_ms and
 // socket_mode, and leaves the others as they are. With socket_mode on, events
-// go to Socket Mode connections and not to the Request URL, which is kept. A non-empty request_url must pass Slack's
-// url_verification handshake, or nothing changes. The --webhook-url flag sets
+// go to Socket Mode connections and not to the Request URL, which is kept. A
+// non-empty request_url must pass Slack's url_verification handshake, or
+// nothing changes. The --webhook-url flag sets
 // the Request URL at startup without one, since the app may not be up yet.
 func (h *Handler) AdminEventsConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := h.events.config()
