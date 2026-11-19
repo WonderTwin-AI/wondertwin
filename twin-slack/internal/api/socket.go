@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,6 +105,38 @@ func (s *sockets) reset() {
 			c.done()
 		}()
 	}
+}
+
+// AppsConnectionsOpen handles /api/apps.connections.open, which gives an app a
+// new Socket Mode URL on every call; each SDK calls it again before every
+// reconnect. Only an app-level token may call it, and only in the
+// Authorization header. Which error Slack gives a bot or user token
+// (socket-010) and a token sent as a POST parameter (socket-011) is not
+// documented: this answers not_allowed_token_type and not_authed.
+func (h *Handler) AppsConnectionsOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Authorization") == "" {
+		slackError(w, "not_authed")
+		return
+	}
+	if principal(r).Type != store.TokenApp {
+		slackError(w, "not_allowed_token_type")
+		return
+	}
+	slackOK(w, map[string]any{"url": h.socketURL(r)})
+}
+
+// socketURL is a new Socket Mode URL on the host the app called, so it
+// reaches this emulator however it is fronted: wss when the app called over
+// https, ws otherwise.
+func (h *Handler) socketURL(r *http.Request) string {
+	base := origin(r)
+	if rest, ok := strings.CutPrefix(base, "https://"); ok {
+		base = "wss://" + rest
+	} else {
+		base = "ws://" + strings.TrimPrefix(base, "http://")
+	}
+	// ticket comes first, as in Slack's example URL.
+	return base + socketPath + "?ticket=" + h.sockets.issueTicket() + "&app_id=" + url.QueryEscape(store.DefaultAppID)
 }
 
 // SocketConnect serves the WebSocket a Socket Mode URL points at. The ticket
