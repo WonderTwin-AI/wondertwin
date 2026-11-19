@@ -69,6 +69,28 @@ func TestSocketDisconnect(t *testing.T) {
 		closedNormally(t, ctx, old)
 	})
 
+	t.Run("refresh_requested lets a replacement open at the limit", func(t *testing.T) {
+		srv, _ := setupSlack(t)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		for range 10 {
+			openSocket(t, ctx, srv)
+		}
+		if status, m := socketDisconnect(t, srv, `{"reason":"refresh_requested"}`); status != 200 || m["connections"] != float64(10) {
+			t.Fatalf("disconnect: %d %v", status, m)
+		}
+		m := connectionsOpen(t, srv.URL, http.Header{"Authorization": {"Bearer xapp-1-A_SIM-1-secret"}}, "")
+		if m["ok"] != true {
+			t.Fatalf("apps.connections.open with ten retiring: %v, want ok", m)
+		}
+		raw, _ := m["url"].(string)
+		conn, _, err := dialSocket(t, ctx, raw)
+		if err != nil {
+			t.Fatalf("dial %s: %v", raw, err)
+		}
+		readHello(t, ctx, conn)
+	})
+
 	t.Run("link_disabled closes the connection", func(t *testing.T) {
 		srv, _ := setupSlack(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
