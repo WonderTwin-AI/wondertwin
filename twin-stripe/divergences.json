@@ -144,6 +144,12 @@
       "stripe": "create_prorations adds pending proration items to the next invoice and always_invoice invoices them at once; each item gets its own credit and charge line, taxed at its price's tax_behavior",
       "app_emulator": "Both create_prorations and always_invoice invoice the proration at once, paid. The subscription's items are combined into one credit line and one charge line, each taxed at the first item's tax_behavior",
       "reason": "Proration predates Stripe Tax here; stripe-bp2-s05 taxes these lines and keeps their shape, which matches Stripe for single-item subscriptions"
+    },
+    {
+      "route": "POST /v1/checkout/sessions, automatic_tax with no customer location",
+      "stripe": "Checkout collects the address on its hosted page and calculates tax once it has it",
+      "app_emulator": "There is no hosted page, so the session is created with automatic_tax.status requires_location_inputs, no tax, and an untaxed amount_total. Completing it through POST /admin/checkout/sessions/{id}/complete stays untaxed: payment mode charges the untaxed amount_total, and subscription mode creates a subscription with automatic_tax enabled whose first invoice is paid untaxed with automatic_tax.status requires_location_inputs",
+      "reason": "Checkout's hosted page is out of scope for the app emulator, and Stripe's answer for this case was not captured; tax handling is critical, so the difference is declared rather than left implicit"
     }
   ]
 }

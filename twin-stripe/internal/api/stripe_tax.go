@@ -266,3 +266,62 @@ func subscriptionTax(enabled bool) store.SubscriptionTax {
 	}
 	return store.SubscriptionTax{Enabled: true, Liability: map[string]any{"type": "self"}}
 }
+
+// applyCheckoutTax taxes a checkout session through Stripe Tax: amount_total
+// includes exclusive tax and total_details.amount_tax is the tax. Without a
+// customer location the session waits for the address Checkout collects.
+func (h *Handler) applyCheckoutTax(cs *store.CheckoutSession) {
+	provider, status := "stripe", "complete"
+	var lines []taxLine
+	var subtotal int64
+	for _, li := range cs.LineItems {
+		p, ok := h.store.Prices.Get(li.Price)
+		if !ok {
+			continue
+		}
+		amount := p.UnitAmount * li.Quantity
+		subtotal += amount
+		lines = append(lines, taxLine{Amount: amount, TaxBehavior: p.TaxBehavior})
+	}
+	var country string
+	if cus, ok := h.store.Customers.Get(cs.Customer); ok {
+		country = customerTaxCountry(cus)
+	}
+
+	var taxed taxedLines
+	switch {
+	case len(lines) > 0 && country == "":
+		status = "requires_location_inputs"
+	case len(lines) > 0:
+		currency := cs.Currency
+		if currency == "" {
+			currency = "usd"
+		}
+		taxed = h.automaticTaxes(country, currency, lines)
+	}
+	cs.AutomaticTax = &store.CheckoutAutomaticTax{Enabled: true, Liability: map[string]any{"type": "self"}, Provider: &provider, Status: &status}
+	cs.AmountSubtotal = &subtotal
+	cs.AmountTotal = subtotal + taxed.exclusiveTax
+	cs.TotalDetails = &store.CheckoutTotalDetails{AmountTax: taxed.exclusiveTax + taxed.inclusiveTax}
+	cs.TaxBreakdown = taxed.totalTaxes
+}
+
+// addTaxBreakdown renders total_details.breakdown, each tax embedding its full
+// tax_rate object (quirk crud-016).
+func (h *Handler) addTaxBreakdown(m map[string]any, cs store.CheckoutSession) {
+	td, ok := m["total_details"].(map[string]any)
+	if !ok {
+		return
+	}
+	taxes := make([]map[string]any, 0, len(cs.TaxBreakdown))
+	for _, t := range cs.TaxBreakdown {
+		var rate any = t.TaxRateDetails.TaxRate
+		if tr, ok := h.store.StripeTaxRates.Get(t.TaxRateDetails.TaxRate); ok {
+			rate = tr
+		}
+		taxes = append(taxes, map[string]any{
+			"amount": t.Amount, "rate": rate, "taxability_reason": t.TaxabilityReason, "taxable_amount": t.TaxableAmount,
+		})
+	}
+	td["breakdown"] = map[string]any{"discounts": []any{}, "taxes": taxes}
+}

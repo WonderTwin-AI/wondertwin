@@ -18,6 +18,9 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		stripeError(w, http.StatusBadRequest, "invalid_request_error", "parse_error", err.Error())
 		return
 	}
+	if !h.requireTaxSetUp(w, r, true) {
+		return
+	}
 
 	id := h.store.StripeID(h.store.CheckoutSessions.NextID())
 	now := h.store.Now()
@@ -86,9 +89,17 @@ func (h *Handler) CreateCheckoutSession(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	if automaticTaxRequested(r) {
+		h.applyCheckoutTax(&cs)
+	}
+
 	h.store.CheckoutSessions.Set(id, cs)
 	h.emitEvent("checkout.session.created", h.renderCheckoutSession(cs, false))
-	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
+	m := h.renderCheckoutSession(cs, expandRequested(r, "line_items"))
+	if expandRequested(r, "total_details.breakdown") {
+		h.addTaxBreakdown(m, cs)
+	}
+	twincore.JSON(w, http.StatusOK, m)
 }
 
 func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +109,11 @@ func (h *Handler) GetCheckoutSession(w http.ResponseWriter, r *http.Request) {
 		stripeError(w, http.StatusNotFound, "invalid_request_error", "resource_missing", "No such checkout session: "+id)
 		return
 	}
-	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
+	m := h.renderCheckoutSession(cs, expandRequested(r, "line_items"))
+	if expandRequested(r, "total_details.breakdown") {
+		h.addTaxBreakdown(m, cs)
+	}
+	twincore.JSON(w, http.StatusOK, m)
 }
 
 func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
@@ -108,9 +123,14 @@ func (h *Handler) ListCheckoutSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	withItems := expandRequested(r, "data.line_items")
+	withBreakdown := expandRequested(r, "data.total_details.breakdown")
 	data := make([]map[string]any, 0, len(page.Data))
 	for _, cs := range page.Data {
-		data = append(data, h.renderCheckoutSession(cs, withItems))
+		m := h.renderCheckoutSession(cs, withItems)
+		if withBreakdown {
+			h.addTaxBreakdown(m, cs)
+		}
+		data = append(data, m)
 	}
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"object":   "list",
@@ -136,7 +156,7 @@ func (h *Handler) ExpireCheckoutSession(w http.ResponseWriter, r *http.Request) 
 	cs.Status = "expired"
 	cs.URL = ""
 	h.store.CheckoutSessions.Set(id, cs)
-	h.emitEvent("checkout.session.expired", mapFromJSON(cs))
+	h.emitEvent("checkout.session.expired", h.renderCheckoutSession(cs, false))
 	twincore.JSON(w, http.StatusOK, h.renderCheckoutSession(cs, expandRequested(r, "line_items")))
 }
 
@@ -226,6 +246,7 @@ func (h *Handler) AdminCompleteCheckoutSession(w http.ResponseWriter, r *http.Re
 				CurrentPeriodStart: now,
 				CurrentPeriodEnd:   now + 30*86400, // ~1 month
 				CollectionMethod:   "charge_automatically",
+				AutomaticTax:       subscriptionTax(cs.AutomaticTax != nil && cs.AutomaticTax.Enabled),
 				Livemode:           false,
 				Created:            now,
 				Items: &store.SubscriptionItems{
@@ -333,6 +354,7 @@ func (h *Handler) ListPaymentLinks(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderCheckoutSession(cs store.CheckoutSession, withLineItems bool) map[string]any {
 	m := mapFromJSON(cs)
 	delete(m, "line_items")
+	delete(m, "tax_breakdown")
 	if withLineItems {
 		m["line_items"] = h.checkoutLineItemList(cs)
 	}
