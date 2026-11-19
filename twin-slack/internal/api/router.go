@@ -59,6 +59,9 @@ func (h *Handler) Routes(r chi.Router) {
 			route(r, "auth.test", h.AuthTest)
 			route(r, "auth.revoke", h.AuthRevoke)
 
+			// apps.*
+			route(r, "apps.connections.open", h.AppsConnectionsOpen)
+
 			// chat.*
 			route(r, "chat.postMessage", h.ChatPostMessage)
 			route(r, "chat.postEphemeral", h.ChatPostEphemeral)
