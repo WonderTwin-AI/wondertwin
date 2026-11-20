@@ -1,13 +1,17 @@
 // Package store defines the PostHog twin's state types and in-memory store.
 package store
 
-// CapturedEvent represents a PostHog analytics event.
-type CapturedEvent struct {
+// StoredEvent is an analytics event the emulator holds after capture. Token is
+// the project key the event arrived under; ReceivedAt is read from the
+// emulator clock, so it is deterministic when the clock is seeded.
+type StoredEvent struct {
 	UUID       string         `json:"uuid"`
 	Event      string         `json:"event"`
 	DistinctID string         `json:"distinct_id"`
 	Properties map[string]any `json:"properties,omitempty"`
 	Timestamp  string         `json:"timestamp"`
+	Token      string         `json:"token"`
+	ReceivedAt string         `json:"received_at"`
 }
 
 // FeatureFlag represents a PostHog feature flag configuration.

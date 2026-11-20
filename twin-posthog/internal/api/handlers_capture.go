@@ -89,7 +89,8 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	if captureKey == "" {
 		captureKey = formKey
 	}
-	if resolveAPIKey(r, captureKey, req.Properties) == "" {
+	token := resolveAPIKey(r, captureKey, req.Properties)
+	if token == "" {
 		noKeyError(w)
 		return
 	}
@@ -102,7 +103,7 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.storeEvent(req)
+	h.storeEvent(req, token)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"status": 1,
@@ -152,7 +153,11 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range req.Batch {
-		h.storeEvent(event)
+		token := eventKey(event)
+		if token == "" {
+			token = resolveAPIKey(r, envelopeKey, nil)
+		}
+		h.storeEvent(event, token)
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
@@ -229,7 +234,7 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeEvent saves a captured event to the store and processes special event types.
-func (h *Handler) storeEvent(req captureRequest) {
+func (h *Handler) storeEvent(req captureRequest, token string) {
 	now := h.store.Clock.Now()
 
 	ts := req.Timestamp
@@ -239,12 +244,14 @@ func (h *Handler) storeEvent(req captureRequest) {
 
 	id := h.store.Events.NextID()
 
-	evt := store.CapturedEvent{
+	evt := store.StoredEvent{
 		UUID:       id,
 		Event:      req.Event,
 		DistinctID: req.DistinctID,
 		Properties: req.Properties,
 		Timestamp:  ts,
+		Token:      token,
+		ReceivedAt: now.Format(time.RFC3339),
 	}
 
 	h.store.Events.Set(id, evt)
@@ -385,7 +392,7 @@ func (h *Handler) AdminListEvents(w http.ResponseWriter, r *http.Request) {
 	events := h.store.Events.List()
 
 	if eventFilter != "" || distinctIDFilter != "" {
-		var filtered []store.CapturedEvent
+		var filtered []store.StoredEvent
 		for _, evt := range events {
 			if eventFilter != "" && evt.Event != eventFilter {
 				continue

@@ -9,7 +9,7 @@ import (
 
 // MemoryStore holds all PostHog twin state in memory.
 type MemoryStore struct {
-	Events  *pkgstate.Store[CapturedEvent]
+	Events  *pkgstate.Store[StoredEvent]
 	Persons *pkgstate.Store[Person]
 	Aliases *pkgstate.Store[AliasMapping]
 	Groups  *pkgstate.Store[Group]
@@ -22,7 +22,7 @@ type MemoryStore struct {
 // New creates a new MemoryStore with empty state.
 func New() *MemoryStore {
 	return &MemoryStore{
-		Events:       pkgstate.New[CapturedEvent]("evt"),
+		Events:       pkgstate.New[StoredEvent]("evt"),
 		Persons:      pkgstate.New[Person]("per"),
 		Aliases:      pkgstate.New[AliasMapping]("als"),
 		Groups:       pkgstate.New[Group]("grp"),
@@ -68,11 +68,11 @@ func (s *MemoryStore) SetFeatureFlags(flags []FeatureFlag) {
 
 // stateSnapshot is the JSON-serializable state for admin endpoints.
 type stateSnapshot struct {
-	Events       map[string]CapturedEvent `json:"events"`
-	Persons      map[string]Person        `json:"persons"`
-	Aliases      map[string]AliasMapping  `json:"aliases"`
-	Groups       map[string]Group         `json:"groups"`
-	FeatureFlags map[string]FeatureFlag   `json:"feature_flags"`
+	Events       map[string]StoredEvent  `json:"events"`
+	Persons      map[string]Person       `json:"persons"`
+	Aliases      map[string]AliasMapping `json:"aliases"`
+	Groups       map[string]Group        `json:"groups"`
+	FeatureFlags map[string]FeatureFlag  `json:"feature_flags"`
 }
 
 // Snapshot returns the full state as a JSON-serializable value.
