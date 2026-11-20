@@ -15,10 +15,15 @@ import (
 const (
 	msgNoAPIKey     = "event submitted without an api_key"
 	msgNoPayload    = "request missing data payload"
+	msgNoDistinctID = "event submitted without a distinct_id"
+	msgEmptyBatch   = "request holds no event"
 	msgNoEventName  = "failed to hydrate events from request: non-engage request missing event name attribute"
 	msgParsePrefix  = "failed to parse request: "
 	msgBodyTooLarge = "request body exceeds the maximum ingest size"
 )
+
+// maxDistinctIDLen is the length a distinct_id is cut to (ph-ee-002).
+const maxDistinctIDLen = 200
 
 // ingestText writes a text/plain capture rejection.
 func ingestText(w http.ResponseWriter, status int, msg string) {
