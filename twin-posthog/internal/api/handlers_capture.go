@@ -114,14 +114,35 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Event == "" {
-		ingestText(w, http.StatusBadRequest, msgNoEventName)
+	if msg := validateIngestEvent(&req); msg != "" {
+		ingestText(w, http.StatusBadRequest, msg)
 		return
 	}
 
 	h.storeEvent(req, token)
 
 	ingestOK(w)
+}
+
+// validateIngestEvent applies the checks every capture route makes on one
+// event, in the order the capture service reports them: an event name, then a
+// distinct_id (its own field, else inside properties). It cuts a distinct_id
+// over 200 characters to 200 (ph-ee-002, a hypothesis from the docs, not
+// observed) and returns the text/plain rejection, or "" when the event is
+// accepted. The rejections are observed on /i/v0/e/ (ph-ee-014); /capture/
+// and /e/ share them by the same service (INFERENCE).
+func validateIngestEvent(e *captureRequest) string {
+	if e.Event == "" {
+		return msgNoEventName
+	}
+	e.DistinctID = distinctIDOf(*e)
+	if e.DistinctID == "" {
+		return msgNoDistinctID
+	}
+	if r := []rune(e.DistinctID); len(r) > maxDistinctIDLen {
+		e.DistinctID = string(r[:maxDistinctIDLen])
+	}
+	return ""
 }
 
 // BatchCapture handles POST /batch. Requires a project key on the envelope or
@@ -169,19 +190,9 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range req.Batch {
-		req.Batch[i].DistinctID = distinctIDOf(req.Batch[i])
-		if req.Batch[i].Event == "" {
-			ingestText(w, http.StatusBadRequest, msgNoEventName)
+		if msg := validateIngestEvent(&req.Batch[i]); msg != "" {
+			ingestText(w, http.StatusBadRequest, msg)
 			return
-		}
-		if req.Batch[i].DistinctID == "" {
-			ingestText(w, http.StatusBadRequest, msgNoDistinctID)
-			return
-		}
-		// A distinct_id over 200 characters is cut to 200 and the event is
-		// still ingested (ph-ee-002, hypothesis from the docs, not observed).
-		if r := []rune(req.Batch[i].DistinctID); len(r) > maxDistinctIDLen {
-			req.Batch[i].DistinctID = string(r[:maxDistinctIDLen])
 		}
 	}
 
