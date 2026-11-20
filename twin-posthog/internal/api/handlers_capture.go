@@ -89,7 +89,8 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	if captureKey == "" {
 		captureKey = formKey
 	}
-	if resolveAPIKey(r, captureKey, req.Properties) == "" {
+	token := resolveAPIKey(r, captureKey, req.Properties)
+	if token == "" {
 		noKeyError(w)
 		return
 	}
@@ -102,7 +103,7 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.storeEvent(req)
+	h.storeEvent(req, token)
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
 		"status": 1,
@@ -129,30 +130,25 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PostHog reads a batch's project key from the envelope or from the first
-	// event, so gate on that union — otherwise a batch carrying per-event keys
-	// would 401. The events themselves are stored without a key: this twin has
-	// no project registry, so the key is an admission check only.
+	// PostHog reads a batch's project key once, from the envelope or else from
+	// the first event that carries one, and files the whole batch under that
+	// project. Resolve it the same way and store it on every event, so a later
+	// event's own api_key or $token never splits the batch across projects.
 	envelopeKey := req.APIKey
 	if envelopeKey == "" {
 		envelopeKey = formKey
 	}
-	keyed := resolveAPIKey(r, envelopeKey, nil) != ""
-	// A batch's key may ride on any event rather than the envelope. Ask the same
-	// question per event so an api_key and a $token can never be paired across
-	// two different events.
-	// Only the event's own sources here — the header and query param were
-	// already settled by the envelope check and cannot change per iteration.
-	for i := 0; !keyed && i < len(req.Batch); i++ {
-		keyed = eventKey(req.Batch[i]) != ""
+	token := resolveAPIKey(r, envelopeKey, nil)
+	for i := 0; token == "" && i < len(req.Batch); i++ {
+		token = eventKey(req.Batch[i])
 	}
-	if !keyed {
+	if token == "" {
 		noKeyError(w)
 		return
 	}
 
 	for _, event := range req.Batch {
-		h.storeEvent(event)
+		h.storeEvent(event, token)
 	}
 
 	twincore.JSON(w, http.StatusOK, map[string]any{
@@ -229,7 +225,7 @@ func (h *Handler) Decide(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeEvent saves a captured event to the store and processes special event types.
-func (h *Handler) storeEvent(req captureRequest) {
+func (h *Handler) storeEvent(req captureRequest, token string) {
 	now := h.store.Clock.Now()
 
 	ts := req.Timestamp
@@ -239,12 +235,14 @@ func (h *Handler) storeEvent(req captureRequest) {
 
 	id := h.store.Events.NextID()
 
-	evt := store.CapturedEvent{
+	evt := store.StoredEvent{
 		UUID:       id,
 		Event:      req.Event,
 		DistinctID: req.DistinctID,
 		Properties: req.Properties,
 		Timestamp:  ts,
+		Token:      token,
+		ReceivedAt: now.Format(time.RFC3339),
 	}
 
 	h.store.Events.Set(id, evt)
@@ -385,7 +383,7 @@ func (h *Handler) AdminListEvents(w http.ResponseWriter, r *http.Request) {
 	events := h.store.Events.List()
 
 	if eventFilter != "" || distinctIDFilter != "" {
-		var filtered []store.CapturedEvent
+		var filtered []store.StoredEvent
 		for _, evt := range events {
 			if eventFilter != "" && evt.Event != eventFilter {
 				continue
