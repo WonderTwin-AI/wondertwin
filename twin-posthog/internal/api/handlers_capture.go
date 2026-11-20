@@ -70,18 +70,16 @@ func eventKey(e captureRequest) string {
 func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	body, formKey, err := readCaptureBody(r)
 	if err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"status": 0,
-			"error":  "Invalid request body: " + err.Error(),
-		})
+		ingestBodyError(w, err)
+		return
+	}
+	if ingestEmptyBody(body) {
+		ingestText(w, http.StatusBadRequest, msgNoPayload)
 		return
 	}
 	var req captureRequest
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&req); err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"status": 0,
-			"error":  "Invalid request body: " + err.Error(),
-		})
+		ingestText(w, http.StatusBadRequest, msgParsePrefix+err.Error())
 		return
 	}
 
@@ -91,23 +89,18 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	token := resolveAPIKey(r, captureKey, req.Properties)
 	if token == "" {
-		noKeyError(w)
+		ingestText(w, http.StatusUnauthorized, msgNoAPIKey)
 		return
 	}
 
 	if req.Event == "" {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"status": 0,
-			"error":  "event field is required",
-		})
+		ingestText(w, http.StatusBadRequest, msgNoEventName)
 		return
 	}
 
 	h.storeEvent(req, token)
 
-	twincore.JSON(w, http.StatusOK, map[string]any{
-		"status": 1,
-	})
+	ingestOK(w)
 }
 
 // BatchCapture handles POST /batch. Requires a project key on the envelope or
@@ -115,18 +108,16 @@ func (h *Handler) CaptureEvent(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 	body, formKey, err := readCaptureBody(r)
 	if err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"status": 0,
-			"error":  "Invalid request body: " + err.Error(),
-		})
+		ingestBodyError(w, err)
+		return
+	}
+	if ingestEmptyBody(body) {
+		ingestText(w, http.StatusBadRequest, msgNoPayload)
 		return
 	}
 	var req batchRequest
 	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&req); err != nil {
-		twincore.JSON(w, http.StatusBadRequest, map[string]any{
-			"status": 0,
-			"error":  "Invalid request body: " + err.Error(),
-		})
+		ingestText(w, http.StatusBadRequest, msgParsePrefix+err.Error())
 		return
 	}
 
@@ -143,7 +134,7 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		token = eventKey(req.Batch[i])
 	}
 	if token == "" {
-		noKeyError(w)
+		ingestText(w, http.StatusUnauthorized, msgNoAPIKey)
 		return
 	}
 
@@ -151,9 +142,7 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		h.storeEvent(event, token)
 	}
 
-	twincore.JSON(w, http.StatusOK, map[string]any{
-		"status": 1,
-	})
+	ingestOK(w)
 }
 
 // Decide handles POST /decide/?v=3 (feature flag evaluation).

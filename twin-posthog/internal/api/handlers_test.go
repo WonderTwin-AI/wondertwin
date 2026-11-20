@@ -43,8 +43,8 @@ func TestCaptureEvent(t *testing.T) {
 	resp.AssertStatus(200)
 
 	m := resp.JSONMap()
-	if m["status"] != float64(1) {
-		t.Errorf("expected status=1, got %v", m["status"])
+	if m["status"] != "Ok" {
+		t.Errorf("expected status=Ok, got %v", m["status"])
 	}
 
 	// Verify event was stored via admin
@@ -72,7 +72,7 @@ func TestCaptureEventMissingEvent(t *testing.T) {
 		"distinct_id": "user_123",
 	})
 	resp.AssertStatus(400)
-	resp.AssertBodyContains("event field is required")
+	resp.AssertBodyContains("non-engage request missing event name attribute")
 }
 
 func TestBatchCapture(t *testing.T) {
@@ -88,8 +88,8 @@ func TestBatchCapture(t *testing.T) {
 	})
 	resp.AssertStatus(200)
 	m := resp.JSONMap()
-	if m["status"] != float64(1) {
-		t.Errorf("expected status=1, got %v", m["status"])
+	if m["status"] != "Ok" {
+		t.Errorf("expected status=Ok, got %v", m["status"])
 	}
 
 	// Verify all events stored
@@ -538,27 +538,33 @@ func TestAdminListGroups(t *testing.T) {
 // --- Project-key enforcement ---
 
 // TestIngestRequiresProjectKey covers the ingest endpoints that PostHog gates
-// on a project key. Real PostHog answers a missing key with 401
-// authentication_error / invalid_api_key; this twin accepts any non-empty key,
-// having no project registry to validate against.
+// on a project key. The capture routes answer 401 with the capture service's
+// text body (ph-br-004); /decide and /flags answer the JSON authentication
+// error. This twin accepts any non-empty key, having no project registry to
+// validate against.
 func TestIngestRequiresProjectKey(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		path string
 		body map[string]any
+		text bool
 	}{
-		{"capture", "/capture", map[string]any{"event": "page_view", "distinct_id": "u1"}},
-		{"e", "/e", map[string]any{"event": "page_view", "distinct_id": "u1"}},
+		{"capture", "/capture", map[string]any{"event": "page_view", "distinct_id": "u1"}, true},
+		{"e", "/e", map[string]any{"event": "page_view", "distinct_id": "u1"}, true},
 		{"batch", "/batch", map[string]any{"batch": []any{
 			map[string]any{"event": "page_view", "distinct_id": "u1"},
-		}}},
-		{"decide", "/decide", map[string]any{"distinct_id": "u1"}},
-		{"flags", "/flags", map[string]any{"distinct_id": "u1"}},
+		}}, true},
+		{"decide", "/decide", map[string]any{"distinct_id": "u1"}, false},
+		{"flags", "/flags", map[string]any{"distinct_id": "u1"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, c := setupPostHog(t)
 			resp := c.Post(tc.path, tc.body)
 			resp.AssertStatus(401)
+			if tc.text {
+				resp.AssertBodyContains("event submitted without an api_key")
+				return
+			}
 
 			m := resp.JSONMap()
 			if m["type"] != "authentication_error" {

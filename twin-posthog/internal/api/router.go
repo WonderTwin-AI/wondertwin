@@ -24,7 +24,9 @@ func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
 func (h *Handler) Routes(r chi.Router) {
 	// PostHog ingest routes. /capture, /e, /batch, /decide and /flags require a
 	// non-empty project key — any of the sources resolveAPIKey checks — and
-	// answer noKeyError's 401 without one. Any key is accepted: this twin has no
+	// answer 401 without one: /capture, /e and /batch with the capture
+	// service's text/plain body (ingest_errors.go), /decide and /flags with
+	// noKeyError's JSON object. Any key is accepted: this twin has no
 	// project registry, so the check is admission only. local_evaluation is not
 	// gated here; real PostHog takes a personal API key for it.
 	r.Group(func(r chi.Router) {
