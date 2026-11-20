@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -518,5 +519,24 @@ func TestRequestLogLetsHandlersHijack(t *testing.T) {
 	}
 	if err := <-hijacked; err != nil {
 		t.Fatalf("hijack through RequestLog: %v", err)
+	}
+}
+
+func TestCORSAllowHeadersOverride(t *testing.T) {
+	mw := NewMiddleware(&Config{}, slog.Default())
+	h := mw.CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	preflight := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodOptions, "/x", nil))
+		return rec.Header().Get("Access-Control-Allow-Headers")
+	}
+
+	if got := preflight(); !strings.Contains(got, "Idempotency-Key") {
+		t.Errorf("default allow headers %q lack Idempotency-Key", got)
+	}
+	mw.CORSAllowHeaders = "X-Custom"
+	if got := preflight(); got != "X-Custom" {
+		t.Errorf("override allow headers = %q, want X-Custom", got)
 	}
 }

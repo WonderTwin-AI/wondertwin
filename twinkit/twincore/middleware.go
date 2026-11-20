@@ -187,7 +187,15 @@ type Middleware struct {
 	Idempotent    *IdempotencyTracker
 	RateLimiter   *RateLimiter
 	TokenRegistry *TokenRegistry
+
+	// CORSAllowHeaders replaces the default Access-Control-Allow-Headers list
+	// when set. A twin whose clients send vendor headers (posthog-js and the
+	// PostHog SDKs) sets it so a browser preflight for those headers passes.
+	CORSAllowHeaders string
 }
+
+// defaultCORSAllowHeaders is the preflight allow list when a twin sets none.
+const defaultCORSAllowHeaders = "Accept, Authorization, Content-Type, Idempotency-Key, Stripe-Account, X-Api-Key"
 
 // NewMiddleware creates a new Middleware instance.
 func NewMiddleware(cfg *Config, logger *slog.Logger) *Middleware {
@@ -207,7 +215,11 @@ func (m *Middleware) CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Idempotency-Key, Stripe-Account, X-Api-Key")
+		allow := m.CORSAllowHeaders
+		if allow == "" {
+			allow = defaultCORSAllowHeaders
+		}
+		w.Header().Set("Access-Control-Allow-Headers", allow)
 		w.Header().Set("Access-Control-Max-Age", "3600")
 
 		if r.Method == http.MethodOptions {
