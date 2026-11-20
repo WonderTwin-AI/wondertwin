@@ -271,6 +271,9 @@ func (h *Handler) storeEvent(req captureRequest, token string) {
 
 	id := h.store.Events.NextID()
 
+	// Fold a top-level $set (posthog-go) into a copy of properties.$set, so the
+	// stored event reads back the same as one sent by posthog-python or
+	// posthog-js. The request's own map is left untouched.
 	props := req.Properties
 	if len(req.Set) > 0 {
 		props = make(map[string]any, len(req.Properties)+1)
