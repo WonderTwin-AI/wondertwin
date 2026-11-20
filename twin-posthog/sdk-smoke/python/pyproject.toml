@@ -1,0 +1,15 @@
+[project]
+name = "twin-posthog-sdk-smoke-python"
+version = "0.0.0"
+description = "Runs the PostHog app emulator's capture flows through the official posthog-python SDK."
+requires-python = ">=3.10"
+dependencies = ["posthog==7.91.1", "requests"]
+
+[tool.uv]
+package = false
+exclude-newer = "7 days"
+# certifi is held to the newest release so a published CVE fix is never delayed by the 7 day window.
+# posthog 7.91.1 (2026-11-13) is the version the plan pins and was newer than the
+# 7 day window when this was written; the absolute cutoff admits that release and
+# nothing later.
+exclude-newer-package = { certifi = "0 days", posthog = "2026-11-14T00:00:00Z" }
