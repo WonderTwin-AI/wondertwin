@@ -271,11 +271,29 @@ func (h *Handler) storeEvent(req captureRequest, token string) {
 
 	id := h.store.Events.NextID()
 
+	props := req.Properties
+	if len(req.Set) > 0 {
+		props = make(map[string]any, len(req.Properties)+1)
+		for k, v := range req.Properties {
+			props[k] = v
+		}
+		set := make(map[string]any, len(req.Set))
+		if existing, ok := req.Properties["$set"].(map[string]any); ok {
+			for k, v := range existing {
+				set[k] = v
+			}
+		}
+		for k, v := range req.Set {
+			set[k] = v
+		}
+		props["$set"] = set
+	}
+
 	evt := store.StoredEvent{
 		UUID:       id,
 		Event:      req.Event,
 		DistinctID: req.DistinctID,
-		Properties: req.Properties,
+		Properties: props,
 		Timestamp:  ts,
 		Token:      token,
 		ReceivedAt: now.Format(time.RFC3339),

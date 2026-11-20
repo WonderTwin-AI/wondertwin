@@ -88,6 +88,26 @@ func TestBatchValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("top-level $set on identify is stored under properties.$set", func(t *testing.T) {
+		srv, tc := setupPostHog(t)
+		resp := post(srv.URL, `{"api_key":"phc_k","batch":[{"event":"$identify","distinct_id":"u7","properties":{"$set":{"name":"Ada"}},"$set":{"email":"u7@example.com"}}]}`)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("status %d, want 200", resp.StatusCode)
+		}
+		resp.Body.Close()
+		r := tc.Get("/admin/events?event=$identify")
+		r.AssertStatus(200)
+		evts := r.JSONMap()["events"].([]any)
+		if len(evts) != 1 {
+			t.Fatalf("%d events, want 1", len(evts))
+		}
+		props, _ := evts[0].(map[string]any)["properties"].(map[string]any)
+		set, _ := props["$set"].(map[string]any)
+		if set["email"] != "u7@example.com" || set["name"] != "Ada" {
+			t.Errorf("properties.$set = %v, want email and name merged", props["$set"])
+		}
+	})
+
 	t.Run("distinct_id inside properties is read", func(t *testing.T) {
 		srv, tc := setupPostHog(t)
 		resp := post(srv.URL, `{"api_key":"phc_k","batch":[{"event":"$create_alias","properties":{"distinct_id":"u8","alias":"u8-alias"}}]}`)
