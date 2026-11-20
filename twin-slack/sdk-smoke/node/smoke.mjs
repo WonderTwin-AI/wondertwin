@@ -1,5 +1,6 @@
 // SDK smoke suite: runs each MVP use case of the Slack app emulator through the
-// official @slack/web-api SDK against a running binary.
+// official @slack/web-api SDK, and Socket Mode through @slack/socket-mode,
+// against a running binary.
 //
 //   SLACK_EMULATOR_URL=http://localhost:4197 node smoke.mjs
 //

@@ -1,7 +1,7 @@
 {
   "name": "twin-slack-sdk-smoke-node",
   "private": true,
-  "description": "Runs the Slack app emulator's MVP use cases through the official @slack/web-api SDK.",
+  "description": "Runs the Slack app emulator's MVP use cases through the official @slack/web-api and @slack/socket-mode SDKs.",
   "type": "module",
   "scripts": {
     "smoke": "node smoke.mjs"

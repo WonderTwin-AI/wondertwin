@@ -4,7 +4,8 @@
 # Builds twin-slack, starts it the way lstk launches an app emulator
 # (--port=N, ready when GET /admin/health returns {"status":"ok"}), and runs
 # every covered MVP use case and error case through the official SDKs pinned in
-# node/package-lock.json (@slack/web-api) and python/uv.lock (slack-sdk).
+# node/package-lock.json (@slack/web-api and @slack/socket-mode) and
+# python/uv.lock (slack-sdk, whose builtin SocketModeClient drives Socket Mode).
 # Test-only: nothing here is part of the Go build.
 #
 #   twin-slack/sdk-smoke/run.sh             # build and run against a fresh binary
