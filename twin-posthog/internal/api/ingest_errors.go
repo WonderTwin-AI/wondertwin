@@ -35,8 +35,8 @@ func ingestOK(w http.ResponseWriter) {
 }
 
 // ingestBodyError maps a body read or decode failure to the capture service's
-// text answer: an empty body is "request missing data payload", an oversized
-// one keeps the size message, and anything else is a parse failure.
+// text answer: an oversized body keeps the size message, and anything else is
+// a parse failure. An empty body is caught separately by ingestEmptyBody.
 func ingestBodyError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errIngestBodyTooLarge):
