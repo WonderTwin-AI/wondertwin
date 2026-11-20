@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/wondertwin-ai/wondertwin/twin-slack/internal/store"
+	"github.com/wondertwin-ai/wondertwin/twinkit/twincore"
 )
 
 // Socket Mode, as apis/events-api/using-socket-mode.md describes it: the app
@@ -31,6 +34,17 @@ const (
 
 	// socketWriteTimeout bounds one frame written to an app that stopped reading.
 	socketWriteTimeout = 10 * time.Second
+
+	// maxSocketConnections is how many connections an app may hold open.
+	maxSocketConnections = 10
+
+	// retireTimeout is how long a connection sent refresh_requested stays open
+	// if the app opens no replacement. Slack warns about 10 seconds ahead.
+	retireTimeout = 10 * time.Second
+
+	// socketHost names the emulator in hello and disconnect debug_info, where
+	// Slack names its socket host.
+	socketHost = "applink-emulator"
 )
 
 // socketConn is one open Socket Mode connection.
@@ -41,6 +55,17 @@ type socketConn struct {
 	// done is cancelled when the connection closes, from either side.
 	ctx  context.Context
 	done context.CancelFunc
+	// retiring is set once the connection is sent refresh_requested.
+	retiring bool
+}
+
+// close closes the connection without waiting for the app's reply, which a
+// test harness may not read for a while.
+func (c *socketConn) close() {
+	go func() {
+		c.conn.Close(websocket.StatusNormalClosure, "")
+		c.done()
+	}()
 }
 
 // sockets holds the tickets apps.connections.open has issued and the
@@ -84,8 +109,78 @@ func (s *sockets) add(c *socketConn) int {
 	defer s.mu.Unlock()
 	s.opened++
 	c.seq = s.opened
+	// A replacement retires every connection sent refresh_requested, which
+	// the SDKs leave for the server to close.
+	for _, old := range s.conns {
+		if old.retiring {
+			delete(s.conns, old.id)
+			old.close()
+		}
+	}
 	s.conns[c.id] = c
 	return len(s.conns)
+}
+
+// full reports whether the app holds as many connections as Slack allows.
+// Retiring connections do not count, so a refresh_requested hand-off works
+// at the limit. Whether Slack counts them is undocumented; this is a labelled
+// guess (socket-007).
+func (s *sockets) full() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, c := range s.conns {
+		if !c.retiring {
+			n++
+		}
+	}
+	return n >= maxSocketConnections
+}
+
+// disconnect sends a disconnect message with reason to every open connection
+// and reports how many there were. After warning the connections stay open.
+// After refresh_requested each stays open until the app opens a replacement,
+// or retireTimeout passes. After link_disabled, or any other reason, each is
+// closed. Slack's close codes and timings are not documented (socket-006).
+func (s *sockets) disconnect(reason string) int {
+	s.mu.Lock()
+	conns := make([]*socketConn, 0, len(s.conns))
+	for _, c := range s.conns {
+		conns = append(conns, c)
+		switch reason {
+		case "warning":
+		case "refresh_requested":
+			c.retiring = true
+		default:
+			delete(s.conns, c.id)
+		}
+	}
+	s.mu.Unlock()
+	msg := map[string]any{"type": "disconnect", "reason": reason, "debug_info": map[string]any{"host": socketHost}}
+	for _, c := range conns {
+		c.send(msg)
+		switch reason {
+		case "warning":
+		case "refresh_requested":
+			time.AfterFunc(retireTimeout, func() { s.retire(c) })
+		default:
+			c.close()
+		}
+	}
+	return len(conns)
+}
+
+// retire closes a retiring connection the app has not replaced in time.
+func (s *sockets) retire(c *socketConn) {
+	s.mu.Lock()
+	_, open := s.conns[c.id]
+	if open {
+		delete(s.conns, c.id)
+	}
+	s.mu.Unlock()
+	if open {
+		c.close()
+	}
 }
 
 // newest is the connection opened last, or nil with none open. Slack says only
@@ -118,13 +213,8 @@ func (s *sockets) reset() {
 	s.tickets = map[string]bool{}
 	s.conns = map[string]*socketConn{}
 	s.mu.Unlock()
-	// A close waits for the app's reply, so the reset does not: a test
-	// harness often resets before it reads from the socket again.
 	for _, c := range conns {
-		go func() {
-			c.conn.Close(websocket.StatusNormalClosure, "")
-			c.done()
-		}()
+		c.close()
 	}
 }
 
@@ -141,6 +231,13 @@ func (h *Handler) AppsConnectionsOpen(w http.ResponseWriter, r *http.Request) {
 	}
 	if principal(r).Type != store.TokenApp {
 		slackError(w, "not_allowed_token_type")
+		return
+	}
+	// Slack allows ten connections and does not say how it refuses an
+	// eleventh (socket-007); the Python SDK's aiohttp client names
+	// too_many_websockets as the error it avoids.
+	if h.sockets.full() {
+		slackError(w, "too_many_websockets")
 		return
 	}
 	slackOK(w, map[string]any{"url": h.socketURL(r)})
@@ -224,7 +321,7 @@ func socketHello(appID string, numConnections int) map[string]any {
 		"num_connections": numConnections,
 		"connection_info": map[string]any{"app_id": appID},
 		"debug_info": map[string]any{
-			"host":                        "applink-emulator",
+			"host":                        socketHost,
 			"started":                     time.Now().UTC().Format("2006-01-02 15:04:05.000"),
 			"build_number":                1,
 			"approximate_connection_time": approximateConnectionTime,
@@ -250,6 +347,29 @@ func socketEnvelope(envelopeID string, body []byte) map[string]any {
 func envelopeID() string {
 	h := randomHex(16)
 	return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
+}
+
+// AdminSocketDisconnect handles POST /admin/socket/disconnect, which sends a
+// disconnect message to every open connection, as Slack does before it
+// refreshes or drops them. reason is warning, refresh_requested (the default)
+// or link_disabled.
+func (h *Handler) AdminSocketDisconnect(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		twincore.Error(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	switch req.Reason {
+	case "":
+		req.Reason = "refresh_requested"
+	case "warning", "refresh_requested", "link_disabled":
+	default:
+		twincore.Error(w, http.StatusBadRequest, "reason must be warning, refresh_requested or link_disabled")
+		return
+	}
+	twincore.JSON(w, http.StatusOK, map[string]any{"reason": req.Reason, "connections": h.sockets.disconnect(req.Reason)})
 }
 
 func randomHex(n int) string {
