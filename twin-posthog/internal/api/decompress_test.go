@@ -65,8 +65,8 @@ func TestCaptureGzipJS(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 	m := readJSON(t, resp)
-	if m["status"] != float64(1) {
-		t.Errorf("expected status=1, got %v", m["status"])
+	if m["status"] != "Ok" {
+		t.Errorf("expected status=Ok, got %v", m["status"])
 	}
 
 	r := tc.Get("/admin/events?event=gzip_event")
