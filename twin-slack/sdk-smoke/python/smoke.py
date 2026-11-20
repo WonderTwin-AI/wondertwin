@@ -320,6 +320,74 @@ def case_error_invalid_auth():
     assert platform_error(lambda: bad.auth_test()) == "invalid_auth"
 
 
+def admin_post(path, body):
+    conn = HTTPConnection(urlsplit(BASE).netloc)
+    conn.request("POST", path, json.dumps(body), {"Content-Type": "application/json"})
+    resp = conn.getresponse()
+    data = resp.read()
+    conn.close()
+    assert resp.status == 200, f"{path} answered {resp.status}"
+    return json.loads(data)
+
+
+def admin_get(path):
+    conn = HTTPConnection(urlsplit(BASE).netloc)
+    conn.request("GET", path)
+    resp = conn.getresponse()
+    data = json.loads(resp.read())
+    conn.close()
+    return data
+
+
+def case_socket_mode():
+    # The builtin client the SDK documents first: it calls apps.connections.open
+    # through its WebClient, connects to the ws:// URL, and acks each envelope.
+    from slack_sdk.socket_mode import SocketModeClient
+    from slack_sdk.socket_mode.response import SocketModeResponse
+
+    channel = new_channel()
+    admin_post("/admin/webhooks/flush", {})
+    admin_post("/admin/events/config", {"socket_mode": True})
+    received = []
+    arrived = threading.Event()
+
+    def listener(sm_client, req):
+        if req.type == "events_api":
+            sm_client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
+            received.append(req)
+            arrived.set()
+
+    sm = SocketModeClient(app_token="xapp-1-A_SIM-1-smoke-python", web_client=WebClient(base_url=f"{BASE}/api/"))
+    sm.socket_mode_request_listeners.append(listener)
+    try:
+        sm.connect()
+        # The builtin client returns once the upgrade completes, which can be
+        # just before the app emulator registers the connection; an event
+        # raised in between is dropped, so post until one arrives.
+        for _ in range(20):
+            posted = client.chat_postMessage(channel=channel, text="over socket mode")
+            if arrived.wait(0.25):
+                break
+        assert received, "an events_api envelope arrives"
+        req = received[0]
+        assert req.retry_attempt == 0
+        assert req.payload["type"] == "event_callback"
+        assert req.payload["event"]["type"] == "message"
+        assert req.payload["event"]["text"] == "over socket mode"
+        acked = False
+        for _ in range(100):
+            log = admin_get("/admin/events/deliveries")["deliveries"]
+            if any(d.get("envelope_id") == req.envelope_id and d.get("acked") for d in log):
+                acked = True
+                break
+            time.sleep(0.025)
+        assert acked, "the app emulator logs the ack"
+        assert posted["ok"] is True
+    finally:
+        sm.close()
+        admin_post("/admin/events/config", {"socket_mode": False})
+
+
 CASES = {
     "slack-bot-post-and-thread": case_post_and_thread,
     "slack-read-history-paginated": case_read_history_paginated,
@@ -329,6 +397,7 @@ CASES = {
     "slack-dm-user": case_dm_user,
     "slack-react-pin-bookmark": case_react_pin_bookmark,
     "slack-events-http-receive": case_events_http_receive,
+    "slack-socket-mode": case_socket_mode,
     "slack-message-lifecycle": case_message_lifecycle,
     "error-unknown-method": case_error_unknown_method,
     "error-channel-not-found": case_error_channel_not_found,
