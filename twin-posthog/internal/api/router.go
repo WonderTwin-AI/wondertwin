@@ -15,8 +15,17 @@ type Handler struct {
 	mw    *twincore.Middleware
 }
 
+// corsAllowHeaders is the preflight allow list for the headers posthog-js and
+// the PostHog SDKs send: the project key header the ingest routes read, the
+// body-encoding header, and the four PostHog-* headers capture v1 uses. The
+// list comes from the SDK sources (INFERENCE); the vendor's own preflight
+// answer was not captured (divergences.json states this at closure).
+const corsAllowHeaders = "Accept, Authorization, Content-Type, Content-Encoding, " +
+	"X-PostHog-Api-Key, PostHog-Sdk-Info, PostHog-Attempt, PostHog-Request-Id, PostHog-Request-Timestamp"
+
 // NewHandler creates a new API handler.
 func NewHandler(s *store.MemoryStore, mw *twincore.Middleware) *Handler {
+	mw.CORSAllowHeaders = corsAllowHeaders
 	return &Handler{store: s, mw: mw}
 }
 
