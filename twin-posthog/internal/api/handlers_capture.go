@@ -130,33 +130,24 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PostHog reads a batch's project key from the envelope or from the first
-	// event, so gate on that union — otherwise a batch carrying per-event keys
-	// would 401. The events themselves are stored without a key: this twin has
-	// no project registry, so the key is an admission check only.
+	// PostHog reads a batch's project key once, from the envelope or else from
+	// the first event that carries one, and files the whole batch under that
+	// project. Resolve it the same way and store it on every event, so a later
+	// event's own api_key or $token never splits the batch across projects.
 	envelopeKey := req.APIKey
 	if envelopeKey == "" {
 		envelopeKey = formKey
 	}
-	keyed := resolveAPIKey(r, envelopeKey, nil) != ""
-	// A batch's key may ride on any event rather than the envelope. Ask the same
-	// question per event so an api_key and a $token can never be paired across
-	// two different events.
-	// Only the event's own sources here — the header and query param were
-	// already settled by the envelope check and cannot change per iteration.
-	for i := 0; !keyed && i < len(req.Batch); i++ {
-		keyed = eventKey(req.Batch[i]) != ""
+	token := resolveAPIKey(r, envelopeKey, nil)
+	for i := 0; token == "" && i < len(req.Batch); i++ {
+		token = eventKey(req.Batch[i])
 	}
-	if !keyed {
+	if token == "" {
 		noKeyError(w)
 		return
 	}
 
 	for _, event := range req.Batch {
-		token := eventKey(event)
-		if token == "" {
-			token = resolveAPIKey(r, envelopeKey, nil)
-		}
 		h.storeEvent(event, token)
 	}
 

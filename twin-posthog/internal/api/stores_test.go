@@ -75,3 +75,52 @@ func TestStoresResetState(t *testing.T) {
 		}
 	})
 }
+
+// TestBatchTokenResolvedOncePerBatch holds that a batch is filed under one
+// project key: the envelope key when present, else the first event's key.
+func TestBatchTokenResolvedOncePerBatch(t *testing.T) {
+	cases := []struct {
+		name  string
+		body  map[string]any
+		token string
+	}{
+		{
+			name: "envelope key wins over an event's own $token",
+			body: map[string]any{
+				"api_key": "phc_A",
+				"batch": []map[string]any{
+					{"event": "x", "distinct_id": "u1", "properties": map[string]any{"$token": "phc_B"}},
+					{"event": "y", "distinct_id": "u1"},
+				},
+			},
+			token: "phc_A",
+		},
+		{
+			name: "without an envelope key the first event's key covers the batch",
+			body: map[string]any{
+				"batch": []map[string]any{
+					{"event": "x", "distinct_id": "u1"},
+					{"event": "y", "distinct_id": "u1", "properties": map[string]any{"$token": "phc_first"}},
+					{"event": "z", "distinct_id": "u1", "api_key": "phc_later"},
+				},
+			},
+			token: "phc_first",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, tc := setupPostHog(t)
+			tc.Post("/batch", c.body).AssertStatus(200)
+			events, _ := tc.Get("/admin/state").JSONMap()["events"].(map[string]any)
+			want := len(c.body["batch"].([]map[string]any))
+			if len(events) != want {
+				t.Fatalf("stored %d events, want %d", len(events), want)
+			}
+			for id, raw := range events {
+				if got := raw.(map[string]any)["token"]; got != c.token {
+					t.Errorf("event %s: token = %v, want %s", id, got, c.token)
+				}
+			}
+		})
+	}
+}
