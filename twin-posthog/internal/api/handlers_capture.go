@@ -17,6 +17,10 @@ type captureRequest struct {
 	DistinctID string         `json:"distinct_id"`
 	Properties map[string]any `json:"properties,omitempty"`
 	Timestamp  string         `json:"timestamp,omitempty"`
+	// Set carries person properties posthog-go sends beside properties, as the
+	// event's own $set, instead of inside properties.$set as posthog-python and
+	// posthog-js do.
+	Set map[string]any `json:"$set,omitempty"`
 }
 
 // batchRequest represents a PostHog batch capture request body.
@@ -48,6 +52,23 @@ func resolveAPIKey(r *http.Request, bodyKey string, props map[string]any) string
 	if props != nil {
 		if token, ok := props["$token"].(string); ok && token != "" {
 			return token
+		}
+	}
+	return ""
+}
+
+// distinctIDOf returns an event's distinct id: its own field, else the
+// distinct_id or $distinct_id inside properties. posthog-go sends an alias
+// event with the id only in properties, and posthog-js repeats it there. That
+// the vendor reads it from properties is INFERENCE from the SDK payloads; it
+// was not observed.
+func distinctIDOf(e captureRequest) string {
+	if e.DistinctID != "" {
+		return e.DistinctID
+	}
+	for _, k := range []string{"distinct_id", "$distinct_id"} {
+		if v, ok := e.Properties[k].(string); ok && v != "" {
+			return v
 		}
 	}
 	return ""
@@ -138,6 +159,32 @@ func (h *Handler) BatchCapture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate the whole batch before storing any of it: the capture service
+	// answers one status for the request, so a rejected event rejects the
+	// batch. An empty batch is 400 (ph-br-004, observed); a missing event name
+	// or distinct_id is 400 as on the single-event route (ph-ee-014, observed
+	// there; /batch/ itself was not probed for these two, ph-ee-001).
+	if len(req.Batch) == 0 {
+		ingestText(w, http.StatusBadRequest, msgEmptyBatch)
+		return
+	}
+	for i := range req.Batch {
+		req.Batch[i].DistinctID = distinctIDOf(req.Batch[i])
+		if req.Batch[i].Event == "" {
+			ingestText(w, http.StatusBadRequest, msgNoEventName)
+			return
+		}
+		if req.Batch[i].DistinctID == "" {
+			ingestText(w, http.StatusBadRequest, msgNoDistinctID)
+			return
+		}
+		// A distinct_id over 200 characters is cut to 200 and the event is
+		// still ingested (ph-ee-002, hypothesis from the docs, not observed).
+		if r := []rune(req.Batch[i].DistinctID); len(r) > maxDistinctIDLen {
+			req.Batch[i].DistinctID = string(r[:maxDistinctIDLen])
+		}
+	}
+
 	for _, event := range req.Batch {
 		h.storeEvent(event, token)
 	}
@@ -224,11 +271,32 @@ func (h *Handler) storeEvent(req captureRequest, token string) {
 
 	id := h.store.Events.NextID()
 
+	// Fold a top-level $set (posthog-go) into a copy of properties.$set, so the
+	// stored event reads back the same as one sent by posthog-python or
+	// posthog-js. The request's own map is left untouched.
+	props := req.Properties
+	if len(req.Set) > 0 {
+		props = make(map[string]any, len(req.Properties)+1)
+		for k, v := range req.Properties {
+			props[k] = v
+		}
+		set := make(map[string]any, len(req.Set))
+		if existing, ok := req.Properties["$set"].(map[string]any); ok {
+			for k, v := range existing {
+				set[k] = v
+			}
+		}
+		for k, v := range req.Set {
+			set[k] = v
+		}
+		props["$set"] = set
+	}
+
 	evt := store.StoredEvent{
 		UUID:       id,
 		Event:      req.Event,
 		DistinctID: req.DistinctID,
-		Properties: req.Properties,
+		Properties: props,
 		Timestamp:  ts,
 		Token:      token,
 		ReceivedAt: now.Format(time.RFC3339),
@@ -251,13 +319,16 @@ func (h *Handler) storeEvent(req captureRequest, token string) {
 func (h *Handler) processIdentify(req captureRequest, ts string) {
 	props := make(map[string]any)
 
-	// Merge $set properties
+	// Merge $set properties, from properties.$set and from the event's own $set.
 	if req.Properties != nil {
 		if setProps, ok := req.Properties["$set"].(map[string]any); ok {
 			for k, v := range setProps {
 				props[k] = v
 			}
 		}
+	}
+	for k, v := range req.Set {
+		props[k] = v
 	}
 
 	// Check if person already exists and merge
