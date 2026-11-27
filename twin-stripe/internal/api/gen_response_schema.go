@@ -6,9 +6,10 @@
 //
 // It reads the pinned dahlia GA spec, which is not in this repository. Restore
 // it from the research corpus (wondertwin-docs research/twins/stripe,
-// reference openapi-v1-2026-08-26.dahlia) and run:
+// reference openapi-latest-2026-08-26.dahlia, the spec provenance.json pins)
+// and run:
 //
-//	go run gen_response_schema.go -spec /path/to/stripe-v1-2026-08-26.dahlia.json
+//	go run gen_response_schema.go -spec /path/to/stripe-latest-2026-08-26.dahlia.json
 package main
 
 import (
@@ -46,7 +47,7 @@ var includable = map[string][]string{
 	"customer": {"cash_balance", "invoice_credit_balance", "sources", "subscriptions", "tax", "tax_ids"},
 }
 
-const specID = "openapi-v1-2026-08-26.dahlia"
+const specID = "openapi-latest-2026-08-26.dahlia"
 
 type schema struct {
 	Ref                  string             `json:"$ref"`

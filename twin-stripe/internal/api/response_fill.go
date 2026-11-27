@@ -33,9 +33,12 @@ type responseProp struct {
 // one. The Go types use omitempty throughout, so this is done once on the
 // encoded response rather than per type.
 //
+// A null the handler wrote for a non-nullable array, and a list's null data,
+// become [], since Stripe returns an empty array there and never null.
+//
 // Objects are found by their "object" value, and embedded sub-objects (such
 // as a customer's invoice_settings) by the property that holds them. Deleted
-// objects and lists are left as they are; list items are filled.
+// objects are left as they are; list items are filled.
 func fillResponse(v any) {
 	fillValue(v, "")
 }
@@ -56,6 +59,12 @@ func fillObject(m map[string]any, schema string) {
 		if deleted, _ := m["deleted"].(bool); deleted {
 			return
 		}
+		if obj == "list" {
+			// A list's data is never null, even when it holds nothing.
+			if d, present := m["data"]; present && d == nil {
+				m["data"] = []any{}
+			}
+		}
 		if s, ok := objectSchemas[obj]; ok {
 			schema = s
 		}
@@ -74,7 +83,11 @@ func fillObject(m map[string]any, schema string) {
 	known := make(map[string]string, len(props))
 	for _, p := range props {
 		known[p.name] = p.nested
-		if _, present := m[p.name]; present {
+		if v, present := m[p.name]; present {
+			// Stripe never returns null for a non-nullable array.
+			if v == nil && p.fill == fillEmptyArray {
+				m[p.name] = []any{}
+			}
 			continue
 		}
 		switch p.fill {

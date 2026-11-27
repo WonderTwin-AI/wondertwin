@@ -21,3 +21,14 @@ func (inv Invoice) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(alias(inv))
 }
+
+// MarshalJSON renders an invoice's lines with data as an empty array rather
+// than null when the invoice has no lines. Webhook deliveries are encoded from
+// the store type without the response fill, so this is where they get it.
+func (l InvoiceLines) MarshalJSON() ([]byte, error) {
+	type alias InvoiceLines
+	if l.Data == nil {
+		l.Data = []InvoiceLine{}
+	}
+	return json.Marshal(alias(l))
+}
