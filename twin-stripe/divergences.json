@@ -64,7 +64,7 @@
     {
       "route": "response objects, properties the handlers do not set",
       "stripe": "Returns every documented property, including non-nullable scalars such as a subscription's currency and start_date and an invoice's attempted",
-      "app_emulator": "Fills unset nullable fields with null, string maps with {}, non-nullable arrays with [] and customer invoice_settings; omits the non-nullable scalars and customer includable fields the handlers do not set",
+      "app_emulator": "Fills unset nullable fields with null, string maps with {}, non-nullable arrays with [] and customer invoice_settings, from the pinned latest/openapi.spec3.json schemas; returns [] for a non-nullable array or a list's data even when a handler wrote null; omits the non-nullable scalars and customer includable fields the handlers do not set",
       "reason": "Their values are not modelled, and inventing them would be a guess"
     },
     {
