@@ -15,7 +15,7 @@ const (
 	fillNone        = iota // no unset value; left as the handler wrote it
 	fillNull               // nullable: returned as null
 	fillEmptyMap           // a string map such as metadata: returned as {}
-	fillEmptyArray         // a non-nullable array: returned as []
+	fillEmptyArray         // a non-nullable array: returned as [], also when the handler wrote null
 	fillEmptyObject        // an embedded sub-object whose every field fills
 )
 
